@@ -3,9 +3,9 @@ package file
 
 import (
 	"fmt"
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/utils/log"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/app/log"
 )
 
 const (

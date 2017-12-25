@@ -6,7 +6,7 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/Palantir/palantir/web/server"
+	"github.com/yaptide/app/web/server"
 )
 
 // HandleSimulation define simulation routes.

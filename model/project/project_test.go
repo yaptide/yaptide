@@ -5,7 +5,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/Palantir/palantir/model/test"
+	"github.com/yaptide/app/test"
 )
 
 var testCases = test.MarshallingCases{

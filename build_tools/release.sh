@@ -18,7 +18,7 @@ cp -R $PROJECT_ROOT/static $PROJECT_ROOT/release/static
 
 # backend deploy
 cd $PROJECT_ROOT && go install -v
-cp `which palantir` $PROJECT_ROOT/release/bin
+cp `which yaptide` $PROJECT_ROOT/release/bin
 
 # copy runtime tools
 cp $PROJECT_ROOT/build_tools/release_run.sh $PROJECT_ROOT/release/run.sh

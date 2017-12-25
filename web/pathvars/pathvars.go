@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Palantir/palantir/model/project"
+	"github.com/yaptide/app/model/project"
 	"github.com/gorilla/mux"
 	"gopkg.in/mgo.v2/bson"
 )

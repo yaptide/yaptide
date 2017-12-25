@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/web"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/web"
 )
 
 func main() {

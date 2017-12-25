@@ -3,8 +3,8 @@ package setup
 import (
 	"net/http"
 
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
 )
 
 type getSetupHandler struct {

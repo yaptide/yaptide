@@ -3,7 +3,7 @@ package db
 import (
 	"encoding/json"
 
-	"github.com/Palantir/palantir/model/simulation/setup"
+	"github.com/yaptide/converter/setup"
 	"gopkg.in/mgo.v2/bson"
 )
 

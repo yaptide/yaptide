@@ -1,9 +1,9 @@
 package processor
 
 import (
-	"github.com/Palantir/palantir/db"
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/model/simulation/setup"
+	"github.com/yaptide/app/db"
+	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/converter/setup"
 )
 
 type request interface {

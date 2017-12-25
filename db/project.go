@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/model/simulation/result"
-	"github.com/Palantir/palantir/model/simulation/setup"
+	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/converter/result"
+	"github.com/yaptide/converter/setup"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )

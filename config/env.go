@@ -7,7 +7,7 @@ import (
 func readEnv() {
 	isProd := os.Getenv("PROD") != ""
 	isDev := os.Getenv("DEV") != ""
-	env := os.Getenv("PALANTIR_ENV")
+	env := os.Getenv("YAPTIDE_ENV")
 	if isProd || env == "PROD" {
 		PRODEnv = true
 	} else if isDev || env == "DEV" {

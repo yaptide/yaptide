@@ -6,9 +6,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Palantir/palantir/db"
-	"github.com/Palantir/palantir/web/auth/token"
-	"github.com/Palantir/palantir/web/pathvars"
+	"github.com/yaptide/app/db"
+	"github.com/yaptide/app/web/auth/token"
+	"github.com/yaptide/app/web/pathvars"
 )
 
 // DecodeJSONRequest decode json payload from request to result.

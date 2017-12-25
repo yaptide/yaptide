@@ -6,11 +6,11 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/web/auth"
-	"github.com/Palantir/palantir/web/projects"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/simulation"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/web/auth"
+	"github.com/yaptide/app/web/projects"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/simulation"
 	"github.com/gorilla/handlers"
 	"github.com/gorilla/mux"
 )
@@ -38,7 +38,7 @@ func NewRouter(config *config.Config) http.Handler {
 	router.Handle("/configuration", &getConfigurationHandler{Context: context, Config: config}).
 		Methods(http.MethodGet)
 
-	router.PathPrefix("/").Handler(http.FileServer(http.Dir(config.StaticDirectory)))
+	//router.PathPrefix("/").Handler(http.FileServer(http.Dir(config.StaticDirectory)))
 
 	return handlers.CORS(
 		handlers.AllowedHeaders([]string{"content-type", "x-auth-token"}),

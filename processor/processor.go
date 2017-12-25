@@ -4,11 +4,11 @@ package processor
 import (
 	"fmt"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/db"
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/runner/file"
-	"github.com/Palantir/palantir/utils/log"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/db"
+	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/app/runner/file"
+	"github.com/yaptide/app/log"
 )
 
 // SimulationProcessor responsible for all steps of processing simulation.

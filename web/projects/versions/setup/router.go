@@ -5,7 +5,7 @@ package setup
 import (
 	"net/http"
 
-	"github.com/Palantir/palantir/web/server"
+	"github.com/yaptide/app/web/server"
 	"github.com/gorilla/mux"
 )
 

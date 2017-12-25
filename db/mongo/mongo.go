@@ -4,8 +4,8 @@ package mongo
 import (
 	"fmt"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/db"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/db"
 	"gopkg.in/mgo.v2"
 )
 

@@ -3,7 +3,7 @@ package request
 import (
 	"net/http"
 
-	"github.com/Palantir/palantir/db"
+	"github.com/yaptide/app/db"
 )
 
 // Context wraps object used in request handler.

@@ -3,11 +3,11 @@ package web
 import (
 	"net/http"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/model/simulation/setup/detector"
-	"github.com/Palantir/palantir/model/simulation/setup/material"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
+	"github.com/yaptide/converter/setup/detector"
+	"github.com/yaptide/converter/setup/material"
 )
 
 type getConfigurationHandler struct {

@@ -3,9 +3,9 @@ package projects
 import (
 	"log"
 
-	"github.com/Palantir/palantir/web/auth/token"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/web/auth/token"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
 	//"github.com/gorilla/mux"
 
 	"net/http"

@@ -1,7 +1,7 @@
 {
   "port": "3101",
-  "dbName": "palantir-db-prod",
-  "dbUsername": "palantir",
+  "dbName": "yaptide-db-prod",
+  "dbUsername": "yaptide",
   "dbPassword": "password",
   "dbPort": "3105"
 }

@@ -4,12 +4,12 @@ package server
 import (
 	"crypto/rand"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/db"
-	"github.com/Palantir/palantir/db/mongo"
-	"github.com/Palantir/palantir/processor"
-	"github.com/Palantir/palantir/web/auth/token"
-	"github.com/Palantir/palantir/web/server/middleware"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/db"
+	"github.com/yaptide/app/db/mongo"
+	"github.com/yaptide/app/processor"
+	"github.com/yaptide/app/web/auth/token"
+	"github.com/yaptide/app/web/server/middleware"
 )
 
 // Context contains server structures passed to all subrouters

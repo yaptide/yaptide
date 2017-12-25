@@ -4,9 +4,9 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Palantir/palantir/web/auth/token"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/web/auth/token"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
 )
 
 type fetchAccountHandler struct {

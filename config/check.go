@@ -2,10 +2,7 @@ package config
 
 import (
 	"errors"
-	"fmt"
 	"net"
-	"os"
-	"path/filepath"
 	"strconv"
 )
 
@@ -14,7 +11,6 @@ type checkFunc func(conf *Config) error
 func checkConfig(conf *Config) error {
 	checkFuncs := []checkFunc{
 		checkPort,
-		checkStaticDirectory,
 	}
 
 	for _, checkFunc := range checkFuncs {
@@ -38,19 +34,4 @@ func checkPort(conf *Config) error {
 	}
 	closeErr := ln.Close()
 	return closeErr
-}
-
-func checkStaticDirectory(conf *Config) error {
-	static := conf.StaticDirectory
-	fileInfo, statErr := os.Stat(static)
-	if statErr != nil {
-		return statErr
-	}
-	if !fileInfo.IsDir() {
-		return fmt.Errorf("%s is not directory", static)
-	}
-
-	indexPath := filepath.Join(static, "index.html")
-	_, statErr = os.Stat(indexPath)
-	return statErr
 }

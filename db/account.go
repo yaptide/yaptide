@@ -1,7 +1,7 @@
 package db
 
 import (
-	"github.com/Palantir/palantir/model/auth"
+	"github.com/yaptide/app/model/auth"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )

@@ -19,15 +19,15 @@ elif [ "$1" = "client:deploy" ]; then
 elif [ "$1" = "client:run" ]; then
     cd $SCRIPT_PATH
     npm install
-    PALANTIR_BASE_URL=http://localhost:3000 npm start
+    YAPTIDE_BASE_URL=http://localhost:3000 npm start
 elif [ "$1" = "server:run" ]; then
     cd $SCRIPT_PATH
-    echo "{\"port\": \"3000\", \"dbName\": \"palantir-db-dev\", \"dbUsername\": \"palantir-db-dev\", \"dbPassword\": \"password\", \"dbPort\": \"3005\"}" > $SCRIPT_PATH/conf.json
+    echo "{\"port\": \"3000\", \"dbName\": \"yaptide-db-dev\", \"dbUsername\": \"yaptide-db-dev\", \"dbPassword\": \"password\", \"dbPort\": \"3005\"}" > $SCRIPT_PATH/conf.json
     startDB "dev" "3005"
     DEV=true go run main.go
 elif [ "$1" = "server:run:dev" ]; then
     # go get github.com/codegangsta/gin
-    echo "{\"port\": \"3001\", \"dbName\": \"palantir-db-dev\", \"dbUsername\": \"palantir-db-dev\", \"dbPassword\": \"password\", \"dbPort\": \"3005\"}" > $SCRIPT_PATH/conf.json
+    echo "{\"port\": \"3001\", \"dbName\": \"yaptide-db-dev\", \"dbUsername\": \"yaptide-db-dev\", \"dbPassword\": \"password\", \"dbPort\": \"3005\"}" > $SCRIPT_PATH/conf.json
     cd $SCRIPT_PATH
     startDB "dev" "3005"
     DEV=true gin
@@ -45,19 +45,19 @@ elif [ "$1" = "check" ]; then
     npm run check
 elif [ "$1" = "docker:run" ]; then
     cd $SCRIPT_PATH
-    echo "{\"port\": \"3301\", \"dbName\": \"palantir-db-docker\", \"dbUsername\": \"palantir-db-docker\", \"dbPassword\": \"password\", \"dbPort\": \"27017\". \"dbHost\": \"172.17.1.1\"}" > $SCRIPT_PATH/conf.json
+    echo "{\"port\": \"3301\", \"dbName\": \"yaptide-db-docker\", \"dbUsername\": \"yaptide-db-docker\", \"dbPassword\": \"password\", \"dbPort\": \"27017\". \"dbHost\": \"172.17.1.1\"}" > $SCRIPT_PATH/conf.json
     startDB "docker" "27017"
-    docker build --force-rm --tag palantir $SCRIPT_PATH
-    docker run --tty --interactive --rm -p 3301:3301 --name=palantir palantir:latest
+    docker build --force-rm --tag yaptide $SCRIPT_PATH
+    docker run --tty --interactive --rm -p 3301:3301 --name=yaptide yaptide:latest
 elif [ "$1" = "prod:run" ]; then
-    echo "{\"port\": \"3101\", \"dbName\": \"palantir-db-prod\", \"dbUsername\": \"palantir-db-prod\", \"dbPassword\": \"password\", \"dbPort\": \"3105\"}" > $SCRIPT_PATH/conf.json
+    echo "{\"port\": \"3101\", \"dbName\": \"yaptide-db-prod\", \"dbUsername\": \"yaptide-db-prod\", \"dbPassword\": \"password\", \"dbPort\": \"3105\"}" > $SCRIPT_PATH/conf.json
     cd $SCRIPT_PATH
     startDB "prod" "3105"
-    PALANTIR_BASE_URL=http://localhost:3101 ./run.sh client:deploy
+    YAPTIDE_BASE_URL=http://localhost:3101 ./run.sh client:deploy
 
 
     go install -v
-    DEV=true palantir
+    DEV=true yaptide
 elif [ "$1" = "setup:go" ]; then
     cd $SCRIPT_PATH
     go get -u github.com/alecthomas/gometalinter

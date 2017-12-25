@@ -18,6 +18,6 @@ if [ "$1" = "docker" ]; then
     # copy Dockerfile to preserve context
     cp release_test_dockerfile $RELEASE_ROOT/Dockerfile
 
-	docker build --force-rm --tag palantir_release $RELEASE_ROOT 
-	docker run --tty --interactive --rm -p 3201:3201 --name=palantir palantir_release:latest
+	docker build --force-rm --tag yaptide_release $RELEASE_ROOT 
+	docker run --tty --interactive --rm -p 3201:3201 --name=yaptide yaptide_release:latest
 fi

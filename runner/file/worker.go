@@ -3,10 +3,10 @@ package file
 import (
 	"bytes"
 	"fmt"
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/utils/log"
 	"github.com/davecgh/go-spew/spew"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/log"
+	"github.com/yaptide/app/model/project"
 	"io/ioutil"
 	"os"
 	"os/exec"
@@ -61,13 +61,13 @@ func (w *worker) setupDirectory() error {
 	w.dirInPath = path.Join(
 		"/",
 		"tmp",
-		"palantir_tmp_simulation_files",
+		"yaptide_tmp_simulation_files",
 		fmt.Sprintf("sim_workdir_%s_in", timestamp),
 	)
 	w.dirOutPath = path.Join(
 		"/",
 		"tmp",
-		"palantir_tmp_simulation_files",
+		"yaptide_tmp_simulation_files",
 		fmt.Sprintf("sim_workdir_%s_out", timestamp),
 	)
 
@@ -133,9 +133,9 @@ func (w *worker) startWorker(release chan bool) {
 				log.Error("[Runner][Local] Unable to kill process. Reason: %s", killErr.Error())
 			}
 		}
-		log.Debug("[Runner][Local] LogStdOut %v", w.results.LogStdOut)
-		log.Debug("[Runner][Local] LogStdErr %v", w.results.LogStdErr)
-		log.Debug("[Runner][Local] Errors %v", w.results.Errors)
+		log.Debug("[Runner][Local] LogStdOut %100s", w.results.LogStdOut)
+		log.Debug("[Runner][Local] LogStdErr %100s", w.results.LogStdErr)
+		log.Debug("[Runner][Local] Errors %100s", w.results.Errors)
 		w.job.ResultCallback(w.results)
 		log.Debug("[Runner][Local] Defer finished")
 	}()

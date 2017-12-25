@@ -2,9 +2,9 @@
 
 function startDB {
     set +e
-    DB_NAME=palantir-db-$1
-    IS_RUNNING=`docker inspect -f {{.State.Running}} palantir-db-$1 > /dev/null 2>&1`
-    docker inspect palantir-db-${1} > /dev/null 2>&1
+    DB_NAME=yaptide-db-$1
+    IS_RUNNING=`docker inspect -f {{.State.Running}} yaptide-db-$1 > /dev/null 2>&1`
+    docker inspect yaptide-db-${1} > /dev/null 2>&1
     EXISTS=$?
     
     set -e

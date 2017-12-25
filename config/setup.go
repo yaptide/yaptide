@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/Palantir/palantir/utils/log"
+	"github.com/yaptide/app/log"
 	"os"
 	"path"
 	"path/filepath"

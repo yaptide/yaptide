@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/Palantir/palantir/config"
-	"github.com/Palantir/palantir/web/server/middleware"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/web/server/middleware"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
 	"gopkg.in/mgo.v2/bson"

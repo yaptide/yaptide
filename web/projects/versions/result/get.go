@@ -3,12 +3,12 @@ package result
 import (
 	"net/http"
 
-	"github.com/Palantir/palantir/db"
-	"github.com/Palantir/palantir/utils/log"
-	"github.com/Palantir/palantir/web/auth/token"
-	"github.com/Palantir/palantir/web/pathvars"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/db"
+	"github.com/yaptide/app/log"
+	"github.com/yaptide/app/web/auth/token"
+	"github.com/yaptide/app/web/pathvars"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
 )
 
 type getResultHandler struct {

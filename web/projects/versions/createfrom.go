@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
 )
 
 type createFromExistingVersionHandler struct {

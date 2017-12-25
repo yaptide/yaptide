@@ -7,9 +7,9 @@ import (
 
 	"github.com/gorilla/mux"
 
-	"github.com/Palantir/palantir/web/pathvars"
-	"github.com/Palantir/palantir/web/projects/versions"
-	"github.com/Palantir/palantir/web/server"
+	"github.com/yaptide/app/web/pathvars"
+	"github.com/yaptide/app/web/projects/versions"
+	"github.com/yaptide/app/web/server"
 )
 
 // HandleProject define project routes.

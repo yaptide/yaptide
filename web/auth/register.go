@@ -3,9 +3,9 @@ package auth
 import (
 	"net/http"
 
-	"github.com/Palantir/palantir/model/auth"
-	"github.com/Palantir/palantir/web/server"
-	"github.com/Palantir/palantir/web/util"
+	"github.com/yaptide/app/model/auth"
+	"github.com/yaptide/app/web/server"
+	"github.com/yaptide/app/web/util"
 )
 
 type registerHandler struct {

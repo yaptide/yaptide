@@ -3,7 +3,7 @@ package auth
 import (
 	"testing"
 
-	"github.com/Palantir/palantir/model/test"
+	"github.com/yaptide/app/test"
 
 	"gopkg.in/mgo.v2/bson"
 )

@@ -1,12 +1,12 @@
 package processor
 
 import (
-	"github.com/Palantir/palantir/converter/shield"
-	"github.com/Palantir/palantir/converter/shield/results"
-	"github.com/Palantir/palantir/converter/shield/setup/serialize"
-	"github.com/Palantir/palantir/model/project"
-	"github.com/Palantir/palantir/runner/file"
-	"github.com/Palantir/palantir/utils/log"
+	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/app/runner/file"
+	"github.com/yaptide/app/log"
+	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/results"
+	"github.com/yaptide/converter/shield/setup/serialize"
 )
 
 type localShieldRequest struct {
