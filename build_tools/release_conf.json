@@ -1,7 +1,0 @@
-{
-  "port": "3101",
-  "dbName": "yaptide-db-prod",
-  "dbUsername": "yaptide",
-  "dbPassword": "password",
-  "dbPort": "3105"
-}

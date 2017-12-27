@@ -6,12 +6,9 @@ node_modules
 *.swo
 
 *.log
-package-lock.json
 
 /conf.json
 gin-bin
 
 vendor/*
-!vendor/vendor.json
 
-yarn.lock

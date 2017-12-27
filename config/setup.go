@@ -3,8 +3,7 @@ package config
 import (
 	"github.com/yaptide/app/log"
 	"os"
-	"path"
-	"path/filepath"
+	"strconv"
 )
 
 // PRODEnv - current environment
@@ -21,29 +20,30 @@ func SetupConfig() *Config {
 
 	log.SetLoggerLevel(log.LevelWarning)
 
-	paramsMapping := map[string]configParam{
-		"port":       configParam{"int64", &conf.Port, "Port on which application is served"},
-		"dbHost":     configParam{"string", &conf.DbHost, "Database ip"},
-		"dbPort":     configParam{"int64", &conf.DbPort, "Database port"},
-		"dbName":     configParam{"string", &conf.DbName, "Database name"},
-		"dbUsername": configParam{"string", &conf.DbUsername, "Database username"},
-		"dbPassword": configParam{"string", &conf.DbPassword, "Database password"},
+	publicUrl := os.Getenv("YAPTIDE_BACKEND_PUBLIC_URL")
+	if publicUrl != "" {
+		conf.BackendPublicUrl = publicUrl
+	} else {
+		log.Warning("[config] Public url is not defined. Using default localhost:3002")
 	}
 
-	reader := &compositeReader{
-		readers: []reader{
-			createCmdReader(paramsMapping),
-			createFileReader("conf.json"),
-		},
+	port := os.Getenv("YAPTIDE_BACKEND_PORT")
+	if port != "" {
+		portNumber, numberErr := strconv.ParseInt(port, 10, 64)
+		if numberErr != nil {
+			log.Error("[config] Port is not a number. %s", numberErr.Error())
+		} else {
+			conf.BackendPort = portNumber
+		}
+	} else {
+		log.Warning("[config] Backend port is not defined. Using default 3002")
 	}
 
-	for key, param := range paramsMapping {
-		param.readConfigParam(key, reader)
-	}
-
-	err := checkConfig(conf)
-	if err != nil {
-		log.Error(err.Error())
+	dbUrl := os.Getenv("YAPTIDE_DB_URL")
+	if dbUrl != "" {
+		conf.DbUrl = dbUrl
+	} else {
+		log.Error("[config] Db url is not defined")
 		os.Exit(-1)
 	}
 
@@ -51,21 +51,9 @@ func SetupConfig() *Config {
 }
 
 func getDefaultConfig() *Config {
-	var static string
-	if PRODEnv {
-		dir, err := filepath.Abs(filepath.Dir(os.Args[0]))
-		if err != nil {
-			log.Error("Unable to find configuration file %s", err.Error())
-		}
-		static = path.Join(dir, "../static")
-	} else if DEVEnv {
-		static = "./static"
-	}
-
 	return &Config{
-		Port:            3001,
-		DbHost:          "localhost",
-		DbPort:          27018,
-		StaticDirectory: static,
+		BackendPublicUrl: "localhost:3002",
+		BackendPort:      3002,
+		DbUrl:            "",
 	}
 }

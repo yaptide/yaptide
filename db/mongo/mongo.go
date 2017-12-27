@@ -2,8 +2,6 @@
 package mongo
 
 import (
-	"fmt"
-
 	"github.com/yaptide/app/config"
 	"github.com/yaptide/app/db"
 	"gopkg.in/mgo.v2"
@@ -15,12 +13,11 @@ type collection struct {
 
 type database struct {
 	session *mgo.Session
-	dbName  *string
 }
 
 // C return Collection which implement db.Collection interface.
 func (d database) C(name string) db.Collection {
-	return collection{d.session.DB(*d.dbName).C(name)}
+	return collection{d.session.DB("").C(name)}
 }
 
 // session provide MongoDB session implementation of db.Session interface.
@@ -30,15 +27,14 @@ type session struct {
 
 // NewConnection establish new MongoDB connection based on config.Config.
 func NewConnection(conf *config.Config) (db.Session, error) {
-	dbURL := fmt.Sprintf("mongodb://%v:%v@%v:%d/%v",
-		conf.DbUsername, conf.DbPassword, conf.DbHost, conf.DbPort, conf.DbName)
+	dbURL := conf.DbUrl
 	mgoSession, err := mgo.Dial(dbURL)
 
 	if err != nil {
 		return nil, err
 	}
 
-	res := session{db: database{session: mgoSession, dbName: &conf.DbName}}
+	res := session{db: database{session: mgoSession}}
 	err = res.Configure()
 	if err != nil {
 		return nil, err

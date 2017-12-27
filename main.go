@@ -11,11 +11,11 @@ import (
 
 func main() {
 	conf := config.SetupConfig()
+	log.Printf("Config: %+v\n", *conf)
 	router := web.NewRouter(conf)
 
-	portString := ":" + strconv.FormatInt(conf.Port, 10)
+	portString := ":" + strconv.FormatInt(conf.BackendPort, 10)
 
-	log.Printf("Config: %+v\n", *conf)
 	log.Printf("Listening on %v\n", portString)
 	log.Fatal(http.ListenAndServe(portString, router))
 }
