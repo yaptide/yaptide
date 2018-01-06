@@ -185,11 +185,11 @@ func constructHandleDebugTags(tagStatName string) tagHandlerFunc {
 func handleResultDimensions(dtype bdoDataUnit, payload [][]byte, parser *bdoParser) error {
 	if dtype != "<i8" {
 		errStr := log.Warning("[handleMainDataBlockTag] Unexpected data type %s.", dtype)
-		return fmt.Errorf("dataType", "Unexpected data type in Shield result file", errStr)
+		return fmt.Errorf("Unexpected data type in Shield result file (%s)", errStr)
 	}
 	if len(payload) != 3 {
 		errStr := log.Warning("[handleMainDataBlockTag] Should be 3 dimesnions", dtype)
-		return fmt.Errorf("dataType", "Unexpected token length in Shield result file. Expected 3 dimensions.", errStr)
+		return fmt.Errorf("Unexpected token length in Shield result file. Expected 3 dimensions. (%s)", errStr)
 	}
 	parser.Results.Dimensions = result.Dimensions{}
 	var dim1, dim2, dim3 int64
@@ -213,7 +213,7 @@ func handleResultDimensions(dtype bdoDataUnit, payload [][]byte, parser *bdoPars
 func handleMainDataBlockTag(dtype bdoDataUnit, payload [][]byte, parser *bdoParser) error {
 	if dtype != "<f8" {
 		errStr := log.Error("[handleMainDataBlockTag] Unexpected data type %s.", dtype)
-		return fmt.Errorf("dataType", "Unexpected data type in SHIeld result file", errStr)
+		return fmt.Errorf("Unexpected data type in SHIeld result file (%s)", errStr)
 	}
 	expectedPayloadSize := parser.Results.Dimensions.SegmentsInDim1 *
 		parser.Results.Dimensions.SegmentsInDim2 *
@@ -221,7 +221,7 @@ func handleMainDataBlockTag(dtype bdoDataUnit, payload [][]byte, parser *bdoPars
 
 	if int64(len(payload)) != expectedPayloadSize {
 		errStr := log.Error("[handleMainDataBlockTag] To short token payload size.")
-		return fmt.Errorf("mainDataBlock", "To short token payload size.", errStr)
+		return fmt.Errorf("To short token payload size. (%s)", errStr)
 	}
 
 	parser.Results.Data = make([][][]float64, parser.Results.Dimensions.SegmentsInDim3)

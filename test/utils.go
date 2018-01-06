@@ -1,4 +1,4 @@
-// Package testing contains testing utils functions.
+// Package test contains testing utils functions.
 package test
 
 import (

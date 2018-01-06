@@ -1,13 +1,4 @@
-.git
-
-dist
-node_modules
-release
-
 *.swp
-npm-debug.log
+*.swo
 
-gin-bin
-
-vendor/*
-!vendor/vendor.json
+vendor
