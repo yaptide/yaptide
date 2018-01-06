@@ -27,8 +27,7 @@ type session struct {
 
 // NewConnection establish new MongoDB connection based on config.Config.
 func NewConnection(conf *config.Config) (db.Session, error) {
-	dbURL := conf.DbUrl
-	mgoSession, err := mgo.Dial(dbURL)
+	mgoSession, err := mgo.Dial(conf.DbURL)
 
 	if err != nil {
 		return nil, err

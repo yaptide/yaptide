@@ -12,6 +12,24 @@ var PRODEnv = false
 // DEVEnv - current environment
 var DEVEnv = false
 
+// Config contains basic server configuration
+type Config struct {
+	FrontendPublicURL string
+	BackendPort       int64
+	DbURL             string
+}
+
+func readEnv() {
+	env := os.Getenv("YAPTIDE_ENV")
+	if env == "PROD" {
+		PRODEnv = true
+	} else if env == "DEV" {
+		DEVEnv = true
+	} else {
+		PRODEnv = true
+	}
+}
+
 // SetupConfig read and check config from various sources
 // Close application, if any checkConfig err occurs
 func SetupConfig() *Config {
@@ -20,11 +38,11 @@ func SetupConfig() *Config {
 
 	log.SetLoggerLevel(log.LevelWarning)
 
-	publicUrl := os.Getenv("YAPTIDE_BACKEND_PUBLIC_URL")
-	if publicUrl != "" {
-		conf.BackendPublicUrl = publicUrl
+	frontendPublicURL := os.Getenv("YAPTIDE_FRONTEND_PUBLIC_URL")
+	if frontendPublicURL != "" {
+		conf.FrontendPublicURL = frontendPublicURL
 	} else {
-		log.Warning("[config] Public url is not defined. Using default localhost:3002")
+		log.Warning("[config] Public frontend url is not defined. Using default localhost:3001")
 	}
 
 	port := os.Getenv("YAPTIDE_BACKEND_PORT")
@@ -39,9 +57,9 @@ func SetupConfig() *Config {
 		log.Warning("[config] Backend port is not defined. Using default 3002")
 	}
 
-	dbUrl := os.Getenv("YAPTIDE_DB_URL")
-	if dbUrl != "" {
-		conf.DbUrl = dbUrl
+	dbURL := os.Getenv("YAPTIDE_DB_URL")
+	if dbURL != "" {
+		conf.DbURL = dbURL
 	} else {
 		log.Error("[config] Db url is not defined")
 		os.Exit(-1)
@@ -52,8 +70,8 @@ func SetupConfig() *Config {
 
 func getDefaultConfig() *Config {
 	return &Config{
-		BackendPublicUrl: "localhost:3002",
-		BackendPort:      3002,
-		DbUrl:            "",
+		FrontendPublicURL: "localhost:3001",
+		BackendPort:       3002,
+		DbURL:             "",
 	}
 }
