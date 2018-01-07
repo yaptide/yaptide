@@ -2,6 +2,7 @@ package builder
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"os/exec"
 )
@@ -23,4 +24,46 @@ func startDevFrontend(conf config) (*exec.Cmd, error) {
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_FRONTEND_PUBLIC_URL=%s", conf.frontendPublicUrl))
 
 	return cmd, cmd.Start()
+}
+
+func ensureNpm() error {
+	_, pathErr := exec.LookPath("npm")
+	if pathErr != nil {
+		log.Println("Install nvm")
+		cmd := exec.Command(
+			"bash",
+			"-c",
+			"curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.8/install.sh | bash",
+		)
+		runErr := cmd.Run()
+		if runErr != nil {
+			return runErr
+		}
+		log.Println("Download npm")
+		if err := exec.Command("nvm", "install", "8").Run(); err != nil {
+			return err
+		}
+		log.Println("Install npm")
+		if err := exec.Command("nvm", "use", "8").Run(); err != nil {
+			return err
+		}
+		return nil
+	}
+	return nil
+}
+
+func ensureNpmDeps(importPath string) error {
+	npmErr := ensureNpm()
+	if npmErr != nil {
+		return npmErr
+	}
+	cmd := exec.Command("bash", "-c", "npm", "install")
+	absolutePath, getPackageErr := getPackagePath(importPath)
+	if getPackageErr != nil {
+		return getPackageErr
+	}
+	cmd.Dir = absolutePath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	return cmd.Run()
 }

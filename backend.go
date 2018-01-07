@@ -42,18 +42,6 @@ func startDevBackend(conf config) (*exec.Cmd, error) {
 	return cmd, cmd.Start()
 }
 
-func ensureDeps(importPath string) error {
-	cmd := exec.Command("dep", "ensure")
-	absolutePath, getPackageErr := getPackagePath(importPath)
-	if getPackageErr != nil {
-		return getPackageErr
-	}
-	cmd.Dir = absolutePath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	return cmd.Run()
-}
-
 func startDevBackendConverter(conf config) (*exec.Cmd, error) {
 	modulePath, getPackageErr := getPackagePath(backendModule)
 	if getPackageErr != nil {
