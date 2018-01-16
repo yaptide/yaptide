@@ -3,15 +3,16 @@ package builder
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+	"time"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/network"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"time"
 )
 
 const backendModule = "github.com/yaptide/app"
@@ -39,6 +40,7 @@ func startDevBackend(conf config) (*exec.Cmd, error) {
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_FRONTEND_PUBLIC_URL=%s", conf.backendPublicUrl))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_BACKEND_PORT=%d", 15003))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_DB_URL=%s", conf.dbUrl()))
+	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_ENV=%s", "DEV"))
 	return cmd, cmd.Start()
 }
 

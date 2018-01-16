@@ -8,7 +8,7 @@
 non-root environment
 ```
     sudo apt-get -y update && \
-    sudo apt-get -y install wget sudo git && \
+    sudo apt-get -y install wget sudo git curl && \
     wget https://raw.githubusercontent.com/yaptide/builder/master/config/setup_env.sh && \
     source setup_env.sh
 ```
@@ -16,7 +16,7 @@ non-root environment
 root environment
 ```
     apt-get -y update && \
-    apt-get -y install wget sudo git && \
+    apt-get -y install wget sudo git curl && \
     wget https://raw.githubusercontent.com/yaptide/builder/master/config/setup_env.sh && \
     source setup_env.sh
 ```

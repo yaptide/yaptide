@@ -2,8 +2,7 @@ version: '3'
 services:
     backend:
         build:
-            context: ../..
-            dockerfile: builder/dockerfiles/app.Dockerfile
+            context: ../../app
         environment:
             YAPTIDE_BACKEND_PORT: "80"
             YAPTIDE_BACKEND_PUBLIC_URL: "backend:8001"
@@ -14,8 +13,7 @@ services:
             - mongo
     frontend:
         build:
-            context: ../..
-            dockerfile: builder/dockerfiles/ui.Dockerfile
+            context: ../../builder
             args:
                 YAPTIDE_FRONTEND_PORT: "80"
                 YAPTIDE_FRONTEND_PUBLIC_URL: "localhost:8002"

@@ -22,7 +22,7 @@ func startDevFrontend(conf config) (*exec.Cmd, error) {
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_BACKEND_PUBLIC_URL=%s", conf.backendPublicUrl))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_FRONTEND_PORT=%d", conf.frontendPort))
 	cmd.Env = append(cmd.Env, fmt.Sprintf("YAPTIDE_FRONTEND_PUBLIC_URL=%s", conf.frontendPublicUrl))
-
+	log.Print(cmd.Env)
 	return cmd, cmd.Start()
 }
 

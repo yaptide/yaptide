@@ -45,7 +45,7 @@ func Launch() {
 	case "converter:only":
 		runCmd(
 			localConfig,
-			startDevBackendOnly,
+			startDevBackendConverter,
 		)
 
 	case "client:dev":
@@ -55,6 +55,33 @@ func Launch() {
 		fmt.Println("not implemented")
 		fmt.Print(help)
 	case "converter:dev":
+		fmt.Println("not implemented")
+		fmt.Print(help)
+
+	case "deploy:backend:master":
+		deployFromRepo("backend", "https://github.com/yaptide/app.git", "master")
+		fmt.Println("not implemented")
+		fmt.Print(help)
+	case "deploy:backend:develop":
+		deployFromRepo("backend", "https://github.com/yaptide/app.git", "develop")
+		fmt.Println("not implemented")
+		fmt.Print(help)
+	case "deploy:backend:staging":
+		deployLocal("backend", backendModule)
+		fmt.Println("not implemented")
+		fmt.Print(help)
+
+	case "deploy:frontend:master":
+		deployFromRepo("frontend", "https://github.com/yaptide/ui.git", "master")
+
+		fmt.Println("not implemented")
+		fmt.Print(help)
+	case "deploy:frontend:develop":
+		deployFromRepo("frontend", "https://github.com/yaptide/ui.git", "develop")
+		fmt.Println("not implemented")
+		fmt.Print(help)
+	case "deploy:frontend:staging":
+		deployLocal("frontend", frontendModule)
 		fmt.Println("not implemented")
 		fmt.Print(help)
 
