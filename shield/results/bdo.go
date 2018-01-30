@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
-	"strings"
 
 	"github.com/yaptide/converter/log"
 	"github.com/yaptide/converter/result"
@@ -22,10 +21,9 @@ type bdoParser struct {
 }
 
 var (
-	shieldNameTag       = "xSH12A"
-	lilteEndianFormat   = "II"
-	bigEndianFormat     = "MM"
-	shield0p6VersionTag = "0.6" + strings.Repeat("\000", 13)
+	shieldNameTag     = "xSH12A"
+	lilteEndianFormat = "II"
+	bigEndianFormat   = "MM"
 )
 
 func newBdoParser(name string, filecontent []byte, context shield.SimulationContext) bdoParser {
@@ -85,9 +83,6 @@ func (p *bdoParser) validateShieldVersion() error {
 		p.endiness = binary.BigEndian
 	} else {
 		return fmt.Errorf("Unknown endinaess")
-	}
-	if string(p.content[8:24]) != shield0p6VersionTag {
-		return fmt.Errorf("Suported only version 0.6 of shield binnary")
 	}
 	p.metadata["version"] = "0.6"
 	p.content = p.content[24:]

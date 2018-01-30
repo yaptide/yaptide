@@ -73,6 +73,7 @@ const (
 	tagdetdifstart = 0xDD0E // det(7)
 	tagdetdifstop  = 0xDD0F // det(8)
 	tagdetvoxvol   = 0xDD10 // det(9)
+	tagdettreshold = 0xDD11 // low energy scoring treshold
 
 	tagMainDataBlock = 0xDDBB // data block
 
@@ -133,6 +134,7 @@ var tagsHandler = map[uint64]tagHandlerFunc{
 	tagdetdifstart:  constructHandleDebugTags("tagdetdifstart"),
 	tagdetdifstop:   constructHandleDebugTags("tagdetdifstop"),
 	tagdetvoxvol:    constructHandleDebugTags("tagdetvoxvol"),
+	tagdettreshold:  constructHandleDebugTags("tagdettreshold"),
 
 	// Main data block contain result of detector scoring
 	tagMainDataBlock: handleMainDataBlockTag,
