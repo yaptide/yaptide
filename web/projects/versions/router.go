@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/gorilla/mux"
 	"github.com/yaptide/app/web/pathvars"
 	"github.com/yaptide/app/web/projects/versions/result"
 	"github.com/yaptide/app/web/projects/versions/setup"
 	"github.com/yaptide/app/web/server"
-	"github.com/gorilla/mux"
 )
 
 // HandleVersions define versions routes.

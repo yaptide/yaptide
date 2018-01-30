@@ -60,7 +60,7 @@
     "shield/setup/serialize",
     "shield/setup/serialize/data"
   ]
-  revision = "cb742dd4f13bd7ba3405d54e9106b0ff9b0cb353"
+  revision = "4051b7cf9e8a4f439cb9fe39b6365bccdbf8308a"
 
 [[projects]]
   branch = "master"

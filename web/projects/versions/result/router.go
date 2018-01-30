@@ -5,8 +5,8 @@ package result
 import (
 	"net/http"
 
-	"github.com/yaptide/app/web/server"
 	"github.com/gorilla/mux"
+	"github.com/yaptide/app/web/server"
 )
 
 // HandleResult define simulation result routes.

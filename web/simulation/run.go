@@ -8,8 +8,8 @@ import (
 	"gopkg.in/mgo.v2/bson"
 
 	"github.com/yaptide/app/db"
-	"github.com/yaptide/app/model/project"
 	"github.com/yaptide/app/log"
+	"github.com/yaptide/app/model/project"
 	"github.com/yaptide/app/web/auth/token"
 	"github.com/yaptide/app/web/server"
 	"github.com/yaptide/app/web/util"

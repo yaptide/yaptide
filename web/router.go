@@ -6,13 +6,13 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/gorilla/handlers"
+	"github.com/gorilla/mux"
 	"github.com/yaptide/app/config"
 	"github.com/yaptide/app/web/auth"
 	"github.com/yaptide/app/web/projects"
 	"github.com/yaptide/app/web/server"
 	"github.com/yaptide/app/web/simulation"
-	"github.com/gorilla/handlers"
-	"github.com/gorilla/mux"
 )
 
 // NewRouter create main router, which define root routes.

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/yaptide/app/model/project"
 	"github.com/gorilla/mux"
+	"github.com/yaptide/app/model/project"
 	"gopkg.in/mgo.v2/bson"
 )
 

@@ -1,9 +1,9 @@
 package processor
 
 import (
+	"github.com/yaptide/app/log"
 	"github.com/yaptide/app/model/project"
 	"github.com/yaptide/app/runner/file"
-	"github.com/yaptide/app/log"
 	"github.com/yaptide/converter/shield"
 	"github.com/yaptide/converter/shield/results"
 	"github.com/yaptide/converter/shield/setup/serialize"

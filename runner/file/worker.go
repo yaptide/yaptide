@@ -3,16 +3,17 @@ package file
 import (
 	"bytes"
 	"fmt"
-	"github.com/davecgh/go-spew/spew"
-	"github.com/yaptide/app/config"
-	"github.com/yaptide/app/log"
-	"github.com/yaptide/app/model/project"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"path"
 	"strconv"
 	"time"
+
+	"github.com/davecgh/go-spew/spew"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/log"
+	"github.com/yaptide/app/model/project"
 )
 
 const (

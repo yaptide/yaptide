@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/yaptide/app/log"
 	"os"
 	"strconv"
+
+	"github.com/yaptide/app/log"
 )
 
 // PRODEnv - current environment

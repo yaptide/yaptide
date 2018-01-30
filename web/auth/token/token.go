@@ -7,10 +7,10 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/yaptide/app/config"
-	"github.com/yaptide/app/web/server/middleware"
 	"github.com/dgrijalva/jwt-go"
 	"github.com/dgrijalva/jwt-go/request"
+	"github.com/yaptide/app/config"
+	"github.com/yaptide/app/web/server/middleware"
 	"gopkg.in/mgo.v2/bson"
 )
 
