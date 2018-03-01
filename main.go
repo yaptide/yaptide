@@ -1,21 +1,34 @@
 package main
 
 import (
-	"log"
+	"fmt"
 	"net/http"
-	"strconv"
+	"os"
 
-	"github.com/yaptide/app/config"
+	conf "github.com/yaptide/app/config"
 	"github.com/yaptide/app/web"
 )
 
+var log = conf.NamedLogger("main")
+
 func main() {
-	conf := config.SetupConfig()
-	log.Printf("Config: %+v\n", *conf)
-	router := web.NewRouter(conf)
+	config, configErr := conf.SetupConfig()
+	if configErr != nil {
+		log.Errorf("Config error [%s]", configErr.Error())
+		os.Exit(-1)
+	}
 
-	portString := ":" + strconv.FormatInt(conf.BackendPort, 10)
+	router, routerErr := web.NewRouter(config)
+	if routerErr != nil {
+		log.Errorf("Setup router error [%s]", configErr.Error())
+		os.Exit(-1)
+	}
 
-	log.Printf("Listening on %v\n", portString)
-	log.Fatal(http.ListenAndServe(portString, router))
+	portStr := fmt.Sprintf(":%d", config.BackendPort)
+	log.Infof("Serving content on port %d", config.BackendPort)
+	listenErr := http.ListenAndServe(portStr, router)
+	if listenErr != nil {
+		log.Errorf("Server crashed [%s]", listenErr.Error())
+		os.Exit(-1)
+	}
 }

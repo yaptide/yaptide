@@ -3,9 +3,9 @@ package config
 import (
 	"os"
 	"strconv"
-
-	"github.com/yaptide/app/log"
 )
+
+var log = NamedLogger("web")
 
 // PRODEnv - current environment
 var PRODEnv = false
@@ -33,11 +33,9 @@ func readEnv() {
 
 // SetupConfig read and check config from various sources
 // Close application, if any checkConfig err occurs
-func SetupConfig() *Config {
+func SetupConfig() (*Config, error) {
 	readEnv()
 	conf := getDefaultConfig()
-
-	log.SetLoggerLevel(log.LevelWarning)
 
 	frontendPublicURL := os.Getenv("YAPTIDE_FRONTEND_PUBLIC_URL")
 	if frontendPublicURL != "" {
@@ -66,7 +64,7 @@ func SetupConfig() *Config {
 		os.Exit(-1)
 	}
 
-	return conf
+	return conf, nil
 }
 
 func getDefaultConfig() *Config {
