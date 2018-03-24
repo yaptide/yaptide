@@ -12,8 +12,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	"github.com/yaptide/app/config"
-	"github.com/yaptide/app/log"
-	"github.com/yaptide/app/model/project"
+	"github.com/yaptide/app/model"
 )
 
 const (
@@ -21,36 +20,41 @@ const (
 )
 
 type worker struct {
+	cmdCreator          cmdCreator
 	cmd                 *exec.Cmd
 	cmdString           []string
 	dirInPath           string
 	dirOutPath          string
 	workerFinishChannel chan bool
-	job                 LocalSimulationInput
-	results             LocalSimulationResults
+	job                 FileSimulationInput
+	results             FileSimulationResults
 	outbuf              bytes.Buffer
 	errbuf              bytes.Buffer
 }
 
-func createWorker(config *config.Config, job LocalSimulationInput) (*worker, error) {
+func createWorker(
+	config *config.Config,
+	job FileSimulationInput,
+	cmdCreator cmdCreator,
+) (*worker, error) {
 	w := &worker{
 		job:                 job,
 		workerFinishChannel: make(chan bool),
-		results: LocalSimulationResults{
+		results: FileSimulationResults{
 			Errors: map[string]string{},
 			Files:  map[string]string{},
 		},
 	}
-	job.StatusUpdate(project.Running)
+	job.StatusUpdate(model.Running)
 	setupDirectoryErr := w.setupDirectory()
 	if setupDirectoryErr != nil {
-		job.StatusUpdate(project.Failure)
+		job.StatusUpdate(model.Failure)
 		return nil, setupDirectoryErr
 	}
 
 	setupExecutionErr := w.setupExecution()
 	if setupExecutionErr != nil {
-		job.StatusUpdate(project.Failure)
+		job.StatusUpdate(model.Failure)
 		return nil, setupExecutionErr
 	}
 
@@ -84,7 +88,7 @@ func (w *worker) setupDirectory() error {
 		return mkdirOutErr
 	}
 
-	for fileName, fileContent := range w.job.Files {
+	for fileName, fileContent := range w.job.Files() {
 		content := []byte(fileContent)
 		writeErr := ioutil.WriteFile(path.Join(w.dirInPath, fileName), content, os.ModePerm)
 		if writeErr != nil {
@@ -96,7 +100,7 @@ func (w *worker) setupDirectory() error {
 }
 
 func (w *worker) setupExecution() error {
-	w.cmdString = w.job.CmdCreator(w.dirInPath)
+	w.cmdString = w.cmdCreator(w.dirInPath)
 	binaryName := w.cmdString[0]
 	binaryArgs := w.cmdString[1:]
 
@@ -155,7 +159,7 @@ func (w *worker) startWorker(release chan bool) {
 				err.Error(),
 				spew.Sdump(""),
 			)
-			w.job.StatusUpdate(project.Failure)
+			w.job.StatusUpdate(model.Failure)
 			w.results.Errors["invalidReturnCode"] = err.Error()
 		}
 		log.Info("[Runner][Local] Process finished")

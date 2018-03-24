@@ -11,6 +11,13 @@ type Settings struct {
 	ComputingLibrary ComputingLibrary `json:"computingLibrary" bson:"computingLibrary"`
 }
 
+func (s Settings) IsValid() error {
+	if s.ComputingLibrary != ShieldLibrary || s.SimulationEngine != LocalMachine {
+		return fmt.Errorf("simultionEngin and ComputingLibrary need to be selected")
+	}
+	return nil
+}
+
 // ComputingLibrary library used for computing
 type ComputingLibrary int
 

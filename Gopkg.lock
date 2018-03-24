@@ -48,10 +48,9 @@
     "setup/zone",
     "shield",
     "shield/results",
-    "shield/setup/serialize",
-    "shield/setup/serialize/data"
+    "shield/setup"
   ]
-  revision = "4051b7cf9e8a4f439cb9fe39b6365bccdbf8308a"
+  revision = "9867d8657c20935c9d42c89519363b81d1cc66b0"
 
 [[projects]]
   branch = "master"
@@ -87,6 +86,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "78e61e3d92db4c75457520d3c00c61f2c7592813c95c6fff65f3637c224aae7f"
+  inputs-digest = "064776f1fe22d0ed72c75f6c2b33635e9ac20c5a9f36516d607274e0ad9b1dfb"
   solver-name = "gps-cdcl"
   solver-version = 1

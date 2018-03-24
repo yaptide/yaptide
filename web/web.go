@@ -7,6 +7,7 @@ import (
 	conf "github.com/yaptide/app/config"
 	"github.com/yaptide/app/model/action"
 	"github.com/yaptide/app/model/mongo"
+	"github.com/yaptide/app/simulation"
 )
 
 var log = conf.NamedLogger("web")
@@ -25,11 +26,13 @@ func NewRouter(config *conf.Config) (http.Handler, error) {
 		return nil, dbErr
 	}
 
+	resolver := &action.Resolver{
+		Config:        config,
+		GenerateToken: jwt.generate,
+	}
 	context := &handler{
-		Resolver: &action.Resolver{
-			Config:        config,
-			GenerateToken: jwt.generate,
-		},
+		Resolver:          resolver,
+		simulationHandler: simulation.NewHandler(resolver, dbCreatorFunc()),
 	}
 
 	router, setupRoutesErr := setupRoutes(

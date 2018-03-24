@@ -6,10 +6,12 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/yaptide/app/model/action"
+	"github.com/yaptide/app/simulation"
 )
 
 type handler struct {
 	*action.Resolver
+	simulationHandler *simulation.Handler
 }
 
 func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, error) {
@@ -42,14 +44,18 @@ func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, err
 	router.Route("/simulation/setup", func(router chi.Router) {
 		router.Use(jwt.middleware)
 
-		router.Get("/{setupId}", w(h.getProjectsHandler))
-		router.Put("/{setupId}", w(h.updateProjectHandler))
+		router.Get("/{setupId}", w(h.getSimulationSetup))
+		router.Put("/{setupId}", w(h.updateSimulationSetup))
 	})
 
 	router.Route("/simulation/results", func(router chi.Router) {
 		router.Use(jwt.middleware)
 
-		router.Get("/{resultId}", w(h.getProjectsHandler))
+		router.Get("/{resultId}", w(h.getSimulationResult))
 	})
+
+	router.Post("/simulation/run", w(h.runSimulationHandler))
+	router.Get("/server_configuration", w(h.getConfiguration))
+
 	return router, nil
 }

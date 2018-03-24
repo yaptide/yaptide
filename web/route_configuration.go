@@ -1,11 +1,13 @@
 package web
 
 import (
+	"context"
+
 	"github.com/yaptide/converter/setup/detector"
 	"github.com/yaptide/converter/setup/material"
 )
 
-func (h *handler) getConfiguration() (interface{}, error) {
+func (h *handler) getConfiguration(ctx context.Context) (interface{}, error) {
 	var response struct {
 		PredefinedMaterials []material.PredefinedMaterialRecord `json:"predefinedMaterials"`
 		Isotopes            []material.IsotopeRecord            `json:"isotopes"`

@@ -5,6 +5,7 @@ import (
 
 	"github.com/yaptide/app/model"
 	"github.com/yaptide/converter/setup"
+	"gopkg.in/mgo.v2/bson"
 )
 
 func (h *handler) getSimulationResult(
@@ -58,7 +59,13 @@ func (h *handler) updateSimulationSetup(
 	return setup, nil
 }
 
-func (h *handler) runSimulationHandler(ctx context.Context) (bool, error) {
-
-	return true, nil
+func (h *handler) runSimulationHandler(
+	args *struct {
+		ProjectID bson.ObjectId `json:"projectId"`
+		VersionID int           `json:"versionId"`
+	},
+	ctx context.Context,
+) error {
+	userID := extractUserId(ctx)
+	return h.simulationHandler.HandleSimulation(args.ProjectID, args.VersionID, userID)
 }

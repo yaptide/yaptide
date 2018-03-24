@@ -21,6 +21,8 @@ var (
 	ErrInvalidForm = fmt.Errorf("formerror")
 	// ErrInternalServerError Internal Server Error.
 	ErrInternalServerError = fmt.Errorf("internal")
+	// ErrNotImplemented
+	ErrNotImplemented = fmt.Errorf("notimplemented")
 )
 
 type FormError map[string]string

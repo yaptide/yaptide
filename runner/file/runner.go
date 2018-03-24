@@ -4,33 +4,36 @@ package file
 import (
 	"fmt"
 
-	"github.com/yaptide/app/config"
-	"github.com/yaptide/app/log"
-	"github.com/yaptide/app/model/project"
+	conf "github.com/yaptide/app/config"
+	"github.com/yaptide/app/model"
 )
+
+var log = conf.NamedLogger("file_runner")
 
 const (
 	maxNumberOfPendingJobs = 1000 // TODO: remove pending jobs limit
 )
 
+type cmdCreator = func(string) []string
+
 // Runner starts and supervises running of shield simulations.
 type Runner struct {
-	jobsChannel        chan LocalSimulationInput
+	jobsChannel        chan FileSimulationInput
 	workerReleased     chan bool
 	maxNumberOfWorkers int64
 	workers            map[*worker]bool
+	cmdCreator         func(workDir string) []string
 }
 
-// LocalSimulationInput localSimulationInput.
-type LocalSimulationInput struct {
-	Files          map[string]string
-	CmdCreator     func(workDir string) []string
-	ResultCallback func(LocalSimulationResults)
-	StatusUpdate   func(project.VersionStatus)
+// FileSimulationInput localSimulationInput.
+type FileSimulationInput interface {
+	Files() map[string]string
+	ResultCallback(FileSimulationResults)
+	StatusUpdate(model.VersionStatus)
 }
 
-// LocalSimulationResults localSimulationResults.
-type LocalSimulationResults struct {
+// FileSimulationResults localSimulationResults.
+type FileSimulationResults struct {
 	Files     map[string]string
 	LogStdOut string
 	LogStdErr string
@@ -38,12 +41,13 @@ type LocalSimulationResults struct {
 }
 
 // SetupRunner is RunnerSupervisor constructor.
-func SetupRunner(config *config.Config) *Runner {
+func SetupRunner(config *conf.Config, cmdCreator cmdCreator) *Runner {
 	runner := &Runner{
-		jobsChannel:        make(chan LocalSimulationInput, maxNumberOfPendingJobs),
+		jobsChannel:        make(chan FileSimulationInput, maxNumberOfPendingJobs),
 		workerReleased:     make(chan bool, maxNumberOfPendingJobs),
 		maxNumberOfWorkers: 2,
 		workers:            map[*worker]bool{},
+		cmdCreator:         cmdCreator,
 	}
 
 	for i := int64(0); i < runner.maxNumberOfWorkers; i++ {
@@ -54,26 +58,26 @@ func SetupRunner(config *config.Config) *Runner {
 	return runner
 }
 
-// StartSimulation starts local simulation using shield library.
-func (r *Runner) StartSimulation(simultion LocalSimulationInput) error {
+// SubmitSimulation starts local simulation using file configured library.
+func (r *Runner) SubmitSimulation(simultion FileSimulationInput) error {
 	// TODO: potentialy blocking
 	if len(r.jobsChannel) < maxNumberOfPendingJobs {
-		log.Debug("[Runner.Local.SHIELD] Add pending simulation")
+		log.Debug("Add pending simulation")
 		r.jobsChannel <- simultion //pending}
 		return nil
 	}
 	return fmt.Errorf("too much jobs pending")
 }
 
-func (r *Runner) listenForNewJobs(config *config.Config) {
+func (r *Runner) listenForNewJobs(config *conf.Config) {
 	for {
 		<-r.workerReleased
 		job := <-r.jobsChannel
-		newWorker, createErr := createWorker(config, job)
+		newWorker, createErr := createWorker(config, job, r.cmdCreator)
 		if createErr != nil {
 			continue
 		}
-		log.Debug("[Runner][Local][SHIELD] Start simulation")
+		log.Debug("Start simulation")
 		go newWorker.startWorker(r.workerReleased)
 	}
 }
