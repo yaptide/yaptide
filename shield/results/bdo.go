@@ -16,7 +16,7 @@ type bdoParser struct {
 	content  []byte
 	metadata map[string]string
 	endiness binary.ByteOrder
-	context  shield.SimulationContext
+	context  shield.SerializationContext
 	Results  result.DetectorResult
 }
 
@@ -26,7 +26,7 @@ var (
 	bigEndianFormat   = "MM"
 )
 
-func newBdoParser(name string, filecontent []byte, context shield.SimulationContext) bdoParser {
+func newBdoParser(name string, filecontent []byte, context shield.SerializationContext) bdoParser {
 	return bdoParser{
 		context:  context,
 		filename: name,
