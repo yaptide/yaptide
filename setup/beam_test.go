@@ -1,4 +1,4 @@
-package beam
+package setup
 
 import (
 	"testing"
@@ -85,18 +85,18 @@ var testCases = test.MarshallingCases{
 		}`},
 }
 
-func TestSetupMarshal(t *testing.T) {
+func TestBeamMarshal(t *testing.T) {
 	test.Marshal(t, testCases)
 }
 
-func TestSetupUnmarshal(t *testing.T) {
+func TestBeamUnmarshal(t *testing.T) {
 	test.Unmarshal(t, testCases)
 }
 
-func TestSetupUnmarshalMarshalled(t *testing.T) {
+func TestBeamUnmarshalMarshalled(t *testing.T) {
 	test.UnmarshalMarshalled(t, testCases)
 }
 
-func TestSetupMarshalUnmarshalled(t *testing.T) {
+func TestBeamMarshalUnmarshalled(t *testing.T) {
 	test.MarshalUnmarshalled(t, testCases)
 }

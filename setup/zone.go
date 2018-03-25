@@ -1,19 +1,10 @@
-// Package zone implement Zone model.
-package zone
-
-import (
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/material"
-)
-
-// ID is key type in Zone map.
-type ID int64
+package setup
 
 // RootID indicate that zone with the given number is a root.
 const RootID = 0
 
 // Zone is composed from list of bodies.
-// Every Zone have Base body. Zone 3D model is created by using an pseudo algorithm:
+// Every Zone have Base  Zone 3D model is created by using an pseudo algorithm:
 // 	currentResult := zone.Base
 // 	for _, construction := range(zone.Construction) {
 //		currentResult = construction.Type(currentResult, construction.Body)
@@ -37,7 +28,7 @@ type Zone struct {
 	ParentID ID `json:"parentId"`
 
 	Name         string       `json:"name"`
-	BaseID       body.ID      `json:"baseId"`
-	MaterialID   material.ID  `json:"materialId"`
+	BaseID       ID           `json:"baseId"`
+	MaterialID   ID           `json:"materialId"`
 	Construction []*Operation `json:"construction"`
 }

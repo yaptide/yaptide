@@ -1,10 +1,10 @@
-package detector
+package setup
 
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaptide/converter/common"
-	"github.com/yaptide/converter/setup/material"
 )
 
 // PredefinedScoring ...
@@ -12,8 +12,8 @@ type PredefinedScoring string
 
 // LetTypeScoring ...
 type LetTypeScoring struct {
-	Type     string      `json:"type"`
-	Material material.ID `json:"material"`
+	Type     string `json:"type"`
+	Material ID     `json:"material"`
 }
 
 // MarshalJSON json.Marshaller implementation.

@@ -1,4 +1,4 @@
-package material
+package setup
 
 import (
 	"encoding/json"

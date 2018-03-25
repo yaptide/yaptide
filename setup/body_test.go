@@ -1,4 +1,4 @@
-package body
+package setup
 
 import (
 	"encoding/json"
@@ -8,7 +8,7 @@ import (
 	test "github.com/yaptide/converter/test"
 )
 
-var testCases = test.MarshallingCases{
+var bodyTestCasses = test.MarshallingCases{
 	{
 		&Body{ID: ID(1), Name: "name", Geometry: Sphere{}},
 		`{
@@ -83,19 +83,19 @@ var testCases = test.MarshallingCases{
 }
 
 func TestBodyMarshal(t *testing.T) {
-	test.Marshal(t, testCases)
+	test.Marshal(t, bodyTestCasses)
 }
 
 func TestBodyUnmarshal(t *testing.T) {
-	test.Unmarshal(t, testCases)
+	test.Unmarshal(t, bodyTestCasses)
 }
 
 func TestBodyUnmarshalMarshalled(t *testing.T) {
-	test.UnmarshalMarshalled(t, testCases)
+	test.UnmarshalMarshalled(t, bodyTestCasses)
 }
 
 func TestBodyMarshalUnmarshalled(t *testing.T) {
-	test.MarshalUnmarshalled(t, testCases)
+	test.MarshalUnmarshalled(t, bodyTestCasses)
 }
 
 func TestBadGeometryTypeUnmarshalling(t *testing.T) {

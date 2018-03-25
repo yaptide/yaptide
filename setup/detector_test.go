@@ -1,4 +1,4 @@
-package detector
+package setup
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	test "github.com/yaptide/converter/test"
 )
 
-var testCases = test.MarshallingCases{
+var detectorTestCasses = test.MarshallingCases{
 	{
 		&Detector{
 			ID:   ID(1),
@@ -94,18 +94,18 @@ var testCases = test.MarshallingCases{
 	},
 }
 
-func TestSetupMarshal(t *testing.T) {
-	test.Marshal(t, testCases)
+func TestDetectorMarshal(t *testing.T) {
+	test.Marshal(t, detectorTestCasses)
 }
 
-func TestSetupUnmarshal(t *testing.T) {
-	test.Unmarshal(t, testCases)
+func TestDetectorUnmarshal(t *testing.T) {
+	test.Unmarshal(t, detectorTestCasses)
 }
 
-func TestSetupUnmarshalMarshalled(t *testing.T) {
-	test.UnmarshalMarshalled(t, testCases)
+func TestDetectorUnmarshalMarshalled(t *testing.T) {
+	test.UnmarshalMarshalled(t, detectorTestCasses)
 }
 
-func TestSetupMarshalUnmarshalled(t *testing.T) {
-	test.MarshalUnmarshalled(t, testCases)
+func TestDetectorMarshalUnmarshalled(t *testing.T) {
+	test.MarshalUnmarshalled(t, detectorTestCasses)
 }

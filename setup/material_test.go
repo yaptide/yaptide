@@ -1,4 +1,4 @@
-package material
+package setup
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	test "github.com/yaptide/converter/test"
 )
 
-var testCases = test.MarshallingCases{
+var materialTestCasses = test.MarshallingCases{
 	{
 		&Material{ID(1), color.New(0xFF, 0x00, 0x00, 0xFF), Predefined{PredefinedID: "methanol"}},
 		`{
@@ -125,18 +125,18 @@ var testCases = test.MarshallingCases{
 	},
 }
 
-func TestSetupMarshal(t *testing.T) {
-	test.Marshal(t, testCases)
+func TestMaterialMarshal(t *testing.T) {
+	test.Marshal(t, materialTestCasses)
 }
 
-func TestSetupUnmarshal(t *testing.T) {
-	test.Unmarshal(t, testCases)
+func TestMaterialUnmarshal(t *testing.T) {
+	test.Unmarshal(t, materialTestCasses)
 }
 
-func TestSetupUnmarshalMarshalled(t *testing.T) {
-	test.UnmarshalMarshalled(t, testCases)
+func TestMaterialUnmarshalMarshalled(t *testing.T) {
+	test.UnmarshalMarshalled(t, materialTestCasses)
 }
 
-func TestSetupMarshalUnmarshalled(t *testing.T) {
-	test.MarshalUnmarshalled(t, testCases)
+func TestMaterialMarshalUnmarshalled(t *testing.T) {
+	test.MarshalUnmarshalled(t, materialTestCasses)
 }

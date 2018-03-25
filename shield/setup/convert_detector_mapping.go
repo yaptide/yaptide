@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/yaptide/converter/common"
-	"github.com/yaptide/converter/setup/detector"
+	"github.com/yaptide/converter/setup"
 )
 
 // MapParticleToShieldParticleID map Particle to shield format.
@@ -49,15 +49,15 @@ var predefinedParticleToShieldMapping = map[common.PredefinedParticle]int64{
 	"he_4":             24,
 }
 
-func mapScoringToShield(scoringType detector.ScoringType) (string, error) {
+func mapScoringToShield(scoringType setup.ScoringType) (string, error) {
 	switch scoring := scoringType.(type) {
-	case detector.PredefinedScoring:
+	case setup.PredefinedScoring:
 		name, found := scoringToShield[string(scoring)]
 		if !found {
 			return "", fmt.Errorf("Unsuported scoring type %s", scoring)
 		}
 		return name, nil
-	case detector.LetTypeScoring:
+	case setup.LetTypeScoring:
 		name, found := scoringToShield[scoring.Type]
 		if !found {
 			return "", fmt.Errorf("Unsuported scoring type %s", scoring.Type)

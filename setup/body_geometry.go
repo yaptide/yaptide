@@ -1,4 +1,4 @@
-package body
+package setup
 
 import (
 	"encoding/json"

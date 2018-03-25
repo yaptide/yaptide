@@ -2,7 +2,6 @@ package setup
 
 import (
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/material"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -13,7 +12,7 @@ type Geometry struct {
 	ZoneToMaterialPairs []ZoneToMaterial
 }
 
-func convertSetupGeometry(bodyMap setup.BodyMap, zoneMap setup.ZoneMap, materialIDToShield map[material.ID]shield.MaterialID, simContext *shield.SerializationContext) (Geometry, error) {
+func convertSetupGeometry(bodyMap setup.BodyMap, zoneMap setup.ZoneMap, materialIDToShield map[setup.ID]shield.MaterialID, simContext *shield.SerializationContext) (Geometry, error) {
 	bodies, bodyIDToShield, err := convertSetupBodies(bodyMap, simContext)
 	if err != nil {
 		return Geometry{}, err

@@ -1,4 +1,4 @@
-package detector
+package setup
 
 import (
 	"encoding/json"
@@ -7,16 +7,13 @@ import (
 	"github.com/yaptide/converter/common"
 )
 
-// ID is a key type in detector map.
-type ID int64
-
 // Detector describes where and what values are scored during simulation.
 type Detector struct {
-	ID               ID              `json:"id"`
-	Name             string          `json:"name"`
-	DetectorGeometry Geometry        `json:"detectorGeometry"`
-	ScoredParticle   common.Particle `json:"particle"`
-	ScoringType      ScoringType     `json:"scoring"`
+	ID               ID               `json:"id"`
+	Name             string           `json:"name"`
+	DetectorGeometry DetectorGeometry `json:"detectorGeometry"`
+	ScoredParticle   common.Particle  `json:"particle"`
+	ScoringType      ScoringType      `json:"scoring"`
 }
 
 // UnmarshalJSON custom Unmarshal function.
@@ -75,7 +72,7 @@ func unmarshalDetectorGeometry(b json.RawMessage) (Geometry, error) {
 		}
 		return geomap, nil
 	case zoneScoringDetector:
-		zone := Zone{}
+		zone := Zones{}
 		err = json.Unmarshal(b, &zone)
 		if err != nil {
 			return nil, err
@@ -110,7 +107,7 @@ func unmarshalDetectorGeometry(b json.RawMessage) (Geometry, error) {
 // Geometry is interface for detector type.
 // It must implement json.Marshaler to marshal detector Type
 // dependant on detector Type implementation type.
-type Geometry interface {
+type DetectorGeometry interface {
 	json.Marshaler
 }
 

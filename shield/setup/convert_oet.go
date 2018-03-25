@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/yaptide/converter/setup/zone"
+	"github.com/yaptide/converter/setup"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -149,11 +149,11 @@ func oetFromZoneDescription(baseBodyID shield.BodyID, operations []operation) *o
 		var operator oetOperator
 		var sign Sign
 		switch o.Type {
-		case zone.Intersect:
+		case setup.Intersect:
 			operator, sign = intersection, Plus
-		case zone.Union:
+		case setup.Union:
 			operator, sign = union, Plus
-		case zone.Subtract:
+		case setup.Subtract:
 			operator, sign = intersection, Minus
 		}
 

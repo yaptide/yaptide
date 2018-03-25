@@ -1,9 +1,9 @@
-// Package options implement simulation parametrization options.
-package options
+package setup
 
 import (
 	"encoding/json"
 	"fmt"
+
 	"github.com/yaptide/converter/common"
 )
 
@@ -43,7 +43,7 @@ type SimulationOptions struct {
 }
 
 // Default ...
-var Default = SimulationOptions{
+var DefaultOptions = SimulationOptions{
 	AntyparticleCorrectionOn:   false,
 	NuclearReactionsOn:         true,
 	MeanEnergyLoss:             1,

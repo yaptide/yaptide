@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/yaptide/converter/setup/material"
+	"github.com/yaptide/converter/setup"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -21,11 +21,11 @@ const (
 	stateLiquid     StateOfMatter = 2
 )
 
-var setupStateOfMatterToShield = map[material.StateOfMatter]StateOfMatter{
-	material.NonDefined: stateNonDefined,
-	material.Solid:      stateSolid,
-	material.Gas:        stateGas,
-	material.Liquid:     stateLiquid,
+var setupStateOfMatterToShield = map[setup.StateOfMatter]StateOfMatter{
+	setup.NonDefined: stateNonDefined,
+	setup.Solid:      stateSolid,
+	setup.Gas:        stateGas,
+	setup.Liquid:     stateLiquid,
 }
 
 // BlackholeMaterialID represent Blackhole material in shield input files.

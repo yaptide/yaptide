@@ -1,4 +1,4 @@
-package material
+package setup
 
 import (
 	"github.com/yaptide/converter/common/color"

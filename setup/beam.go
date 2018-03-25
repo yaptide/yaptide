@@ -1,8 +1,8 @@
-// Package beam implement beam model.
-package beam
+package setup
 
 import (
 	"encoding/json"
+
 	"github.com/yaptide/converter/common"
 )
 
@@ -28,7 +28,7 @@ type Beam struct {
 }
 
 // Default represents default beam configuration.
-var Default = Beam{
+var DefaultBeam = Beam{
 	Direction: Direction{
 		Phi: 0, Theta: 0, Position: common.Point{X: 0, Y: 0, Z: 0},
 	},

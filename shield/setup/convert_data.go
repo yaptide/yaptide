@@ -4,8 +4,6 @@ import (
 	"fmt"
 
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/beam"
-	"github.com/yaptide/converter/setup/options"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -19,11 +17,11 @@ type Data struct {
 
 	// Data needed for detect.dat file serialization.
 	Detectors []Detector
-	// Data needed for beam.dat file serialization.
-	Beam beam.Beam
+	// Data needed for setup.dat file serialization.
+	Beam setup.Beam
 
-	// Data needed for beam.dat file serialization.
-	Options options.SimulationOptions
+	// Data needed for setup.dat file serialization.
+	Options setup.SimulationOptions
 }
 
 // Convert simulation setup model to easily serializable data,

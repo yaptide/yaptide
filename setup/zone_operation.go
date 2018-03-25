@@ -1,10 +1,8 @@
-package zone
+package setup
 
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/yaptide/converter/setup/body"
 )
 
 // OperationType determines operation type.
@@ -34,13 +32,13 @@ var mapJSONToOperation = map[string]OperationType{
 
 // Operation determines construction of Zone.
 type Operation struct {
-	BodyID body.ID       `json:"bodyId"`
+	BodyID ID            `json:"bodyId"`
 	Type   OperationType `json:"-"`
 }
 
 type rawOperation struct {
-	BodyID body.ID `json:"bodyId"`
-	Type   string  `json:"type"`
+	BodyID ID     `json:"bodyId"`
+	Type   string `json:"type"`
 }
 
 // MarshalJSON custom Marshal function.

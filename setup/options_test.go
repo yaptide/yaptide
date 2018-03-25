@@ -1,4 +1,4 @@
-package options
+package setup
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 	test "github.com/yaptide/converter/test"
 )
 
-var testCases = test.MarshallingCases{
+var optionTestCasses = test.MarshallingCases{
 	{
 		&SimulationOptions{
 			AntyparticleCorrectionOn:   true,
@@ -34,18 +34,18 @@ var testCases = test.MarshallingCases{
 	},
 }
 
-func TestSetupMarshal(t *testing.T) {
-	test.Marshal(t, testCases)
+func TestOptionsMarshal(t *testing.T) {
+	test.Marshal(t, optionTestCasses)
 }
 
-func TestSetupUnmarshal(t *testing.T) {
-	test.Unmarshal(t, testCases)
+func TestOptionsUnmarshal(t *testing.T) {
+	test.Unmarshal(t, optionTestCasses)
 }
 
-func TestSetupUnmarshalMarshalled(t *testing.T) {
-	test.UnmarshalMarshalled(t, testCases)
+func TestOptionsUnmarshalMarshalled(t *testing.T) {
+	test.UnmarshalMarshalled(t, optionTestCasses)
 }
 
-func TestSetupMarshalUnmarshalled(t *testing.T) {
-	test.MarshalUnmarshalled(t, testCases)
+func TestOptionsMarshalUnmarshalled(t *testing.T) {
+	test.MarshalUnmarshalled(t, optionTestCasses)
 }

@@ -1,25 +1,26 @@
-package detector
+package setup
 
 import (
 	"encoding/json"
+
 	"github.com/yaptide/converter/common"
 )
 
-// Mesh detector.
-type Mesh struct {
+// Geomap detector used to debug geometry.
+type Geomap struct {
 	Center common.Point    `json:"center"`
 	Size   common.Vec3D    `json:"size"`
 	Slices common.Vec3DInt `json:"slices"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (m Mesh) MarshalJSON() ([]byte, error) {
-	type Alias Mesh
+func (g Geomap) MarshalJSON() ([]byte, error) {
+	type Alias Geomap
 	return json.Marshal(struct {
 		detectorType
 		Alias
 	}{
-		detectorType: meshScoringDetector,
-		Alias:        (Alias)(m),
+		detectorType: geomapDetector,
+		Alias:        (Alias)(g),
 	})
 }

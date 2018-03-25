@@ -1,24 +1,23 @@
-package zone
+package setup
 
 import (
 	"encoding/json"
 	"testing"
 
-	"github.com/yaptide/converter/setup/body"
 	test "github.com/yaptide/converter/test"
 )
 
 var opTestCases = test.MarshallingCases{
 	{
-		&Operation{BodyID: body.ID(1), Type: Intersect},
+		&Operation{BodyID: ID(1), Type: Intersect},
 		`{"bodyId":1,"type":"intersect"}`,
 	},
 	{
-		&Operation{BodyID: body.ID(1), Type: Subtract},
+		&Operation{BodyID: ID(1), Type: Subtract},
 		`{"bodyId":1,"type":"subtract"}`,
 	},
 	{
-		&Operation{BodyID: body.ID(1), Type: Union},
+		&Operation{BodyID: ID(1), Type: Union},
 		`{"bodyId":1,"type":"union"}`,
 	},
 }
@@ -45,11 +44,11 @@ func TestOperationInvalidTypeMarshal(t *testing.T) {
 		IsReturnErr   bool
 	}{
 		{
-			&Operation{BodyID: body.ID(1), Type: Subtract},
+			&Operation{BodyID: ID(1), Type: Subtract},
 			false,
 		},
 		{
-			&Operation{BodyID: body.ID(1), Type: (OperationType)(10000)},
+			&Operation{BodyID: ID(1), Type: (OperationType)(10000)},
 			true,
 		},
 	}

@@ -6,7 +6,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/body"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -28,9 +27,9 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 
 	t.Run("Sphere", func(t *testing.T) {
 		check(t, testCase{
-			Input: createBodyMap(&body.Body{
+			Input: createBodyMap(&setup.Body{
 				ID: 1,
-				Geometry: body.Sphere{
+				Geometry: setup.Sphere{
 					Center: common.Point{X: 20.0, Y: 31.0, Z: 0.99},
 					Radius: 0.01,
 				},
@@ -41,9 +40,9 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 
 	t.Run("Cuboid", func(t *testing.T) {
 		check(t, testCase{
-			Input: createBodyMap(&body.Body{
+			Input: createBodyMap(&setup.Body{
 				ID: 1,
-				Geometry: body.Cuboid{
+				Geometry: setup.Cuboid{
 					Center: common.Point{X: 10.0, Y: 20.0, Z: 30.0},
 					Size:   common.Vec3D{X: 100.0, Y: 200.0, Z: 30.5},
 				},
@@ -54,9 +53,9 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 
 	t.Run("Cylinder", func(t *testing.T) {
 		check(t, testCase{
-			Input: createBodyMap(&body.Body{
+			Input: createBodyMap(&setup.Body{
 				ID: 1,
-				Geometry: body.Cylinder{
+				Geometry: setup.Cylinder{
 					Center: common.Point{X: 10.1, Y: 20.2, Z: 30.3},
 					Height: 24.4,
 					Radius: 99.5,
@@ -69,31 +68,31 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 	t.Run("ManyMixed", func(t *testing.T) {
 		check(t, testCase{
 			Input: createBodyMap(
-				&body.Body{
+				&setup.Body{
 					ID: 3,
-					Geometry: body.Cylinder{Center: common.Point{X: 10.1, Y: 20.2, Z: 30.3},
+					Geometry: setup.Cylinder{Center: common.Point{X: 10.1, Y: 20.2, Z: 30.3},
 						Height: 24.4,
 						Radius: 99.5,
 					},
 				},
-				&body.Body{
+				&setup.Body{
 					ID: 4,
-					Geometry: body.Sphere{
+					Geometry: setup.Sphere{
 						Center: common.Point{X: 20.0, Y: 31.0, Z: 0.99},
 						Radius: 0.01,
 					},
 				},
-				&body.Body{
+				&setup.Body{
 					ID: 1,
-					Geometry: body.Cylinder{
+					Geometry: setup.Cylinder{
 						Center: common.Point{X: 0.0, Y: 1.0, Z: 2.0},
 						Height: 3.0,
 						Radius: 4.0,
 					},
 				},
-				&body.Body{
+				&setup.Body{
 					ID: 2,
-					Geometry: body.Cuboid{
+					Geometry: setup.Cuboid{
 						Center: common.Point{X: 10.0, Y: 20.0, Z: 30.0},
 						Size:   common.Vec3D{X: 100.0, Y: 200.0, Z: 30.5},
 					},
@@ -134,7 +133,7 @@ func TestAppendBlackholeBody(t *testing.T) {
 	assert.Equal(t, expectedBlackholeBodyID, blackholeBodyID)
 }
 
-func createBodyMap(bodies ...*body.Body) setup.BodyMap {
+func createBodyMap(bodies ...*setup.Body) setup.BodyMap {
 	res := setup.BodyMap{}
 	for _, b := range bodies {
 		res[b.ID] = b

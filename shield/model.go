@@ -1,9 +1,7 @@
 package shield
 
 import (
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/detector"
-	"github.com/yaptide/converter/setup/material"
+	"github.com/yaptide/converter/setup"
 )
 
 // MaterialID used directly in shield input files.
@@ -17,16 +15,16 @@ type ZoneID int
 
 // SerializationContext is struct used to recover data lost in process of serializing simulation data.
 type SerializationContext struct {
-	MapMaterialID           map[MaterialID]material.ID
-	MapBodyID               map[BodyID]body.ID
-	MapFilenameToDetectorID map[string]detector.ID
+	MapMaterialID           map[MaterialID]setup.ID
+	MapBodyID               map[BodyID]setup.ID
+	MapFilenameToDetectorID map[string]setup.ID
 }
 
 // NewSerializationContext constructor.
 func NewSerializationContext() *SerializationContext {
 	return &SerializationContext{
-		MapMaterialID:           map[MaterialID]material.ID{},
-		MapBodyID:               map[BodyID]body.ID{},
-		MapFilenameToDetectorID: map[string]detector.ID{},
+		MapMaterialID:           map[MaterialID]setup.ID{},
+		MapBodyID:               map[BodyID]setup.ID{},
+		MapFilenameToDetectorID: map[string]setup.ID{},
 	}
 }

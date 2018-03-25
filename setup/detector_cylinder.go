@@ -1,12 +1,13 @@
-package detector
+package setup
 
 import (
 	"encoding/json"
+
 	"github.com/yaptide/converter/common"
 )
 
 // Cylinder is detector with cylindrical shape directed along z-axis.
-type Cylinder struct {
+type DetectorCylinder struct {
 	Radius common.Range               `json:"radius"`
 	Angle  common.Range               `json:"angle"`
 	ZValue common.Range               `json:"zValue"`
@@ -14,8 +15,8 @@ type Cylinder struct {
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (g Cylinder) MarshalJSON() ([]byte, error) {
-	type Alias Cylinder
+func (g DetectorCylinder) MarshalJSON() ([]byte, error) {
+	type Alias DetectorCylinder
 	return json.Marshal(struct {
 		detectorType
 		Alias

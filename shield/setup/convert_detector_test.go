@@ -6,16 +6,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/detector"
-	"github.com/yaptide/converter/setup/material"
 	"github.com/yaptide/converter/shield"
 )
 
 func TestConvertSetupDetectors(t *testing.T) {
 	type testCase struct {
 		Input              setup.DetectorMap
-		MaterialIDToShield map[material.ID]shield.MaterialID
+		MaterialIDToShield map[setup.ID]shield.MaterialID
 		Expected           []Detector
 		ExpectedSimContext *shield.SerializationContext
 	}
@@ -33,19 +30,19 @@ func TestConvertSetupDetectors(t *testing.T) {
 
 	t.Run("One detector", func(t *testing.T) {
 		check(t, testCase{
-			Input: setup.DetectorMap{5: &detector.Detector{
+			Input: setup.DetectorMap{5: &setup.Detector{
 				ID:   5,
 				Name: "Ala ma psa",
-				DetectorGeometry: detector.Cylinder{
+				DetectorGeometry: setup.DetectorCylinder{
 					Radius: common.Range{Min: 0.0, Max: 10.0},
 					Angle:  common.Range{Min: -10.0, Max: 20.0},
 					ZValue: common.Range{Min: -20.0, Max: 30.0},
 					Slices: common.Vec3DCylindricalInt{Radius: 10, Angle: 200, Z: 1000},
 				},
 				ScoredParticle: common.PredefinedParticle("all"),
-				ScoringType:    detector.PredefinedScoring("energy"),
+				ScoringType:    setup.PredefinedScoring("energy"),
 			}},
-			MaterialIDToShield: map[material.ID]shield.MaterialID{},
+			MaterialIDToShield: map[setup.ID]shield.MaterialID{},
 			Expected: []Detector{
 				Detector{
 					ScoringType: "CYL",
@@ -56,9 +53,9 @@ func TestConvertSetupDetectors(t *testing.T) {
 				},
 			},
 			ExpectedSimContext: &shield.SerializationContext{
-				MapMaterialID: map[shield.MaterialID]material.ID{},
-				MapBodyID:     map[shield.BodyID]body.ID{},
-				MapFilenameToDetectorID: map[string]detector.ID{
+				MapMaterialID: map[shield.MaterialID]setup.ID{},
+				MapBodyID:     map[shield.BodyID]setup.ID{},
+				MapFilenameToDetectorID: map[string]setup.ID{
 					"ala_ma_psa0": 5,
 				},
 			},
@@ -68,45 +65,45 @@ func TestConvertSetupDetectors(t *testing.T) {
 	t.Run("All combined", func(t *testing.T) {
 		check(t, testCase{
 			Input: setup.DetectorMap{
-				3: &detector.Detector{
+				3: &setup.Detector{
 					ID:   3,
 					Name: "raz raz raz",
-					DetectorGeometry: detector.Mesh{
+					DetectorGeometry: setup.Mesh{
 						Center: common.Point{X: 0.0, Y: 0.0, Z: 15.0},
 						Size:   common.Vec3D{X: 10.0, Y: 10.0, Z: 30.0},
 						Slices: common.Vec3DInt{X: 1, Y: 1, Z: 300},
 					},
 
 					ScoredParticle: common.HeavyIon{Charge: 10, NucleonsCount: 20},
-					ScoringType:    detector.PredefinedScoring("counter"),
+					ScoringType:    setup.PredefinedScoring("counter"),
 				},
-				2: &detector.Detector{
+				2: &setup.Detector{
 					ID:   2,
 					Name: "dwa dwa dwa",
-					DetectorGeometry: detector.Cylinder{
+					DetectorGeometry: setup.DetectorCylinder{
 						Radius: common.Range{Min: 0.0, Max: 10.0},
 						Angle:  common.Range{Min: -10.0, Max: 20.0},
 						ZValue: common.Range{Min: -20.0, Max: 30.0},
 						Slices: common.Vec3DCylindricalInt{Radius: 10, Angle: 200, Z: 1000},
 					},
 					ScoredParticle: common.PredefinedParticle("all"),
-					ScoringType:    detector.PredefinedScoring("energy"),
+					ScoringType:    setup.PredefinedScoring("energy"),
 				},
-				1: &detector.Detector{
+				1: &setup.Detector{
 					ID:   1,
 					Name: "trzy trzy trzy",
-					DetectorGeometry: detector.Plane{
+					DetectorGeometry: setup.Plane{
 						Point:  common.Point{X: 1.0, Y: 2.0, Z: 3.0},
 						Normal: common.Vec3D{X: -1.0, Y: -2.0, Z: -3.0},
 					},
 					ScoredParticle: common.HeavyIon{Charge: 10, NucleonsCount: 20},
-					ScoringType: detector.LetTypeScoring{
+					ScoringType: setup.LetTypeScoring{
 						Type:     "letflu",
 						Material: 4,
 					},
 				},
 			},
-			MaterialIDToShield: map[material.ID]shield.MaterialID{4: 100},
+			MaterialIDToShield: map[setup.ID]shield.MaterialID{4: 100},
 			Expected: []Detector{
 				Detector{
 					ScoringType: "PLANE",
@@ -133,9 +130,9 @@ func TestConvertSetupDetectors(t *testing.T) {
 				},
 			},
 			ExpectedSimContext: &shield.SerializationContext{
-				MapMaterialID: map[shield.MaterialID]material.ID{},
-				MapBodyID:     map[shield.BodyID]body.ID{},
-				MapFilenameToDetectorID: map[string]detector.ID{
+				MapMaterialID: map[shield.MaterialID]setup.ID{},
+				MapBodyID:     map[shield.BodyID]setup.ID{},
+				MapFilenameToDetectorID: map[string]setup.ID{
 					"trzy_trzy_trzy0": 1,
 					"dwa_dwa_dwa1":    2,
 					"raz_raz_raz2":    3,

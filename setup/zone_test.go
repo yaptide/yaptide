@@ -1,10 +1,8 @@
-package zone
+package setup
 
 import (
 	"testing"
 
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/material"
 	test "github.com/yaptide/converter/test"
 )
 
@@ -14,10 +12,10 @@ var zoneTestCases = test.MarshallingCases{
 			ID:         ID(1),
 			ParentID:   ID(0),
 			Name:       "name",
-			BaseID:     body.ID(1),
-			MaterialID: material.ID(2),
+			BaseID:     ID(1),
+			MaterialID: ID(2),
 			Construction: []*Operation{
-				&Operation{Type: Intersect, BodyID: body.ID(100)},
+				&Operation{Type: Intersect, BodyID: ID(100)},
 			},
 		},
 		`{
@@ -40,12 +38,12 @@ var zoneTestCases = test.MarshallingCases{
 			ID:         ID(2),
 			ParentID:   ID(1),
 			Name:       "name",
-			BaseID:     body.ID(1),
-			MaterialID: material.ID(2),
+			BaseID:     ID(1),
+			MaterialID: ID(2),
 			Construction: []*Operation{
-				&Operation{Type: Intersect, BodyID: body.ID(100)},
-				&Operation{Type: Subtract, BodyID: body.ID(200)},
-				&Operation{Type: Union, BodyID: body.ID(300)},
+				&Operation{Type: Intersect, BodyID: ID(100)},
+				&Operation{Type: Subtract, BodyID: ID(200)},
+				&Operation{Type: Union, BodyID: ID(300)},
 			},
 		},
 		`{

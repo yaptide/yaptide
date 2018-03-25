@@ -3,24 +3,18 @@ package setup
 import (
 	"testing"
 
-	"github.com/yaptide/converter/setup/beam"
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/detector"
-	"github.com/yaptide/converter/setup/material"
-	"github.com/yaptide/converter/setup/options"
-	"github.com/yaptide/converter/setup/zone"
 	test "github.com/yaptide/converter/test"
 )
 
-var testCases = test.MarshallingCases{
+var setupTestCasses = test.MarshallingCases{
 	{
 		&Setup{
-			Materials: MaterialMap{material.ID(40): nil, material.ID(34): nil},
-			Bodies:    BodyMap{body.ID(1): nil, body.ID(2): nil},
-			Zones:     ZoneMap{zone.ID(100): nil, zone.ID(200): nil},
-			Detectors: DetectorMap{detector.ID(1): nil, detector.ID(2): nil},
-			Beam:      beam.Default,
-			Options:   options.SimulationOptions{},
+			Materials: MaterialMap{ID(40): nil, ID(34): nil},
+			Bodies:    BodyMap{ID(1): nil, ID(2): nil},
+			Zones:     ZoneMap{ID(100): nil, ID(200): nil},
+			Detectors: DetectorMap{ID(1): nil, ID(2): nil},
+			Beam:      DefaultBeam,
+			Options:   SimulationOptions{},
 		},
 		`{
 			"materials": {
@@ -77,17 +71,17 @@ var testCases = test.MarshallingCases{
 }
 
 func TestSetupMarshal(t *testing.T) {
-	test.Marshal(t, testCases)
+	test.Marshal(t, setupTestCasses)
 }
 
 func TestSetupUnmarshal(t *testing.T) {
-	test.Unmarshal(t, testCases)
+	test.Unmarshal(t, setupTestCasses)
 }
 
 func TestSetupUnmarshalMarshalled(t *testing.T) {
-	test.UnmarshalMarshalled(t, testCases)
+	test.UnmarshalMarshalled(t, setupTestCasses)
 }
 
 func TestSetupMarshalUnmarshalled(t *testing.T) {
-	test.MarshalUnmarshalled(t, testCases)
+	test.MarshalUnmarshalled(t, setupTestCasses)
 }

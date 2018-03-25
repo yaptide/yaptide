@@ -1,5 +1,4 @@
-// Package material implement material model.
-package material
+package setup
 
 import (
 	"encoding/json"
@@ -7,9 +6,6 @@ import (
 
 	"github.com/yaptide/converter/common/color"
 )
-
-// ID is key type in Material map.
-type ID int64
 
 // Material defines the zone material that is used in the simulation.
 type Material struct {

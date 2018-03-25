@@ -1,18 +1,17 @@
-package detector
+package setup
 
 import (
 	"encoding/json"
-	"github.com/yaptide/converter/setup/zone"
 )
 
 // Zone detector used to debug geometry.
-type Zone struct {
-	Zones []zone.ID `json:"zones"`
+type Zones struct {
+	Zones []ID `json:"zones"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (z Zone) MarshalJSON() ([]byte, error) {
-	type Alias Zone
+func (z Zones) MarshalJSON() ([]byte, error) {
+	type Alias Zones
 	return json.Marshal(struct {
 		detectorType
 		Alias

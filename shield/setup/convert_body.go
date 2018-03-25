@@ -6,7 +6,6 @@ import (
 
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/body"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -17,11 +16,11 @@ type Body struct {
 	Arguments  []float64
 }
 
-func convertSetupBodies(bodyMap setup.BodyMap, simContext *shield.SerializationContext) ([]Body, map[body.ID]shield.BodyID, error) {
+func convertSetupBodies(bodyMap setup.BodyMap, simContext *shield.SerializationContext) ([]Body, map[setup.ID]shield.BodyID, error) {
 	result := []Body{}
-	bodyIDToShield := map[body.ID]shield.BodyID{}
+	bodyIDToShield := map[setup.ID]shield.BodyID{}
 
-	bodyIds := []body.ID{}
+	bodyIds := []setup.ID{}
 	for k := range bodyMap {
 		bodyIds = append(bodyIds, k)
 	}
@@ -45,7 +44,7 @@ func convertSetupBodies(bodyMap setup.BodyMap, simContext *shield.SerializationC
 func appendBlackholeBody(bodies []Body) ([]Body, shield.BodyID, error) {
 	newID := bodies[len(bodies)-1].ID + 1
 
-	blackholeBody, err := convertCuboid(body.Cuboid{
+	blackholeBody, err := convertCuboid(setup.Cuboid{
 		Center: common.Point{
 			X: 0.0,
 			Y: 0.0,
@@ -67,13 +66,13 @@ func appendBlackholeBody(bodies []Body) ([]Body, shield.BodyID, error) {
 
 }
 
-func convertBody(b *body.Body) (Body, error) {
+func convertBody(b *setup.Body) (Body, error) {
 	switch g := b.Geometry.(type) {
-	case body.Sphere:
+	case setup.Sphere:
 		return convertSphere(g)
-	case body.Cuboid:
+	case setup.Cuboid:
 		return convertCuboid(g)
-	case body.Cylinder:
+	case setup.Cylinder:
 		return convertCylinder(g)
 
 	default:
@@ -81,7 +80,7 @@ func convertBody(b *body.Body) (Body, error) {
 	}
 }
 
-func convertSphere(sphere body.Sphere) (Body, error) {
+func convertSphere(sphere setup.Sphere) (Body, error) {
 	if sphere.Radius <= 0.0 {
 		return Body{}, fmt.Errorf("sphere radius cannot be <= 0.0")
 	}
@@ -92,7 +91,7 @@ func convertSphere(sphere body.Sphere) (Body, error) {
 	}, nil
 }
 
-func convertCuboid(cuboid body.Cuboid) (Body, error) {
+func convertCuboid(cuboid setup.Cuboid) (Body, error) {
 	for axis, size := range map[string]float64{
 		"x": cuboid.Size.X,
 		"y": cuboid.Size.Y,
@@ -119,7 +118,7 @@ func convertCuboid(cuboid body.Cuboid) (Body, error) {
 	}, nil
 }
 
-func convertCylinder(cylinder body.Cylinder) (Body, error) {
+func convertCylinder(cylinder setup.Cylinder) (Body, error) {
 	if cylinder.Height <= 0.0 {
 		return Body{}, fmt.Errorf("cylinder height cannot be <= 0.0")
 	}

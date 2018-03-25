@@ -23,18 +23,18 @@ var testCases = test.MarshallingCases{
 	},
 }
 
-func TestSetupMarshal(t *testing.T) {
+func TestResultMarshal(t *testing.T) {
 	test.Marshal(t, testCases)
 }
 
-func TestSetupUnmarshal(t *testing.T) {
+func TestResultUnmarshal(t *testing.T) {
 	test.Unmarshal(t, testCases)
 }
 
-func TestSetupUnmarshalMarshalled(t *testing.T) {
+func TestResultUnmarshalMarshalled(t *testing.T) {
 	test.UnmarshalMarshalled(t, testCases)
 }
 
-func TestSetupMarshalUnmarshalled(t *testing.T) {
+func TestResultMarshalUnmarshalled(t *testing.T) {
 	test.MarshalUnmarshalled(t, testCases)
 }

@@ -1,5 +1,4 @@
-// Package body implement Body model, which store basic Geometry description.
-package body
+package setup
 
 import "encoding/json"
 

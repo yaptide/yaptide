@@ -1,7 +1,7 @@
 // Package result implement result.result, which contains simulation results data.
 package result
 
-import "github.com/yaptide/converter/setup/detector"
+import "github.com/yaptide/converter/setup"
 
 // Result contains all simulation result data.
 type Result struct {
@@ -10,9 +10,9 @@ type Result struct {
 	Detectors []DetectorResult  `json:"detectors"`
 }
 
-// DetectorResult contains simulation result data for single detector.
+// DetectorResult contains simulation result data for single setup.
 type DetectorResult struct {
-	DetectorID       detector.ID       `json:"detectorId"`
+	DetectorID       setup.ID          `json:"detectorId"`
 	Errors           map[string]string `json:"errors"`
 	DetectorMetadata map[string]string `json:"metadata"`
 	Data             [][][]float64     `json:"scored"`
@@ -34,7 +34,7 @@ func NewEmptyResult() Result {
 	}
 }
 
-// AddDetectorResults adds results for single detector.
+// AddDetectorResults adds results for single setup.
 func (r *Result) AddDetectorResults(detectorResult DetectorResult) {
 	r.Detectors = append(r.Detectors, detectorResult)
 }

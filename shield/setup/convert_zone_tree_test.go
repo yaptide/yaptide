@@ -5,17 +5,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/material"
-	"github.com/yaptide/converter/setup/zone"
 	"github.com/yaptide/converter/shield"
 )
 
 func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 	type testCase struct {
 		ZoneMap            setup.ZoneMap
-		MaterialIDToShield map[material.ID]shield.MaterialID
-		BodyIDToShield     map[body.ID]shield.BodyID
+		MaterialIDToShield map[setup.ID]shield.MaterialID
+		BodyIDToShield     map[setup.ID]shield.BodyID
 
 		Expected      []*zoneTree
 		ExpectedError error
@@ -32,24 +29,24 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 
 	t.Run("SimpleOneZone", func(t *testing.T) {
 		check(t, testCase{
-			ZoneMap: createZoneMap(&zone.Zone{
-				ID:         zone.ID(1),
-				ParentID:   zone.ID(0),
-				BaseID:     body.ID(1),
-				MaterialID: material.ID(2),
-				Construction: []*zone.Operation{
-					&zone.Operation{Type: zone.Intersect, BodyID: body.ID(100)},
+			ZoneMap: createZoneMap(&setup.Zone{
+				ID:         setup.ID(1),
+				ParentID:   setup.ID(0),
+				BaseID:     setup.ID(1),
+				MaterialID: setup.ID(2),
+				Construction: []*setup.Operation{
+					&setup.Operation{Type: setup.Intersect, BodyID: setup.ID(100)},
 				},
 			}),
-			BodyIDToShield:     map[body.ID]shield.BodyID{1: 1, 100: 2},
-			MaterialIDToShield: map[material.ID]shield.MaterialID{2: 200},
+			BodyIDToShield:     map[setup.ID]shield.BodyID{1: 1, 100: 2},
+			MaterialIDToShield: map[setup.ID]shield.MaterialID{2: 200},
 			Expected: []*zoneTree{
 				&zoneTree{
 					childrens:  []*zoneTree{},
 					baseBodyID: 1,
 					operations: []operation{operation{
 						BodyID: 2,
-						Type:   zone.Intersect,
+						Type:   setup.Intersect,
 					}},
 					materialID: 200,
 				},
@@ -61,24 +58,24 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 	t.Run("ManyZones", func(t *testing.T) {
 		check(t, testCase{
 			ZoneMap: createZoneMap(
-				&zone.Zone{
-					ID:         zone.ID(1),
-					ParentID:   zone.ID(0),
-					BaseID:     body.ID(1),
-					MaterialID: material.ID(2),
-					Construction: []*zone.Operation{
-						&zone.Operation{Type: zone.Intersect, BodyID: body.ID(100)},
+				&setup.Zone{
+					ID:         setup.ID(1),
+					ParentID:   setup.ID(0),
+					BaseID:     setup.ID(1),
+					MaterialID: setup.ID(2),
+					Construction: []*setup.Operation{
+						&setup.Operation{Type: setup.Intersect, BodyID: setup.ID(100)},
 					},
 				},
-				&zone.Zone{
-					ID:         zone.ID(2),
-					ParentID:   zone.ID(1),
-					BaseID:     body.ID(300),
-					MaterialID: material.ID(300),
+				&setup.Zone{
+					ID:         setup.ID(2),
+					ParentID:   setup.ID(1),
+					BaseID:     setup.ID(300),
+					MaterialID: setup.ID(300),
 				},
 			),
-			BodyIDToShield:     map[body.ID]shield.BodyID{1: 1, 100: 2, 300: 3},
-			MaterialIDToShield: map[material.ID]shield.MaterialID{2: 200, 300: 1},
+			BodyIDToShield:     map[setup.ID]shield.BodyID{1: 1, 100: 2, 300: 3},
+			MaterialIDToShield: map[setup.ID]shield.MaterialID{2: 200, 300: 1},
 			Expected: []*zoneTree{
 				&zoneTree{
 					childrens: []*zoneTree{
@@ -92,7 +89,7 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 					baseBodyID: 1,
 					operations: []operation{operation{
 						BodyID: 2,
-						Type:   zone.Intersect,
+						Type:   setup.Intersect,
 					}},
 					materialID: 200,
 				},
@@ -102,7 +99,7 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 	})
 }
 
-func createZoneMap(zones ...*zone.Zone) setup.ZoneMap {
+func createZoneMap(zones ...*setup.Zone) setup.ZoneMap {
 	res := setup.ZoneMap{}
 	for _, z := range zones {
 		res[z.ID] = z

@@ -1,4 +1,4 @@
-package detector
+package setup
 
 // PredefinedParticleRecord ...
 type PredefinedParticleRecord struct {

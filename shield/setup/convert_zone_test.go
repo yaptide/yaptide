@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter/setup/zone"
+	"github.com/yaptide/converter/setup"
 )
 
 func TestConvertTreeToZones(t *testing.T) {
@@ -84,9 +84,9 @@ func TestConvertTreeToZones(t *testing.T) {
 						childrens:  []*zoneTree{},
 						baseBodyID: 1,
 						operations: []operation{
-							operation{BodyID: 2, Type: zone.Union},
-							operation{BodyID: 3, Type: zone.Intersect},
-							operation{BodyID: 4, Type: zone.Subtract},
+							operation{BodyID: 2, Type: setup.Union},
+							operation{BodyID: 3, Type: setup.Intersect},
+							operation{BodyID: 4, Type: setup.Subtract},
 						},
 						materialID: 1,
 					},
@@ -94,14 +94,14 @@ func TestConvertTreeToZones(t *testing.T) {
 						childrens:  []*zoneTree{},
 						baseBodyID: 5,
 						operations: []operation{
-							operation{BodyID: 6, Type: zone.Union},
+							operation{BodyID: 6, Type: setup.Union},
 						},
 						materialID: 1,
 					},
 				},
 				baseBodyID: 7,
 				operations: []operation{
-					operation{BodyID: 8, Type: zone.Subtract},
+					operation{BodyID: 8, Type: setup.Subtract},
 				},
 				materialID: 2,
 			},

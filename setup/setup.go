@@ -1,35 +1,26 @@
 // Package setup implement setup.Setup, which contains simulation setup data.
 package setup
 
-import (
-	"github.com/yaptide/converter/setup/beam"
-	"github.com/yaptide/converter/setup/body"
-	"github.com/yaptide/converter/setup/detector"
-	"github.com/yaptide/converter/setup/material"
-	"github.com/yaptide/converter/setup/options"
-	"github.com/yaptide/converter/setup/zone"
-)
-
 // MaterialMap type used in Setup structure.
-type MaterialMap map[material.ID]*material.Material
+type MaterialMap map[ID]*Material
 
 // BodyMap type used in Setup structure.
-type BodyMap map[body.ID]*body.Body
+type BodyMap map[ID]*Body
 
 // ZoneMap type used in Setup structure.
-type ZoneMap map[zone.ID]*zone.Zone
+type ZoneMap map[ID]*Zone
 
 // DetectorMap type used in Setup structure.
-type DetectorMap map[detector.ID]*detector.Detector
+type DetectorMap map[ID]*Detector
 
 // Setup contains all simulation data.
 type Setup struct {
-	Materials MaterialMap               `json:"materials" bson:"materials"`
-	Bodies    BodyMap                   `json:"bodies" bson:"bodies"`
-	Zones     ZoneMap                   `json:"zones" bson:"zones"`
-	Detectors DetectorMap               `json:"detectors" bson:"detectors"`
-	Beam      beam.Beam                 `json:"beam" bson:"beam"`
-	Options   options.SimulationOptions `json:"options" bson:"options"`
+	Materials MaterialMap       `json:"materials" bson:"materials"`
+	Bodies    BodyMap           `json:"bodies" bson:"bodies"`
+	Zones     ZoneMap           `json:"zones" bson:"zones"`
+	Detectors DetectorMap       `json:"detectors" bson:"detectors"`
+	Beam      Beam              `json:"beam" bson:"beam"`
+	Options   SimulationOptions `json:"options" bson:"options"`
 }
 
 // NewEmptySetup constructor.
@@ -39,7 +30,7 @@ func NewEmptySetup() Setup {
 		Bodies:    make(BodyMap),
 		Zones:     make(ZoneMap),
 		Detectors: make(DetectorMap),
-		Beam:      beam.Default,
-		Options:   options.Default,
+		Beam:      DefaultBeam,
+		Options:   DefaultOptions,
 	}
 }

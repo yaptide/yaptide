@@ -8,8 +8,6 @@ import (
 
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/setup/detector"
-	"github.com/yaptide/converter/setup/material"
 	"github.com/yaptide/converter/shield"
 )
 
@@ -21,9 +19,9 @@ type Detector struct {
 	Arguments []interface{}
 }
 
-func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield map[material.ID]shield.MaterialID, simContext *shield.SerializationContext) ([]Detector, error) {
+func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield map[setup.ID]shield.MaterialID, simContext *shield.SerializationContext) ([]Detector, error) {
 	result := []Detector{}
-	detectIds := []detector.ID{}
+	detectIds := []setup.ID{}
 	for k := range detectorsMap {
 		detectIds = append(detectIds, k)
 	}
@@ -31,7 +29,7 @@ func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield ma
 
 	detectorConverter := detectorConverter{materialIDToShield}
 
-	uniqNameSet := map[string]detector.ID{}
+	uniqNameSet := map[string]setup.ID{}
 	for n, id := range detectIds {
 		setupDetector := detectorsMap[id]
 
@@ -56,21 +54,21 @@ func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield ma
 }
 
 type detectorConverter struct {
-	materialIDToShield map[material.ID]shield.MaterialID
+	materialIDToShield map[setup.ID]shield.MaterialID
 }
 
-func (d detectorConverter) convertDetector(detect *detector.Detector, filename string) (Detector, error) {
+func (d detectorConverter) convertDetector(detect *setup.Detector, filename string) (Detector, error) {
 	switch geo := detect.DetectorGeometry.(type) {
-	case detector.Geomap:
+	case setup.Geomap:
 		return Detector{}, newGeneralDetectorError("Geomap detector serialization not implemented")
-	case detector.Zone:
+	case setup.Zones:
 		return Detector{}, newGeneralDetectorError("Zone detector serialization not implemented")
 
-	case detector.Cylinder:
+	case setup.DetectorCylinder:
 		return d.convertStandardGeometryDetector(detect, filename)
-	case detector.Mesh:
+	case setup.Mesh:
 		return d.convertStandardGeometryDetector(detect, filename)
-	case detector.Plane:
+	case setup.Plane:
 		return d.convertStandardGeometryDetector(detect, filename)
 
 	default:
@@ -78,11 +76,11 @@ func (d detectorConverter) convertDetector(detect *detector.Detector, filename s
 	}
 }
 
-func (d detectorConverter) convertStandardGeometryDetector(detect *detector.Detector, filename string) (Detector, error) {
+func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detector, filename string) (Detector, error) {
 	var newDetector Detector
 
 	switch geo := detect.DetectorGeometry.(type) {
-	case detector.Cylinder:
+	case setup.DetectorCylinder:
 		newDetector = Detector{
 			ScoringType: "CYL",
 			Arguments: []interface{}{
@@ -98,7 +96,7 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *detector.Dete
 				geo.Slices.Z,
 			},
 		}
-	case detector.Mesh:
+	case setup.Mesh:
 		xMin, xMax := centerAndSizeToMinAndMax(geo.Center.X, geo.Size.Y)
 		yMin, yMax := centerAndSizeToMinAndMax(geo.Center.Y, geo.Size.Y)
 		zMin, zMax := centerAndSizeToMinAndMax(geo.Center.Z, geo.Size.Z)
@@ -117,7 +115,7 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *detector.Dete
 				geo.Slices.Z,
 			},
 		}
-	case detector.Plane:
+	case setup.Plane:
 		newDetector = Detector{
 			ScoringType: "PLANE",
 			Arguments: []interface{}{
@@ -159,12 +157,12 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *detector.Dete
 }
 
 // TODO: we need A and Z if partile is not HeavyIon and scoring is LetTypeScoring
-func (d detectorConverter) appendHeavyIonOrLetfluCard(arguments []interface{}, particle common.Particle, scoringType detector.ScoringType) ([]interface{}, error) {
+func (d detectorConverter) appendHeavyIonOrLetfluCard(arguments []interface{}, particle common.Particle, scoringType setup.ScoringType) ([]interface{}, error) {
 	switch part := particle.(type) {
 	case common.HeavyIon:
 		arguments = append(arguments, part.NucleonsCount, part.Charge)
 		switch scoring := scoringType.(type) {
-		case detector.LetTypeScoring:
+		case setup.LetTypeScoring:
 			material, found := d.materialIDToShield[scoring.Material]
 			if !found {
 				return nil, fmt.Errorf("Can not found Material{ID: %d} for LetTypeScoring", scoring.Material)

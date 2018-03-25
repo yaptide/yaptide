@@ -1,7 +1,8 @@
-package detector
+package setup
 
 import (
 	"encoding/json"
+
 	"github.com/yaptide/converter/common"
 )
 
