@@ -2,7 +2,7 @@ package setup
 
 import (
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 type oetType int
@@ -32,7 +32,7 @@ type oet struct {
 	Sign Sign
 
 	// Only when Type==value
-	Value shield.BodyID
+	Value context.BodyID
 
 	// Only when Type==binaryExpression
 	Left     *oet
@@ -40,7 +40,7 @@ type oet struct {
 	Operator oetOperator
 }
 
-func createOetValue(val shield.BodyID, sign Sign) *oet {
+func createOetValue(val context.BodyID, sign Sign) *oet {
 	return &oet{Type: value, Value: val, Sign: sign}
 }
 
@@ -82,7 +82,7 @@ func (o *oet) applyDeMorganLawRecursively() *oet {
 
 type signValue struct {
 	Sign  Sign
-	Value shield.BodyID
+	Value context.BodyID
 }
 
 func cartesian(l, r [][]signValue) [][]signValue {
@@ -142,7 +142,7 @@ func (o *oet) toConstructions() []Construction {
 	return constructions
 }
 
-func oetFromZoneDescription(baseBodyID shield.BodyID, operations []operation) *oet {
+func oetFromZoneDescription(baseBodyID context.BodyID, operations []operation) *oet {
 	result := createOetValue(baseBodyID, Plus)
 
 	for _, o := range operations {

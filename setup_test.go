@@ -1,37 +1,30 @@
-package setup
+package converter
 
 import (
 	"testing"
 
+	"github.com/yaptide/converter/setup"
 	test "github.com/yaptide/converter/test"
 )
 
 var setupTestCasses = test.MarshallingCases{
 	{
 		&Setup{
-			Materials: MaterialMap{ID(40): nil, ID(34): nil},
-			Bodies:    BodyMap{ID(1): nil, ID(2): nil},
-			Zones:     ZoneMap{ID(100): nil, ID(200): nil},
-			Detectors: DetectorMap{ID(1): nil, ID(2): nil},
-			Beam:      DefaultBeam,
-			Options:   SimulationOptions{},
+			Materials: MaterialMap{},
+			Bodies:    BodyMap{},
+			Zones:     ZoneMap{},
+			Detectors: DetectorMap{},
+			Beam:      setup.DefaultBeam,
+			Options:   setup.SimulationOptions{},
 		},
 		`{
 			"materials": {
-				"34": null,
-				"40": null
 			},
 			"bodies": {
-				"1": null,
-				"2": null
 			},
 			"zones": {
-				"100": null,
-				"200": null
 			},
 			"detectors": {
-				"1": null,
-				"2": null
 			},
 			"beam": {
 				"direction": {

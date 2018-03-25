@@ -6,15 +6,15 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 func genZoneToMaterials(n int) []ZoneToMaterial {
 	res := []ZoneToMaterial{}
 	for i := 0; i < n; i++ {
 		res = append(res, ZoneToMaterial{
-			ZoneID:     shield.ZoneID(i),
-			MaterialID: shield.MaterialID(i),
+			ZoneID:     context.ZoneID(i),
+			MaterialID: context.MaterialID(i),
 		})
 	}
 	return res

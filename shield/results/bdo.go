@@ -5,9 +5,9 @@ import (
 	"encoding/binary"
 	"fmt"
 
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/log"
-	"github.com/yaptide/converter/result"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // TODO: suport for big endian (for no litle endian files and host system is assumed)
@@ -16,8 +16,8 @@ type bdoParser struct {
 	content  []byte
 	metadata map[string]string
 	endiness binary.ByteOrder
-	context  shield.SerializationContext
-	Results  result.DetectorResult
+	ctx      context.SerializationContext
+	Results  converter.DetectorResult
 }
 
 var (
@@ -26,14 +26,14 @@ var (
 	bigEndianFormat   = "MM"
 )
 
-func newBdoParser(name string, filecontent []byte, context shield.SerializationContext) bdoParser {
+func newBdoParser(name string, filecontent []byte, ctx context.SerializationContext) bdoParser {
 	return bdoParser{
-		context:  context,
+		ctx:      ctx,
 		filename: name,
 		content:  filecontent,
 		metadata: map[string]string{},
 		endiness: nil,
-		Results:  result.NewDetectorResult(),
+		Results:  converter.NewDetectorResult(),
 	}
 }
 
@@ -60,7 +60,7 @@ func (p *bdoParser) Parse() error {
 }
 
 func (p *bdoParser) findDetectorIDByFilename() error {
-	if detectorID, found := p.context.MapFilenameToDetectorID[p.filename]; found {
+	if detectorID, found := p.ctx.MapFilenameToDetectorID[p.filename]; found {
 		log.Debug("[Parser][SHIELD] Found DetectorID: %d for filename", detectorID, p.filename)
 		p.Results.DetectorID = detectorID
 		return nil

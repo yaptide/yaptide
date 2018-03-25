@@ -4,33 +4,34 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 func TestConvertSetupDetectors(t *testing.T) {
 	type testCase struct {
-		Input              setup.DetectorMap
-		MaterialIDToShield map[setup.ID]shield.MaterialID
+		Input              converter.DetectorMap
+		MaterialIDToShield map[setup.ID]context.MaterialID
 		Expected           []Detector
-		ExpectedSimContext *shield.SerializationContext
+		ExpectedSimContext *context.SerializationContext
 	}
 
 	check := func(t *testing.T, tc testCase) {
 		t.Helper()
 
-		simContext := shield.NewSerializationContext()
-		actual, actualErr := convertSetupDetectors(tc.Input, tc.MaterialIDToShield, simContext)
+		simContext := context.NewSerializationContext()
+		actual, actualErr := convertSetupDetectors(tc.Input, tc.MaterialIDToShield, &simContext)
 
 		assert.Equal(t, nil, actualErr)
 		assert.Equal(t, tc.Expected, actual)
-		assert.Equal(t, tc.ExpectedSimContext, simContext)
+		assert.Equal(t, tc.ExpectedSimContext, &simContext)
 	}
 
 	t.Run("One detector", func(t *testing.T) {
 		check(t, testCase{
-			Input: setup.DetectorMap{5: &setup.Detector{
+			Input: converter.DetectorMap{5: setup.Detector{
 				ID:   5,
 				Name: "Ala ma psa",
 				DetectorGeometry: setup.DetectorCylinder{
@@ -42,7 +43,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 				ScoredParticle: common.PredefinedParticle("all"),
 				ScoringType:    setup.PredefinedScoring("energy"),
 			}},
-			MaterialIDToShield: map[setup.ID]shield.MaterialID{},
+			MaterialIDToShield: map[setup.ID]context.MaterialID{},
 			Expected: []Detector{
 				Detector{
 					ScoringType: "CYL",
@@ -52,9 +53,9 @@ func TestConvertSetupDetectors(t *testing.T) {
 					},
 				},
 			},
-			ExpectedSimContext: &shield.SerializationContext{
-				MapMaterialID: map[shield.MaterialID]setup.ID{},
-				MapBodyID:     map[shield.BodyID]setup.ID{},
+			ExpectedSimContext: &context.SerializationContext{
+				MapMaterialID: map[context.MaterialID]setup.ID{},
+				MapBodyID:     map[context.BodyID]setup.ID{},
 				MapFilenameToDetectorID: map[string]setup.ID{
 					"ala_ma_psa0": 5,
 				},
@@ -64,8 +65,8 @@ func TestConvertSetupDetectors(t *testing.T) {
 
 	t.Run("All combined", func(t *testing.T) {
 		check(t, testCase{
-			Input: setup.DetectorMap{
-				3: &setup.Detector{
+			Input: converter.DetectorMap{
+				3: setup.Detector{
 					ID:   3,
 					Name: "raz raz raz",
 					DetectorGeometry: setup.Mesh{
@@ -77,7 +78,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 					ScoredParticle: common.HeavyIon{Charge: 10, NucleonsCount: 20},
 					ScoringType:    setup.PredefinedScoring("counter"),
 				},
-				2: &setup.Detector{
+				2: setup.Detector{
 					ID:   2,
 					Name: "dwa dwa dwa",
 					DetectorGeometry: setup.DetectorCylinder{
@@ -89,7 +90,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 					ScoredParticle: common.PredefinedParticle("all"),
 					ScoringType:    setup.PredefinedScoring("energy"),
 				},
-				1: &setup.Detector{
+				1: setup.Detector{
 					ID:   1,
 					Name: "trzy trzy trzy",
 					DetectorGeometry: setup.Plane{
@@ -103,7 +104,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 					},
 				},
 			},
-			MaterialIDToShield: map[setup.ID]shield.MaterialID{4: 100},
+			MaterialIDToShield: map[setup.ID]context.MaterialID{4: 100},
 			Expected: []Detector{
 				Detector{
 					ScoringType: "PLANE",
@@ -129,9 +130,9 @@ func TestConvertSetupDetectors(t *testing.T) {
 					},
 				},
 			},
-			ExpectedSimContext: &shield.SerializationContext{
-				MapMaterialID: map[shield.MaterialID]setup.ID{},
-				MapBodyID:     map[shield.BodyID]setup.ID{},
+			ExpectedSimContext: &context.SerializationContext{
+				MapMaterialID: map[context.MaterialID]setup.ID{},
+				MapBodyID:     map[context.BodyID]setup.ID{},
 				MapFilenameToDetectorID: map[string]setup.ID{
 					"trzy_trzy_trzy0": 1,
 					"dwa_dwa_dwa1":    2,

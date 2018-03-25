@@ -5,11 +5,11 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 func TestOetFromZoneDescription(t *testing.T) {
-	baseBodyID := shield.BodyID(1)
+	baseBodyID := context.BodyID(1)
 	operations := []operation{
 		operation{BodyID: 2, Type: setup.Intersect},
 		operation{BodyID: 3, Type: setup.Union},

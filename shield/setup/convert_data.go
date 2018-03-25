@@ -3,8 +3,9 @@ package setup
 import (
 	"fmt"
 
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // Data is input for shield Serialize function.
@@ -27,30 +28,36 @@ type Data struct {
 // Convert simulation setup model to easily serializable data,
 // which is input for shield serializer.
 // Return error, if setup data are not semantically correct.
-func Convert(setup setup.Setup) (*RawShieldSetup, *shield.SerializationContext, error) {
+func Convert(setup converter.Setup) (RawShieldSetup, context.SerializationContext, error) {
+	simContext := context.NewSerializationContext()
+
 	err := checkSetupCompleteness(setup)
 	if err != nil {
-		return nil, nil, err
+		return RawShieldSetup{}, simContext, err
 	}
 
-	simContext := shield.NewSerializationContext()
-
-	materials, materialIDToShield, err := convertSetupMaterials(setup.Materials, simContext)
+	materials, materialIDToShield, err := convertSetupMaterials(
+		setup.Materials, &simContext,
+	)
 	if err != nil {
-		return nil, nil, err
+		return RawShieldSetup{}, simContext, err
 	}
 
-	geometry, err := convertSetupGeometry(setup.Bodies, setup.Zones, materialIDToShield, simContext)
+	geometry, err := convertSetupGeometry(
+		setup.Bodies, setup.Zones, materialIDToShield, &simContext,
+	)
 	if err != nil {
-		return nil, nil, err
+		return RawShieldSetup{}, simContext, err
 	}
 
-	detectors, err := convertSetupDetectors(setup.Detectors, materialIDToShield, simContext)
+	detectors, err := convertSetupDetectors(
+		setup.Detectors, materialIDToShield, &simContext,
+	)
 	if err != nil {
-		return nil, nil, err
+		return RawShieldSetup{}, simContext, err
 	}
 
-	return &RawShieldSetup{
+	return RawShieldSetup{
 			Materials: materials,
 			Geometry:  geometry,
 			Detectors: detectors,
@@ -61,7 +68,7 @@ func Convert(setup setup.Setup) (*RawShieldSetup, *shield.SerializationContext, 
 		nil
 }
 
-func checkSetupCompleteness(setup setup.Setup) error {
+func checkSetupCompleteness(setup converter.Setup) error {
 	createMissingError := func(mapName string) error {
 		return fmt.Errorf("[serializer]: %s map is null", mapName)
 	}

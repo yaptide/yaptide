@@ -4,21 +4,22 @@ import (
 	"fmt"
 	"sort"
 
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // Body represent setup.Body,
 type Body struct {
-	ID         shield.BodyID
+	ID         context.BodyID
 	Identifier string
 	Arguments  []float64
 }
 
-func convertSetupBodies(bodyMap setup.BodyMap, simContext *shield.SerializationContext) ([]Body, map[setup.ID]shield.BodyID, error) {
+func convertSetupBodies(bodyMap converter.BodyMap, simContext *context.SerializationContext) ([]Body, map[setup.ID]context.BodyID, error) {
 	result := []Body{}
-	bodyIDToShield := map[setup.ID]shield.BodyID{}
+	bodyIDToShield := map[setup.ID]context.BodyID{}
 
 	bodyIds := []setup.ID{}
 	for k := range bodyMap {
@@ -27,7 +28,7 @@ func convertSetupBodies(bodyMap setup.BodyMap, simContext *shield.SerializationC
 	sort.SliceStable(bodyIds, func(i, j int) bool { return bodyIds[i] < bodyIds[j] })
 
 	for i, id := range bodyIds {
-		nextShieldID := shield.BodyID(i + 1)
+		nextShieldID := context.BodyID(i + 1)
 		bodyIDToShield[id] = nextShieldID
 		simContext.MapBodyID[nextShieldID] = id
 
@@ -41,7 +42,7 @@ func convertSetupBodies(bodyMap setup.BodyMap, simContext *shield.SerializationC
 	return result, bodyIDToShield, nil
 }
 
-func appendBlackholeBody(bodies []Body) ([]Body, shield.BodyID, error) {
+func appendBlackholeBody(bodies []Body) ([]Body, context.BodyID, error) {
 	newID := bodies[len(bodies)-1].ID + 1
 
 	blackholeBody, err := convertCuboid(setup.Cuboid{
@@ -66,7 +67,7 @@ func appendBlackholeBody(bodies []Body) ([]Body, shield.BodyID, error) {
 
 }
 
-func convertBody(b *setup.Body) (Body, error) {
+func convertBody(b setup.Body) (Body, error) {
 	switch g := b.Geometry.(type) {
 	case setup.Sphere:
 		return convertSphere(g)

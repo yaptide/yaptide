@@ -6,9 +6,10 @@ import (
 	"sort"
 	"unicode"
 
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // Detector represent setup.Detector,
@@ -19,7 +20,7 @@ type Detector struct {
 	Arguments []interface{}
 }
 
-func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield map[setup.ID]shield.MaterialID, simContext *shield.SerializationContext) ([]Detector, error) {
+func convertSetupDetectors(detectorsMap converter.DetectorMap, materialIDToShield map[setup.ID]context.MaterialID, simContext *context.SerializationContext) ([]Detector, error) {
 	result := []Detector{}
 	detectIds := []setup.ID{}
 	for k := range detectorsMap {
@@ -43,7 +44,7 @@ func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield ma
 		filename := createDetectorFileName(setupDetector.Name, n)
 		simContext.MapFilenameToDetectorID[filename] = setupDetector.ID
 
-		detector, err := detectorConverter.convertDetector(setupDetector, filename)
+		detector, err := detectorConverter.convertDetector(&setupDetector, filename)
 		if err != nil {
 			return nil, err
 		}
@@ -54,7 +55,7 @@ func convertSetupDetectors(detectorsMap setup.DetectorMap, materialIDToShield ma
 }
 
 type detectorConverter struct {
-	materialIDToShield map[setup.ID]shield.MaterialID
+	materialIDToShield map[setup.ID]context.MaterialID
 }
 
 func (d detectorConverter) convertDetector(detect *setup.Detector, filename string) (Detector, error) {

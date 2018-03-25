@@ -1,7 +1,9 @@
-// Package result implement result.result, which contains simulation results data.
-package result
+package converter
 
-import "github.com/yaptide/converter/setup"
+import (
+	"github.com/yaptide/converter/result"
+	"github.com/yaptide/converter/setup"
+)
 
 // Result contains all simulation result data.
 type Result struct {
@@ -16,7 +18,7 @@ type DetectorResult struct {
 	Errors           map[string]string `json:"errors"`
 	DetectorMetadata map[string]string `json:"metadata"`
 	Data             [][][]float64     `json:"scored"`
-	Dimensions       Dimensions        `json:"dimensions"`
+	Dimensions       result.Dimensions `json:"dimensions"`
 }
 
 // NewDetectorResult constructor.

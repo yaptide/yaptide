@@ -3,8 +3,9 @@ package setup
 import (
 	"sort"
 
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // Materials contains representation of setup.MaterialsMap,
@@ -16,7 +17,7 @@ type Materials struct {
 
 // PredefinedMaterial represent setup.Predefined.
 type PredefinedMaterial struct {
-	ID                        shield.MaterialID
+	ID                        context.MaterialID
 	ICRUNumber                MaterialICRU
 	StateOfMatter             StateOfMatter
 	Density                   float64
@@ -33,7 +34,7 @@ type Element struct {
 
 // CompoundMaterial represent setup.Compound.
 type CompoundMaterial struct {
-	ID                                    shield.MaterialID
+	ID                                    context.MaterialID
 	StateOfMatter                         StateOfMatter
 	Density                               float64
 	ExternalStoppingPowerFromMaterialICRU MaterialICRU
@@ -42,13 +43,13 @@ type CompoundMaterial struct {
 	serializeExternalStoppingPower bool
 }
 
-func convertSetupMaterials(setupMat setup.MaterialMap, simContext *shield.SerializationContext) (Materials, map[setup.ID]shield.MaterialID, error) {
+func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.SerializationContext) (Materials, map[setup.ID]context.MaterialID, error) {
 	result := Materials{
 		Predefined: []PredefinedMaterial{},
 		Compound:   []CompoundMaterial{},
 	}
 
-	materialIDToShield := map[setup.ID]shield.MaterialID{}
+	materialIDToShield := map[setup.ID]context.MaterialID{}
 
 	const maxMaterialsNumber = 100
 
@@ -70,7 +71,7 @@ func convertSetupMaterials(setupMat setup.MaterialMap, simContext *shield.Serial
 			if g.PredefinedID != "vacuum" {
 				predefMaterialsIds = append(predefMaterialsIds, id)
 			} else {
-				materialIDToShield[id] = shield.MaterialID(predefinedMaterialsToShieldICRU["vacuum"])
+				materialIDToShield[id] = context.MaterialID(predefinedMaterialsToShieldICRU["vacuum"])
 			}
 		case setup.Compound:
 			compoundMaterialsIds = append(compoundMaterialsIds, id)
@@ -85,8 +86,8 @@ func convertSetupMaterials(setupMat setup.MaterialMap, simContext *shield.Serial
 	for _, ids := range [][]setup.ID{predefMaterialsIds, compoundMaterialsIds} {
 		sort.SliceStable(ids, func(i, j int) bool { return ids[i] < ids[j] })
 		for _, id := range ids {
-			materialIDToShield[id] = shield.MaterialID(nextShieldID)
-			simContext.MapMaterialID[shield.MaterialID(nextShieldID)] = id
+			materialIDToShield[id] = context.MaterialID(nextShieldID)
+			simContext.MapMaterialID[context.MaterialID(nextShieldID)] = id
 			nextShieldID++
 		}
 	}
@@ -134,7 +135,7 @@ func (e *Element) SerializeIValue() bool {
 	return e.IValue > 0.0
 }
 
-func createPredefinedMaterial(predef setup.Predefined, id shield.MaterialID) (PredefinedMaterial, error) {
+func createPredefinedMaterial(predef setup.Predefined, id context.MaterialID) (PredefinedMaterial, error) {
 	ICRUNumber, found := predefinedMaterialsToShieldICRU[predef.PredefinedID]
 	if !found {
 		return PredefinedMaterial{}, newMaterialIDError(id, "\"%s\" material mapping to shield format not found", predef.PredefinedID)
@@ -148,7 +149,7 @@ func createPredefinedMaterial(predef setup.Predefined, id shield.MaterialID) (Pr
 		LoadExternalStoppingPower: predef.LoadExternalStoppingPower}, nil
 }
 
-func createCompoundMaterial(compound setup.Compound, id shield.MaterialID) (CompoundMaterial, error) {
+func createCompoundMaterial(compound setup.Compound, id context.MaterialID) (CompoundMaterial, error) {
 	const maxElementsNumber = 13
 
 	if compound.StateOfMatter == setup.NonDefined {

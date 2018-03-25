@@ -1,8 +1,9 @@
 package setup
 
 import (
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // Geometry represent ready to serialize data for geo.dat file.
@@ -12,7 +13,7 @@ type Geometry struct {
 	ZoneToMaterialPairs []ZoneToMaterial
 }
 
-func convertSetupGeometry(bodyMap setup.BodyMap, zoneMap setup.ZoneMap, materialIDToShield map[setup.ID]shield.MaterialID, simContext *shield.SerializationContext) (Geometry, error) {
+func convertSetupGeometry(bodyMap converter.BodyMap, zoneMap converter.ZoneMap, materialIDToShield map[setup.ID]context.MaterialID, simContext *context.SerializationContext) (Geometry, error) {
 	bodies, bodyIDToShield, err := convertSetupBodies(bodyMap, simContext)
 	if err != nil {
 		return Geometry{}, err

@@ -2,7 +2,7 @@ package setup
 
 import (
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 // MaterialICRU is representation of predefined materials in shield mat.dat file.
@@ -29,7 +29,7 @@ var setupStateOfMatterToShield = map[setup.StateOfMatter]StateOfMatter{
 }
 
 // BlackholeMaterialID represent Blackhole material in shield input files.
-const BlackholeMaterialID shield.MaterialID = 0
+const BlackholeMaterialID context.MaterialID = 0
 
 var predefinedMaterialsToShieldICRU = map[string]MaterialICRU{
 	"hydrogen":                                 1,

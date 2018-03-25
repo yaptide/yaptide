@@ -1,4 +1,4 @@
-package shield
+package context
 
 import (
 	"github.com/yaptide/converter/setup"
@@ -21,8 +21,8 @@ type SerializationContext struct {
 }
 
 // NewSerializationContext constructor.
-func NewSerializationContext() *SerializationContext {
-	return &SerializationContext{
+func NewSerializationContext() SerializationContext {
+	return SerializationContext{
 		MapMaterialID:           map[MaterialID]setup.ID{},
 		MapBodyID:               map[BodyID]setup.ID{},
 		MapFilenameToDetectorID: map[string]setup.ID{},

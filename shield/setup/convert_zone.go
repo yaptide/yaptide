@@ -1,8 +1,6 @@
 package setup
 
-import (
-	"github.com/yaptide/converter/shield"
-)
+import "github.com/yaptide/converter/shield/context"
 
 // Operation decribe how to construct zone using bodies.
 type Operation string
@@ -33,23 +31,23 @@ func (s *Sign) opposite() Sign {
 	return Plus
 }
 
-// Construction represent steps to build zone by shield.
+// Construction represent steps to build zone by context.
 type Construction struct {
 	Operation Operation
 	Sign      Sign
-	BodyID    shield.BodyID
+	BodyID    context.BodyID
 }
 
 // Zone represent zone in shield files.
 type Zone struct {
-	ID            shield.ZoneID
+	ID            context.ZoneID
 	Constructions []Construction
 }
 
 // ZoneToMaterial mapping.
 type ZoneToMaterial struct {
-	ZoneID     shield.ZoneID
-	MaterialID shield.MaterialID
+	ZoneID     context.ZoneID
+	MaterialID context.MaterialID
 }
 
 func convertTreeToZones(root *zoneTree) ([]Zone, []ZoneToMaterial, error) {
@@ -83,8 +81,8 @@ func convertTreeToZones(root *zoneTree) ([]Zone, []ZoneToMaterial, error) {
 	return zones, zoneToMaterialPairs, nil
 }
 
-func genNextZoneID(zones []Zone) shield.ZoneID {
-	return shield.ZoneID(len(zones) + 1)
+func genNextZoneID(zones []Zone) context.ZoneID {
+	return context.ZoneID(len(zones) + 1)
 }
 
 func recursiveWalk(tree *zoneTree, ch chan *zoneTree) {

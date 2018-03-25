@@ -3,28 +3,29 @@ package setup
 import (
 	"fmt"
 
+	"github.com/yaptide/converter"
 	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/converter/shield/context"
 )
 
 type operation struct {
-	BodyID shield.BodyID
+	BodyID context.BodyID
 	Type   setup.OperationType
 }
 
 type zoneTree struct {
 	childrens []*zoneTree
 
-	baseBodyID shield.BodyID
+	baseBodyID context.BodyID
 	operations []operation
 
-	materialID shield.MaterialID
+	materialID context.MaterialID
 }
 
 func convertSetupZonesToZoneTreeForest(
-	zoneMap setup.ZoneMap,
-	materialIDToShield map[setup.ID]shield.MaterialID,
-	bodyIDToShield map[setup.ID]shield.BodyID) ([]*zoneTree, error) {
+	zoneMap converter.ZoneMap,
+	materialIDToShield map[setup.ID]context.MaterialID,
+	bodyIDToShield map[setup.ID]context.BodyID) ([]*zoneTree, error) {
 
 	converter := zoneConverter{
 		zoneMap:            zoneMap,
@@ -35,9 +36,9 @@ func convertSetupZonesToZoneTreeForest(
 }
 
 type zoneConverter struct {
-	zoneMap            setup.ZoneMap
-	materialIDToShield map[setup.ID]shield.MaterialID
-	bodyIDToShield     map[setup.ID]shield.BodyID
+	zoneMap            converter.ZoneMap
+	materialIDToShield map[setup.ID]context.MaterialID
+	bodyIDToShield     map[setup.ID]context.BodyID
 }
 
 func (z *zoneConverter) convertSetupZonesToZoneTreeForest() ([]*zoneTree, error) {
@@ -45,7 +46,7 @@ func (z *zoneConverter) convertSetupZonesToZoneTreeForest() ([]*zoneTree, error)
 
 	for _, zoneModel := range z.zoneMap {
 		if zoneModel.ParentID == setup.RootID {
-			newZoneTree, err := z.createZoneTree(zoneModel)
+			newZoneTree, err := z.createZoneTree(&zoneModel)
 			if err != nil {
 				return nil, err
 			}
@@ -85,7 +86,7 @@ func (z *zoneConverter) createZoneTree(zoneModel *setup.Zone) (*zoneTree, error)
 			return nil, newZoneIDError(zoneModel.ID, "Can not find Children {ID: %d}", childModelID)
 		}
 
-		child, err := z.createZoneTree(childModel)
+		child, err := z.createZoneTree(&childModel)
 		if err != nil {
 			return nil, err
 		}
@@ -116,7 +117,7 @@ func (z *zoneConverter) convertSetupOperations(setupOperations []*setup.Operatio
 	return operations, nil
 }
 
-func surroundZoneForestWithBlackholeZone(zoneForest []*zoneTree, blackholeBodyID shield.BodyID) *zoneTree {
+func surroundZoneForestWithBlackholeZone(zoneForest []*zoneTree, blackholeBodyID context.BodyID) *zoneTree {
 	return &zoneTree{
 		childrens:  zoneForest,
 		baseBodyID: blackholeBodyID,
