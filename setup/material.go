@@ -7,9 +7,11 @@ import (
 	"github.com/yaptide/converter/common/color"
 )
 
+type MaterialID int64
+
 // Material defines the zone material that is used in the simulation.
 type Material struct {
-	ID    ID          `json:"id"`
+	ID    MaterialID  `json:"id"`
 	Color color.Color `json:"color"`
 	Type  Type        `json:"materialInfo"`
 }
@@ -18,7 +20,7 @@ type Material struct {
 // material.Type is recognized by material/type in json.
 func (m *Material) UnmarshalJSON(b []byte) error {
 	type rawBody struct {
-		ID      ID              `json:"id"`
+		ID      MaterialID      `json:"id"`
 		Color   color.Color     `json:"color"`
 		TypeRaw json.RawMessage `json:"materialInfo"`
 	}
@@ -48,7 +50,7 @@ func unmarshalMaterialType(b json.RawMessage) (Type, error) {
 
 	switch matType {
 	case predefinedType:
-		predefined := Predefined{}
+		predefined := MaterialPredefined{}
 		err = json.Unmarshal(b, &predefined)
 		if err != nil {
 			return nil, err
@@ -56,14 +58,14 @@ func unmarshalMaterialType(b json.RawMessage) (Type, error) {
 		return predefined, nil
 
 	case compoundType:
-		compound := Compound{}
+		compound := MaterialCompound{}
 		err = json.Unmarshal(b, &compound)
 		if err != nil {
 			return nil, err
 		}
 		return compound, nil
 	case voxelType:
-		voxel := Voxel{}
+		voxel := MaterialVoxel{}
 		err = json.Unmarshal(b, &voxel)
 		if err != nil {
 			return nil, err

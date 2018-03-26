@@ -5,44 +5,44 @@ import (
 	"fmt"
 )
 
-// OperationType determines operation type.
+// ZoneOperationType determines operation type.
 // OperationTypes are based on mathematical operations on sets.
-type OperationType int
+type ZoneOperationType int
 
 const (
 	// Intersect operation: A ∩ B.
-	Intersect OperationType = iota
+	Intersect ZoneOperationType = iota
 	// Subtract operation: A \ B.
 	Subtract
 	// Union operation: A ∪ B.
 	Union
 )
 
-var mapOperationToJSON = map[OperationType]string{
+var mapOperationToJSON = map[ZoneOperationType]string{
 	Intersect: "intersect",
 	Subtract:  "subtract",
 	Union:     "union",
 }
 
-var mapJSONToOperation = map[string]OperationType{
+var mapJSONToOperation = map[string]ZoneOperationType{
 	"intersect": Intersect,
 	"subtract":  Subtract,
 	"union":     Union,
 }
 
-// Operation determines construction of Zone.
-type Operation struct {
-	BodyID ID            `json:"bodyId"`
-	Type   OperationType `json:"-"`
+// ZoneOperation determines construction of Zone.
+type ZoneOperation struct {
+	BodyID BodyID            `json:"bodyId"`
+	Type   ZoneOperationType `json:"-"`
 }
 
 type rawOperation struct {
-	BodyID ID     `json:"bodyId"`
+	BodyID BodyID `json:"bodyId"`
 	Type   string `json:"type"`
 }
 
 // MarshalJSON custom Marshal function.
-func (o *Operation) MarshalJSON() ([]byte, error) {
+func (o *ZoneOperation) MarshalJSON() ([]byte, error) {
 
 	typeStr, ok := mapOperationToJSON[o.Type]
 	if !ok {
@@ -57,7 +57,7 @@ func (o *Operation) MarshalJSON() ([]byte, error) {
 }
 
 // UnmarshalJSON custom Unmarshal function.
-func (o *Operation) UnmarshalJSON(b []byte) error {
+func (o *ZoneOperation) UnmarshalJSON(b []byte) error {
 	rOperation := rawOperation{}
 	err := json.Unmarshal(b, &rOperation)
 	if err != nil {

@@ -9,15 +9,15 @@ import (
 
 var opTestCases = test.MarshallingCases{
 	{
-		&Operation{BodyID: ID(1), Type: Intersect},
+		&ZoneOperation{BodyID: BodyID(1), Type: Intersect},
 		`{"bodyId":1,"type":"intersect"}`,
 	},
 	{
-		&Operation{BodyID: ID(1), Type: Subtract},
+		&ZoneOperation{BodyID: BodyID(1), Type: Subtract},
 		`{"bodyId":1,"type":"subtract"}`,
 	},
 	{
-		&Operation{BodyID: ID(1), Type: Union},
+		&ZoneOperation{BodyID: BodyID(1), Type: Union},
 		`{"bodyId":1,"type":"union"}`,
 	},
 }
@@ -40,15 +40,15 @@ func TestOperationUnmarshalMarshalled(t *testing.T) {
 
 func TestOperationInvalidTypeMarshal(t *testing.T) {
 	testCases := []struct {
-		TestOperation *Operation
+		TestOperation *ZoneOperation
 		IsReturnErr   bool
 	}{
 		{
-			&Operation{BodyID: ID(1), Type: Subtract},
+			&ZoneOperation{BodyID: BodyID(1), Type: Subtract},
 			false,
 		},
 		{
-			&Operation{BodyID: ID(1), Type: (OperationType)(10000)},
+			&ZoneOperation{BodyID: BodyID(1), Type: (ZoneOperationType)(10000)},
 			true,
 		},
 	}
@@ -78,7 +78,7 @@ func TestOperationInvalidTypeUnmarshal(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		var op Operation
+		var op ZoneOperation
 		err := json.Unmarshal([]byte(tc.TestJSON), &op)
 		if (err != nil) != tc.IsReturnErr {
 			t.Errorf("TestOperationInvalidTypeUnmarshal: IsReturnErr: %v, Actual: %v",

@@ -14,7 +14,7 @@ type Result struct {
 
 // DetectorResult contains simulation result data for single setup.
 type DetectorResult struct {
-	DetectorID       setup.ID          `json:"detectorId"`
+	DetectorID       setup.DetectorID  `json:"detectorId"`
 	Errors           map[string]string `json:"errors"`
 	DetectorMetadata map[string]string `json:"metadata"`
 	Data             [][][]float64     `json:"scored"`

@@ -20,9 +20,9 @@ type Detector struct {
 	Arguments []interface{}
 }
 
-func convertSetupDetectors(detectorsMap converter.DetectorMap, materialIDToShield map[setup.ID]context.MaterialID, simContext *context.SerializationContext) ([]Detector, error) {
+func convertSetupDetectors(detectorsMap converter.DetectorMap, materialIDToShield map[setup.MaterialID]context.MaterialID, simContext *context.SerializationContext) ([]Detector, error) {
 	result := []Detector{}
-	detectIds := []setup.ID{}
+	detectIds := []setup.DetectorID{}
 	for k := range detectorsMap {
 		detectIds = append(detectIds, k)
 	}
@@ -30,7 +30,7 @@ func convertSetupDetectors(detectorsMap converter.DetectorMap, materialIDToShiel
 
 	detectorConverter := detectorConverter{materialIDToShield}
 
-	uniqNameSet := map[string]setup.ID{}
+	uniqNameSet := map[string]setup.DetectorID{}
 	for n, id := range detectIds {
 		setupDetector := detectorsMap[id]
 
@@ -55,21 +55,21 @@ func convertSetupDetectors(detectorsMap converter.DetectorMap, materialIDToShiel
 }
 
 type detectorConverter struct {
-	materialIDToShield map[setup.ID]context.MaterialID
+	materialIDToShield map[setup.MaterialID]context.MaterialID
 }
 
 func (d detectorConverter) convertDetector(detect *setup.Detector, filename string) (Detector, error) {
 	switch geo := detect.DetectorGeometry.(type) {
-	case setup.Geomap:
+	case setup.DetectorGeomap:
 		return Detector{}, newGeneralDetectorError("Geomap detector serialization not implemented")
-	case setup.Zones:
+	case setup.DetectorZones:
 		return Detector{}, newGeneralDetectorError("Zone detector serialization not implemented")
 
 	case setup.DetectorCylinder:
 		return d.convertStandardGeometryDetector(detect, filename)
-	case setup.Mesh:
+	case setup.DetectorMesh:
 		return d.convertStandardGeometryDetector(detect, filename)
-	case setup.Plane:
+	case setup.DetectorPlane:
 		return d.convertStandardGeometryDetector(detect, filename)
 
 	default:
@@ -97,7 +97,7 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detecto
 				geo.Slices.Z,
 			},
 		}
-	case setup.Mesh:
+	case setup.DetectorMesh:
 		xMin, xMax := centerAndSizeToMinAndMax(geo.Center.X, geo.Size.Y)
 		yMin, yMax := centerAndSizeToMinAndMax(geo.Center.Y, geo.Size.Y)
 		zMin, zMax := centerAndSizeToMinAndMax(geo.Center.Z, geo.Size.Z)
@@ -116,7 +116,7 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detecto
 				geo.Slices.Z,
 			},
 		}
-	case setup.Plane:
+	case setup.DetectorPlane:
 		newDetector = Detector{
 			ScoringType: "PLANE",
 			Arguments: []interface{}{

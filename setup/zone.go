@@ -3,6 +3,8 @@ package setup
 // RootID indicate that zone with the given number is a root.
 const RootID = 0
 
+type ZoneID int64
+
 // Zone is composed from list of bodies.
 // Every Zone have Base  Zone 3D model is created by using an pseudo algorithm:
 // 	currentResult := zone.Base
@@ -22,13 +24,13 @@ const RootID = 0
 //
 // TODO: intersections other than children <-> one parent like beetween childrens of same parent are not allowed.
 type Zone struct {
-	ID ID `json:"id"`
+	ID ZoneID `json:"id"`
 
 	// ID of parent. If ID == RootID then Zone is a root.
-	ParentID ID `json:"parentId"`
+	ParentID ZoneID `json:"parentId"`
 
-	Name         string       `json:"name"`
-	BaseID       ID           `json:"baseId"`
-	MaterialID   ID           `json:"materialId"`
-	Construction []*Operation `json:"construction"`
+	Name         string           `json:"name"`
+	BaseID       BodyID           `json:"baseId"`
+	MaterialID   MaterialID       `json:"materialId"`
+	Construction []*ZoneOperation `json:"construction"`
 }

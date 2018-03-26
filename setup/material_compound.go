@@ -2,8 +2,8 @@ package setup
 
 import "encoding/json"
 
-// Compound material type - create material by defining isotope mixture.
-type Compound struct {
+// MaterialCompound material type - create material by defining isotope mixture.
+type MaterialCompound struct {
 	Name string `json:"name"`
 
 	// Density of the medium in g/cm³ - mandatory.
@@ -33,8 +33,8 @@ type Element struct {
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (c Compound) MarshalJSON() ([]byte, error) {
-	type Alias Compound
+func (c MaterialCompound) MarshalJSON() ([]byte, error) {
+	type Alias MaterialCompound
 	return json.Marshal(struct {
 		materialType
 		Alias

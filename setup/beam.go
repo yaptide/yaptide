@@ -10,10 +10,10 @@ import (
 type Beam struct {
 	// Direction ...
 	// SHIELD doc: BEAMDIR, BEAMPOS
-	Direction Direction `json:"direction"`
+	Direction BeamDirection `json:"direction"`
 	// Divergance ...
 	// SHIELD doc: BEAMDIV
-	Divergence Divergence `json:"divergence"`
+	Divergence BeamDivergence `json:"divergence"`
 
 	// ParticleType ...
 	// SHIELD doc: HIPROJ, JPART0
@@ -29,10 +29,10 @@ type Beam struct {
 
 // Default represents default beam configuration.
 var DefaultBeam = Beam{
-	Direction: Direction{
+	Direction: BeamDirection{
 		Phi: 0, Theta: 0, Position: common.Point{X: 0, Y: 0, Z: 0},
 	},
-	Divergence: Divergence{
+	Divergence: BeamDivergence{
 		SigmaX:       0,
 		SigmaY:       0,
 		Distribution: common.GaussianDistribution,
@@ -45,8 +45,8 @@ var DefaultBeam = Beam{
 // UnmarshalJSON custom Unmarshal function.
 func (d *Beam) UnmarshalJSON(b []byte) error {
 	type rawBeam struct {
-		Direction          Direction       `json:"direction"`
-		Divergence         Divergence      `json:"divergence"`
+		Direction          BeamDirection   `json:"direction"`
+		Divergence         BeamDivergence  `json:"divergence"`
 		ParticleType       json.RawMessage `json:"particleType"`
 		InitialBaseEnergy  float64         `json:"initialBaseEnergy"`
 		InitialEnergySigma float64         `json:"initialEnergySigma"`
@@ -68,8 +68,8 @@ func (d *Beam) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-// Direction ...
-type Direction struct {
+// BeamDirection ...
+type BeamDirection struct {
 	// Phi is angle between positive x axis and direction after cast on xy plane.
 	Phi float64 `json:"phi"`
 	// Theta is angle between z axis and direction.
@@ -77,8 +77,8 @@ type Direction struct {
 	Position common.Point `json:"position"`
 }
 
-// Divergence ...
-type Divergence struct {
+// BeamDivergence ...
+type BeamDivergence struct {
 	SigmaX       float64             `json:"sigmaX"`
 	SigmaY       float64             `json:"sigmaY"`
 	Distribution common.Distribution `json:"distribution"`

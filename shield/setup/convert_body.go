@@ -17,11 +17,13 @@ type Body struct {
 	Arguments  []float64
 }
 
-func convertSetupBodies(bodyMap converter.BodyMap, simContext *context.SerializationContext) ([]Body, map[setup.ID]context.BodyID, error) {
+func convertSetupBodies(
+	bodyMap converter.BodyMap, simContext *context.SerializationContext,
+) ([]Body, map[setup.BodyID]context.BodyID, error) {
 	result := []Body{}
-	bodyIDToShield := map[setup.ID]context.BodyID{}
+	bodyIDToShield := map[setup.BodyID]context.BodyID{}
 
-	bodyIds := []setup.ID{}
+	bodyIds := []setup.BodyID{}
 	for k := range bodyMap {
 		bodyIds = append(bodyIds, k)
 	}
@@ -45,7 +47,7 @@ func convertSetupBodies(bodyMap converter.BodyMap, simContext *context.Serializa
 func appendBlackholeBody(bodies []Body) ([]Body, context.BodyID, error) {
 	newID := bodies[len(bodies)-1].ID + 1
 
-	blackholeBody, err := convertCuboid(setup.Cuboid{
+	blackholeBody, err := convertCuboid(setup.CuboidBody{
 		Center: common.Point{
 			X: 0.0,
 			Y: 0.0,
@@ -69,11 +71,11 @@ func appendBlackholeBody(bodies []Body) ([]Body, context.BodyID, error) {
 
 func convertBody(b setup.Body) (Body, error) {
 	switch g := b.Geometry.(type) {
-	case setup.Sphere:
+	case setup.SphereBody:
 		return convertSphere(g)
-	case setup.Cuboid:
+	case setup.CuboidBody:
 		return convertCuboid(g)
-	case setup.Cylinder:
+	case setup.CylinderBody:
 		return convertCylinder(g)
 
 	default:
@@ -81,7 +83,7 @@ func convertBody(b setup.Body) (Body, error) {
 	}
 }
 
-func convertSphere(sphere setup.Sphere) (Body, error) {
+func convertSphere(sphere setup.SphereBody) (Body, error) {
 	if sphere.Radius <= 0.0 {
 		return Body{}, fmt.Errorf("sphere radius cannot be <= 0.0")
 	}
@@ -92,7 +94,7 @@ func convertSphere(sphere setup.Sphere) (Body, error) {
 	}, nil
 }
 
-func convertCuboid(cuboid setup.Cuboid) (Body, error) {
+func convertCuboid(cuboid setup.CuboidBody) (Body, error) {
 	for axis, size := range map[string]float64{
 		"x": cuboid.Size.X,
 		"y": cuboid.Size.Y,
@@ -119,7 +121,7 @@ func convertCuboid(cuboid setup.Cuboid) (Body, error) {
 	}, nil
 }
 
-func convertCylinder(cylinder setup.Cylinder) (Body, error) {
+func convertCylinder(cylinder setup.CylinderBody) (Body, error) {
 	if cylinder.Height <= 0.0 {
 		return Body{}, fmt.Errorf("cylinder height cannot be <= 0.0")
 	}

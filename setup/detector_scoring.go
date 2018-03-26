@@ -12,8 +12,8 @@ type PredefinedScoring string
 
 // LetTypeScoring ...
 type LetTypeScoring struct {
-	Type     string `json:"type"`
-	Material ID     `json:"material"`
+	Type     string     `json:"type"`
+	Material MaterialID `json:"material"`
 }
 
 // MarshalJSON json.Marshaller implementation.

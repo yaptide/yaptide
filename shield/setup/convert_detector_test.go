@@ -13,7 +13,7 @@ import (
 func TestConvertSetupDetectors(t *testing.T) {
 	type testCase struct {
 		Input              converter.DetectorMap
-		MaterialIDToShield map[setup.ID]context.MaterialID
+		MaterialIDToShield map[setup.MaterialID]context.MaterialID
 		Expected           []Detector
 		ExpectedSimContext *context.SerializationContext
 	}
@@ -43,7 +43,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 				ScoredParticle: common.PredefinedParticle("all"),
 				ScoringType:    setup.PredefinedScoring("energy"),
 			}},
-			MaterialIDToShield: map[setup.ID]context.MaterialID{},
+			MaterialIDToShield: map[setup.MaterialID]context.MaterialID{},
 			Expected: []Detector{
 				Detector{
 					ScoringType: "CYL",
@@ -54,9 +54,9 @@ func TestConvertSetupDetectors(t *testing.T) {
 				},
 			},
 			ExpectedSimContext: &context.SerializationContext{
-				MapMaterialID: map[context.MaterialID]setup.ID{},
-				MapBodyID:     map[context.BodyID]setup.ID{},
-				MapFilenameToDetectorID: map[string]setup.ID{
+				MapMaterialID: map[context.MaterialID]setup.MaterialID{},
+				MapBodyID:     map[context.BodyID]setup.BodyID{},
+				MapFilenameToDetectorID: map[string]setup.DetectorID{
 					"ala_ma_psa0": 5,
 				},
 			},
@@ -69,7 +69,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 				3: setup.Detector{
 					ID:   3,
 					Name: "raz raz raz",
-					DetectorGeometry: setup.Mesh{
+					DetectorGeometry: setup.DetectorMesh{
 						Center: common.Point{X: 0.0, Y: 0.0, Z: 15.0},
 						Size:   common.Vec3D{X: 10.0, Y: 10.0, Z: 30.0},
 						Slices: common.Vec3DInt{X: 1, Y: 1, Z: 300},
@@ -93,7 +93,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 				1: setup.Detector{
 					ID:   1,
 					Name: "trzy trzy trzy",
-					DetectorGeometry: setup.Plane{
+					DetectorGeometry: setup.DetectorPlane{
 						Point:  common.Point{X: 1.0, Y: 2.0, Z: 3.0},
 						Normal: common.Vec3D{X: -1.0, Y: -2.0, Z: -3.0},
 					},
@@ -104,7 +104,7 @@ func TestConvertSetupDetectors(t *testing.T) {
 					},
 				},
 			},
-			MaterialIDToShield: map[setup.ID]context.MaterialID{4: 100},
+			MaterialIDToShield: map[setup.MaterialID]context.MaterialID{4: 100},
 			Expected: []Detector{
 				Detector{
 					ScoringType: "PLANE",
@@ -131,9 +131,9 @@ func TestConvertSetupDetectors(t *testing.T) {
 				},
 			},
 			ExpectedSimContext: &context.SerializationContext{
-				MapMaterialID: map[context.MaterialID]setup.ID{},
-				MapBodyID:     map[context.BodyID]setup.ID{},
-				MapFilenameToDetectorID: map[string]setup.ID{
+				MapMaterialID: map[context.MaterialID]setup.MaterialID{},
+				MapBodyID:     map[context.BodyID]setup.BodyID{},
+				MapFilenameToDetectorID: map[string]setup.DetectorID{
 					"trzy_trzy_trzy0": 1,
 					"dwa_dwa_dwa1":    2,
 					"raz_raz_raz2":    3,

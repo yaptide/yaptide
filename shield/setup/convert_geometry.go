@@ -13,7 +13,12 @@ type Geometry struct {
 	ZoneToMaterialPairs []ZoneToMaterial
 }
 
-func convertSetupGeometry(bodyMap converter.BodyMap, zoneMap converter.ZoneMap, materialIDToShield map[setup.ID]context.MaterialID, simContext *context.SerializationContext) (Geometry, error) {
+func convertSetupGeometry(
+	bodyMap converter.BodyMap,
+	zoneMap converter.ZoneMap,
+	materialIDToShield map[setup.MaterialID]context.MaterialID,
+	simContext *context.SerializationContext,
+) (Geometry, error) {
 	bodies, bodyIDToShield, err := convertSetupBodies(bodyMap, simContext)
 	if err != nil {
 		return Geometry{}, err

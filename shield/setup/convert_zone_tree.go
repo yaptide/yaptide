@@ -10,7 +10,7 @@ import (
 
 type operation struct {
 	BodyID context.BodyID
-	Type   setup.OperationType
+	Type   setup.ZoneOperationType
 }
 
 type zoneTree struct {
@@ -24,8 +24,8 @@ type zoneTree struct {
 
 func convertSetupZonesToZoneTreeForest(
 	zoneMap converter.ZoneMap,
-	materialIDToShield map[setup.ID]context.MaterialID,
-	bodyIDToShield map[setup.ID]context.BodyID) ([]*zoneTree, error) {
+	materialIDToShield map[setup.MaterialID]context.MaterialID,
+	bodyIDToShield map[setup.BodyID]context.BodyID) ([]*zoneTree, error) {
 
 	converter := zoneConverter{
 		zoneMap:            zoneMap,
@@ -37,8 +37,8 @@ func convertSetupZonesToZoneTreeForest(
 
 type zoneConverter struct {
 	zoneMap            converter.ZoneMap
-	materialIDToShield map[setup.ID]context.MaterialID
-	bodyIDToShield     map[setup.ID]context.BodyID
+	materialIDToShield map[setup.MaterialID]context.MaterialID
+	bodyIDToShield     map[setup.BodyID]context.BodyID
 }
 
 func (z *zoneConverter) convertSetupZonesToZoneTreeForest() ([]*zoneTree, error) {
@@ -72,7 +72,7 @@ func (z *zoneConverter) createZoneTree(zoneModel *setup.Zone) (*zoneTree, error)
 		return nil, newZoneIDError(zoneModel.ID, "Cannot find material: %d", zoneModel.MaterialID)
 	}
 
-	childModelIDs := []setup.ID{}
+	childModelIDs := []setup.ZoneID{}
 	for _, zone := range z.zoneMap {
 		if zone.ParentID == zoneModel.ID {
 			childModelIDs = append(childModelIDs, zone.ID)
@@ -102,7 +102,7 @@ func (z *zoneConverter) createZoneTree(zoneModel *setup.Zone) (*zoneTree, error)
 	}, nil
 }
 
-func (z *zoneConverter) convertSetupOperations(setupOperations []*setup.Operation) ([]operation, error) {
+func (z *zoneConverter) convertSetupOperations(setupOperations []*setup.ZoneOperation) ([]operation, error) {
 	operations := []operation{}
 	for _, o := range setupOperations {
 		bodyID, found := z.bodyIDToShield[o.BodyID]

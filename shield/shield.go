@@ -8,10 +8,13 @@ import (
 	"github.com/yaptide/converter/shield/setup"
 )
 
-func ConvertSetup(simulationSetup converter.Setup) (setup.RawShieldSetup, context.SerializationContext, error) {
+func ConvertSetup(simulationSetup converter.Setup) (setup.RawShieldSetup, SerializationContext, error) {
 	return setup.Convert(simulationSetup)
 }
 
-func ParseResults(files map[string]string, simulationContext *context.SerializationContext) (*converter.Result, error) {
+func ParseResults(files map[string]string, simulationContext *SerializationContext) (*converter.Result, error) {
 	return results.ParseResults(files, simulationContext)
 }
+
+type SerializationContext = context.SerializationContext
+type RawShieldSetup = setup.RawShieldSetup

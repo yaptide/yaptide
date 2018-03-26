@@ -2,8 +2,8 @@ package setup
 
 import "encoding/json"
 
-// Predefined material type - choose material definition from predefined material list by name.
-type Predefined struct {
+// MaterialPredefined material type - choose material definition from predefined material list by name.
+type MaterialPredefined struct {
 	PredefinedID string `json:"predefinedId"`
 
 	// Density of the medium in g/cm³ - optional.
@@ -17,8 +17,8 @@ type Predefined struct {
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (p Predefined) MarshalJSON() ([]byte, error) {
-	type Alias Predefined
+func (p MaterialPredefined) MarshalJSON() ([]byte, error) {
+	type Alias MaterialPredefined
 	return json.Marshal(struct {
 		materialType
 		Alias

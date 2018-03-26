@@ -10,9 +10,9 @@ import (
 var detectorTestCasses = test.MarshallingCases{
 	{
 		&Detector{
-			ID:   ID(1),
+			ID:   DetectorID(1),
 			Name: "ala",
-			DetectorGeometry: Mesh{
+			DetectorGeometry: DetectorMesh{
 				Center: common.Point{X: 1, Y: 2, Z: 3},
 				Size:   common.Vec3D{X: 1, Y: 2, Z: 3},
 				Slices: common.Vec3DInt{X: 10, Y: 10, Z: 10},
@@ -50,9 +50,9 @@ var detectorTestCasses = test.MarshallingCases{
 		}`,
 	}, {
 		&Detector{
-			ID:   ID(1),
+			ID:   DetectorID(1),
 			Name: "ma",
-			DetectorGeometry: Mesh{
+			DetectorGeometry: DetectorMesh{
 				Center: common.Point{X: 1, Y: 2, Z: 3},
 				Size:   common.Vec3D{X: 1, Y: 2, Z: 3},
 				Slices: common.Vec3DInt{X: 10, Y: 10, Z: 10},

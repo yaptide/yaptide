@@ -30,7 +30,7 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 		check(t, testCase{
 			Input: createBodyMap(setup.Body{
 				ID: 1,
-				Geometry: setup.Sphere{
+				Geometry: setup.SphereBody{
 					Center: common.Point{X: 20.0, Y: 31.0, Z: 0.99},
 					Radius: 0.01,
 				},
@@ -43,7 +43,7 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 		check(t, testCase{
 			Input: createBodyMap(setup.Body{
 				ID: 1,
-				Geometry: setup.Cuboid{
+				Geometry: setup.CuboidBody{
 					Center: common.Point{X: 10.0, Y: 20.0, Z: 30.0},
 					Size:   common.Vec3D{X: 100.0, Y: 200.0, Z: 30.5},
 				},
@@ -56,7 +56,7 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 		check(t, testCase{
 			Input: createBodyMap(setup.Body{
 				ID: 1,
-				Geometry: setup.Cylinder{
+				Geometry: setup.CylinderBody{
 					Center: common.Point{X: 10.1, Y: 20.2, Z: 30.3},
 					Height: 24.4,
 					Radius: 99.5,
@@ -71,21 +71,21 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 			Input: createBodyMap(
 				setup.Body{
 					ID: 3,
-					Geometry: setup.Cylinder{Center: common.Point{X: 10.1, Y: 20.2, Z: 30.3},
+					Geometry: setup.CylinderBody{Center: common.Point{X: 10.1, Y: 20.2, Z: 30.3},
 						Height: 24.4,
 						Radius: 99.5,
 					},
 				},
 				setup.Body{
 					ID: 4,
-					Geometry: setup.Sphere{
+					Geometry: setup.SphereBody{
 						Center: common.Point{X: 20.0, Y: 31.0, Z: 0.99},
 						Radius: 0.01,
 					},
 				},
 				setup.Body{
 					ID: 1,
-					Geometry: setup.Cylinder{
+					Geometry: setup.CylinderBody{
 						Center: common.Point{X: 0.0, Y: 1.0, Z: 2.0},
 						Height: 3.0,
 						Radius: 4.0,
@@ -93,7 +93,7 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 				},
 				setup.Body{
 					ID: 2,
-					Geometry: setup.Cuboid{
+					Geometry: setup.CuboidBody{
 						Center: common.Point{X: 10.0, Y: 20.0, Z: 30.0},
 						Size:   common.Vec3D{X: 100.0, Y: 200.0, Z: 30.5},
 					},

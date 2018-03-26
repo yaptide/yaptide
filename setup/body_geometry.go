@@ -7,9 +7,9 @@ import (
 	"github.com/yaptide/converter/common"
 )
 
-// Geometry is a variant type, which represent different geometries used in simulations.
-// It must implement json.Marshaler to marshal geometry type dependant on Geometry implementation type.
-type Geometry interface {
+// BodyGeometry is a variant type, which represent different geometries used in simulations.
+// It must implement json.Marshaler to marshal geometry type dependant on BodyGeometry implementation type.
+type BodyGeometry interface {
 	json.Marshaler
 }
 
@@ -23,7 +23,7 @@ var (
 	cylinderType = geometryType{"cylinder"}
 )
 
-func unmarshalGeometry(b json.RawMessage) (Geometry, error) {
+func unmarshalGeometry(b json.RawMessage) (BodyGeometry, error) {
 	var geoType geometryType
 	err := json.Unmarshal(b, &geoType)
 	if err != nil {
@@ -32,21 +32,21 @@ func unmarshalGeometry(b json.RawMessage) (Geometry, error) {
 
 	switch geoType {
 	case sphereType:
-		sphere := Sphere{}
+		sphere := SphereBody{}
 		err = json.Unmarshal(b, &sphere)
 		if err != nil {
 			return nil, err
 		}
 		return sphere, nil
 	case cuboidType:
-		cuboid := Cuboid{}
+		cuboid := CuboidBody{}
 		err = json.Unmarshal(b, &cuboid)
 		if err != nil {
 			return nil, err
 		}
 		return cuboid, nil
 	case cylinderType:
-		cylinder := Cylinder{}
+		cylinder := CylinderBody{}
 		err = json.Unmarshal(b, &cylinder)
 		if err != nil {
 			return nil, err
@@ -58,15 +58,15 @@ func unmarshalGeometry(b json.RawMessage) (Geometry, error) {
 	}
 }
 
-// Sphere represent sphere with given radius in space.
-type Sphere struct {
+// SphereBody represent sphere with given radius in space.
+type SphereBody struct {
 	Center common.Point `json:"center"`
 	Radius float64      `json:"radius"`
 }
 
 // MarshalJSON json.Marshaller implementaion.
-func (s Sphere) MarshalJSON() ([]byte, error) {
-	type Alias Sphere
+func (s SphereBody) MarshalJSON() ([]byte, error) {
+	type Alias SphereBody
 	return json.Marshal(struct {
 		geometryType
 		Alias
@@ -76,15 +76,15 @@ func (s Sphere) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Cuboid represent cuboid of given sizes in a space.
-type Cuboid struct {
+// CuboidBody represent cuboid of given sizes in a space.
+type CuboidBody struct {
 	Center common.Point `json:"center"`
 	Size   common.Vec3D `json:"size"`
 }
 
 // MarshalJSON json.Marshaller implementaion.
-func (c Cuboid) MarshalJSON() ([]byte, error) {
-	type Alias Cuboid
+func (c CuboidBody) MarshalJSON() ([]byte, error) {
+	type Alias CuboidBody
 	return json.Marshal(struct {
 		geometryType
 		Alias
@@ -94,16 +94,16 @@ func (c Cuboid) MarshalJSON() ([]byte, error) {
 	})
 }
 
-// Cylinder represent cylinder of given sizes in a space.
-type Cylinder struct {
+// CylinderBody represent cylinder of given sizes in a space.
+type CylinderBody struct {
 	Center common.Point `json:"baseCenter"`
 	Height float64      `json:"height"`
 	Radius float64      `json:"radius"`
 }
 
 // MarshalJSON json.Marshaller implementaion.
-func (c Cylinder) MarshalJSON() ([]byte, error) {
-	type Alias Cylinder
+func (c CylinderBody) MarshalJSON() ([]byte, error) {
+	type Alias CylinderBody
 	return json.Marshal(struct {
 		geometryType
 		Alias

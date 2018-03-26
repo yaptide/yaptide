@@ -3,16 +3,16 @@ package converter
 import "github.com/yaptide/converter/setup"
 
 // MaterialMap type used in Setup structure.
-type MaterialMap map[setup.ID]setup.Material
+type MaterialMap map[setup.MaterialID]setup.Material
 
 // BodyMap type used in Setup structure.
-type BodyMap map[setup.ID]setup.Body
+type BodyMap map[setup.BodyID]setup.Body
 
 // ZoneMap type used in Setup structure.
-type ZoneMap map[setup.ID]setup.Zone
+type ZoneMap map[setup.ZoneID]setup.Zone
 
 // DetectorMap type used in Setup structure.
-type DetectorMap map[setup.ID]setup.Detector
+type DetectorMap map[setup.DetectorID]setup.Detector
 
 // Setup contains all simulation data.
 type Setup struct {

@@ -12,8 +12,8 @@ import (
 func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 	type testCase struct {
 		ZoneMap            converter.ZoneMap
-		MaterialIDToShield map[setup.ID]context.MaterialID
-		BodyIDToShield     map[setup.ID]context.BodyID
+		MaterialIDToShield map[setup.MaterialID]context.MaterialID
+		BodyIDToShield     map[setup.BodyID]context.BodyID
 
 		Expected      []*zoneTree
 		ExpectedError error
@@ -31,16 +31,16 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 	t.Run("SimpleOneZone", func(t *testing.T) {
 		check(t, testCase{
 			ZoneMap: createZoneMap(setup.Zone{
-				ID:         setup.ID(1),
-				ParentID:   setup.ID(0),
-				BaseID:     setup.ID(1),
-				MaterialID: setup.ID(2),
-				Construction: []*setup.Operation{
-					&setup.Operation{Type: setup.Intersect, BodyID: setup.ID(100)},
+				ID:         setup.ZoneID(1),
+				ParentID:   setup.ZoneID(0),
+				BaseID:     setup.BodyID(1),
+				MaterialID: setup.MaterialID(2),
+				Construction: []*setup.ZoneOperation{
+					&setup.ZoneOperation{Type: setup.Intersect, BodyID: setup.BodyID(100)},
 				},
 			}),
-			BodyIDToShield:     map[setup.ID]context.BodyID{1: 1, 100: 2},
-			MaterialIDToShield: map[setup.ID]context.MaterialID{2: 200},
+			BodyIDToShield:     map[setup.BodyID]context.BodyID{1: 1, 100: 2},
+			MaterialIDToShield: map[setup.MaterialID]context.MaterialID{2: 200},
 			Expected: []*zoneTree{
 				&zoneTree{
 					childrens:  []*zoneTree{},
@@ -60,23 +60,23 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 		check(t, testCase{
 			ZoneMap: createZoneMap(
 				setup.Zone{
-					ID:         setup.ID(1),
-					ParentID:   setup.ID(0),
-					BaseID:     setup.ID(1),
-					MaterialID: setup.ID(2),
-					Construction: []*setup.Operation{
-						&setup.Operation{Type: setup.Intersect, BodyID: setup.ID(100)},
+					ID:         setup.ZoneID(1),
+					ParentID:   setup.ZoneID(0),
+					BaseID:     setup.BodyID(1),
+					MaterialID: setup.MaterialID(2),
+					Construction: []*setup.ZoneOperation{
+						&setup.ZoneOperation{Type: setup.Intersect, BodyID: setup.BodyID(100)},
 					},
 				},
 				setup.Zone{
-					ID:         setup.ID(2),
-					ParentID:   setup.ID(1),
-					BaseID:     setup.ID(300),
-					MaterialID: setup.ID(300),
+					ID:         setup.ZoneID(2),
+					ParentID:   setup.ZoneID(1),
+					BaseID:     setup.BodyID(300),
+					MaterialID: setup.MaterialID(300),
 				},
 			),
-			BodyIDToShield:     map[setup.ID]context.BodyID{1: 1, 100: 2, 300: 3},
-			MaterialIDToShield: map[setup.ID]context.MaterialID{2: 200, 300: 1},
+			BodyIDToShield:     map[setup.BodyID]context.BodyID{1: 1, 100: 2, 300: 3},
+			MaterialIDToShield: map[setup.MaterialID]context.MaterialID{2: 200, 300: 1},
 			Expected: []*zoneTree{
 				&zoneTree{
 					childrens: []*zoneTree{

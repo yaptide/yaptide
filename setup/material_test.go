@@ -9,7 +9,7 @@ import (
 
 var materialTestCasses = test.MarshallingCases{
 	{
-		&Material{ID(1), color.New(0xFF, 0x00, 0x00, 0xFF), Predefined{PredefinedID: "methanol"}},
+		&Material{MaterialID(1), color.New(0xFF, 0x00, 0x00, 0xFF), MaterialPredefined{PredefinedID: "methanol"}},
 		`{
 			"id": 1,
 			"color": {
@@ -25,7 +25,7 @@ var materialTestCasses = test.MarshallingCases{
 		}`,
 	},
 	{
-		&Material{ID(1), color.New(0xFF, 0x00, 0x00, 0xFF), Predefined{
+		&Material{MaterialID(1), color.New(0xFF, 0x00, 0x00, 0xFF), MaterialPredefined{
 			PredefinedID:              "methanol",
 			StateOfMatter:             Liquid,
 			Density:                   0.001,
@@ -48,7 +48,7 @@ var materialTestCasses = test.MarshallingCases{
 		}`,
 	},
 	{
-		&Material{ID(1), color.New(0xFF, 0xFF, 0xFF, 0xFF), Compound{
+		&Material{MaterialID(1), color.New(0xFF, 0xFF, 0xFF, 0xFF), MaterialCompound{
 			Name:          "ala",
 			Density:       1.2345,
 			StateOfMatter: Gas,
@@ -84,7 +84,7 @@ var materialTestCasses = test.MarshallingCases{
 		}`,
 	},
 	{
-		&Material{ID(1), color.New(0xAA, 0xBB, 0xCC, 0xFF), Compound{
+		&Material{MaterialID(1), color.New(0xAA, 0xBB, 0xCC, 0xFF), MaterialCompound{
 			Name:          "kot",
 			Density:       99.9,
 			StateOfMatter: Liquid,

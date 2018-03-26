@@ -15,16 +15,16 @@ type ZoneID int
 
 // SerializationContext is struct used to recover data lost in process of serializing simulation data.
 type SerializationContext struct {
-	MapMaterialID           map[MaterialID]setup.ID
-	MapBodyID               map[BodyID]setup.ID
-	MapFilenameToDetectorID map[string]setup.ID
+	MapMaterialID           map[MaterialID]setup.MaterialID
+	MapBodyID               map[BodyID]setup.BodyID
+	MapFilenameToDetectorID map[string]setup.DetectorID
 }
 
 // NewSerializationContext constructor.
 func NewSerializationContext() SerializationContext {
 	return SerializationContext{
-		MapMaterialID:           map[MaterialID]setup.ID{},
-		MapBodyID:               map[BodyID]setup.ID{},
-		MapFilenameToDetectorID: map[string]setup.ID{},
+		MapMaterialID:           map[MaterialID]setup.MaterialID{},
+		MapBodyID:               map[BodyID]setup.BodyID{},
+		MapFilenameToDetectorID: map[string]setup.DetectorID{},
 	}
 }

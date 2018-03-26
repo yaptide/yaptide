@@ -9,13 +9,13 @@ import (
 var zoneTestCases = test.MarshallingCases{
 	{
 		&Zone{
-			ID:         ID(1),
-			ParentID:   ID(0),
+			ID:         ZoneID(1),
+			ParentID:   ZoneID(0),
 			Name:       "name",
-			BaseID:     ID(1),
-			MaterialID: ID(2),
-			Construction: []*Operation{
-				&Operation{Type: Intersect, BodyID: ID(100)},
+			BaseID:     BodyID(1),
+			MaterialID: MaterialID(2),
+			Construction: []*ZoneOperation{
+				&ZoneOperation{Type: Intersect, BodyID: BodyID(100)},
 			},
 		},
 		`{
@@ -35,15 +35,15 @@ var zoneTestCases = test.MarshallingCases{
 
 	{
 		&Zone{
-			ID:         ID(2),
-			ParentID:   ID(1),
+			ID:         ZoneID(2),
+			ParentID:   ZoneID(1),
 			Name:       "name",
-			BaseID:     ID(1),
-			MaterialID: ID(2),
-			Construction: []*Operation{
-				&Operation{Type: Intersect, BodyID: ID(100)},
-				&Operation{Type: Subtract, BodyID: ID(200)},
-				&Operation{Type: Union, BodyID: ID(300)},
+			BaseID:     BodyID(1),
+			MaterialID: MaterialID(2),
+			Construction: []*ZoneOperation{
+				&ZoneOperation{Type: Intersect, BodyID: BodyID(100)},
+				&ZoneOperation{Type: Subtract, BodyID: BodyID(200)},
+				&ZoneOperation{Type: Union, BodyID: BodyID(300)},
 			},
 		},
 		`{

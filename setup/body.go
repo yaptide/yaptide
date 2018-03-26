@@ -2,21 +2,21 @@ package setup
 
 import "encoding/json"
 
-// ID is key type in Body map.
-type ID int64
+// BodyID is key type in Body map.
+type BodyID int64
 
 // Body store Geometry interface described by ID and Name.
 type Body struct {
-	ID       ID       `json:"id"`
-	Name     string   `json:"name,omitempty"`
-	Geometry Geometry `json:"geometry"`
+	ID       BodyID       `json:"id"`
+	Name     string       `json:"name,omitempty"`
+	Geometry BodyGeometry `json:"geometry"`
 }
 
 // UnmarshalJSON custom Unmarshal function.
 // GeometryType is recognized by geometry/type in json.
 func (body *Body) UnmarshalJSON(b []byte) error {
 	type rawBody struct {
-		ID          ID              `json:"id"`
+		ID          BodyID          `json:"id"`
 		Name        string          `json:"name,omitempty"`
 		GeometryRaw json.RawMessage `json:"geometry"`
 	}

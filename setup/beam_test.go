@@ -10,10 +10,10 @@ import (
 var testCases = test.MarshallingCases{
 	{
 		&Beam{
-			Direction: Direction{
+			Direction: BeamDirection{
 				Phi: 0.1, Theta: 0.1, Position: common.Point{X: 1, Y: 1, Z: 1},
 			},
-			Divergence: Divergence{
+			Divergence: BeamDivergence{
 				SigmaX:       1,
 				SigmaY:       1,
 				Distribution: common.GaussianDistribution,
@@ -45,10 +45,10 @@ var testCases = test.MarshallingCases{
 		}`,
 	}, {
 		&Beam{
-			Direction: Direction{
+			Direction: BeamDirection{
 				Phi: 0.1, Theta: 0.1, Position: common.Point{X: 1, Y: 1, Z: 1},
 			},
-			Divergence: Divergence{
+			Divergence: BeamDivergence{
 				SigmaX:       1,
 				SigmaY:       1,
 				Distribution: common.FlatDistribution,

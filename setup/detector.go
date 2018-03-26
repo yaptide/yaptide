@@ -7,9 +7,11 @@ import (
 	"github.com/yaptide/converter/common"
 )
 
+type DetectorID int64
+
 // Detector describes where and what values are scored during simulation.
 type Detector struct {
-	ID               ID               `json:"id"`
+	ID               DetectorID       `json:"id"`
 	Name             string           `json:"name"`
 	DetectorGeometry DetectorGeometry `json:"detectorGeometry"`
 	ScoredParticle   common.Particle  `json:"particle"`
@@ -20,7 +22,7 @@ type Detector struct {
 // detector.Type is recognized by detector/type in json.
 func (m *Detector) UnmarshalJSON(b []byte) error {
 	type rawBody struct {
-		ID          ID              `json:"id"`
+		ID          DetectorID      `json:"id"`
 		Name        string          `json:"name"`
 		GeometryRaw json.RawMessage `json:"detectorGeometry"`
 		ParticleRaw json.RawMessage `json:"particle"`
@@ -56,7 +58,7 @@ func (m *Detector) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
-func unmarshalDetectorGeometry(b json.RawMessage) (Geometry, error) {
+func unmarshalDetectorGeometry(b json.RawMessage) (DetectorGeometry, error) {
 	var detType detectorType
 	err := json.Unmarshal(b, &detType)
 	if err != nil {
@@ -65,35 +67,35 @@ func unmarshalDetectorGeometry(b json.RawMessage) (Geometry, error) {
 
 	switch detType {
 	case geomapDetector:
-		geomap := Geomap{}
+		geomap := DetectorGeomap{}
 		err = json.Unmarshal(b, &geomap)
 		if err != nil {
 			return nil, err
 		}
 		return geomap, nil
 	case zoneScoringDetector:
-		zone := Zones{}
+		zone := DetectorZones{}
 		err = json.Unmarshal(b, &zone)
 		if err != nil {
 			return nil, err
 		}
 		return zone, nil
 	case meshScoringDetector:
-		mesh := Mesh{}
+		mesh := DetectorMesh{}
 		err = json.Unmarshal(b, &mesh)
 		if err != nil {
 			return nil, err
 		}
 		return mesh, nil
 	case cylindricalScoringDetector:
-		cylinder := Cylinder{}
+		cylinder := CylinderBody{}
 		err = json.Unmarshal(b, &cylinder)
 		if err != nil {
 			return nil, err
 		}
 		return cylinder, nil
 	case planeScoringDetector:
-		plane := Plane{}
+		plane := DetectorPlane{}
 		err = json.Unmarshal(b, &plane)
 		if err != nil {
 			return nil, err

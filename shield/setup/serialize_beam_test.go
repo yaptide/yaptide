@@ -42,10 +42,10 @@ func TestSuccessfullBeamSerialization(t *testing.T) {
 }
 
 var beamTest2 = setup.Beam{
-	Direction: setup.Direction{
+	Direction: setup.BeamDirection{
 		Phi: 1, Theta: 1, Position: common.Point{X: 110, Y: 1.2220, Z: 0.001},
 	},
-	Divergence: setup.Divergence{
+	Divergence: setup.BeamDivergence{
 		SigmaX:       0,
 		SigmaY:       0,
 		Distribution: common.GaussianDistribution,

@@ -6,15 +6,15 @@ import (
 	"github.com/yaptide/converter/common"
 )
 
-// Plane detector.
-type Plane struct {
+// DetectorPlane detector.
+type DetectorPlane struct {
 	Point  common.Point `json:"point"`
 	Normal common.Vec3D `json:"normal"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (g Plane) MarshalJSON() ([]byte, error) {
-	type Alias Plane
+func (g DetectorPlane) MarshalJSON() ([]byte, error) {
+	type Alias DetectorPlane
 	return json.Marshal(struct {
 		detectorType
 		Alias

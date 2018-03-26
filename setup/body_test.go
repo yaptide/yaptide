@@ -10,7 +10,7 @@ import (
 
 var bodyTestCasses = test.MarshallingCases{
 	{
-		&Body{ID: ID(1), Name: "name", Geometry: Sphere{}},
+		&Body{ID: BodyID(1), Name: "name", Geometry: SphereBody{}},
 		`{
 			"id": 1,
 			"name": "name",
@@ -23,7 +23,7 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&Body{ID: ID(2), Name: "name", Geometry: Cuboid{}},
+		&Body{ID: BodyID(2), Name: "name", Geometry: CuboidBody{}},
 		`{
 			"id": 2,
 			"name": "name",
@@ -36,7 +36,7 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&Body{ID: ID(3), Name: "somethin", Geometry: Cylinder{}},
+		&Body{ID: BodyID(3), Name: "somethin", Geometry: CylinderBody{}},
 		`{
 			"id": 3,
 			"name": "somethin",
@@ -65,19 +65,19 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&Sphere{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Radius: 100.0},
+		&SphereBody{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Radius: 100.0},
 		`{"type":"sphere","center":{"x":1,"y":2,"z":-100},"radius":100}`,
 	},
 
 	{
-		&Cuboid{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Size: common.Vec3D{X: 5.0, Y: 2.0, Z: 6.0}},
+		&CuboidBody{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Size: common.Vec3D{X: 5.0, Y: 2.0, Z: 6.0}},
 		`{"type":"cuboid",
 		  "center":{"x":1,"y":2,"z":-100},
 		  "size":  {"x":5, "y":2, "z":6}}`,
 	},
 
 	{
-		&Cylinder{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Height: 100.0, Radius: 40.0},
+		&CylinderBody{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Height: 100.0, Radius: 40.0},
 		`{"type":"cylinder","baseCenter":{"x":1,"y":2,"z":-100},"height":100,"radius":40}`,
 	},
 }

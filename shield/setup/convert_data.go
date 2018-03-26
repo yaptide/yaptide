@@ -4,26 +4,8 @@ import (
 	"fmt"
 
 	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/setup"
 	"github.com/yaptide/converter/shield/context"
 )
-
-// Data is input for shield Serialize function.
-type Data struct {
-	// Data needed for mat.dat file serialization.
-	Materials Materials
-
-	// Data needed for geo.dat file serialization.
-	Geometry Geometry
-
-	// Data needed for detect.dat file serialization.
-	Detectors []Detector
-	// Data needed for setup.dat file serialization.
-	Beam setup.Beam
-
-	// Data needed for setup.dat file serialization.
-	Options setup.SimulationOptions
-}
 
 // Convert simulation setup model to easily serializable data,
 // which is input for shield serializer.

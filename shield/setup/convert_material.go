@@ -43,13 +43,13 @@ type CompoundMaterial struct {
 	serializeExternalStoppingPower bool
 }
 
-func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.SerializationContext) (Materials, map[setup.ID]context.MaterialID, error) {
+func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.SerializationContext) (Materials, map[setup.MaterialID]context.MaterialID, error) {
 	result := Materials{
 		Predefined: []PredefinedMaterial{},
 		Compound:   []CompoundMaterial{},
 	}
 
-	materialIDToShield := map[setup.ID]context.MaterialID{}
+	materialIDToShield := map[setup.MaterialID]context.MaterialID{}
 
 	const maxMaterialsNumber = 100
 
@@ -62,20 +62,20 @@ func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.S
 		)
 	}
 
-	predefMaterialsIds := []setup.ID{}
-	compoundMaterialsIds := []setup.ID{}
+	predefMaterialsIds := []setup.MaterialID{}
+	compoundMaterialsIds := []setup.MaterialID{}
 
 	for id, mat := range setupMat {
 		switch g := mat.Type.(type) {
-		case setup.Predefined:
+		case setup.MaterialPredefined:
 			if g.PredefinedID != "vacuum" {
 				predefMaterialsIds = append(predefMaterialsIds, id)
 			} else {
 				materialIDToShield[id] = context.MaterialID(predefinedMaterialsToShieldICRU["vacuum"])
 			}
-		case setup.Compound:
+		case setup.MaterialCompound:
 			compoundMaterialsIds = append(compoundMaterialsIds, id)
-		case setup.Voxel:
+		case setup.MaterialVoxel:
 			return Materials{}, nil, newMaterialIDError(mat.ID, "Voxel material serialization not implemented")
 		default:
 			return Materials{}, nil, newMaterialIDError(mat.ID, "Unkown material type")
@@ -83,7 +83,7 @@ func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.S
 	}
 
 	nextShieldID := 1
-	for _, ids := range [][]setup.ID{predefMaterialsIds, compoundMaterialsIds} {
+	for _, ids := range [][]setup.MaterialID{predefMaterialsIds, compoundMaterialsIds} {
 		sort.SliceStable(ids, func(i, j int) bool { return ids[i] < ids[j] })
 		for _, id := range ids {
 			materialIDToShield[id] = context.MaterialID(nextShieldID)
@@ -93,7 +93,7 @@ func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.S
 	}
 
 	for _, predefID := range predefMaterialsIds {
-		predef, err := createPredefinedMaterial(setupMat[predefID].Type.(setup.Predefined), materialIDToShield[predefID])
+		predef, err := createPredefinedMaterial(setupMat[predefID].Type.(setup.MaterialPredefined), materialIDToShield[predefID])
 		if err != nil {
 			return Materials{}, nil, err
 		}
@@ -101,7 +101,7 @@ func convertSetupMaterials(setupMat converter.MaterialMap, simContext *context.S
 	}
 
 	for _, compoundID := range compoundMaterialsIds {
-		compound, err := createCompoundMaterial(setupMat[compoundID].Type.(setup.Compound), materialIDToShield[compoundID])
+		compound, err := createCompoundMaterial(setupMat[compoundID].Type.(setup.MaterialCompound), materialIDToShield[compoundID])
 		if err != nil {
 			return Materials{}, nil, err
 		}
@@ -135,7 +135,7 @@ func (e *Element) SerializeIValue() bool {
 	return e.IValue > 0.0
 }
 
-func createPredefinedMaterial(predef setup.Predefined, id context.MaterialID) (PredefinedMaterial, error) {
+func createPredefinedMaterial(predef setup.MaterialPredefined, id context.MaterialID) (PredefinedMaterial, error) {
 	ICRUNumber, found := predefinedMaterialsToShieldICRU[predef.PredefinedID]
 	if !found {
 		return PredefinedMaterial{}, newMaterialIDError(id, "\"%s\" material mapping to shield format not found", predef.PredefinedID)
@@ -149,7 +149,7 @@ func createPredefinedMaterial(predef setup.Predefined, id context.MaterialID) (P
 		LoadExternalStoppingPower: predef.LoadExternalStoppingPower}, nil
 }
 
-func createCompoundMaterial(compound setup.Compound, id context.MaterialID) (CompoundMaterial, error) {
+func createCompoundMaterial(compound setup.MaterialCompound, id context.MaterialID) (CompoundMaterial, error) {
 	const maxElementsNumber = 13
 
 	if compound.StateOfMatter == setup.NonDefined {

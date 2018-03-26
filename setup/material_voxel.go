@@ -2,14 +2,14 @@ package setup
 
 import "encoding/json"
 
-// Voxel TODO
-type Voxel struct {
+// MaterialVoxel TODO
+type MaterialVoxel struct {
 	_ int // mock to fix memory alignment issue.
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (v Voxel) MarshalJSON() ([]byte, error) {
-	type Alias Voxel
+func (v MaterialVoxel) MarshalJSON() ([]byte, error) {
+	type Alias MaterialVoxel
 	return json.Marshal(struct {
 		materialType
 		Alias

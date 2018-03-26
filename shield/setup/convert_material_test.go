@@ -14,7 +14,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 	type testCase struct {
 		Input                      converter.MaterialMap
 		Expected                   Materials
-		ExpectedMaterialIDToShield map[setup.ID]context.MaterialID
+		ExpectedMaterialIDToShield map[setup.MaterialID]context.MaterialID
 	}
 
 	check := func(t *testing.T, tc testCase) {
@@ -93,7 +93,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					Predefined: []PredefinedMaterial{setPredefinedID(convertedSimplePredefined, 1)},
 					Compound:   []CompoundMaterial{},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1},
 			})
 
 		check(t,
@@ -103,7 +103,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					Predefined: []PredefinedMaterial{setPredefinedID(convertedFullPredefined, 1)},
 					Compound:   []CompoundMaterial{},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{6: 1},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{6: 1},
 			},
 		)
 	})
@@ -116,7 +116,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					Predefined: []PredefinedMaterial{},
 					Compound:   []CompoundMaterial{setCompoundID(convertedCompound, 1)},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1001: 1},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1001: 1},
 			})
 
 		check(t,
@@ -126,7 +126,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					Predefined: []PredefinedMaterial{},
 					Compound:   []CompoundMaterial{setCompoundID(convertedAnotherCompound, 1)},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{4000: 1},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{4000: 1},
 			})
 	})
 
@@ -143,7 +143,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					},
 					Compound: []CompoundMaterial{},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 2},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 2},
 			})
 
 		check(t,
@@ -158,7 +158,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					},
 					Compound: []CompoundMaterial{},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 2},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 2},
 			})
 	})
 
@@ -175,7 +175,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 						setCompoundID(convertedAnotherCompound, 2),
 					},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 2},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 2},
 			})
 		check(t,
 			testCase{
@@ -189,7 +189,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 						setCompoundID(convertedCompound, 2),
 					},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 2},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 2},
 			})
 
 	})
@@ -212,7 +212,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 						setCompoundID(convertedAnotherCompound, 4),
 					},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 2, 3: 3, 4: 4},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 2, 3: 3, 4: 4},
 			})
 
 		check(t,
@@ -235,7 +235,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 						setCompoundID(convertedCompound, 5),
 					},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 2, 9: 3, 3: 4, 100: 5},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 2, 9: 3, 3: 4, 100: 5},
 			})
 	})
 
@@ -247,7 +247,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 					Predefined: []PredefinedMaterial{},
 					Compound:   []CompoundMaterial{},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1000},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1000},
 			})
 
 		check(t,
@@ -264,7 +264,7 @@ func TestSuccessfullMaterialsConvert(t *testing.T) {
 						setCompoundID(convertedAnotherCompound, 2),
 					},
 				},
-				ExpectedMaterialIDToShield: map[setup.ID]context.MaterialID{1: 1, 2: 1000, 3: 2},
+				ExpectedMaterialIDToShield: map[setup.MaterialID]context.MaterialID{1: 1, 2: 1000, 3: 2},
 			})
 
 	})
@@ -291,7 +291,7 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		const materialsN = 1000
 		materials := converter.MaterialMap{}
 		for i := int64(0); i < materialsN; i++ {
-			materials[setup.ID(i)] = genSetupSimplePredefined(i)
+			materials[setup.MaterialID(i)] = genSetupSimplePredefined(i)
 		}
 
 		check(t, testCase{
@@ -304,11 +304,11 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		const materialsN = 1000
 		materials := converter.MaterialMap{}
 		for i := int64(0); i < materialsN; i++ {
-			materials[setup.ID(i)] = genSetupSimplePredefined(i)
+			materials[setup.MaterialID(i)] = genSetupSimplePredefined(i)
 		}
 
 		check(t, testCase{
-			Input:         createMaterialMap(setup.Material{ID: 1, Type: setup.Voxel{}}),
+			Input:         createMaterialMap(setup.Material{ID: 1, Type: setup.MaterialVoxel{}}),
 			ExpectedError: errors.New("[serializer] Material{Id: 1} -> mat.dat: Voxel material serialization not implemented"),
 		})
 	})
@@ -316,7 +316,7 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 	t.Run("PredefinedMappingNotFound", func(t *testing.T) {
 		const id = 1
 		mat := genSetupSimplePredefined(id)
-		predef := mat.Type.(setup.Predefined)
+		predef := mat.Type.(setup.MaterialPredefined)
 		predef.PredefinedID = "predefNameNotDefined"
 		mat.Type = predef
 
@@ -329,7 +329,7 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 	t.Run("IsotopeMappingNotFound", func(t *testing.T) {
 		const id = 1
 		mat := genSetupCompound(id)
-		compound := mat.Type.(setup.Compound)
+		compound := mat.Type.(setup.MaterialCompound)
 		compound.Elements[0].Isotope = "isotopeNameNotDefined"
 		mat.Type = compound
 
@@ -342,7 +342,7 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 	t.Run("ExternalStoppingPowerFromPredefinedMaterialMappingNotFound", func(t *testing.T) {
 		const id = 1
 		mat := genSetupCompound(id)
-		compound := mat.Type.(setup.Compound)
+		compound := mat.Type.(setup.MaterialCompound)
 		compound.ExternalStoppingPowerFromPredefined = "espfpNameNotDefined"
 		mat.Type = compound
 		check(t, testCase{
@@ -354,13 +354,13 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 }
 
 func genSetupSimplePredefined(id int64) setup.Material {
-	return setup.Material{ID: setup.ID(id), Type: setup.Predefined{
+	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialPredefined{
 		PredefinedID: "urea",
 	}}
 }
 
 func genSetupFullPredefined(id int64) setup.Material {
-	return setup.Material{ID: setup.ID(id), Type: setup.Predefined{
+	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialPredefined{
 		PredefinedID:              "methanol",
 		StateOfMatter:             setup.Liquid,
 		Density:                   123.45,
@@ -369,7 +369,7 @@ func genSetupFullPredefined(id int64) setup.Material {
 }
 
 func genSetupCompound(id int64) setup.Material {
-	return setup.Material{ID: setup.ID(id), Type: setup.Compound{
+	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialCompound{
 		Name:          "kot",
 		Density:       99.9,
 		StateOfMatter: setup.Solid,
@@ -382,7 +382,7 @@ func genSetupCompound(id int64) setup.Material {
 }
 
 func genSetupAnotherCompound(id int64) setup.Material {
-	return setup.Material{ID: setup.ID(id), Type: setup.Compound{
+	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialCompound{
 		Name:          "pies",
 		Density:       0.999,
 		StateOfMatter: setup.Gas,
@@ -396,7 +396,7 @@ func genSetupAnotherCompound(id int64) setup.Material {
 }
 
 func genVacuum(id int64) setup.Material {
-	return setup.Material{ID: setup.ID(id), Type: setup.Predefined{
+	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialPredefined{
 		PredefinedID: "vacuum",
 	}}
 }

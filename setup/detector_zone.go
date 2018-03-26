@@ -5,13 +5,13 @@ import (
 )
 
 // Zone detector used to debug geometry.
-type Zones struct {
-	Zones []ID `json:"zones"`
+type DetectorZones struct {
+	Zones []DetectorID `json:"zones"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (z Zones) MarshalJSON() ([]byte, error) {
-	type Alias Zones
+func (z DetectorZones) MarshalJSON() ([]byte, error) {
+	type Alias DetectorZones
 	return json.Marshal(struct {
 		detectorType
 		Alias
