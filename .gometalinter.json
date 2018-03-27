@@ -1,0 +1,4 @@
+{
+  "Disable": ["maligned", "aligncheck", "gocyclo", "safesql", "gas"],
+  "Exclude": ["^vendor/"]
+}
