@@ -21,7 +21,7 @@ var testCases = test.MarshallingCases{
 		},
 		`{
 			"id": "58cfd607dc25403a3b691781",
-			"accountId": "cccccccccccccccccccccccc",
+			"userId": "cccccccccccccccccccccccc",
 			"name": "name",
 			"description": "description",
 			"versions": []
@@ -44,6 +44,8 @@ var onlyMarshalling = test.MarshallingCases{
 				"simulationEngine": "",
 				"computingLibrary": ""
 			},
+			"setupId": "bbbbbbbbbbbbbbbbbbbbbbbb",
+			"resultId": "aaaaaaaaaaaaaaaaaaaaaaaa",
 			"updatedAt": "0001-01-01T00:00:00Z"
 		}`,
 	},

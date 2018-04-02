@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/yaptide/app/model"
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/converter"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -39,7 +39,7 @@ func (h *handler) getSimulationSetup(
 }
 
 func (h *handler) updateSimulationSetup(
-	input *setup.Setup,
+	input *converter.Setup,
 	ctx context.Context,
 ) (*model.SimulationSetup, error) {
 	db := extractDBSession(ctx)

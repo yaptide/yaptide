@@ -4,13 +4,13 @@ import (
 	"github.com/yaptide/app/model"
 	"github.com/yaptide/app/model/action"
 	"github.com/yaptide/app/runner/file"
-	"github.com/yaptide/converter/result"
+	"github.com/yaptide/converter"
 )
 
 type fileProcessor interface {
 	ConvertModel(setup *model.SimulationSetup) error
 	Files() map[string]string
-	HandleFileResults(file.FileSimulationResults) (*result.Result, error)
+	HandleFileResults(file.FileSimulationResults) (*converter.Result, error)
 }
 
 type fileRequest struct {

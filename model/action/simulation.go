@@ -3,7 +3,7 @@ package action
 import (
 	"github.com/yaptide/app/model"
 	"github.com/yaptide/app/model/mongo"
-	"github.com/yaptide/converter/result"
+	"github.com/yaptide/converter"
 	"gopkg.in/mgo.v2/bson"
 )
 
@@ -27,7 +27,7 @@ func (s *SimulationContext) StatusUpdate(newStatus model.VersionStatus) {
 
 }
 
-func (s *SimulationContext) SetProjectResults(results *result.Result, simulationErr error) error {
+func (s *SimulationContext) SetProjectResults(results *converter.Result, simulationErr error) error {
 	project := model.Project{}
 	getErr := s.db.Project().FindID(s.projectID).One(&project)
 	if getErr != nil {

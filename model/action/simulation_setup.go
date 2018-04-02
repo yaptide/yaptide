@@ -4,7 +4,7 @@ import (
 	"github.com/yaptide/app/errors"
 	"github.com/yaptide/app/model"
 	"github.com/yaptide/app/model/mongo"
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/converter"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -53,7 +53,7 @@ func (r *Resolver) SimulationSetupCreateFrom(
 }
 
 func (r *Resolver) SimulationSetupUpdate(
-	db mongo.DB, setup *model.SimulationSetup, input *setup.Setup,
+	db mongo.DB, setup *model.SimulationSetup, input *converter.Setup,
 ) (*model.SimulationSetup, error) {
 	setup.Setup = *input
 	updateErr := db.SimulationSetup().UpdateID(setup.ID, setup)

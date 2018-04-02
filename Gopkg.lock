@@ -35,22 +35,22 @@
   branch = "master"
   name = "github.com/yaptide/converter"
   packages = [
-    "common",
-    "common/color",
+    ".",
+    "format",
+    "geometry",
     "log",
     "result",
     "setup",
-    "setup/beam",
-    "setup/body",
-    "setup/detector",
-    "setup/material",
-    "setup/options",
-    "setup/zone",
     "shield",
-    "shield/results",
-    "shield/setup"
+    "shield/beam",
+    "shield/detector",
+    "shield/geometry",
+    "shield/mapping",
+    "shield/material",
+    "utils",
+    "validate"
   ]
-  revision = "9867d8657c20935c9d42c89519363b81d1cc66b0"
+  revision = "2242a1ddc0ee48a210c12bef72a773b3ae6b0285"
 
 [[projects]]
   branch = "master"
@@ -86,6 +86,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "064776f1fe22d0ed72c75f6c2b33635e9ac20c5a9f36516d607274e0ad9b1dfb"
+  inputs-digest = "8fc42938dc35912457a8bdc2aff5da520b8eed30de834e641d6753b8a7d9ff0b"
   solver-name = "gps-cdcl"
   solver-version = 1
