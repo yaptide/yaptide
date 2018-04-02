@@ -3,43 +3,32 @@ package setup
 import (
 	"testing"
 
-	"github.com/yaptide/converter/common/color"
 	test "github.com/yaptide/converter/test"
 )
 
 var materialTestCasses = test.MarshallingCases{
 	{
-		&Material{MaterialID(1), color.New(0xFF, 0x00, 0x00, 0xFF), MaterialPredefined{PredefinedID: "methanol"}},
+		&Material{MaterialID(1), MaterialSpecs{
+			MaterialPredefined{PredefinedID: "methanol"},
+		}},
 		`{
 			"id": 1,
-			"color": {
-				"r": 255,
-				"g": 0,
-				"b": 0,
-				"a": 255
-			},
-			"materialInfo": {
+			"specs": {
 				"type": "predefined",
 				"predefinedId": "methanol"
 			}
 		}`,
 	},
 	{
-		&Material{MaterialID(1), color.New(0xFF, 0x00, 0x00, 0xFF), MaterialPredefined{
+		&Material{MaterialID(1), MaterialSpecs{MaterialPredefined{
 			PredefinedID:              "methanol",
 			StateOfMatter:             Liquid,
 			Density:                   0.001,
 			LoadExternalStoppingPower: false,
-		}},
+		}}},
 		`{
 			"id": 1,
-			"color": {
-				"r": 255,
-				"g": 0,
-				"b": 0,
-				"a": 255
-			},
-			"materialInfo": {
+			"specs": {
 				"type": "predefined",
 				"predefinedId": "methanol",
 				"density": 0.001,
@@ -48,7 +37,7 @@ var materialTestCasses = test.MarshallingCases{
 		}`,
 	},
 	{
-		&Material{MaterialID(1), color.New(0xFF, 0xFF, 0xFF, 0xFF), MaterialCompound{
+		&Material{MaterialID(1), MaterialSpecs{MaterialCompound{
 			Name:          "ala",
 			Density:       1.2345,
 			StateOfMatter: Gas,
@@ -56,16 +45,10 @@ var materialTestCasses = test.MarshallingCases{
 				Element{Isotope: "As-75", RelativeStoichiometricFraction: 1},
 				Element{Isotope: "H-1 - Hydrogen", RelativeStoichiometricFraction: 8},
 			},
-		}},
+		}}},
 		`{
 			"id": 1,
-			"color": {
-				"r": 255,
-				"g": 255,
-				"b": 255,
-				"a": 255
-			},
-			"materialInfo": {
+			"specs": {
 				"type": "compound",
 				"name": "ala",
 				"density": 1.2345,
@@ -84,7 +67,7 @@ var materialTestCasses = test.MarshallingCases{
 		}`,
 	},
 	{
-		&Material{MaterialID(1), color.New(0xAA, 0xBB, 0xCC, 0xFF), MaterialCompound{
+		&Material{MaterialID(1), MaterialSpecs{MaterialCompound{
 			Name:          "kot",
 			Density:       99.9,
 			StateOfMatter: Liquid,
@@ -93,16 +76,10 @@ var materialTestCasses = test.MarshallingCases{
 				Element{Isotope: "U-235", RelativeStoichiometricFraction: 123, IValue: 555.34},
 			},
 			ExternalStoppingPowerFromPredefined: "Water",
-		}},
+		}}},
 		`{
 			"id": 1,
-			"color": {
-				"r": 170,
-				"g": 187,
-				"b": 204,
-				"a": 255
-			},
-			"materialInfo": {
+			"specs": {
 				"type": "compound",
 				"name": "kot",
 				"density": 99.9,

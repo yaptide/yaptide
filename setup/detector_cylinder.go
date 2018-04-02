@@ -3,25 +3,25 @@ package setup
 import (
 	"encoding/json"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 )
 
 // Cylinder is detector with cylindrical shape directed along z-axis.
 type DetectorCylinder struct {
-	Radius common.Range               `json:"radius"`
-	Angle  common.Range               `json:"angle"`
-	ZValue common.Range               `json:"zValue"`
-	Slices common.Vec3DCylindricalInt `json:"slices"`
+	Radius geometry.Range               `json:"radius"`
+	Angle  geometry.Range               `json:"angle"`
+	ZValue geometry.Range               `json:"zValue"`
+	Slices geometry.Vec3DCylindricalInt `json:"slices"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (g DetectorCylinder) MarshalJSON() ([]byte, error) {
+func (d DetectorCylinder) MarshalJSON() ([]byte, error) {
 	type Alias DetectorCylinder
 	return json.Marshal(struct {
-		detectorType
+		Type string `json:"type"`
 		Alias
 	}{
-		detectorType: cylindricalScoringDetector,
-		Alias:        (Alias)(g),
+		Type:  detectorGeometryType.cylinder,
+		Alias: Alias(d),
 	})
 }

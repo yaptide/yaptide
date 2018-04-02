@@ -3,7 +3,7 @@ package setup
 import (
 	"testing"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 	test "github.com/yaptide/converter/test"
 )
 
@@ -12,13 +12,13 @@ var detectorTestCasses = test.MarshallingCases{
 		&Detector{
 			ID:   DetectorID(1),
 			Name: "ala",
-			DetectorGeometry: DetectorMesh{
-				Center: common.Point{X: 1, Y: 2, Z: 3},
-				Size:   common.Vec3D{X: 1, Y: 2, Z: 3},
-				Slices: common.Vec3DInt{X: 10, Y: 10, Z: 10},
-			},
-			ScoredParticle: common.PredefinedParticle("all"),
-			ScoringType:    PredefinedScoring("energy"),
+			DetectorGeometry: DetectorGeometry{DetectorMesh{
+				Center: geometry.Point{X: 1, Y: 2, Z: 3},
+				Size:   geometry.Vec3D{X: 1, Y: 2, Z: 3},
+				Slices: geometry.Vec3DInt{X: 10, Y: 10, Z: 10},
+			}},
+			ScoredParticle: Particle{AllParticles("all")},
+			Scoring:        DetectorScoring{PredefinedScoring("energy")},
 		},
 		`{
 			"id": 1,
@@ -52,13 +52,13 @@ var detectorTestCasses = test.MarshallingCases{
 		&Detector{
 			ID:   DetectorID(1),
 			Name: "ma",
-			DetectorGeometry: DetectorMesh{
-				Center: common.Point{X: 1, Y: 2, Z: 3},
-				Size:   common.Vec3D{X: 1, Y: 2, Z: 3},
-				Slices: common.Vec3DInt{X: 10, Y: 10, Z: 10},
-			},
-			ScoredParticle: common.HeavyIon{Charge: 10, NucleonsCount: 10},
-			ScoringType:    LetTypeScoring{Type: "tlet", Material: 0},
+			DetectorGeometry: DetectorGeometry{DetectorMesh{
+				Center: geometry.Point{X: 1, Y: 2, Z: 3},
+				Size:   geometry.Vec3D{X: 1, Y: 2, Z: 3},
+				Slices: geometry.Vec3DInt{X: 10, Y: 10, Z: 10},
+			}},
+			ScoredParticle: Particle{HeavyIon{Charge: 10, NucleonsCount: 10}},
+			Scoring:        DetectorScoring{LetTypeScoring{Type: "tlet", Material: 0}},
 		},
 		`{
 			"id": 1,

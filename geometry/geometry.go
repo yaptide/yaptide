@@ -1,5 +1,5 @@
 // Package common contains model for base component used in simulation and results model.
-package common
+package geometry
 
 // Point represent a point in space.
 type Point struct {

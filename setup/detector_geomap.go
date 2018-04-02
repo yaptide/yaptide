@@ -3,24 +3,24 @@ package setup
 import (
 	"encoding/json"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 )
 
 // DetectorGeomap detector used to debug geometry.
 type DetectorGeomap struct {
-	Center common.Point    `json:"center"`
-	Size   common.Vec3D    `json:"size"`
-	Slices common.Vec3DInt `json:"slices"`
+	Center geometry.Point    `json:"center"`
+	Size   geometry.Vec3D    `json:"size"`
+	Slices geometry.Vec3DInt `json:"slices"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (g DetectorGeomap) MarshalJSON() ([]byte, error) {
+func (d DetectorGeomap) MarshalJSON() ([]byte, error) {
 	type Alias DetectorGeomap
 	return json.Marshal(struct {
-		detectorType
+		Type string `json:"type"`
 		Alias
 	}{
-		detectorType: geomapDetector,
-		Alias:        (Alias)(g),
+		Type:  detectorGeometryType.geomap,
+		Alias: Alias(d),
 	})
 }

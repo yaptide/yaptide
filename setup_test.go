@@ -41,7 +41,7 @@ var setupTestCasses = test.MarshallingCases{
 					"sigmaY": 0,
 					"distribution": "gaussian"
 				},
-				"particleType": {
+				"particle": {
 					"type": "proton"
 				},
 				"initialBaseEnergy": 100,

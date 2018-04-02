@@ -5,7 +5,6 @@ import (
 	"sort"
 
 	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/geometry"
 	"github.com/yaptide/converter/setup"
 )
@@ -49,12 +48,12 @@ func appendBlackholeBody(bodies []Body) ([]Body, ShieldBodyID, error) {
 	newID := bodies[len(bodies)-1].ID + 1
 
 	blackholeBody, err := convertCuboid(setup.CuboidBody{
-		Center: common.Point{
+		Center: geometry.Point{
 			X: 0.0,
 			Y: 0.0,
 			Z: 0.0,
 		},
-		Size: common.Vec3D{
+		Size: geometry.Vec3D{
 			X: 500.0,
 			Y: 500.0,
 			Z: 500.0,
@@ -71,7 +70,7 @@ func appendBlackholeBody(bodies []Body) ([]Body, ShieldBodyID, error) {
 }
 
 func convertBody(b setup.Body) (Body, error) {
-	switch g := b.Geometry.(type) {
+	switch g := b.Geometry.BodyType.(type) {
 	case setup.SphereBody:
 		return convertSphere(g)
 	case setup.CuboidBody:

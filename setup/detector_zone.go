@@ -1,8 +1,6 @@
 package setup
 
-import (
-	"encoding/json"
-)
+import "encoding/json"
 
 // Zone detector used to debug geometry.
 type DetectorZones struct {
@@ -10,13 +8,13 @@ type DetectorZones struct {
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (z DetectorZones) MarshalJSON() ([]byte, error) {
+func (d DetectorZones) MarshalJSON() ([]byte, error) {
 	type Alias DetectorZones
 	return json.Marshal(struct {
-		detectorType
+		Type string `json:"type"`
 		Alias
 	}{
-		detectorType: zoneScoringDetector,
-		Alias:        (Alias)(z),
+		Type:  detectorGeometryType.zone,
+		Alias: Alias(d),
 	})
 }

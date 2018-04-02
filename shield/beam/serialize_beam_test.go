@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 	"github.com/yaptide/converter/log"
 	"github.com/yaptide/converter/setup"
 )
@@ -43,17 +43,17 @@ func TestSuccessfullBeamSerialization(t *testing.T) {
 
 var beamTest2 = setup.Beam{
 	Direction: setup.BeamDirection{
-		Phi: 1, Theta: 1, Position: common.Point{X: 110, Y: 1.2220, Z: 0.001},
+		Phi: 1, Theta: 1, Position: geometry.Point{X: 110, Y: 1.2220, Z: 0.001},
 	},
 	Divergence: setup.BeamDivergence{
 		SigmaX:       0,
 		SigmaY:       0,
-		Distribution: common.GaussianDistribution,
+		Distribution: setup.GaussianDistribution,
 	},
-	ParticleType: common.HeavyIon{
+	Particle: setup.Particle{setup.HeavyIon{
 		NucleonsCount: 111,
 		Charge:        10,
-	},
+	}},
 	InitialBaseEnergy:  100,
 	InitialEnergySigma: 1,
 }

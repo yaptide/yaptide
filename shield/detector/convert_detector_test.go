@@ -5,7 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 	"github.com/yaptide/converter/setup"
 	"github.com/yaptide/converter/shield/material"
 )
@@ -33,14 +33,14 @@ func TestConvertSetupDetectors(t *testing.T) {
 			Input: converter.DetectorMap{5: setup.Detector{
 				ID:   5,
 				Name: "Ala ma psa",
-				DetectorGeometry: setup.DetectorCylinder{
-					Radius: common.Range{Min: 0.0, Max: 10.0},
-					Angle:  common.Range{Min: -10.0, Max: 20.0},
-					ZValue: common.Range{Min: -20.0, Max: 30.0},
-					Slices: common.Vec3DCylindricalInt{Radius: 10, Angle: 200, Z: 1000},
-				},
-				ScoredParticle: common.PredefinedParticle("all"),
-				ScoringType:    setup.PredefinedScoring("energy"),
+				DetectorGeometry: setup.DetectorGeometry{setup.DetectorCylinder{
+					Radius: geometry.Range{Min: 0.0, Max: 10.0},
+					Angle:  geometry.Range{Min: -10.0, Max: 20.0},
+					ZValue: geometry.Range{Min: -20.0, Max: 30.0},
+					Slices: geometry.Vec3DCylindricalInt{Radius: 10, Angle: 200, Z: 1000},
+				}},
+				ScoredParticle: setup.Particle{setup.PredefinedParticle("all")},
+				Scoring:        setup.DetectorScoring{setup.PredefinedScoring("energy")},
 			}},
 			MaterialIDToShield: map[setup.MaterialID]material.ShieldID{},
 			Expected: []Detector{
@@ -64,39 +64,39 @@ func TestConvertSetupDetectors(t *testing.T) {
 				3: setup.Detector{
 					ID:   3,
 					Name: "raz raz raz",
-					DetectorGeometry: setup.DetectorMesh{
-						Center: common.Point{X: 0.0, Y: 0.0, Z: 15.0},
-						Size:   common.Vec3D{X: 10.0, Y: 10.0, Z: 30.0},
-						Slices: common.Vec3DInt{X: 1, Y: 1, Z: 300},
-					},
+					DetectorGeometry: setup.DetectorGeometry{setup.DetectorMesh{
+						Center: geometry.Point{X: 0.0, Y: 0.0, Z: 15.0},
+						Size:   geometry.Vec3D{X: 10.0, Y: 10.0, Z: 30.0},
+						Slices: geometry.Vec3DInt{X: 1, Y: 1, Z: 300},
+					}},
 
-					ScoredParticle: common.HeavyIon{Charge: 10, NucleonsCount: 20},
-					ScoringType:    setup.PredefinedScoring("counter"),
+					ScoredParticle: setup.Particle{setup.HeavyIon{Charge: 10, NucleonsCount: 20}},
+					Scoring:        setup.DetectorScoring{setup.PredefinedScoring("counter")},
 				},
 				2: setup.Detector{
 					ID:   2,
 					Name: "dwa dwa dwa",
-					DetectorGeometry: setup.DetectorCylinder{
-						Radius: common.Range{Min: 0.0, Max: 10.0},
-						Angle:  common.Range{Min: -10.0, Max: 20.0},
-						ZValue: common.Range{Min: -20.0, Max: 30.0},
-						Slices: common.Vec3DCylindricalInt{Radius: 10, Angle: 200, Z: 1000},
-					},
-					ScoredParticle: common.PredefinedParticle("all"),
-					ScoringType:    setup.PredefinedScoring("energy"),
+					DetectorGeometry: setup.DetectorGeometry{setup.DetectorCylinder{
+						Radius: geometry.Range{Min: 0.0, Max: 10.0},
+						Angle:  geometry.Range{Min: -10.0, Max: 20.0},
+						ZValue: geometry.Range{Min: -20.0, Max: 30.0},
+						Slices: geometry.Vec3DCylindricalInt{Radius: 10, Angle: 200, Z: 1000},
+					}},
+					ScoredParticle: setup.Particle{setup.PredefinedParticle("all")},
+					Scoring:        setup.DetectorScoring{setup.PredefinedScoring("energy")},
 				},
 				1: setup.Detector{
 					ID:   1,
 					Name: "trzy trzy trzy",
-					DetectorGeometry: setup.DetectorPlane{
-						Point:  common.Point{X: 1.0, Y: 2.0, Z: 3.0},
-						Normal: common.Vec3D{X: -1.0, Y: -2.0, Z: -3.0},
-					},
-					ScoredParticle: common.HeavyIon{Charge: 10, NucleonsCount: 20},
-					ScoringType: setup.LetTypeScoring{
+					DetectorGeometry: setup.DetectorGeometry{setup.DetectorPlane{
+						Point:  geometry.Point{X: 1.0, Y: 2.0, Z: 3.0},
+						Normal: geometry.Vec3D{X: -1.0, Y: -2.0, Z: -3.0},
+					}},
+					ScoredParticle: setup.Particle{setup.HeavyIon{Charge: 10, NucleonsCount: 20}},
+					Scoring: setup.DetectorScoring{setup.LetTypeScoring{
 						Type:     "letflu",
 						Material: 4,
-					},
+					}},
 				},
 			},
 			MaterialIDToShield: map[setup.MaterialID]material.ShieldID{4: 100},

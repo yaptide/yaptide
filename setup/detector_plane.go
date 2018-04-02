@@ -3,23 +3,23 @@ package setup
 import (
 	"encoding/json"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 )
 
 // DetectorPlane detector.
 type DetectorPlane struct {
-	Point  common.Point `json:"point"`
-	Normal common.Vec3D `json:"normal"`
+	Point  geometry.Point `json:"point"`
+	Normal geometry.Vec3D `json:"normal"`
 }
 
 // MarshalJSON json.Marshaller implementation.
-func (g DetectorPlane) MarshalJSON() ([]byte, error) {
+func (d DetectorPlane) MarshalJSON() ([]byte, error) {
 	type Alias DetectorPlane
 	return json.Marshal(struct {
-		detectorType
+		Type string `json:"type"`
 		Alias
 	}{
-		detectorType: planeScoringDetector,
-		Alias:        (Alias)(g),
+		Type:  detectorGeometryType.plane,
+		Alias: Alias(d),
 	})
 }

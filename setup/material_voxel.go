@@ -11,10 +11,10 @@ type MaterialVoxel struct {
 func (v MaterialVoxel) MarshalJSON() ([]byte, error) {
 	type Alias MaterialVoxel
 	return json.Marshal(struct {
-		materialType
+		Type string `json:"type"`
 		Alias
 	}{
-		materialType: voxelType,
-		Alias:        (Alias)(v),
+		Type:  materialType.voxel,
+		Alias: (Alias)(v),
 	})
 }

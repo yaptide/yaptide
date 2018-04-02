@@ -1,6 +1,8 @@
 package converter
 
-import "fmt"
+import (
+	"fmt"
+)
 
 type makeNewGeneralErrorFuncType = func(message string, formatedvalues ...interface{}) error
 type makeNewIDErrorFuncType = func(id interface{}, message string, formatedValues ...interface{}) error

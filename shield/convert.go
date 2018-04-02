@@ -20,32 +20,25 @@ func Convert(setup converter.Setup) (RawShieldSetup, SerializationContext, error
 		return RawShieldSetup{}, simContext, err
 	}
 
-	materials, materialIDToShield, err := material.ConvertSetupMaterials(setup.Materials)
-	if err != nil {
-		return RawShieldSetup{}, simContext, err
-	}
+	materials, materialIDToShield, materialErr := material.ConvertSetupMaterials(setup.Materials)
+	geometry, mapBodyToShield, geometryErr := geometry.ConvertSetupGeometry(
+		setup.Bodies, setup.Zones, materialIDToShield,
+	)
+	detectors, mapDetectorToShield, detectorErr := detector.ConvertSetupDetectors(
+		setup.Detectors, materialIDToShield,
+	)
 
 	for key, value := range materialIDToShield {
 		simContext.MapMaterialID[value] = key
 	}
 
-	geometry, mapBodyToShield, err := geometry.ConvertSetupGeometry(
-		setup.Bodies, setup.Zones, materialIDToShield,
-	)
-	if err != nil {
-		return RawShieldSetup{}, simContext, err
-	}
 	for key, value := range mapBodyToShield {
 		simContext.MapBodyID[value] = key
 	}
 
-	detectors, mapDetectorToShield, err := detector.ConvertSetupDetectors(
-		setup.Detectors, materialIDToShield,
-	)
-	if err != nil {
-		return RawShieldSetup{}, simContext, err
-	}
 	simContext.MapFilenameToDetectorID = mapDetectorToShield
+
+	_, _, _ = materialErr, geometryErr, detectorErr
 
 	return RawShieldSetup{
 			Materials: materials,

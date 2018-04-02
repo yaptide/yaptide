@@ -309,7 +309,12 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		}
 
 		check(t, testCase{
-			Input:         createMaterialMap(setup.Material{ID: 1, Type: setup.MaterialVoxel{}}),
+			Input: createMaterialMap(
+				setup.Material{
+					ID:    1,
+					Specs: setup.MaterialSpecs{setup.MaterialVoxel{}},
+				},
+			),
 			ExpectedError: errors.New("[serializer] Material{Id: 1} -> mat.dat: Voxel material serialization not implemented"),
 		})
 	})
@@ -317,9 +322,9 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 	t.Run("PredefinedMappingNotFound", func(t *testing.T) {
 		const id = 1
 		mat := genSetupSimplePredefined(id)
-		predef := mat.Type.(setup.MaterialPredefined)
+		predef := mat.Specs.MaterialType.(setup.MaterialPredefined)
 		predef.PredefinedID = "predefNameNotDefined"
-		mat.Type = predef
+		mat.Specs.MaterialType = predef
 
 		check(t, testCase{
 			Input:         createMaterialMap(mat),
@@ -330,9 +335,9 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 	t.Run("IsotopeMappingNotFound", func(t *testing.T) {
 		const id = 1
 		mat := genSetupCompound(id)
-		compound := mat.Type.(setup.MaterialCompound)
+		compound := mat.Specs.MaterialType.(setup.MaterialCompound)
 		compound.Elements[0].Isotope = "isotopeNameNotDefined"
-		mat.Type = compound
+		mat.Specs.MaterialType = compound
 
 		check(t, testCase{
 			Input:         createMaterialMap(mat),
@@ -343,9 +348,9 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 	t.Run("ExternalStoppingPowerFromPredefinedMaterialMappingNotFound", func(t *testing.T) {
 		const id = 1
 		mat := genSetupCompound(id)
-		compound := mat.Type.(setup.MaterialCompound)
+		compound := mat.Specs.MaterialType.(setup.MaterialCompound)
 		compound.ExternalStoppingPowerFromPredefined = "espfpNameNotDefined"
-		mat.Type = compound
+		mat.Specs.MaterialType = compound
 		check(t, testCase{
 			Input:         createMaterialMap(mat),
 			ExpectedError: errors.New(`[serializer] Material{Id: 1} -> mat.dat: "espfpNameNotDefined" material mapping to shield format not found`),
@@ -355,51 +360,66 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 }
 
 func genSetupSimplePredefined(id int64) setup.Material {
-	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialPredefined{
-		PredefinedID: "urea",
-	}}
+	return setup.Material{
+		ID: setup.MaterialID(id),
+		Specs: setup.MaterialSpecs{setup.MaterialPredefined{
+			PredefinedID: "urea",
+		}},
+	}
 }
 
 func genSetupFullPredefined(id int64) setup.Material {
-	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialPredefined{
-		PredefinedID:              "methanol",
-		StateOfMatter:             setup.Liquid,
-		Density:                   123.45,
-		LoadExternalStoppingPower: true,
-	}}
+	return setup.Material{
+		ID: setup.MaterialID(id),
+		Specs: setup.MaterialSpecs{setup.MaterialPredefined{
+			PredefinedID:              "methanol",
+			StateOfMatter:             setup.Liquid,
+			Density:                   123.45,
+			LoadExternalStoppingPower: true,
+		}},
+	}
 }
 
 func genSetupCompound(id int64) setup.Material {
-	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialCompound{
-		Name:          "kot",
-		Density:       99.9,
-		StateOfMatter: setup.Solid,
-		Elements: []setup.Element{
-			setup.Element{Isotope: "gd-*", RelativeStoichiometricFraction: 2, AtomicMass: 100.23},
-			setup.Element{Isotope: "u-235", RelativeStoichiometricFraction: 123, IValue: 555.34},
-		},
-		ExternalStoppingPowerFromPredefined: "water_vapor",
-	}}
+	return setup.Material{
+		ID: setup.MaterialID(id),
+		Specs: setup.MaterialSpecs{setup.MaterialCompound{
+			Name:          "kot",
+			Density:       99.9,
+			StateOfMatter: setup.Solid,
+			Elements: []setup.Element{
+				setup.Element{Isotope: "gd-*", RelativeStoichiometricFraction: 2, AtomicMass: 100.23},
+				setup.Element{Isotope: "u-235", RelativeStoichiometricFraction: 123, IValue: 555.34},
+			},
+			ExternalStoppingPowerFromPredefined: "water_vapor",
+		}},
+	}
 }
 
 func genSetupAnotherCompound(id int64) setup.Material {
-	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialCompound{
-		Name:          "pies",
-		Density:       0.999,
-		StateOfMatter: setup.Gas,
-		Elements: []setup.Element{
-			setup.Element{Isotope: "c-*", RelativeStoichiometricFraction: 4, AtomicMass: 0.01},
-			setup.Element{Isotope: "si-*", RelativeStoichiometricFraction: 1, IValue: 0.34},
-			setup.Element{Isotope: "na-23", RelativeStoichiometricFraction: 11111, IValue: 0.123, AtomicMass: 987.654},
-		},
-		ExternalStoppingPowerFromPredefined: "water_vapor",
-	}}
+	return setup.Material{
+		ID: setup.MaterialID(id),
+		Specs: setup.MaterialSpecs{setup.MaterialCompound{
+			Name:          "pies",
+			Density:       0.999,
+			StateOfMatter: setup.Gas,
+			Elements: []setup.Element{
+				setup.Element{Isotope: "c-*", RelativeStoichiometricFraction: 4, AtomicMass: 0.01},
+				setup.Element{Isotope: "si-*", RelativeStoichiometricFraction: 1, IValue: 0.34},
+				setup.Element{Isotope: "na-23", RelativeStoichiometricFraction: 11111, IValue: 0.123, AtomicMass: 987.654},
+			},
+			ExternalStoppingPowerFromPredefined: "water_vapor",
+		}},
+	}
 }
 
 func genVacuum(id int64) setup.Material {
-	return setup.Material{ID: setup.MaterialID(id), Type: setup.MaterialPredefined{
-		PredefinedID: "vacuum",
-	}}
+	return setup.Material{
+		ID: setup.MaterialID(id),
+		Specs: setup.MaterialSpecs{setup.MaterialPredefined{
+			PredefinedID: "vacuum",
+		}},
+	}
 }
 
 func createMaterialMap(materials ...setup.Material) converter.MaterialMap {

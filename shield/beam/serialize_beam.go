@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/format"
 	"github.com/yaptide/converter/log"
 	"github.com/yaptide/converter/setup"
@@ -55,14 +54,14 @@ var beamCardSerializers = map[string]beamCardSerializerFunc{
 		return ""
 	},
 	"HIPROJ": func(beam setup.Beam, options setup.SimulationOptions) string {
-		particle, ok := beam.ParticleType.(common.HeavyIon)
+		particle, ok := beam.Particle.ParticleType.(setup.HeavyIon)
 		if ok {
 			return fmt.Sprintf("%8d", particle.NucleonsCount) + fmt.Sprintf("%8d", particle.Charge)
 		}
 		return ""
 	},
 	"JPART0": func(beam setup.Beam, options setup.SimulationOptions) string {
-		number, _ := mapping.ParticleToShield(beam.ParticleType)
+		number, _ := mapping.ParticleToShield(beam.Particle)
 		return fmt.Sprintf("%8d", number)
 	},
 	"MAKELN": func(beam setup.Beam, options setup.SimulationOptions) string {

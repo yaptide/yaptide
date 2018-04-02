@@ -7,7 +7,6 @@ import (
 	"unicode"
 
 	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/common"
 	"github.com/yaptide/converter/geometry"
 	"github.com/yaptide/converter/setup"
 	"github.com/yaptide/converter/shield/mapping"
@@ -68,7 +67,7 @@ type detectorConverter struct {
 }
 
 func (d detectorConverter) convertDetector(detect *setup.Detector, filename string) (Detector, error) {
-	switch geo := detect.DetectorGeometry.(type) {
+	switch geo := detect.DetectorGeometry.GeometryType.(type) {
 	case setup.DetectorGeomap:
 		return Detector{}, converter.GeneralDetectorError("Geomap detector serialization not implemented")
 	case setup.DetectorZones:
@@ -89,7 +88,7 @@ func (d detectorConverter) convertDetector(detect *setup.Detector, filename stri
 func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detector, filename string) (Detector, error) {
 	var newDetector Detector
 
-	switch geo := detect.DetectorGeometry.(type) {
+	switch geo := detect.DetectorGeometry.GeometryType.(type) {
 	case setup.DetectorCylinder:
 		newDetector = Detector{
 			ScoringType: "CYL",
@@ -148,7 +147,7 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detecto
 		return Detector{}, converter.DetectorIDError(detect.ID, "%s", err.Error())
 	}
 
-	scoringInShield, err := mapping.ScoringToShield(detect.ScoringType)
+	scoringInShield, err := mapping.ScoringToShield(detect.Scoring)
 	if err != nil {
 		return Detector{}, converter.DetectorIDError(detect.ID, "%s", err.Error())
 	}
@@ -159,7 +158,7 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detecto
 		filename,
 	)
 
-	newDetector.Arguments, err = d.appendHeavyIonOrLetfluCard(newDetector.Arguments, detect.ScoredParticle, detect.ScoringType)
+	newDetector.Arguments, err = d.appendHeavyIonOrLetfluCard(newDetector.Arguments, detect.ScoredParticle, detect.Scoring)
 	if err != nil {
 		return Detector{}, converter.DetectorIDError(detect.ID, "%s", err.Error())
 	}
@@ -167,11 +166,13 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detecto
 }
 
 // TODO: we need A and Z if partile is not HeavyIon and scoring is LetTypeScoring
-func (d detectorConverter) appendHeavyIonOrLetfluCard(arguments []interface{}, particle common.Particle, scoringType setup.ScoringType) ([]interface{}, error) {
-	switch part := particle.(type) {
-	case common.HeavyIon:
+func (d detectorConverter) appendHeavyIonOrLetfluCard(
+	arguments []interface{}, particle setup.Particle, scoringType setup.DetectorScoring,
+) ([]interface{}, error) {
+	switch part := particle.ParticleType.(type) {
+	case setup.HeavyIon:
 		arguments = append(arguments, part.NucleonsCount, part.Charge)
-		switch scoring := scoringType.(type) {
+		switch scoring := scoringType.ScoringType.(type) {
 		case setup.LetTypeScoring:
 			material, found := d.materialIDToShield[scoring.Material]
 			if !found {

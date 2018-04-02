@@ -3,7 +3,7 @@ package setup
 import (
 	"testing"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 	test "github.com/yaptide/converter/test"
 )
 
@@ -11,14 +11,14 @@ var testCases = test.MarshallingCases{
 	{
 		&Beam{
 			Direction: BeamDirection{
-				Phi: 0.1, Theta: 0.1, Position: common.Point{X: 1, Y: 1, Z: 1},
+				Phi: 0.1, Theta: 0.1, Position: geometry.Point{X: 1, Y: 1, Z: 1},
 			},
 			Divergence: BeamDivergence{
 				SigmaX:       1,
 				SigmaY:       1,
-				Distribution: common.GaussianDistribution,
+				Distribution: GaussianDistribution,
 			},
-			ParticleType:       common.PredefinedParticle("neutron"),
+			Particle:           Particle{PredefinedParticle("neutron")},
 			InitialBaseEnergy:  111.111,
 			InitialEnergySigma: 0.11,
 		},
@@ -37,7 +37,7 @@ var testCases = test.MarshallingCases{
 				"sigmaY": 1,
 				"distribution": "gaussian"
 			},
-			"particleType": {
+			"particle": {
 				"type": "neutron"
 			},
 			"initialBaseEnergy": 111.111,
@@ -46,17 +46,17 @@ var testCases = test.MarshallingCases{
 	}, {
 		&Beam{
 			Direction: BeamDirection{
-				Phi: 0.1, Theta: 0.1, Position: common.Point{X: 1, Y: 1, Z: 1},
+				Phi: 0.1, Theta: 0.1, Position: geometry.Point{X: 1, Y: 1, Z: 1},
 			},
 			Divergence: BeamDivergence{
 				SigmaX:       1,
 				SigmaY:       1,
-				Distribution: common.FlatDistribution,
+				Distribution: FlatDistribution,
 			},
-			ParticleType: common.HeavyIon{
+			Particle: Particle{HeavyIon{
 				Charge:        10,
 				NucleonsCount: 10,
-			},
+			}},
 			InitialBaseEnergy:  111.111,
 			InitialEnergySigma: 0.11,
 		},
@@ -75,7 +75,7 @@ var testCases = test.MarshallingCases{
 				"sigmaY": 1,
 				"distribution": "flat"
 			},
-			"particleType": {
+			"particle": {
 				"type": "heavy_ion",
 				"charge": 10,
 				"nucleonsCount": 10

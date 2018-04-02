@@ -2,10 +2,31 @@ package setup
 
 import (
 	"encoding/json"
-	"fmt"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/utils"
 )
+
+var detectorGeometryType = struct {
+	geomap   string
+	zone     string
+	cylinder string
+	mesh     string
+	plane    string
+}{
+	geomap:   "geomap",
+	zone:     "zone",
+	cylinder: "cylinder",
+	mesh:     "mesh",
+	plane:    "plane",
+}
+
+var detectorGeometryTypeMapping = map[string]func() interface{}{
+	detectorGeometryType.geomap:   func() interface{} { return &DetectorGeomap{} },
+	detectorGeometryType.zone:     func() interface{} { return &DetectorZones{} },
+	detectorGeometryType.mesh:     func() interface{} { return &DetectorMesh{} },
+	detectorGeometryType.plane:    func() interface{} { return &DetectorPlane{} },
+	detectorGeometryType.cylinder: func() interface{} { return &DetectorCylinder{} },
+}
 
 type DetectorID int64
 
@@ -14,118 +35,25 @@ type Detector struct {
 	ID               DetectorID       `json:"id"`
 	Name             string           `json:"name"`
 	DetectorGeometry DetectorGeometry `json:"detectorGeometry"`
-	ScoredParticle   common.Particle  `json:"particle"`
-	ScoringType      ScoringType      `json:"scoring"`
+	ScoredParticle   Particle         `json:"particle"`
+	Scoring          DetectorScoring  `json:"scoring"`
 }
 
-// UnmarshalJSON custom Unmarshal function.
-// detector.Type is recognized by detector/type in json.
-func (m *Detector) UnmarshalJSON(b []byte) error {
-	type rawBody struct {
-		ID          DetectorID      `json:"id"`
-		Name        string          `json:"name"`
-		GeometryRaw json.RawMessage `json:"detectorGeometry"`
-		ParticleRaw json.RawMessage `json:"particle"`
-		ScoringType json.RawMessage `json:"scoring"`
-	}
+type GeometryType interface{}
 
-	var raw rawBody
-	err := json.Unmarshal(b, &raw)
+type DetectorGeometry struct {
+	GeometryType
+}
+
+func (d DetectorGeometry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(d.GeometryType)
+}
+
+func (d *DetectorGeometry) UnmarshalJSON(b []byte) error {
+	geometry, err := utils.TypeBasedUnmarshallJSON(b, detectorGeometryTypeMapping)
 	if err != nil {
 		return err
 	}
-	m.ID = raw.ID
-	m.Name = raw.Name
-
-	matType, err := unmarshalDetectorGeometry(raw.GeometryRaw)
-	if err != nil {
-		return err
-	}
-	m.DetectorGeometry = matType
-
-	scoredParticle, err := common.UnmarshalParticle(raw.ParticleRaw)
-	if err != nil {
-		return err
-	}
-	m.ScoredParticle = scoredParticle
-
-	scoringType, err := unmarshalScoringType(raw.ScoringType)
-	if err != nil {
-		return err
-	}
-	m.ScoringType = scoringType
-
+	d.GeometryType = geometry
 	return nil
 }
-
-func unmarshalDetectorGeometry(b json.RawMessage) (DetectorGeometry, error) {
-	var detType detectorType
-	err := json.Unmarshal(b, &detType)
-	if err != nil {
-		return nil, err
-	}
-
-	switch detType {
-	case geomapDetector:
-		geomap := DetectorGeomap{}
-		err = json.Unmarshal(b, &geomap)
-		if err != nil {
-			return nil, err
-		}
-		return geomap, nil
-	case zoneScoringDetector:
-		zone := DetectorZones{}
-		err = json.Unmarshal(b, &zone)
-		if err != nil {
-			return nil, err
-		}
-		return zone, nil
-	case meshScoringDetector:
-		mesh := DetectorMesh{}
-		err = json.Unmarshal(b, &mesh)
-		if err != nil {
-			return nil, err
-		}
-		return mesh, nil
-	case cylindricalScoringDetector:
-		cylinder := CylinderBody{}
-		err = json.Unmarshal(b, &cylinder)
-		if err != nil {
-			return nil, err
-		}
-		return cylinder, nil
-	case planeScoringDetector:
-		plane := DetectorPlane{}
-		err = json.Unmarshal(b, &plane)
-		if err != nil {
-			return nil, err
-		}
-		return plane, nil
-	default:
-		return nil, fmt.Errorf("Can not Unmarshal \"%s\" detector.Type", detType.DetectorType)
-	}
-}
-
-// Geometry is interface for detector type.
-// It must implement json.Marshaler to marshal detector Type
-// dependant on detector Type implementation type.
-type DetectorGeometry interface {
-	json.Marshaler
-}
-
-// ScoringType is interface for scoring particles.
-type ScoringType interface {
-	json.Marshaler
-}
-
-type detectorType struct {
-	DetectorType string `json:"type"`
-}
-
-var (
-	geomapDetector             = detectorType{"geomap"}
-	zoneScoringDetector        = detectorType{"zone"}
-	cylindricalScoringDetector = detectorType{"cylinder"}
-	meshScoringDetector        = detectorType{"mesh"}
-	planeScoringDetector       = detectorType{"plane"}
-)

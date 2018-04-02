@@ -3,8 +3,6 @@ package setup
 import (
 	"encoding/json"
 	"fmt"
-
-	"github.com/yaptide/converter/common"
 )
 
 // SimulationOptions ...
@@ -18,7 +16,7 @@ type SimulationOptions struct {
 
 	// MeanEnergyLoss ...
 	// SHIELD doc: DELTAE
-	MeanEnergyLoss common.Fraction `json:"meanEnergyLoss"`
+	MeanEnergyLoss Fraction `json:"meanEnergyLoss"`
 	// MinEnergyLoss ...
 	// SHIELD doc: DEMIN
 	MinEnergyLoss float64 `json:"minEnergyLoss"`

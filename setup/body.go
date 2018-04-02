@@ -1,6 +1,26 @@
 package setup
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/yaptide/converter/utils"
+)
+
+var bodyType = struct {
+	cuboid   string
+	cylinder string
+	sphere   string
+}{
+	cuboid:   "cuboid",
+	cylinder: "cylinder",
+	sphere:   "sphere",
+}
+
+var bodyTypeMapping = map[string]func() interface{}{
+	bodyType.cuboid:   func() interface{} { return &CuboidBody{} },
+	bodyType.cylinder: func() interface{} { return &CylinderBody{} },
+	bodyType.sphere:   func() interface{} { return &SphereBody{} },
+}
 
 // BodyID is key type in Body map.
 type BodyID int64
@@ -12,28 +32,21 @@ type Body struct {
 	Geometry BodyGeometry `json:"geometry"`
 }
 
-// UnmarshalJSON custom Unmarshal function.
-// GeometryType is recognized by geometry/type in json.
-func (body *Body) UnmarshalJSON(b []byte) error {
-	type rawBody struct {
-		ID          BodyID          `json:"id"`
-		Name        string          `json:"name,omitempty"`
-		GeometryRaw json.RawMessage `json:"geometry"`
-	}
+type BodyGeometry struct {
+	BodyType
+}
 
-	var raw rawBody
-	err := json.Unmarshal(b, &raw)
+type BodyType interface{}
+
+func (b BodyGeometry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(b.BodyType)
+}
+
+func (g *BodyGeometry) UnmarshalJSON(b []byte) error {
+	body, err := utils.TypeBasedUnmarshallJSON(b, bodyTypeMapping)
 	if err != nil {
 		return err
 	}
-	body.ID = raw.ID
-	body.Name = raw.Name
-
-	geometry, err := unmarshalGeometry(raw.GeometryRaw)
-	if err != nil {
-		return err
-	}
-	body.Geometry = geometry
-
+	g.BodyType = body
 	return nil
 }

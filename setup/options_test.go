@@ -3,7 +3,6 @@ package setup
 import (
 	"testing"
 
-	"github.com/yaptide/converter/common"
 	test "github.com/yaptide/converter/test"
 )
 
@@ -12,7 +11,7 @@ var optionTestCasses = test.MarshallingCases{
 		&SimulationOptions{
 			AntyparticleCorrectionOn:   true,
 			NuclearReactionsOn:         true,
-			MeanEnergyLoss:             common.Fraction(0.1),
+			MeanEnergyLoss:             Fraction(0.1),
 			MinEnergyLoss:              1.1,
 			ScatteringType:             GaussianScattering,
 			EnergyStraggling:           VavilovStraggling,

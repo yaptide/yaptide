@@ -4,8 +4,35 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/log"
 )
+
+var predefinedScoringTypes = map[string]bool{
+	"dose":       true,
+	"energy":     true,
+	"fluence":    true,
+	"avg_energy": true,
+	"avg_beta":   true,
+	"spc":        true,
+	"alanine":    true,
+	"counter":    true,
+	"ddd":        true,
+	"crossflu":   true,
+}
+
+// TODO: write test checking if all values are assigned
+// TODO: not sure about that
+var letScoringTypes = map[string]bool{
+	"letflu": true,
+	"dlet":   true,
+	"tlet":   true,
+}
+
+type ScoringType interface{}
+
+type DetectorScoring struct {
+	ScoringType
+}
 
 // PredefinedScoring ...
 type PredefinedScoring string
@@ -35,21 +62,35 @@ func (s LetTypeScoring) MarshalJSON() ([]byte, error) {
 	})
 }
 
-func unmarshalScoringType(scoring json.RawMessage) (common.Particle, error) {
-	var predefinedScoring struct {
-		Type PredefinedScoring `json:"type"`
-	}
-	predefinedScoringErr := json.Unmarshal(scoring, &predefinedScoring)
-	var letTypeScoring LetTypeScoring
-	letTypeScoringErr := json.Unmarshal(scoring, &letTypeScoring)
+func (s DetectorScoring) MarshalJSON() ([]byte, error) {
+	return json.Marshal(s.ScoringType)
+}
 
-	if letTypeScoringErr == nil && (letTypeScoring.Type == "letflu" ||
-		letTypeScoring.Type == "dlet" ||
-		letTypeScoring.Type == "tlet") {
-		return letTypeScoring, nil
+func (s *DetectorScoring) UnmarshalJSON(b []byte) error {
+	var scoring struct {
+		Type string `json:"type"`
 	}
-	if predefinedScoringErr == nil {
-		return predefinedScoring.Type, nil
+	getTypeErr := json.Unmarshal(b, &scoring)
+	if getTypeErr != nil {
+		return getTypeErr
 	}
-	return nil, fmt.Errorf("unknown scoring type")
+
+	log.Error(scoring.Type)
+	_, isPredefined := predefinedScoringTypes[scoring.Type]
+	if isPredefined {
+		s.ScoringType = PredefinedScoring(scoring.Type)
+		return nil
+	}
+
+	_, isLet := letScoringTypes[scoring.Type]
+	if isLet {
+		var detectorScoring LetTypeScoring
+		if err := json.Unmarshal(b, &detectorScoring); err != nil {
+			return err
+		}
+		s.ScoringType = detectorScoring
+		return nil
+	}
+
+	return fmt.Errorf("unknown scoring type")
 }

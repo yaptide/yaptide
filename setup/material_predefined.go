@@ -20,10 +20,10 @@ type MaterialPredefined struct {
 func (p MaterialPredefined) MarshalJSON() ([]byte, error) {
 	type Alias MaterialPredefined
 	return json.Marshal(struct {
-		materialType
+		Type string `json:"type"`
 		Alias
 	}{
-		materialType: predefinedType,
-		Alias:        (Alias)(p),
+		Type:  materialType.predefined,
+		Alias: (Alias)(p),
 	})
 }

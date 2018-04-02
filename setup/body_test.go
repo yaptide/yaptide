@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/yaptide/converter/common"
+	"github.com/yaptide/converter/geometry"
 	test "github.com/yaptide/converter/test"
 )
 
 var bodyTestCasses = test.MarshallingCases{
 	{
-		&Body{ID: BodyID(1), Name: "name", Geometry: SphereBody{}},
+		&Body{ID: BodyID(1), Name: "name", Geometry: BodyGeometry{SphereBody{}}},
 		`{
 			"id": 1,
 			"name": "name",
@@ -23,7 +23,7 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&Body{ID: BodyID(2), Name: "name", Geometry: CuboidBody{}},
+		&Body{ID: BodyID(2), Name: "name", Geometry: BodyGeometry{CuboidBody{}}},
 		`{
 			"id": 2,
 			"name": "name",
@@ -36,7 +36,7 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&Body{ID: BodyID(3), Name: "somethin", Geometry: CylinderBody{}},
+		&Body{ID: BodyID(3), Name: "somethin", Geometry: BodyGeometry{CylinderBody{}}},
 		`{
 			"id": 3,
 			"name": "somethin",
@@ -50,34 +50,29 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&common.Point{X: 1.0, Y: 2.0, Z: 3.0},
+		&geometry.Point{X: 1.0, Y: 2.0, Z: 3.0},
 		`{"x":1,"y":2,"z":3}`,
 	},
 
 	{
-		&common.Vec3D{X: 1.0, Y: 2.0, Z: 3.0},
+		&geometry.Vec3D{X: 1.0, Y: 2.0, Z: 3.0},
 		`{"x":1,"y":2,"z":3}`,
 	},
 
 	{
-		&geometryType{Type: "type"},
-		`{"type":"type"}`,
-	},
-
-	{
-		&SphereBody{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Radius: 100.0},
+		&SphereBody{Center: geometry.Point{X: 1.0, Y: 2.0, Z: -100.0}, Radius: 100.0},
 		`{"type":"sphere","center":{"x":1,"y":2,"z":-100},"radius":100}`,
 	},
 
 	{
-		&CuboidBody{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Size: common.Vec3D{X: 5.0, Y: 2.0, Z: 6.0}},
+		&CuboidBody{Center: geometry.Point{X: 1.0, Y: 2.0, Z: -100.0}, Size: geometry.Vec3D{X: 5.0, Y: 2.0, Z: 6.0}},
 		`{"type":"cuboid",
 		  "center":{"x":1,"y":2,"z":-100},
 		  "size":  {"x":5, "y":2, "z":6}}`,
 	},
 
 	{
-		&CylinderBody{Center: common.Point{X: 1.0, Y: 2.0, Z: -100.0}, Height: 100.0, Radius: 40.0},
+		&CylinderBody{Center: geometry.Point{X: 1.0, Y: 2.0, Z: -100.0}, Height: 100.0, Radius: 40.0},
 		`{"type":"cylinder","baseCenter":{"x":1,"y":2,"z":-100},"height":100,"radius":40}`,
 	},
 }

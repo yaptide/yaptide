@@ -70,7 +70,7 @@ func ConvertSetupMaterials(
 	compoundMaterialsIds := []setup.MaterialID{}
 
 	for id, mat := range setupMat {
-		switch g := mat.Type.(type) {
+		switch g := mat.Specs.MaterialType.(type) {
 		case setup.MaterialPredefined:
 			if g.PredefinedID != "vacuum" {
 				predefMaterialsIds = append(predefMaterialsIds, id)
@@ -96,7 +96,7 @@ func ConvertSetupMaterials(
 	}
 
 	for _, predefID := range predefMaterialsIds {
-		predef, err := createPredefinedMaterial(setupMat[predefID].Type.(setup.MaterialPredefined), materialIDToShield[predefID])
+		predef, err := createPredefinedMaterial(setupMat[predefID].Specs.MaterialType.(setup.MaterialPredefined), materialIDToShield[predefID])
 		if err != nil {
 			return Materials{}, nil, err
 		}
@@ -104,7 +104,7 @@ func ConvertSetupMaterials(
 	}
 
 	for _, compoundID := range compoundMaterialsIds {
-		compound, err := createCompoundMaterial(setupMat[compoundID].Type.(setup.MaterialCompound), materialIDToShield[compoundID])
+		compound, err := createCompoundMaterial(setupMat[compoundID].Specs.MaterialType.(setup.MaterialCompound), materialIDToShield[compoundID])
 		if err != nil {
 			return Materials{}, nil, err
 		}

@@ -36,11 +36,11 @@ type Element struct {
 func (c MaterialCompound) MarshalJSON() ([]byte, error) {
 	type Alias MaterialCompound
 	return json.Marshal(struct {
-		materialType
+		Type string `json:"type"`
 		Alias
 	}{
-		materialType: compoundType,
-		Alias:        (Alias)(c),
+		Type:  materialType.compound,
+		Alias: (Alias)(c),
 	})
 
 }
