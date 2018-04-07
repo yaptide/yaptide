@@ -6,6 +6,7 @@ import (
 	"github.com/yaptide/converter/validate"
 )
 
+// Validate ...
 func (b Beam) Validate() error {
 	result := E{}
 
@@ -30,6 +31,7 @@ func (b Beam) Validate() error {
 	return result
 }
 
+// Validate ...
 func (b BeamDirection) Validate() error {
 	result := E{}
 
@@ -43,6 +45,7 @@ func (b BeamDirection) Validate() error {
 	return result
 }
 
+// Validate ...
 func (b BeamDivergence) Validate() error {
 	result := E{}
 	// TODO research this better;

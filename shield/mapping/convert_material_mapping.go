@@ -14,12 +14,17 @@ type IsotopeNUCLID int64
 type StateOfMatter int64
 
 const (
+	// StateNonDefined ...
 	StateNonDefined StateOfMatter = -1
-	StateSolid      StateOfMatter = 0
-	StateGas        StateOfMatter = 1
-	StateLiquid     StateOfMatter = 2
+	// StateSolid ...
+	StateSolid StateOfMatter = 0
+	// StateGas ...
+	StateGas StateOfMatter = 1
+	// StateLiquid ...
+	StateLiquid StateOfMatter = 2
 )
 
+// StateOfMatterToShield ...
 var StateOfMatterToShield = map[setup.StateOfMatter]StateOfMatter{
 	setup.NonDefined: StateNonDefined,
 	setup.Solid:      StateSolid,
@@ -30,6 +35,7 @@ var StateOfMatterToShield = map[setup.StateOfMatter]StateOfMatter{
 // BlackholeMaterialID represent Blackhole material in shield input files.
 const BlackholeMaterialID MaterialICRU = 0
 
+// PredefinedMaterialsToShieldICRU ...
 var PredefinedMaterialsToShieldICRU = map[string]MaterialICRU{
 	"hydrogen":                                 1,
 	"helium":                                   2,
@@ -313,6 +319,7 @@ var PredefinedMaterialsToShieldICRU = map[string]MaterialICRU{
 	"vacuum":                                   1000,
 }
 
+// IsotopesToShieldNUCLID ...
 var IsotopesToShieldNUCLID = map[string]IsotopeNUCLID{
 	"h-1 - hydrogen":  1,
 	"h-2 - deuterium": 101,

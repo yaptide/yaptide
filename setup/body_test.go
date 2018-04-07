@@ -65,7 +65,10 @@ var bodyTestCasses = test.MarshallingCases{
 	},
 
 	{
-		&CuboidBody{Center: geometry.Point{X: 1.0, Y: 2.0, Z: -100.0}, Size: geometry.Vec3D{X: 5.0, Y: 2.0, Z: 6.0}},
+		&CuboidBody{
+			Center: geometry.Point{X: 1.0, Y: 2.0, Z: -100.0},
+			Size:   geometry.Vec3D{X: 5.0, Y: 2.0, Z: 6.0},
+		},
 		`{"type":"cuboid",
 		  "center":{"x":1,"y":2,"z":-100},
 		  "size":  {"x":5, "y":2, "z":6}}`,

@@ -9,6 +9,7 @@ import (
 	"github.com/yaptide/converter/setup"
 )
 
+// ShieldBodyID ...
 type ShieldBodyID int64
 
 // Body represent setup.Body,
@@ -124,7 +125,8 @@ func convertCylinder(cylinder setup.CylinderBody) (Body, error) {
 		return Body{}, fmt.Errorf("cylinder radius cannot be <= 0.0")
 	}
 
-	// TODO: support cylinders, which vector from the center to the opposite end of the cylinder are not parallel to [0, 1, 0].
+	// TODO: support cylinders, which vector from the center to the opposite end of the
+	// cylinder are not parallel to [0, 1, 0].
 	return Body{
 		Identifier: "RCC",
 		Arguments: []float64{

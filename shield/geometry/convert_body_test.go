@@ -46,7 +46,10 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 					Size:   geometry.Vec3D{X: 100.0, Y: 200.0, Z: 30.5},
 				}},
 			}),
-			Expected: []Body{Body{ID: 1, Identifier: "RPP", Arguments: []float64{-40.0, 60.0, -80.0, 120.0, 14.75, 45.25}}},
+			Expected: []Body{Body{
+				ID: 1, Identifier: "RPP",
+				Arguments: []float64{-40.0, 60.0, -80.0, 120.0, 14.75, 45.25},
+			}},
 		})
 	})
 
@@ -60,7 +63,10 @@ func TestSuccessfullBodiesConvert(t *testing.T) {
 					Radius: 99.5,
 				}},
 			}),
-			Expected: []Body{Body{ID: 1, Identifier: "RCC", Arguments: []float64{10.1, 20.2, 30.3, 0.0, 24.4, 0.0, 99.5}}},
+			Expected: []Body{Body{
+				ID: 1, Identifier: "RCC",
+				Arguments: []float64{10.1, 20.2, 30.3, 0.0, 24.4, 0.0, 99.5},
+			}},
 		})
 	})
 
@@ -120,11 +126,21 @@ func TestAppendBlackholeBody(t *testing.T) {
 	const expectedBlackholeBodyID ShieldBodyID = 5
 
 	expectedBodiesAfterAppend := []Body{
-		Body{ID: 1, Identifier: "RCC", Arguments: []float64{0.0, 1.0, 2.0, 0.0, 3.0, 0.0, 4.0}},
-		Body{ID: 2, Identifier: "RPP", Arguments: []float64{-40.0, 60.0, -80.0, 120, 14.75, 45.25}},
-		Body{ID: 3, Identifier: "RCC", Arguments: []float64{10.1, 20.2, 30.3, 0.0, 24.4, 0.0, 99.5}},
-		Body{ID: 4, Identifier: "SPH", Arguments: []float64{20.0, 31.0, 0.99, 0.01}},
-		Body{ID: expectedBlackholeBodyID, Identifier: "RPP", Arguments: []float64{-250.0, 250.0, -250.0, 250.0, -250.0, 250.0}}}
+		Body{ID: 1, Identifier: "RCC",
+			Arguments: []float64{0.0, 1.0, 2.0, 0.0, 3.0, 0.0, 4.0},
+		},
+		Body{ID: 2, Identifier: "RPP",
+			Arguments: []float64{-40.0, 60.0, -80.0, 120, 14.75, 45.25},
+		},
+		Body{ID: 3, Identifier: "RCC",
+			Arguments: []float64{10.1, 20.2, 30.3, 0.0, 24.4, 0.0, 99.5},
+		},
+		Body{ID: 4, Identifier: "SPH",
+			Arguments: []float64{20.0, 31.0, 0.99, 0.01},
+		},
+		Body{ID: expectedBlackholeBodyID, Identifier: "RPP",
+			Arguments: []float64{-250.0, 250.0, -250.0, 250.0, -250.0, 250.0},
+		}}
 
 	bodiesAfterAppend, blackholeBodyID, err := appendBlackholeBody(inputBodies)
 

@@ -17,7 +17,7 @@ const (
 	tagUsername          = 0x03
 	tagHostname          = 0x04
 
-	// Configuraton
+	// Configuration
 
 	// DELTAE
 	tagdele = 0xCC00 // Tag <f8 value 5.000000074505806e-02
@@ -28,7 +28,7 @@ const (
 	tagoln    = 0xCC04 // <f8 0e+00
 	//NUCRE
 	// 1 - Allow nucler reactions
-	// 0 - oposite
+	// 0 - opposite
 	tagConfNucre  = 0xCC05 // <i8
 	tagiemtrans   = 0xCC06 //
 	tagiextspec   = 0xCC07
@@ -63,10 +63,12 @@ const (
 	tagdetparta       = 0xDD05 // idet(7)
 	tagdetdmat        = 0xDD06 // idet(8)
 	tagdetnbine       = 0xDD07 // idet(9) number of bins in diff scorer, negative means log binning
-	tagdetdifftype    = 0xDD08 // idet(10) detector type for differential scorer (i.e. angle, energy, let)
-	tagdetzonestart   = 0xDD09 // idet(11)
-	tagdetdsize       = 0xDD0A // idet(12)
-	tagdetdsizexyz    = 0xDD0B // idet(13)
+
+	// idet(10) detector type for differential scorer (i.e. angle, energy, let)
+	tagdetdifftype  = 0xDD08
+	tagdetzonestart = 0xDD09 // idet(11)
+	tagdetdsize     = 0xDD0A // idet(12)
+	tagdetdsizexyz  = 0xDD0B // idet(13)
 
 	tagdetxyzstart = 0xDD0C // det(1-3)
 	tagdetxyzstop  = 0xDD0D // det(4-6)
@@ -190,8 +192,11 @@ func handleResultDimensions(dtype bdoDataUnit, payload [][]byte, parser *bdoPars
 		return fmt.Errorf("Unexpected data type in Shield result file (%s)", errStr)
 	}
 	if len(payload) != 3 {
-		errStr := log.Warning("[handleMainDataBlockTag] Should be 3 dimesnions", dtype)
-		return fmt.Errorf("Unexpected token length in Shield result file. Expected 3 dimensions. (%s)", errStr)
+		errStr := log.Warning("[handleMainDataBlockTag] Should be 3 dimensions", dtype)
+		return fmt.Errorf(
+			"Unexpected token length in Shield result file. Expected 3 dimensions. (%s)",
+			errStr,
+		)
 	}
 	parser.Results.Dimensions = result.Dimensions{}
 	var dim1, dim2, dim3 int64
@@ -237,7 +242,11 @@ func handleMainDataBlockTag(dtype bdoDataUnit, payload [][]byte, parser *bdoPars
 						j*parser.Results.Dimensions.SegmentsInDim1 +
 						k
 				var parsedValue float64
-				_ = binary.Read(bytes.NewBuffer(payload[index]), dtype.GetByteOrder(parser.endiness), &parsedValue)
+				_ = binary.Read(
+					bytes.NewBuffer(payload[index]),
+					dtype.GetByteOrder(parser.endiness),
+					&parsedValue,
+				)
 				parser.Results.Data[i][j][k] = parsedValue
 			}
 		}

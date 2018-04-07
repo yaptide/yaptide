@@ -6,6 +6,7 @@ import (
 	"reflect"
 )
 
+// TypeBasedUnmarshallJSON ...
 func TypeBasedUnmarshallJSON(
 	data []byte, typeMapping map[string]func() interface{},
 ) (interface{}, error) {

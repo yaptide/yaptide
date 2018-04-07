@@ -4,9 +4,10 @@ import (
 	"github.com/yaptide/converter/shield/material"
 )
 
+// ShieldZoneID ...
 type ShieldZoneID int64
 
-// Operation decribe how to construct zone using bodies.
+// Operation describe how to construct zone using bodies.
 type Operation string
 
 const (

@@ -31,7 +31,8 @@ func TestSerializeDetect(t *testing.T) {
 				Detector{
 					ScoringType: "CYL",
 					Arguments: []interface{}{
-						0.0, -10.0, -1.0, 10.0, 20.0, 30.0, int64(10), int64(200), int64(1000), int64(-1), "ENERGY", "ala_ma_psa0",
+						0.0, -10.0, -1.0, 10.0, 20.0, 30.0, int64(10), int64(200),
+						int64(1000), int64(-1), "ENERGY", "ala_ma_psa0",
 					},
 				}},
 			Expected: detectTc1Expected,

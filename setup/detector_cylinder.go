@@ -6,7 +6,7 @@ import (
 	"github.com/yaptide/converter/geometry"
 )
 
-// Cylinder is detector with cylindrical shape directed along z-axis.
+// DetectorCylinder is detector with cylindrical shape directed along z-axis.
 type DetectorCylinder struct {
 	Radius geometry.Range               `json:"radius"`
 	Angle  geometry.Range               `json:"angle"`

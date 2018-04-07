@@ -16,6 +16,7 @@ type RawShieldSetup struct {
 	Options   setup.SimulationOptions
 }
 
+// Files ...
 func (s RawShieldSetup) Files() map[string]string {
 	return SerializeData(s)
 }

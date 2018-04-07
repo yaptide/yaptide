@@ -12,7 +12,7 @@ type SphereBody struct {
 	Radius float64        `json:"radius"`
 }
 
-// MarshalJSON json.Marshaller implementaion.
+// MarshalJSON json.Marshaller implementation.
 func (s SphereBody) MarshalJSON() ([]byte, error) {
 	type Alias SphereBody
 	return json.Marshal(struct {
@@ -30,7 +30,7 @@ type CuboidBody struct {
 	Size   geometry.Vec3D `json:"size"`
 }
 
-// MarshalJSON json.Marshaller implementaion.
+// MarshalJSON json.Marshaller implementation.
 func (c CuboidBody) MarshalJSON() ([]byte, error) {
 	type Alias CuboidBody
 	return json.Marshal(struct {
@@ -49,7 +49,7 @@ type CylinderBody struct {
 	Radius float64        `json:"radius"`
 }
 
-// MarshalJSON json.Marshaller implementaion.
+// MarshalJSON json.Marshaller implementation.
 func (c CylinderBody) MarshalJSON() ([]byte, error) {
 	type Alias CylinderBody
 	return json.Marshal(struct {

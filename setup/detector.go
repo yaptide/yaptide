@@ -28,6 +28,7 @@ var detectorGeometryTypeMapping = map[string]func() interface{}{
 	detectorGeometryType.cylinder: func() interface{} { return &DetectorCylinder{} },
 }
 
+// DetectorID ...
 type DetectorID int64
 
 // Detector describes where and what values are scored during simulation.
@@ -39,16 +40,20 @@ type Detector struct {
 	Scoring          DetectorScoring  `json:"scoring"`
 }
 
+// GeometryType ...
 type GeometryType interface{}
 
+// DetectorGeometry ...
 type DetectorGeometry struct {
 	GeometryType
 }
 
+// MarshalJSON ...
 func (d DetectorGeometry) MarshalJSON() ([]byte, error) {
 	return json.Marshal(d.GeometryType)
 }
 
+// UnmarshalJSON ...
 func (d *DetectorGeometry) UnmarshalJSON(b []byte) error {
 	geometry, err := utils.TypeBasedUnmarshallJSON(b, detectorGeometryTypeMapping)
 	if err != nil {

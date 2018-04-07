@@ -25,7 +25,7 @@ type Beam struct {
 	InitialEnergySigma float64 `json:"initialEnergySigma"`
 }
 
-// Default represents default beam configuration.
+// DefaultBeam represents default beam configuration.
 var DefaultBeam = Beam{
 	Direction: BeamDirection{
 		Phi: 0, Theta: 0, Position: geometry.Point{X: 0, Y: 0, Z: 0},

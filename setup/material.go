@@ -22,6 +22,7 @@ var materialTypeMapping = map[string]func() interface{}{
 	materialType.voxel:      func() interface{} { return &MaterialVoxel{} },
 }
 
+// MaterialID ...
 type MaterialID int64
 
 // Material defines the zone material that is used in the simulation.
@@ -30,12 +31,15 @@ type Material struct {
 	Specs MaterialSpecs `json:"specs"`
 }
 
+// MaterialSpecs ...
 type MaterialSpecs struct {
 	MaterialType
 }
 
+// MaterialType ...
 type MaterialType interface{}
 
+// MarshalJSON ...
 func (m MaterialSpecs) MarshalJSON() ([]byte, error) {
 	return json.Marshal(m.MaterialType)
 }

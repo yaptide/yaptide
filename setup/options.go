@@ -40,7 +40,7 @@ type SimulationOptions struct {
 	NumberOfGeneratedParticles int64 `json:"numberOfGeneratedParticles"`
 }
 
-// Default ...
+// DefaultOptions ...
 var DefaultOptions = SimulationOptions{
 	AntyparticleCorrectionOn:   false,
 	NuclearReactionsOn:         true,

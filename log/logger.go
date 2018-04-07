@@ -63,6 +63,6 @@ func SetLoggerLevel(level LoggerLevel) {
 func log(prefix string, message string, values ...interface{}) string {
 	msg := fmt.Sprintf(message, values...)
 	prefixedMsg := fmt.Sprintf("[%s] %s", prefix, msg)
-	_ = go_log.Output(3, prefixedMsg)
+	_ = go_log.Output(3, prefixedMsg) // nolint: gas
 	return msg
 }

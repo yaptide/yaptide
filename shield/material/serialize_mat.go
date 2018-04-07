@@ -6,6 +6,7 @@ import (
 	"io"
 )
 
+// Serialize ...
 func Serialize(materials Materials) string {
 	writer := &bytes.Buffer{}
 

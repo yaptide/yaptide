@@ -43,7 +43,9 @@ func createOetValue(val ShieldBodyID, sign Sign) *oet {
 	return &oet{Type: value, Value: val, Sign: sign}
 }
 
-func createOetBinaryExpression(operator oetOperator, left *oet, right *oet, sign Sign) *oet {
+func createOetBinaryExpression(
+	operator oetOperator, left *oet, right *oet, sign Sign, // nolint: unparam
+) *oet {
 	return &oet{
 		Type:     binaryExpression,
 		Left:     left,

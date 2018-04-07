@@ -1,6 +1,6 @@
 package result
 
-// Dimensions contains data about dimesnions of scored results.
+// Dimensions contains data about dimensions of scored results.
 type Dimensions struct {
 	NumberOfDimensions int64  `json:"numberOfDimensions"`
 	SegmentsInDim1     int64  `json:"segmentsInDim1"`

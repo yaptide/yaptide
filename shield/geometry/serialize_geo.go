@@ -8,6 +8,7 @@ import (
 	"github.com/yaptide/converter/format"
 )
 
+// Serialize ...
 func Serialize(geometry Geometry) string {
 	w := &bytes.Buffer{}
 
@@ -72,7 +73,7 @@ func serializeBodies(w io.Writer, bodies []Body) {
 	fmt.Fprintf(w, "\n  END")
 }
 
-func generateNameFromNumber(n, nameLength int) string {
+func generateNameFromNumber(n, nameLength int) string { // nolint: unparam
 	const charset = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
 	buff := bytes.Buffer{}

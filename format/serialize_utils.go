@@ -6,6 +6,7 @@ import (
 	"strings"
 )
 
+// FloatToFixedWidthString ...
 func FloatToFixedWidthString(n float64, w int) string {
 	wStr := strconv.Itoa(w)
 	s := fmt.Sprintf("%"+wStr+"."+wStr+"f", n)

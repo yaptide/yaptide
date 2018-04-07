@@ -9,7 +9,7 @@ import (
 	"github.com/yaptide/converter/log"
 )
 
-// TODO: suport for big endian (for no litle endian files and host system is assumed)
+// TODO: support for big endian (for no litle endian files and host system is assumed)
 type bdoParser struct {
 	filename string
 	content  []byte
@@ -106,7 +106,7 @@ func (p *bdoParser) readNextToken() error {
 	itemSize := uint64(dataType.GetSize())
 
 	if tagIDBinErr != nil || numberOfItemsErr != nil {
-		errMsg := log.Error("Unexpected read error. Can't ever happend")
+		errMsg := log.Error("Unexpected read error. Can't ever happened")
 		return fmt.Errorf(errMsg)
 	}
 	tokenSize := uint64(24) + itemSize*numberOfItems
@@ -115,7 +115,10 @@ func (p *bdoParser) readNextToken() error {
 		return fmt.Errorf(errMsg)
 	}
 
-	log.Debug("Bdo token header tagId: %v, dataType: %v, tokenSize %v, numberOfItems: %v, itemSize: %v", tagID, dataType, tokenSize, numberOfItems, itemSize)
+	log.Debug(
+		"Bdo token header tagId: %v, dataType: %v, tokenSize %v, numberOfItems: %v, itemSize: %v",
+		tagID, dataType, tokenSize, numberOfItems, itemSize,
+	)
 	splitedToken := p.splitTokenPayload(numberOfItems, p.content[24:tokenSize])
 
 	handler := tagsHandler[tagID]

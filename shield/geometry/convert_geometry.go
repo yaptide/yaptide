@@ -13,6 +13,7 @@ type Geometry struct {
 	ZoneToMaterialPairs []ZoneToMaterial
 }
 
+// ConvertSetupGeometry ...
 func ConvertSetupGeometry(
 	bodyMap converter.BodyMap,
 	zoneMap converter.ZoneMap,

@@ -28,8 +28,10 @@ var letScoringTypes = map[string]bool{
 	"tlet":   true,
 }
 
+// ScoringType ...
 type ScoringType interface{}
 
+// DetectorScoring ...
 type DetectorScoring struct {
 	ScoringType
 }
@@ -62,10 +64,12 @@ func (s LetTypeScoring) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// MarshalJSON ...
 func (s DetectorScoring) MarshalJSON() ([]byte, error) {
 	return json.Marshal(s.ScoringType)
 }
 
+// UnmarshalJSON ...
 func (s *DetectorScoring) UnmarshalJSON(b []byte) error {
 	var scoring struct {
 		Type string `json:"type"`

@@ -2,7 +2,7 @@ package setup
 
 import "encoding/json"
 
-// Zone detector used to debug geometry.
+// DetectorZones ...
 type DetectorZones struct {
 	Zones []DetectorID `json:"zones"`
 }

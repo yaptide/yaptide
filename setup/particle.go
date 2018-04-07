@@ -32,6 +32,7 @@ var predefinedParticleTypes = map[string]bool{
 	"triton":           true,
 }
 
+// ParticleType ...
 type ParticleType interface{}
 
 // Particle is interface for particle scored in detectors.
@@ -39,6 +40,7 @@ type Particle struct {
 	ParticleType
 }
 
+// AllParticles ...
 type AllParticles string
 
 // PredefinedParticle ...
@@ -59,6 +61,7 @@ func (g PredefinedParticle) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// MarshalJSON ...
 func (g AllParticles) MarshalJSON() ([]byte, error) {
 	return json.Marshal(struct {
 		Type string `json:"type"`
@@ -79,11 +82,12 @@ func (p HeavyIon) MarshalJSON() ([]byte, error) {
 	})
 }
 
+// MarshalJSON ...
 func (p Particle) MarshalJSON() ([]byte, error) {
 	return json.Marshal(p.ParticleType)
 }
 
-// unmarshalParticle ...
+// UnmarshalJSON ...
 func (p *Particle) UnmarshalJSON(b []byte) error {
 	var rawParticle struct {
 		Type string `json:"type"`

@@ -49,6 +49,7 @@ func (b bdoDataUnit) ToString(value []byte, hostByteOrder binary.ByteOrder) stri
 		fallthrough
 	case "<i4":
 		var val int32
+		// nolint: gas
 		_ = binary.Read(bytes.NewBuffer(value), b.GetByteOrder(hostByteOrder), &val)
 		return strconv.FormatInt(int64(val), 10)
 
@@ -56,6 +57,7 @@ func (b bdoDataUnit) ToString(value []byte, hostByteOrder binary.ByteOrder) stri
 		fallthrough
 	case "<i8":
 		var val int64
+		// nolint: gas
 		_ = binary.Read(bytes.NewBuffer(value), b.GetByteOrder(hostByteOrder), &val)
 		return strconv.FormatInt(val, 10)
 
@@ -63,6 +65,7 @@ func (b bdoDataUnit) ToString(value []byte, hostByteOrder binary.ByteOrder) stri
 		fallthrough
 	case "<u4":
 		var val uint32
+		// nolint: gas
 		_ = binary.Read(bytes.NewBuffer(value), b.GetByteOrder(hostByteOrder), &val)
 		return strconv.FormatInt(int64(val), 10)
 
@@ -70,6 +73,7 @@ func (b bdoDataUnit) ToString(value []byte, hostByteOrder binary.ByteOrder) stri
 		fallthrough
 	case "<u8":
 		var val uint64
+		// nolint: gas
 		_ = binary.Read(bytes.NewBuffer(value), b.GetByteOrder(hostByteOrder), &val)
 		return strconv.FormatInt(int64(val), 10)
 
@@ -77,6 +81,7 @@ func (b bdoDataUnit) ToString(value []byte, hostByteOrder binary.ByteOrder) stri
 		fallthrough
 	case "<f4":
 		var val float32
+		// nolint: gas
 		_ = binary.Read(bytes.NewBuffer(value), b.GetByteOrder(hostByteOrder), &val)
 		return strconv.FormatFloat(float64(val), 'e', -1, 32)
 
@@ -84,6 +89,7 @@ func (b bdoDataUnit) ToString(value []byte, hostByteOrder binary.ByteOrder) stri
 		fallthrough
 	case "<f8":
 		var val float64
+		// nolint: gas
 		_ = binary.Read(bytes.NewBuffer(value), b.GetByteOrder(hostByteOrder), &val)
 		return strconv.FormatFloat(val, 'e', -1, 64)
 	}

@@ -7,6 +7,7 @@ import (
 	"github.com/yaptide/converter/format"
 )
 
+// Serialize ...
 func Serialize(detectors []Detector) string {
 	w := &bytes.Buffer{}
 

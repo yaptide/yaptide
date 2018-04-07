@@ -21,7 +21,8 @@ var beamCardSerializers = map[string]beamCardSerializerFunc{
 		return fmt.Sprintf("%8d", 0)
 	},
 	"BEAMDIR": func(beam setup.Beam, options setup.SimulationOptions) string {
-		return format.FloatToFixedWidthString(beam.Direction.Theta, 8) + format.FloatToFixedWidthString(beam.Direction.Phi, 8)
+		return format.FloatToFixedWidthString(beam.Direction.Theta, 8) +
+			format.FloatToFixedWidthString(beam.Direction.Phi, 8)
 	},
 	"BEAMDIV": func(beam setup.Beam, options setup.SimulationOptions) string {
 		return ""
@@ -61,7 +62,7 @@ var beamCardSerializers = map[string]beamCardSerializerFunc{
 		return ""
 	},
 	"JPART0": func(beam setup.Beam, options setup.SimulationOptions) string {
-		number, _ := mapping.ParticleToShield(beam.Particle)
+		number, _ := mapping.ParticleToShield(beam.Particle) // nolint: gas
 		return fmt.Sprintf("%8d", number)
 	},
 	"MAKELN": func(beam setup.Beam, options setup.SimulationOptions) string {
@@ -123,6 +124,7 @@ var beamCardOrder = []string{
 	"USECBEAM", "USEPARLEV",
 }
 
+// Serialize ...
 func Serialize(beam setup.Beam, options setup.SimulationOptions) string {
 	writer := &bytes.Buffer{}
 	log.Debug("[Serializer][beam] start")

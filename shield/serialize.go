@@ -8,6 +8,7 @@ import (
 	"github.com/yaptide/converter/shield/material"
 )
 
+// SerializeData ...
 func SerializeData(data RawShieldSetup) map[string]string {
 	log.Debug("[Serializer] data %+v", data)
 	files := map[string]string{}

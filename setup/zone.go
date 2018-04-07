@@ -3,6 +3,7 @@ package setup
 // RootID indicate that zone with the given number is a root.
 const RootID = 0
 
+// ZoneID ...
 type ZoneID int64
 
 // Zone is composed from list of bodies.
@@ -22,7 +23,8 @@ type ZoneID int64
 // Parent <-> Children relationship means that children is contained entirely in parent.
 // Zone is a tree root, if ID == RootID.
 //
-// TODO: intersections other than children <-> one parent like beetween childrens of same parent are not allowed.
+// TODO: intersections other than children <-> one parent like beetween childrens of same parent
+// are not allowed.
 type Zone struct {
 	ID ZoneID `json:"id"`
 

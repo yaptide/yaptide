@@ -49,6 +49,7 @@ var predefinedParticleToShieldMapping = map[setup.PredefinedParticle]int64{
 	"he_4":             24,
 }
 
+// ScoringToShield ...
 func ScoringToShield(scoringType setup.DetectorScoring) (string, error) {
 	switch scoring := scoringType.ScoringType.(type) {
 	case setup.PredefinedScoring:

@@ -2,7 +2,8 @@ package setup
 
 import "encoding/json"
 
-// MaterialPredefined material type - choose material definition from predefined material list by name.
+// MaterialPredefined material type - choose material definition
+// from predefined material list by name.
 type MaterialPredefined struct {
 	PredefinedID string `json:"predefinedId"`
 

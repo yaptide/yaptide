@@ -32,16 +32,20 @@ type Body struct {
 	Geometry BodyGeometry `json:"geometry"`
 }
 
+// BodyGeometry ...
 type BodyGeometry struct {
 	BodyType
 }
 
+// BodyType ...
 type BodyType interface{}
 
-func (b BodyGeometry) MarshalJSON() ([]byte, error) {
-	return json.Marshal(b.BodyType)
+// MarshalJSON ...
+func (g BodyGeometry) MarshalJSON() ([]byte, error) {
+	return json.Marshal(g.BodyType)
 }
 
+// UnmarshalJSON ...
 func (g *BodyGeometry) UnmarshalJSON(b []byte) error {
 	body, err := utils.TypeBasedUnmarshallJSON(b, bodyTypeMapping)
 	if err != nil {

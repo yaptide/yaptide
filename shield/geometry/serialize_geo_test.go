@@ -20,6 +20,7 @@ func genZoneToMaterials(n int) []ZoneToMaterial {
 	return res
 }
 
+// nolint: lll
 const geoTc1Expected = `    0    0          xxxxxxxxxxxxxxxxxxxxxxxxxxxxNAMExxxxxxxxxxxxxxxxxxxxxxxxxxxx
   RCC    1        0.        1.        2.        0.        3.        0.
                   4.                                                  
@@ -37,7 +38,7 @@ const geoTc1Expected = `    0    0          xxxxxxxxxxxxxxxxxxxxxxxxxxxxNAMExxxx
    14   15   16   17   18   19
     0    1    2    3    4    5    6    7    8    9   10   11   12   13
    14   15   16   17   18   19
-`
+` // #nosec
 
 func TestSerializeGeo(t *testing.T) {
 	type testCase struct {
@@ -49,10 +50,18 @@ func TestSerializeGeo(t *testing.T) {
 		testCase{
 			Input: Geometry{
 				Bodies: []Body{
-					Body{ID: 1, Identifier: "RCC", Arguments: []float64{0.0, 1.0, 2.0, 0.0, 3.0, 0.0, 4.0}},
-					Body{ID: 2, Identifier: "RPP", Arguments: []float64{-40.0, 60.0, -80.0, 120, 14.75, 45.25}},
-					Body{ID: 3, Identifier: "RCC", Arguments: []float64{10.1, 20.2, 30.3, 0.0, 24.4, 0.0, 99999.5}},
-					Body{ID: 4, Identifier: "SPH", Arguments: []float64{20.0, 31.0, 0.99, 0.01}},
+					Body{ID: 1, Identifier: "RCC",
+						Arguments: []float64{0.0, 1.0, 2.0, 0.0, 3.0, 0.0, 4.0},
+					},
+					Body{ID: 2, Identifier: "RPP",
+						Arguments: []float64{-40.0, 60.0, -80.0, 120, 14.75, 45.25},
+					},
+					Body{ID: 3, Identifier: "RCC",
+						Arguments: []float64{10.1, 20.2, 30.3, 0.0, 24.4, 0.0, 99999.5},
+					},
+					Body{ID: 4, Identifier: "SPH",
+						Arguments: []float64{20.0, 31.0, 0.99, 0.01},
+					},
 				},
 
 				Zones: []Zone{

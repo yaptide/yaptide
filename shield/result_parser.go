@@ -8,7 +8,9 @@ import (
 )
 
 // ParseResults will parse results of shield simulation.
-func ParseResults(files map[string]string, simulationContext *SerializationContext) (*converter.Result, error) {
+func ParseResults(
+	files map[string]string, simulationContext *SerializationContext,
+) (*converter.Result, error) {
 	log.Info("[Parser][Results] Start shield parser.")
 
 	simulationResult := converter.NewEmptyResult()

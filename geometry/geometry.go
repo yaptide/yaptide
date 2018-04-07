@@ -1,4 +1,4 @@
-// Package common contains model for base component used in simulation and results model.
+// Package geometry ...
 package geometry
 
 // Point represent a point in space.

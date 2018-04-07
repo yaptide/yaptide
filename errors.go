@@ -5,15 +5,26 @@ import (
 )
 
 type makeNewGeneralErrorFuncType = func(message string, formatedvalues ...interface{}) error
-type makeNewIDErrorFuncType = func(id interface{}, message string, formatedValues ...interface{}) error
+type makeNewIDErrorFuncType = func(
+	id interface{}, message string, formatedValues ...interface{},
+) error
 
+// GeneralMatError ...
 var GeneralMatError = makeNewGeneralErrorFunc("mat.dat")
+
+// MaterialIDError ...
 var MaterialIDError = makeNewIDErrorFunc("Material", "mat.dat")
+
+// GeneralDetectorError ...
 var GeneralDetectorError = makeNewGeneralErrorFunc("detect.dat")
 
+// BodyIDError ...
 var BodyIDError = makeNewIDErrorFunc("Body", "geo.dat")
+
+// ZoneIDError ...
 var ZoneIDError = makeNewIDErrorFunc("Zone", "geo.dat")
 
+// DetectorIDError ...
 var DetectorIDError = makeNewIDErrorFunc("Detector", "detect.dat")
 
 func makeNewGeneralErrorFunc(serializedFileName string) makeNewGeneralErrorFuncType {

@@ -296,8 +296,11 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		}
 
 		check(t, testCase{
-			Input:         materials,
-			ExpectedError: errors.New("[serializer] mat.dat: Only 100 distinct materials are permitted in shield (1000 > 100)"),
+			Input: materials,
+			ExpectedError: errors.New(
+				"[serializer] mat.dat: Only 100 distinct materials" +
+					" are permitted in shield (1000 > 100)",
+			),
 		})
 	})
 
@@ -315,7 +318,10 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 					Specs: setup.MaterialSpecs{setup.MaterialVoxel{}},
 				},
 			),
-			ExpectedError: errors.New("[serializer] Material{Id: 1} -> mat.dat: Voxel material serialization not implemented"),
+			ExpectedError: errors.New(
+				"[serializer] Material{Id: 1} -> mat.dat: Voxel material" +
+					" serialization not implemented",
+			),
 		})
 	})
 
@@ -327,8 +333,11 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		mat.Specs.MaterialType = predef
 
 		check(t, testCase{
-			Input:         createMaterialMap(mat),
-			ExpectedError: errors.New(`[serializer] Material{Id: 1} -> mat.dat: "predefNameNotDefined" material mapping to shield format not found`),
+			Input: createMaterialMap(mat),
+			ExpectedError: errors.New(
+				"[serializer] Material{Id: 1} -> mat.dat: \"predefNameNotDefined\"" +
+					" material mapping to shield format not found",
+			),
 		})
 	})
 
@@ -340,8 +349,11 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		mat.Specs.MaterialType = compound
 
 		check(t, testCase{
-			Input:         createMaterialMap(mat),
-			ExpectedError: errors.New(`[serializer] Material{Id: 1} -> mat.dat: "isotopeNameNotDefined" isotope mapping to shield format not found`),
+			Input: createMaterialMap(mat),
+			ExpectedError: errors.New(
+				"[serializer] Material{Id: 1} -> mat.dat: \"isotopeNameNotDefined\"" +
+					" isotope mapping to shield format not found",
+			),
 		})
 	})
 
@@ -352,8 +364,11 @@ func TestBadInputMaterialsConvert(t *testing.T) {
 		compound.ExternalStoppingPowerFromPredefined = "espfpNameNotDefined"
 		mat.Specs.MaterialType = compound
 		check(t, testCase{
-			Input:         createMaterialMap(mat),
-			ExpectedError: errors.New(`[serializer] Material{Id: 1} -> mat.dat: "espfpNameNotDefined" material mapping to shield format not found`),
+			Input: createMaterialMap(mat),
+			ExpectedError: errors.New(
+				"[serializer] Material{Id: 1} -> mat.dat: \"espfpNameNotDefined\"" +
+					" material mapping to shield format not found",
+			),
 		})
 	})
 
@@ -406,7 +421,12 @@ func genSetupAnotherCompound(id int64) setup.Material {
 			Elements: []setup.Element{
 				setup.Element{Isotope: "c-*", RelativeStoichiometricFraction: 4, AtomicMass: 0.01},
 				setup.Element{Isotope: "si-*", RelativeStoichiometricFraction: 1, IValue: 0.34},
-				setup.Element{Isotope: "na-23", RelativeStoichiometricFraction: 11111, IValue: 0.123, AtomicMass: 987.654},
+				setup.Element{
+					Isotope: "na-23",
+					RelativeStoichiometricFraction: 11111,
+					IValue:     0.123,
+					AtomicMass: 987.654,
+				},
 			},
 			ExternalStoppingPowerFromPredefined: "water_vapor",
 		}},

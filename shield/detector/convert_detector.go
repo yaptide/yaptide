@@ -21,6 +21,7 @@ type Detector struct {
 	Arguments []interface{}
 }
 
+// ConvertSetupDetectors ...
 func ConvertSetupDetectors(
 	detectorsMap converter.DetectorMap,
 	materialIDToShield map[setup.MaterialID]material.ShieldID,
@@ -66,7 +67,9 @@ type detectorConverter struct {
 	materialIDToShield map[setup.MaterialID]material.ShieldID
 }
 
-func (d detectorConverter) convertDetector(detect *setup.Detector, filename string) (Detector, error) {
+func (d detectorConverter) convertDetector(
+	detect *setup.Detector, filename string,
+) (Detector, error) {
 	switch geo := detect.DetectorGeometry.GeometryType.(type) {
 	case setup.DetectorGeomap:
 		return Detector{}, converter.GeneralDetectorError("Geomap detector serialization not implemented")
@@ -81,11 +84,13 @@ func (d detectorConverter) convertDetector(detect *setup.Detector, filename stri
 		return d.convertStandardGeometryDetector(detect, filename)
 
 	default:
-		return Detector{}, converter.DetectorIDError(detect.ID, "Unkown detector type: %T", geo)
+		return Detector{}, converter.DetectorIDError(detect.ID, "Unknown detector type: %T", geo)
 	}
 }
 
-func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detector, filename string) (Detector, error) {
+func (d detectorConverter) convertStandardGeometryDetector(
+	detect *setup.Detector, filename string,
+) (Detector, error) {
 	var newDetector Detector
 
 	switch geo := detect.DetectorGeometry.GeometryType.(type) {
@@ -158,7 +163,9 @@ func (d detectorConverter) convertStandardGeometryDetector(detect *setup.Detecto
 		filename,
 	)
 
-	newDetector.Arguments, err = d.appendHeavyIonOrLetfluCard(newDetector.Arguments, detect.ScoredParticle, detect.Scoring)
+	newDetector.Arguments, err = d.appendHeavyIonOrLetfluCard(
+		newDetector.Arguments, detect.ScoredParticle, detect.Scoring,
+	)
 	if err != nil {
 		return Detector{}, converter.DetectorIDError(detect.ID, "%s", err.Error())
 	}

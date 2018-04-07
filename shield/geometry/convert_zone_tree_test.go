@@ -22,7 +22,9 @@ func TestConvertSetupZonesToZoneTreeForest(t *testing.T) {
 	check := func(t *testing.T, tc testCase) {
 		t.Helper()
 
-		actual, actualErr := convertSetupZonesToZoneTreeForest(tc.ZoneMap, tc.MaterialIDToShield, tc.BodyIDToShield)
+		actual, actualErr := convertSetupZonesToZoneTreeForest(
+			tc.ZoneMap, tc.MaterialIDToShield, tc.BodyIDToShield,
+		)
 
 		assert.Equal(t, tc.ExpectedError, actualErr)
 		assert.Equal(t, tc.Expected, actual)

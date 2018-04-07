@@ -6,7 +6,8 @@ import (
 	"github.com/yaptide/converter/shield/material"
 )
 
-// SerializationContext is struct used to recover data lost in process of serializing simulation data.
+// SerializationContext is struct used to recover data lost in process of
+// serializing simulation data.
 type SerializationContext struct {
 	MapMaterialID           map[material.ShieldID]setup.MaterialID
 	MapBodyID               map[geometry.ShieldBodyID]setup.BodyID

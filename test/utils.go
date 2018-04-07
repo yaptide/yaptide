@@ -24,6 +24,7 @@ var jsonFormatterConfig = formatter.AsciiFormatterConfig{
 	ShowArrayIndex: true,
 }
 
+// DiffJSON ...
 func DiffJSON(t *testing.T, expected, actual []byte) string {
 	t.Helper()
 
@@ -46,6 +47,7 @@ func DiffJSON(t *testing.T, expected, actual []byte) string {
 	return ""
 }
 
+// DiffModel ...
 func DiffModel(t *testing.T, expected, actual interface{}) string {
 	t.Helper()
 	if reflect.DeepEqual(expected, actual) {

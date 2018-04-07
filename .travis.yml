@@ -3,10 +3,10 @@ go:
   - 1.9
 install:
   - go get -u github.com/golang/dep/cmd/dep
-  - go get -u github.com/alecthomas/gometalinter
-  - gometalinter --install --force
+  - go get -u gopkg.in/alecthomas/gometalinter.v2
+  - gometalinter.v2 --install
   - dep ensure
 script:
   - go build ./...
   - go test ./...
-  - gometalinter --config=.gometalinter.json --deadline=1000s ./...
+  - gometalinter.v2 --config=.gometalinter.json --deadline=1000s --vendor ./...
