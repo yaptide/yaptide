@@ -2,12 +2,12 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	log "github.com/sirupsen/logrus"
 	"github.com/yaptide/worker/config"
 	"github.com/yaptide/worker/process"
 	"github.com/yaptide/worker/simulation"
+	"github.com/yaptide/worker/wsclient"
 )
 
 func main() {
@@ -15,20 +15,19 @@ func main() {
 	initLogger(config)
 	log.Debugf("Config: %#v", config)
 
-	processRunner := process.CreateRunner()
-
-	simRunner, err := simulation.NewRunner(processRunner)
+	processRunner := process.NewRunner()
+	simulationRunner, err := simulation.NewRunner(processRunner)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)
 	}
 
-	log.Debug("simulation.Runner created")
-	log.Infof("Available computing libraries: [%s]",
-		strings.Join(simRunner.AvailableComputingLibrariesNames(), ", "),
-	)
+	log.Infof("Available computing libraries: ")
+	for _, name := range simulationRunner.AvailableComputingLibrariesNames() {
+		log.Infof("\t\"%s\"", name)
+	}
 
-	err = connectAndServe(config, simRunner)
+	err = wsclient.ConnectAndServe(config, simulationRunner)
 	if err != nil {
 		log.Error(err.Error())
 		os.Exit(1)

@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-// Config structure.
+// Config represent worker configuration.
 type Config struct {
 	Token string
 
@@ -18,8 +18,7 @@ type Config struct {
 	LoggingLevel string
 }
 
-
-// Read from command-line.
+// Read config from command-line.
 // It call os.Exit, if config is incorrect.
 func Read() Config {
 	config := Config{}

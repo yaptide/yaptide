@@ -1,29 +1,38 @@
+// Package simulation runs simulation based on received requests.
 package simulation
 
 import (
 	"errors"
+	"sort"
 
 	"github.com/yaptide/worker/process"
 )
 
-var ErrComputingLibrariesNotFound = errors.New("computing libraries not found")
+// ErrComputingLibrariesNotFound error.
+var ErrComputingLibrariesNotFound = errors.New("Computing libraries not found")
 
 var supportedComputingLibraries = []computingLibrary{shieldHIT12A{}}
 
+// Runner run simulations.
 type Runner struct {
 	processRunner      process.Runner
-	computingLibraries []computingLibrary
+	computingLibraries map[string]computingLibrary
 }
 
+// NewRunner constructor.
 func NewRunner(processRunner process.Runner) (Runner, error) {
 	runner := Runner{
 		processRunner:      processRunner,
-		computingLibraries: []computingLibrary{},
+		computingLibraries: map[string]computingLibrary{},
 	}
 
 	for _, computingLib := range supportedComputingLibraries {
 		if computingLib.IsWorking() {
-			runner.computingLibraries = append(runner.computingLibraries, computingLib)
+			name, err := computingLib.Name()
+			if err != nil {
+				return Runner{}, err
+			}
+			runner.computingLibraries[name] = computingLib
 		}
 	}
 
@@ -33,15 +42,26 @@ func NewRunner(processRunner process.Runner) (Runner, error) {
 	return runner, nil
 }
 
+// AvailableComputingLibrariesNames return list of availables computing libraries names.
 func (r *Runner) AvailableComputingLibrariesNames() []string {
 	names := []string{}
-	for _, computingLibrary := range r.computingLibraries {
-		names = append(names, computingLibrary.Name())
+	for name := range r.computingLibraries {
+		names = append(names, name)
 	}
+
+	sort.Strings(names)
 	return names
 }
 
-func (r *Runner) Run(name string, inputFiles map[string]string) (resultFiles, errors map[string]string) {
-	resultFiles, errors = map[string]string{}, map[string]string{}
-	return
+// Run simulation.
+// Return error, if computingLibrary is not registered.
+func (r *Runner) Run(computingLibraryName string, inputFiles map[string]string) (resultFiles map[string]string, errors []string) {
+	computingLibrary, found := r.computingLibraries[computingLibraryName]
+	if !found {
+		return resultFiles, []string{"computing library not found/available"}
+	}
+
+	result := r.processRunner.Run(computingLibrary, inputFiles)
+
+	return result.Files, result.Errors
 }

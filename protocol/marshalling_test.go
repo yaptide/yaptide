@@ -15,20 +15,20 @@ func TestMessagesMarshalling(t *testing.T) {
 		message     interface{}
 	}{
 		{
-			jsonMessage: `{"MessageType":0, "Token":"abc", "AvailableComputingLibrariesNames": ["shield", "fluka"]}`,
+			jsonMessage: `{"MessageType": "HelloRequest", "Token":"abc", "AvailableComputingLibrariesNames": ["shield", "fluka"]}`,
 			message: &HelloRequestMessage{
 				Token: "abc",
 				AvailableComputingLibrariesNames: []string{"shield", "fluka"},
 			},
 		},
 		{
-			jsonMessage: `{"MessageType":1, "TokenValid": true}`,
+			jsonMessage: `{"MessageType": "HelloResponse", "TokenValid": true}`,
 			message: &HelloResponseMessage{
 				TokenValid: true,
 			},
 		},
 		{
-			jsonMessage: `{"MessageType":2, "ComputingLibraryName": "shield", "Files": {"mat.dat": "*", "geo.dat": "**"}}`,
+			jsonMessage: `{"MessageType": "RunSimulation", "ComputingLibraryName": "shield", "Files": {"mat.dat": "*", "geo.dat": "**"}}`,
 			message: &RunSimulationMessage{
 				ComputingLibraryName: "shield",
 				Files: map[string]string{
@@ -38,14 +38,14 @@ func TestMessagesMarshalling(t *testing.T) {
 			},
 		},
 		{
-			jsonMessage: `{"MessageType":3, "Files": {"a.dat": "x", "b.dat": "D"}, "Errors": {"some_error": "occured"}}`,
+			jsonMessage: `{"MessageType": "SimulationResults", "Files": {"a.dat": "x", "b.dat": "D"}, "Errors": ["some error occurred"]}`,
 			message: &SimulationResultsMessage{
 				Files: map[string]string{
 					"a.dat": "x",
 					"b.dat": "D",
 				},
-				Errors: map[string]string{
-					"some_error": "occured",
+				Errors: []string{
+					"some error occurred",
 				},
 			},
 		},

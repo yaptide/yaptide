@@ -3,9 +3,9 @@ package simulation
 import "github.com/yaptide/worker/process"
 
 type computingLibrary interface {
-	process.CreateCDMFuncGenerator
+	process.CreateCMD
 
-	Name() string
+	Name() (string, error)
 
 	IsWorking() bool
 }

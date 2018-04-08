@@ -33,12 +33,6 @@
 
 [[projects]]
   branch = "master"
-  name = "github.com/yaptide/app"
-  packages = ["log"]
-  revision = "cf128fa272e2553304685ce1a2f995375747d5eb"
-
-[[projects]]
-  branch = "master"
   name = "golang.org/x/crypto"
   packages = ["ssh/terminal"]
   revision = "ee41a25c63fb5b74abf2213abb6dee3751e6ac4a"
@@ -55,6 +49,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "5ea34aa8b25baae27a8abe94d73b6a284e95c997502783e9b48d3751a8461ff7"
+  inputs-digest = "edb0cf87f3894d5929e0d0a90fd11b6d11963ed7eaadaba958b67c9e01bf21b9"
   solver-name = "gps-cdcl"
   solver-version = 1

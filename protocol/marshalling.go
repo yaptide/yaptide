@@ -5,17 +5,17 @@ import (
 	"errors"
 )
 
-type messageType int
+type messageType string
 
 type messageTypeObject struct {
 	MessageType messageType
 }
 
 const (
-	helloRequestMessageType = iota
-	helloResponseMessageType
-	runSimulationMessageType
-	simulationResultsMessageType
+	helloRequestMessageType      = "HelloRequest"
+	helloResponseMessageType     = "HelloResponse"
+	runSimulationMessageType     = "RunSimulation"
+	simulationResultsMessageType = "SimulationResults"
 )
 
 var errBadMessageType = errors.New("Bad MessageType")
@@ -34,12 +34,12 @@ func (m *HelloRequestMessage) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON custom implementation. It decode "MessageType" key to perform validation.
 func (m *HelloRequestMessage) UnmarshalJSON(b []byte) error {
-	messageTypeObject := messageTypeObject{-1}
-	err := json.Unmarshal(b, &messageTypeObject)
+	messageType := messageTypeObject{"Unknown"}
+	err := json.Unmarshal(b, &messageType)
 	if err != nil {
 		return err
 	}
-	if messageTypeObject.MessageType != helloRequestMessageType {
+	if messageType.MessageType != helloRequestMessageType {
 		return errBadMessageType
 	}
 
@@ -61,12 +61,12 @@ func (m *HelloResponseMessage) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON custom implementation. It decode "MessageType" key to perform validation.
 func (m *HelloResponseMessage) UnmarshalJSON(b []byte) error {
-	messageTypeObject := messageTypeObject{-1}
-	err := json.Unmarshal(b, &messageTypeObject)
+	messageType := messageTypeObject{"Unknown"}
+	err := json.Unmarshal(b, &messageType)
 	if err != nil {
 		return err
 	}
-	if messageTypeObject.MessageType != helloResponseMessageType {
+	if messageType.MessageType != helloResponseMessageType {
 		return errBadMessageType
 	}
 
@@ -88,12 +88,12 @@ func (m *RunSimulationMessage) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON custom implementation. It decode "MessageType" key to perform validation.
 func (m *RunSimulationMessage) UnmarshalJSON(b []byte) error {
-	messageTypeObject := messageTypeObject{-1}
-	err := json.Unmarshal(b, &messageTypeObject)
+	messageType := messageTypeObject{"Unknown"}
+	err := json.Unmarshal(b, &messageType)
 	if err != nil {
 		return err
 	}
-	if messageTypeObject.MessageType != runSimulationMessageType {
+	if messageType.MessageType != runSimulationMessageType {
 		return errBadMessageType
 	}
 
@@ -115,12 +115,12 @@ func (m *SimulationResultsMessage) MarshalJSON() ([]byte, error) {
 
 // UnmarshalJSON custom implementation. It decode "MessageType" key to perform validation.
 func (m *SimulationResultsMessage) UnmarshalJSON(b []byte) error {
-	messageTypeObject := messageTypeObject{-1}
-	err := json.Unmarshal(b, &messageTypeObject)
+	messageType := messageTypeObject{"Unknown"}
+	err := json.Unmarshal(b, &messageType)
 	if err != nil {
 		return err
 	}
-	if messageTypeObject.MessageType != simulationResultsMessageType {
+	if messageType.MessageType != simulationResultsMessageType {
 		return errBadMessageType
 	}
 

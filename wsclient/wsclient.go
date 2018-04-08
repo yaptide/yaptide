@@ -1,4 +1,6 @@
-package main
+// Package wsclient implement websocket worker client which exchanges messages with yaptide backend.
+//
+package wsclient
 
 import (
 	"fmt"
@@ -14,23 +16,28 @@ import (
 	"github.com/yaptide/worker/simulation"
 )
 
-func connectAndServe(config config.Config, simRunner simulation.Runner) error {
-
+// ConnectAndServe connect to yaptide backend by webscocket protocol,
+// then waits for simulation RunSimulationMessages from yaptide backend.
+// It use JSON messages from github.com/yaptide/worker/protocol as protocol.
+func ConnectAndServe(config config.Config, simulationRunner simulation.Runner) error {
 	conn := connect(config.Address, protocol.YaptideListenPath)
 	defer conn.Close()
 
-	isValidToken, err := helloMessageHandshake(conn, config.Token, simRunner)
+	isValidToken, err := helloMessageHandshake(conn, config.Token, simulationRunner)
 
 	switch {
 	case err != nil:
 		return err
 	case !isValidToken:
-		return fmt.Errorf("Token authentication failed")
+		return fmt.Errorf("%s", "token authentication failed")
 	}
 
-	go waitForInterrupt(conn)
+	log.Info("token authentication succeeded")
 
-	messageReadLoop(conn, simRunner)
+	go closeConnectionOnInterruptSignal(conn)
+
+	log.Info("waiting for run simulation messages...")
+	messageReadLoop(conn, simulationRunner)
 
 	return nil
 }
@@ -39,7 +46,7 @@ func connect(address, path string) *websocket.Conn {
 	url := url.URL{Scheme: "ws", Host: address, Path: path}
 
 	for {
-		log.Infof("Connecting to %s", address)
+		log.Infof("connecting to %s", url.String())
 
 		conn, _, err := websocket.DefaultDialer.Dial(url.String(), nil)
 		if err != nil {
@@ -71,16 +78,22 @@ func helloMessageHandshake(conn *websocket.Conn, token string, simRunner simulat
 	return helloResponseMessage.TokenValid, nil
 }
 
-func messageReadLoop(conn *websocket.Conn, simRunner simulation.Runner) {
+func messageReadLoop(conn *websocket.Conn, simulationRunner simulation.Runner) {
 	for {
 		var runSimulationMessage protocol.RunSimulationMessage
 		err := conn.ReadJSON(&runSimulationMessage)
 		if err != nil {
+			if websocket.IsCloseError(err, websocket.CloseNormalClosure) {
+				return
+			}
 			log.Warn("read:", err)
 			continue
 		}
 
-		resultFiles, errors := simRunner.Run(runSimulationMessage.ComputingLibraryName, runSimulationMessage.Files)
+		resultFiles, errors := simulationRunner.Run(
+			runSimulationMessage.ComputingLibraryName,
+			runSimulationMessage.Files,
+		)
 
 		err = conn.WriteJSON(protocol.SimulationResultsMessage{
 			Files:  resultFiles,
@@ -91,23 +104,18 @@ func messageReadLoop(conn *websocket.Conn, simRunner simulation.Runner) {
 			log.Warn("write:", err)
 			continue
 		}
-
 	}
 }
 
-func waitForInterrupt(conn *websocket.Conn) error {
+func closeConnectionOnInterruptSignal(conn *websocket.Conn) {
 	interrupt := make(chan os.Signal)
 	signal.Notify(interrupt, os.Interrupt)
-	for {
-		select {
-		case <-interrupt:
-			log.Info("interrupt")
-			err := conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-			if err != nil {
-				return err
-			}
-			time.Sleep(2 * time.Second)
-			return nil
-		}
-	}
+
+	<-interrupt
+	log.Info("interrupt")
+	conn.WriteMessage(
+		websocket.CloseMessage,
+		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+	)
+	time.Sleep(2 * time.Second)
 }

@@ -1,9 +1,7 @@
-// Package runner implements mechanism of starting and supervising simulations.
-// Simulations are started by running binary configured using config files.
+// Package process implements mechanism of starting and supervising simulation processes.
 package process
 
 import (
-	"fmt"
 	"os/exec"
 )
 
@@ -11,30 +9,26 @@ const (
 	maxNumberOfWorkers = 10
 )
 
-type CreateCDMFuncGenerator interface {
-	CreateCMDFunc(workingDirPath string) *exec.Cmd
+// CreateCMD create command which run simulation process.
+type CreateCMD interface {
+	CreateCMD(workingDirPath string) *exec.Cmd
 }
 
-// Runner starts and supervises running of shield simulations.
+// Runner starts and supervises running of simulations.
 type Runner struct {
-	jobsQueue    chan inputResultsChanPair
 	workerTokens chan bool
 }
 
-type Input struct {
-	Files                  map[string]string
-	CreateCDMFuncGenerator CreateCDMFuncGenerator
-}
-
+// Result of simulation run.
 type Result struct {
 	Files  map[string]string
 	StdOut string
 	StdErr string
-	Errors map[string]string
+	Errors []string
 }
 
-// CreateRunner create new runner, which start listening for new jobs.
-func CreateRunner() Runner {
+// NewRunner create Runner which is ready to run new jobs.
+func NewRunner() Runner {
 	runner := Runner{
 		workerTokens: make(chan bool, maxNumberOfWorkers),
 	}
@@ -46,14 +40,18 @@ func CreateRunner() Runner {
 	return runner
 }
 
-// Start .
-func (r *Runner) Start(cmd CreateCDMFuncGenerator, inputFiles map[string]string) (Result, error) {
-	resultChan := make(chan Result)
+// Run new job.
+func (r *Runner) Run(createCMD CreateCMD, inputFiles map[string]string) Result {
 	select {
-	case r.jobsQueue <- inputResultsChanPair{input, resultChan}:
-	default:
-		return nil, fmt.Errorf("too much jobs pending")
-	}
+	case <-r.workerTokens:
+		defer func() { r.workerTokens <- true }()
+		return runProcess(createCMD, inputFiles, maxJobDuration)
 
-	return <-resultChan
+	default:
+		return Result{
+			Errors: []string{
+				"to much jobs pending",
+			},
+		}
+	}
 }
