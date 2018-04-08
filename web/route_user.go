@@ -7,8 +7,8 @@ import (
 )
 
 type userLoginResponse struct {
-	Token string
-	User  *model.User
+	Token string      `json:"token"`
+	User  *model.User `json:"user"`
 }
 
 func (h *handler) userGetHandler(
@@ -45,6 +45,7 @@ func (h *handler) userRegisterHandler(
 	db := extractDBSession(ctx)
 
 	user, registerErr := h.Resolver.UserRegister(db, form)
+
 	if registerErr != nil {
 		return nil, registerErr
 	}

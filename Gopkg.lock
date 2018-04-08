@@ -50,7 +50,7 @@
     "utils",
     "validate"
   ]
-  revision = "2242a1ddc0ee48a210c12bef72a773b3ae6b0285"
+  revision = "e59617486366516ae4c7343d7f36049ca6ffe9d5h"
 
 [[projects]]
   branch = "master"

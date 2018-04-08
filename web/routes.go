@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+	"github.com/go-chi/cors"
 	"github.com/yaptide/app/model/action"
 	"github.com/yaptide/app/simulation"
 )
@@ -18,8 +19,14 @@ func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, err
 	w := requestWrapper
 
 	router := chi.NewRouter()
+	cors := cors.New(cors.Options{
+		AllowedOrigins: []string{"*"},
+		AllowedMethods: []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
+		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+	})
 
 	router.Use(db.middleware)
+	router.Use(cors.Handler)
 	router.Route("/auth", func(router chi.Router) {
 		router.Post("/login", w(h.userLoginHandler))
 		router.Post("/register", w(h.userRegisterHandler))

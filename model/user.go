@@ -42,9 +42,9 @@ func (u UserLoginInput) ValidatePassword(hashedPassword string) error {
 }
 
 type UserRegisterInput struct {
-	Email    string
-	Username string
-	Password string
+	Email    string `json:"email"`
+	Username string `json:"username"`
+	Password string `json:"password"`
 }
 
 func (u UserRegisterInput) Validate() error {
