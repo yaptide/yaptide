@@ -22,7 +22,7 @@ func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, err
 	cors := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
-		AllowedHeaders: []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+		AllowedHeaders: []string{"Accept", "X-Auth-Token", "Content-Type", "X-CSRF-Token"},
 	})
 
 	router.Use(db.middleware)

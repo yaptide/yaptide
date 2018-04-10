@@ -20,6 +20,12 @@
   version = "v3.3.2"
 
 [[projects]]
+  name = "github.com/go-chi/cors"
+  packages = ["."]
+  revision = "dba6525398619dead495962a916728e7ee2ca322"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/sergi/go-diff"
   packages = ["diffmatchpatch"]
@@ -32,10 +38,11 @@
   version = "v1.0.4"
 
 [[projects]]
-  branch = "master"
+  branch = "develop"
   name = "github.com/yaptide/converter"
   packages = [
     ".",
+    "common/color",
     "format",
     "geometry",
     "log",
@@ -50,7 +57,7 @@
     "utils",
     "validate"
   ]
-  revision = "e59617486366516ae4c7343d7f36049ca6ffe9d5h"
+  revision = "e59617486366516ae4c7343d7f36049ca6ffe9d5"
 
 [[projects]]
   branch = "master"
@@ -61,6 +68,12 @@
     "ssh/terminal"
   ]
   revision = "91a49db82a88618983a78a06c1cbd4e00ab749ab"
+
+[[projects]]
+  branch = "master"
+  name = "golang.org/x/net"
+  packages = ["context"]
+  revision = "61147c48b25b599e5b561d2e9c4f3e1ef489ca41"
 
 [[projects]]
   branch = "master"
@@ -77,15 +90,22 @@
   packages = [
     ".",
     "bson",
+    "dbtest",
     "internal/json",
     "internal/sasl",
     "internal/scram"
   ]
   revision = "3f83fa5005286a7fe593b055f0d7771a7dce4655"
 
+[[projects]]
+  branch = "v2"
+  name = "gopkg.in/tomb.v2"
+  packages = ["."]
+  revision = "d5d1b5820637886def9eef33e03a27a9f166942c"
+
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "8fc42938dc35912457a8bdc2aff5da520b8eed30de834e641d6753b8a7d9ff0b"
+  inputs-digest = "443d1ef61d8ea5192133d7ae6ac62db8ad6c2beaf9d177b698b1ecc6d34f4614"
   solver-name = "gps-cdcl"
   solver-version = 1

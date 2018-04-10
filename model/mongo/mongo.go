@@ -64,8 +64,8 @@ type Collection interface {
 	UpsertID(id bson.ObjectId, update interface{}) (info *mgo.ChangeInfo, err error)
 }
 
-// SetupDB ...
-func SetupDB(config *conf.Config) (func() DB, error) {
+// ConnectDB ...
+func ConnectDB(config *conf.Config) (*mgo.Session, error) {
 	log.Info("Connecting to db ...")
 	session, sessionErr := mgo.Dial(config.DbURL)
 	if sessionErr != nil {
@@ -73,7 +73,11 @@ func SetupDB(config *conf.Config) (func() DB, error) {
 		return nil, sessionErr
 	}
 	log.Info("Connected")
+	return session, nil
+}
 
+// SetupDB ...
+func SetupDB(config *conf.Config, session *mgo.Session) (func() DB, error) {
 	log.Info("Ensure indices")
 	ensureErr := ensureDBIndices(session.DB(""))
 	if ensureErr != nil {

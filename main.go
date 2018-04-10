@@ -18,11 +18,12 @@ func main() {
 		os.Exit(-1)
 	}
 
-	router, routerErr := web.NewRouter(config)
+	router, serverCleanup, routerErr := web.SetupWeb(config)
 	if routerErr != nil {
 		log.Errorf("Setup router error [%s]", configErr.Error())
 		os.Exit(-1)
 	}
+	defer serverCleanup()
 
 	portStr := fmt.Sprintf(":%d", config.BackendPort)
 	log.Infof("Serving content on port %d", config.BackendPort)

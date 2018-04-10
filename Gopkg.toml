@@ -33,7 +33,7 @@
   name = "github.com/sergi/go-diff"
 
 [[constraint]]
-  branch = "master"
+  branch = "develop"
   name = "github.com/yaptide/converter"
 
 [[constraint]]
