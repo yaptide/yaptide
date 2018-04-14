@@ -85,6 +85,10 @@ func requestWrapperCallWithBody(handler reflect.Value, inputType reflect.Type) w
 			handleRequestErr(w, errors.ErrMalformed)
 			return
 		}
+		if arg == nil {
+			handleRequestErr(w, errors.ErrMalformed)
+			return
+		}
 		response := handler.Call([]reflect.Value{
 			reflect.ValueOf(arg),
 			reflect.ValueOf(r.Context()),

@@ -2,44 +2,63 @@
 package test
 
 import (
-	"bytes"
 	"encoding/json"
 	"reflect"
 	"testing"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/sergi/go-diff/diffmatchpatch"
+	diff "github.com/yudai/gojsondiff"
+	"github.com/yudai/gojsondiff/formatter"
 )
 
-// PrettyDiff print pretty diff of expected and actual using t.Errorf().
-func PrettyDiff(t *testing.T, expected, actual string) {
+func init() {
+	spew.Config.DisableMethods = true
+	spew.Config.DisableCapacities = true
+	spew.Config.DisablePointerMethods = true
+	spew.Config.DisablePointerAddresses = true
+}
+
+var jsonFormatterConfig = formatter.AsciiFormatterConfig{
+	Coloring:       true,
+	ShowArrayIndex: true,
+}
+
+// DiffJSON ...
+func DiffJSON(t *testing.T, expected, actual []byte) string {
 	t.Helper()
-	dmp := diffmatchpatch.New()
-	diffs := dmp.DiffMain(expected, actual, true)
-	t.Errorf("\n%s", dmp.DiffPrettyText(diffs))
+
+	jsonRaw := map[string]interface{}{}
+	if err := json.Unmarshal(expected, &jsonRaw); err != nil {
+		t.Errorf("Unable to marshall expected Error[%v]", err)
+	}
+
+	diffs, diffErr := diff.New().Compare(expected, actual)
+	if diffErr != nil {
+		t.Errorf("Unable to calculate diff Error[%v]", diffErr)
+	}
+	if diffs.Modified() {
+		str, err := formatter.NewAsciiFormatter(jsonRaw, jsonFormatterConfig).Format(diffs)
+		if err != nil {
+			t.Errorf("Unable to format diff in test Error[%v]", err)
+		}
+		return str
+	}
+	return ""
 }
 
-// PrettyMarshal return prettified json representation of the argument.
-// Return empty string, if argument can not be represented as json.
-func PrettyMarshal(toMarshall interface{}) string {
-	marshalled, err := json.Marshal(toMarshall)
-	if err != nil {
+// DiffModel ...
+func DiffModel(t *testing.T, expected, actual interface{}) string {
+	t.Helper()
+	if reflect.DeepEqual(expected, actual) {
 		return ""
 	}
-	var out bytes.Buffer
-	err = json.Indent(&out, marshalled, "", "  ")
-	if err != nil {
-		return ""
-	}
-	return out.String()
-}
+	expectedStr := spew.Sdump(expected)
+	actualStr := spew.Sdump(actual)
 
-func jsonPrettyPrint(in string) string {
-	var out bytes.Buffer
-	err := json.Indent(&out, []byte(in), "", "\t")
-	if err != nil {
-		return in
-	}
-	return out.String()
+	dump := diffmatchpatch.New()
+	diffs := dump.DiffMain(expectedStr, actualStr, true)
+	return dump.DiffPrettyText(diffs)
 }
 
 // MarshallingCases contains test cases for Marshalling Test functions.
@@ -53,90 +72,76 @@ type MarshallingCases []struct {
 
 // Marshal run testCases on json.Marshal function.
 func Marshal(t *testing.T, testCases MarshallingCases) {
+	t.Helper()
 	for _, tc := range testCases {
-		prettyJSON := jsonPrettyPrint(tc.JSON)
-		result, err := json.MarshalIndent(tc.Model, "", "\t")
-
+		result, err := json.Marshal(tc.Model)
 		if err != nil {
-			t.Error(err.Error())
+			t.Errorf("Marshall failed with Error[%v]", err)
 		}
-
-		sres := string(result[:])
-		if sres != prettyJSON {
-			t.Errorf("json.Marshal(%T):", tc.Model)
-			PrettyDiff(t, prettyJSON, sres)
+		if diff := DiffJSON(t, []byte(tc.JSON), result); diff != "" {
+			t.Errorf("actual != expected\n%s", diff)
 		}
 	}
 }
 
 // Unmarshal run test cases on json.Unmarshal function.
 func Unmarshal(t *testing.T, testCases MarshallingCases) {
+	t.Helper()
 	for _, tc := range testCases {
+		rawInput := []byte(tc.JSON)
+
 		objType := reflect.TypeOf(tc.Model).Elem()
-		res := reflect.New(objType).Interface()
-
-		bInput := []byte(tc.JSON)
-		err := json.Unmarshal(bInput, &res)
-
-		if err != nil {
-			t.Error(err.Error())
+		result := reflect.New(objType).Interface()
+		if err := json.Unmarshal(rawInput, &result); err != nil {
+			t.Errorf("Marshall failed with Error[%v]", err)
 		}
 
-		if !reflect.DeepEqual(res, tc.Model) {
-			t.Errorf("json.Unmarshal(%T, %T): \nexpected:\n%+v\nactual:\n%+v",
-				bInput, res, tc.Model, res)
+		if diff := DiffModel(t, tc.Model, result); diff != "" {
+			t.Errorf("actual != expected\n%s", diff)
 		}
+
 	}
 }
 
 // UnmarshalMarshalled first Marshal tc.Model, then Unmarshal result from previous operation.
 func UnmarshalMarshalled(t *testing.T, testCases MarshallingCases) {
+	t.Helper()
 	for _, tc := range testCases {
-		marshallingResult, err := json.Marshal(tc.Model)
-
-		if err != nil {
-			t.Error(err.Error())
+		marshaled, marshallErr := json.Marshal(tc.Model)
+		if marshallErr != nil {
+			t.Errorf("Marshal failed with Error[%v]", marshallErr)
 		}
 
 		objType := reflect.TypeOf(tc.Model).Elem()
-		res := reflect.New(objType).Interface()
-		err = json.Unmarshal(marshallingResult, &res)
-
-		if err != nil {
-			t.Error(err.Error())
+		unmarshaled := reflect.New(objType).Interface()
+		if err := json.Unmarshal(marshaled, &unmarshaled); err != nil {
+			t.Errorf("Unmarshall failed with Error[%v]", err)
 		}
 
-		if !reflect.DeepEqual(res, tc.Model) {
-			t.Errorf("json.Unmarshal(%T, %T) on json.Marshal(%T) result: \nexpected:\n%s\nactual:\n%s",
-				marshallingResult, res, tc.Model, tc.Model, res)
+		if diff := DiffModel(t, tc.Model, unmarshaled); diff != "" {
+			t.Errorf("actual != expected\n%s", diff)
 		}
 	}
 }
 
 // MarshalUnmarshalled first Unmarshal tc.JSON, then Marshal result from previous operation.
 func MarshalUnmarshalled(t *testing.T, testCases MarshallingCases) {
+	t.Helper()
 	for _, tc := range testCases {
+		raw := []byte(tc.JSON)
 		objType := reflect.TypeOf(tc.Model).Elem()
-		unmarshallingResult := reflect.New(objType).Interface()
-
-		bInput := []byte(tc.JSON)
-		err := json.Unmarshal(bInput, &unmarshallingResult)
-
-		if err != nil {
-			t.Error(err.Error())
+		unmarshaled := reflect.New(objType).Interface()
+		if err := json.Unmarshal(raw, &unmarshaled); err != nil {
+			t.Errorf("Unmarshall failed with Error[%v]", err)
 		}
 
-		res, err := json.MarshalIndent(unmarshallingResult, "", "\t")
-
-		if err != nil {
-			t.Error(err.Error())
+		marshaled, marshallErr := json.Marshal(unmarshaled)
+		if marshallErr != nil {
+			t.Errorf("Marshall failed with Error[%v]", marshallErr)
 		}
 
-		sres := string(res[:])
-		if sres != jsonPrettyPrint(tc.JSON) {
-			t.Errorf("json.Marshal(%T) on json.Unmarshal(%T, %T):", unmarshallingResult, bInput, unmarshallingResult)
-
-			PrettyDiff(t, tc.JSON, sres)
+		if diff := DiffJSON(t, raw, marshaled); diff != "" {
+			t.Errorf("actual != expected\n%s", diff)
 		}
 	}
 }

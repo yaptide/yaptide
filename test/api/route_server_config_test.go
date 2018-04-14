@@ -1,30 +1,43 @@
 package api
 
 import (
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	mgo "gopkg.in/mgo.v2"
 )
 
-func TestHandleGetServerConfig(t *testing.T) {
-	requestURI := url.URL{
-		Path: "/server_config",
-	}
+var serverConfigTestCasses = []apiTestCase{
+	apiTestCase{
+		requests: []func(*testing.T, []response) request{
+			func(t *testing.T, r []response) request {
+				return request{
+					method: "GET",
+					path:   "/server_configuration",
+					body:   nil,
+				}
+			},
+		},
+		validate: func(t *testing.T, responses []response, session *mgo.Session) {
+			r := responses[0]
+			t.Logf("%+v", r)
+			body, bodyOk := r.body.(map[string]interface{})
+			require.True(t, bodyOk)
+			_, materialsOk := body["predefinedMaterials"].([]interface{})
+			_, isotopesOk := body["isotopes"].([]interface{})
+			_, particlesOk := body["particles"].([]interface{})
+			_, scoringTypesOk := body["scoringTypes"].([]interface{})
 
-	req, err := http.NewRequest("GET", requestURI.String(), nil)
-	if err != nil {
-		t.Fatal(err)
-	}
+			assert.True(t, materialsOk)
+			assert.True(t, isotopesOk)
+			assert.True(t, particlesOk)
+			assert.True(t, scoringTypesOk)
+			assert.Len(t, body, 4)
+		},
+	},
+}
 
-	// Create a new recorder to get results.
-	rr := httptest.NewRecorder()
-	// Run the above request
-	Router.ServeHTTP(rr, req)
-
-	// Status should be http.StatusNotFound
-	if status := rr.Code; status != http.StatusNotFound {
-		t.Errorf("handler returned wrong status code: got %v want %v",
-			status, http.StatusOK)
-	}
+func TestServerConfig(t *testing.T) {
+	runTestCases(t, serverConfigTestCasses)
 }

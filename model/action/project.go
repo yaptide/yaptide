@@ -24,7 +24,7 @@ func (r *Resolver) ProjectGet(
 ) (*model.Project, error) {
 	project := &model.Project{}
 	getErr := db.Project().FindID(projectID).One(project)
-	if getErr != mgo.ErrNotFound {
+	if getErr == mgo.ErrNotFound {
 		return nil, errors.ErrNotFound
 	}
 	if getErr != nil {
@@ -63,34 +63,32 @@ func (r *Resolver) ProjectCreate(
 }
 
 func (r *Resolver) ProjectUpdate(
-	db mongo.DB, project *model.Project, input *model.ProjectUpdateInput,
-) (*model.Project, error) {
-	if err := input.Validate(); err != nil {
-		return nil, err
-	}
-
-	input.ApplyTo(project)
-
-	updateErr := db.Project().UpdateID(project.ID, project)
+	db mongo.DB, projectID bson.ObjectId, input *model.ProjectUpdateInput, userID bson.ObjectId,
+) error {
+	updateErr := db.Project().Update(
+		bson.M{"_id": projectID, "userId": userID},
+		bson.M{"$set": input},
+	)
 	if updateErr == mgo.ErrNotFound {
-		return nil, errors.ErrNotFound
+		log.Debug("updated failed %s, reason: not found", projectID.Hex())
+		return errors.ErrNotFound
 	}
 	if updateErr != nil {
-		return nil, errors.ErrInternalServerError
+		log.Errorf(updateErr.Error())
+		return errors.ErrInternalServerError
 	}
 
-	return project, nil
+	log.Debugf("project %s updated", projectID.Hex())
+	return nil
 }
 
 func (r *Resolver) ProjectRemove(
 	db mongo.DB, projectID bson.ObjectId, userID bson.ObjectId,
 ) error {
-	_, getErr := r.ProjectGet(db, projectID, userID)
-	if getErr != nil {
-		return getErr
+	removeErr := db.Project().Remove(bson.M{"_id": projectID})
+	if removeErr == mgo.ErrNotFound {
+		return errors.ErrNotFound
 	}
-
-	removeErr := db.Project().RemoveID(projectID)
 	if removeErr != nil {
 		return errors.ErrInternalServerError
 	}

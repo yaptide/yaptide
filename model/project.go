@@ -1,7 +1,6 @@
 package model
 
 import (
-	"fmt"
 	"time"
 
 	"github.com/yaptide/app/errors"
@@ -75,24 +74,10 @@ func (p ProjectCreateInput) ToProject(userID bson.ObjectId) *Project {
 }
 
 type ProjectUpdateInput struct {
-	ID          bson.ObjectId `json:"id,omitempty"`
-	Name        *string       `json:"project.name,omitempty"`
-	Description *string       `json:"project.description,omitempty"`
+	Name        *string `json:"name,omitempty"`
+	Description *string `json:"description,omitempty"`
 }
 
 func (p ProjectUpdateInput) Validate() error {
-	if p.ID == "" {
-		return fmt.Errorf("Missing project id")
-	}
-
 	return nil
-}
-
-func (p ProjectUpdateInput) ApplyTo(project *Project) {
-	if p.Name != nil {
-		project.ProjectDetails.Name = *p.Name
-	}
-	if p.Description != nil {
-		project.ProjectDetails.Description = *p.Description
-	}
 }

@@ -4,7 +4,6 @@ import (
 	"github.com/yaptide/app/errors"
 	"github.com/yaptide/app/model"
 	"github.com/yaptide/app/model/mongo"
-	"github.com/yaptide/converter/log"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -31,6 +30,7 @@ func (r *Resolver) UserRegister(
 	}
 	user := input.ToUser()
 
+	log.Debugf("Insert user into db %+v", user)
 	insertErr := db.User().Insert(user)
 	if insertErr != nil {
 		return nil, errors.ErrInternalServerError

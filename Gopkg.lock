@@ -26,6 +26,12 @@
   version = "v1.0.0"
 
 [[projects]]
+  name = "github.com/pmezard/go-difflib"
+  packages = ["difflib"]
+  revision = "792786c7400a136282c1664665ae0a8db921c6c2"
+  version = "v1.0.0"
+
+[[projects]]
   branch = "master"
   name = "github.com/sergi/go-diff"
   packages = ["diffmatchpatch"]
@@ -36,6 +42,15 @@
   packages = ["."]
   revision = "d682213848ed68c0a260ca37d6dd5ace8423f5ba"
   version = "v1.0.4"
+
+[[projects]]
+  name = "github.com/stretchr/testify"
+  packages = [
+    "assert",
+    "require"
+  ]
+  revision = "12b6f73e6084dad08a7c6e575284b177ecafbc71"
+  version = "v1.2.1"
 
 [[projects]]
   branch = "develop"
@@ -58,6 +73,21 @@
     "validate"
   ]
   revision = "e59617486366516ae4c7343d7f36049ca6ffe9d5"
+
+[[projects]]
+  name = "github.com/yudai/gojsondiff"
+  packages = [
+    ".",
+    "formatter"
+  ]
+  revision = "7b1b7adf999dab73a6eb02669c3d82dbb27a3dd6"
+  version = "1.0.0"
+
+[[projects]]
+  branch = "master"
+  name = "github.com/yudai/golcs"
+  packages = ["."]
+  revision = "ecda9a501e8220fae3b4b600c3db4b0ba22cfc68"
 
 [[projects]]
   branch = "master"
@@ -106,6 +136,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "443d1ef61d8ea5192133d7ae6ac62db8ad6c2beaf9d177b698b1ecc6d34f4614"
+  inputs-digest = "56a6d832160911d821500386fa50c9d46977bbbd521c185d74aad36bae72a663"
   solver-name = "gps-cdcl"
   solver-version = 1

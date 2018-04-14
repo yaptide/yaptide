@@ -43,9 +43,8 @@ func (h *handler) userRegisterHandler(
 	form *model.UserRegisterInput, ctx context.Context,
 ) (*model.User, error) {
 	db := extractDBSession(ctx)
-
+	log.Debug("Register request")
 	user, registerErr := h.Resolver.UserRegister(db, form)
-
 	if registerErr != nil {
 		return nil, registerErr
 	}

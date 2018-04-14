@@ -65,6 +65,7 @@ func (u UserRegisterInput) Validate() error {
 
 func (u UserRegisterInput) ToUser() *User {
 	return &User{
+		ID:           bson.NewObjectId(),
 		Username:     u.Username,
 		Email:        u.Email,
 		PasswordHash: u.generatePasswordHash(),
