@@ -11,12 +11,12 @@ import (
 
 // Version is project version, which contains settting and simulation setup/results.
 type Version struct {
-	ID        int           `json:"id" bson:"id"`
+	ID        int           `json:"id" bson:"_id"`
 	Status    VersionStatus `json:"status" bson:"status"`
 	Settings  Settings      `json:"settings" bson:"settings"`
 	SetupID   bson.ObjectId `json:"setupId" bson:"setupId"`
 	ResultID  bson.ObjectId `json:"resultId" bson:"resultId"`
-	UpdatedAt time.Time     `json:"updatedAt"`
+	UpdatedAt time.Time     `json:"updatedAt" bson:"updatedAt"`
 }
 
 func (v *Version) UpdateStatus(status VersionStatus) error {
@@ -98,30 +98,6 @@ func defaultProjectVersion(
 		ResultID:  resultID,
 		UpdatedAt: time.Now(),
 	}
-}
-
-type ProjectVersionUpdateInput struct {
-	Status           *VersionStatus    `json:"status"`
-	SimulationEngine *SimulationEngine `json:"simulationEngine"`
-	ComputingLibrary *ComputingLibrary `json:"computingLibrary"`
-}
-
-func (p *ProjectVersionUpdateInput) ApplyTo(project *Project, versionID int) error {
-	if len(project.Versions) <= versionID {
-		return errors.ErrNotFound
-	}
-	if p.Status != nil {
-		if err := project.Versions[versionID].UpdateStatus(*p.Status); err != nil {
-			return err
-		}
-	}
-	if p.SimulationEngine != nil {
-		project.Versions[versionID].Settings.SimulationEngine = *p.SimulationEngine
-	}
-	if p.ComputingLibrary != nil {
-		project.Versions[versionID].Settings.ComputingLibrary = *p.ComputingLibrary
-	}
-	return nil
 }
 
 var mapVersionStatusToJSON = map[VersionStatus]string{

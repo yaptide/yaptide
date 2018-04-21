@@ -1,3 +1,5 @@
+// +build integration
+
 package api
 
 import (
@@ -38,13 +40,10 @@ var registerTestCasses = []apiTestCase{
 			assertMongoID(t, body["id"])
 
 			var result map[string]interface{}
-			if err := session.DB("").C("user").Find(bson.M{"username": "username"}).One(&result); err != nil {
-				t.Fatal(err)
-			}
+			require.Nil(t, session.DB("").C("user").Find(bson.M{"username": "username"}).One(&result))
+			assert.Equal(t, "username", result["username"])
+			assert.Equal(t, "email", result["email"])
 
-			if result["username"] != "username" || result["email"] != "email" {
-				t.Fatalf("wrong user data in db %v", result)
-			}
 		},
 	},
 }

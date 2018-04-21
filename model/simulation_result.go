@@ -7,7 +7,7 @@ import (
 
 type SimulationResult struct {
 	ID               bson.ObjectId `json:"id" bson:"_id"`
-	UserID           bson.ObjectId `json:"userId" bson: "userID"`
+	UserID           bson.ObjectId `json:"userId" bson:"userId"`
 	converter.Result `bson:",inline"`
 }
 

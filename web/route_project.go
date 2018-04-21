@@ -7,35 +7,32 @@ import (
 )
 
 func (h *handler) getProjectsHandler(ctx context.Context) ([]model.Project, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 
-	log.Debugf("Request get all projects for user %s", userID.Hex())
+	log.Debugf("Request get all projects for user %s", a.UserID().Hex())
 
-	projects, projectErr := h.Resolver.ProjectGetAll(db, userID)
+	projects, projectErr := h.Resolver.ProjectGetAll(a)
 
 	return projects, projectErr
 }
 
 func (h *handler) getProjectHandler(ctx context.Context) (*model.Project, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 	projectID := extractProjectId(ctx)
 
-	log.Debugf("Request get project %s", projectID.Hex())
+	log.Debugf("Request get project %s for user %s", projectID.Hex(), a.UserID().Hex())
 
-	return h.Resolver.ProjectGet(db, projectID, userID)
+	return h.Resolver.ProjectGet(a, projectID)
 }
 
 func (h *handler) createProjectHandler(
 	input *model.ProjectCreateInput, ctx context.Context,
 ) (*model.Project, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 
-	log.Infof("Request create project")
+	log.Infof("Request create project for user %s", a.UserID().Hex())
 
-	project, projectErr := h.Resolver.ProjectCreate(db, input, userID)
+	project, projectErr := h.Resolver.ProjectCreate(a, input)
 
 	return project, projectErr
 }
@@ -43,17 +40,16 @@ func (h *handler) createProjectHandler(
 func (h *handler) updateProjectHandler(
 	input *model.ProjectUpdateInput, ctx context.Context,
 ) (*model.Project, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 	projectID := extractProjectId(ctx)
 
-	log.Infof("Request update project %s", projectID.Hex())
+	log.Infof("Request update project %s for user %s", projectID.Hex(), a.UserID().Hex())
 
-	if err := h.Resolver.ProjectUpdate(db, projectID, input, userID); err != nil {
+	if err := h.Resolver.ProjectUpdate(a, projectID, input); err != nil {
 		return nil, err
 	}
 
-	project, getErr := h.Resolver.ProjectGet(db, projectID, userID)
+	project, getErr := h.Resolver.ProjectGet(a, projectID)
 	if getErr != nil {
 		return nil, getErr
 	}
@@ -63,13 +59,12 @@ func (h *handler) updateProjectHandler(
 func (h *handler) removeProjectHandler(
 	ctx context.Context,
 ) (bool, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 	projectID := extractProjectId(ctx)
 
-	log.Debugf("Request delete project %s", projectID.Hex())
+	log.Infof("Request delete project %s", projectID.Hex())
 
-	projectErr := h.Resolver.ProjectRemove(db, projectID, userID)
+	projectErr := h.Resolver.ProjectRemove(a, projectID)
 
 	return true, projectErr
 }

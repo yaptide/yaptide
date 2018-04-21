@@ -3,33 +3,35 @@ package action
 import (
 	"github.com/yaptide/app/errors"
 	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/model/mongo"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
 func (r *Resolver) SimulationResultGet(
-	db mongo.DB, resultID bson.ObjectId, userID bson.ObjectId,
+	ctx *context, resultID bson.ObjectId,
 ) (*model.SimulationResult, error) {
 	result := &model.SimulationResult{}
-	getErr := db.SimulationResult().FindID(resultID).One(result)
-	if getErr != mgo.ErrNotFound {
+	getErr := ctx.db.SimulationResult().Find(M{
+		"_id":    resultID,
+		"userId": ctx.userID,
+	}).One(result)
+	if getErr == mgo.ErrNotFound {
 		return nil, errors.ErrNotFound
 	}
 	if getErr != nil {
 		return nil, errors.ErrInternalServerError
 	}
-	if result.UserID != userID {
+	if result.UserID != ctx.userID {
 		return nil, errors.ErrUnauthorized
 	}
 	return result, nil
 }
 
 func (r *Resolver) SimulationResultCreateInitial(
-	db mongo.DB, userID bson.ObjectId,
+	ctx *context,
 ) (*model.SimulationResult, error) {
-	result := model.InitialSimulationResult(userID)
-	insertErr := db.SimulationResult().Insert(result)
+	result := model.InitialSimulationResult(ctx.userID)
+	insertErr := ctx.db.SimulationResult().Insert(result)
 	if insertErr != nil {
 		return nil, errors.ErrInternalServerError
 	}

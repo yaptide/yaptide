@@ -8,50 +8,61 @@ import (
 
 func (h *handler) createProjectVersionHandler(
 	ctx context.Context,
-) (*model.Version, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+) (*model.Project, error) {
+	a := extractActionContext(ctx)
 	projectID := extractProjectId(ctx)
 
-	project, getErr := h.Resolver.ProjectGet(db, projectID, userID)
+	log.Infof("Request create new version for project %s", projectID.Hex())
+
+	if err := h.Resolver.ProjectVersionCreateNew(a, projectID); err != nil {
+		return nil, err
+	}
+
+	project, getErr := h.Resolver.ProjectGet(a, projectID)
 	if getErr != nil {
 		return nil, getErr
 	}
-
-	version, createErr := h.Resolver.ProjectVersionCreateNew(db, project)
-	return version, createErr
+	return project, nil
 }
 
 func (h *handler) createProjectVersionFromHandler(
 	ctx context.Context,
-) (*model.Version, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+) (*model.Project, error) {
+	a := extractActionContext(ctx)
 	projectID := extractProjectId(ctx)
 	versionID := extractVersionId(ctx)
 
-	project, getErr := h.Resolver.ProjectGet(db, projectID, userID)
+	log.Infof(
+		"Request create new version from version %d for project %s",
+		versionID, projectID.Hex(),
+	)
+
+	if err := h.Resolver.ProjectVersionCreateFrom(a, projectID, versionID); err != nil {
+		return nil, err
+	}
+
+	project, getErr := h.Resolver.ProjectGet(a, projectID)
 	if getErr != nil {
 		return nil, getErr
 	}
-
-	version, createErr := h.Resolver.ProjectVersionCreateFrom(db, project, versionID)
-	return version, createErr
+	return project, nil
 }
 
-func (h *handler) updateProjectVersionHandler(
-	input *model.ProjectVersionUpdateInput,
+func (h *handler) updateProjectVersionSettingsHandler(
+	input *model.ProjectVersionUpdateSettings,
 	ctx context.Context,
-) (*model.Version, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+) (*model.Project, error) {
+	a := extractActionContext(ctx)
 	projectID := extractProjectId(ctx)
 	versionID := extractVersionId(ctx)
 
-	project, getErr := h.Resolver.ProjectGet(db, projectID, userID)
+	if err := h.Resolver.ProjectVersionUpdateSettings(a, projectID, versionID, input); err != nil {
+		return nil, err
+	}
+
+	project, getErr := h.Resolver.ProjectGet(a, projectID)
 	if getErr != nil {
 		return nil, getErr
 	}
-	version, createErr := h.Resolver.ProjectVersionUpdate(db, project, versionID, input)
-	return version, createErr
+	return project, nil
 }

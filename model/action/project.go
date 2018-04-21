@@ -3,16 +3,13 @@ package action
 import (
 	"github.com/yaptide/app/errors"
 	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/model/mongo"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )
 
-func (r *Resolver) ProjectGetAll(
-	db mongo.DB, userID bson.ObjectId,
-) ([]model.Project, error) {
+func (r *Resolver) ProjectGetAll(ctx *context) ([]model.Project, error) {
 	projects := []model.Project{}
-	getErr := db.Project().Find(bson.M{"userId": userID}).All(&projects)
+	getErr := ctx.db.Project().Find(bson.M{"userId": ctx.userID}).All(&projects)
 	if getErr != nil {
 		return nil, errors.ErrInternalServerError
 	}
@@ -20,41 +17,44 @@ func (r *Resolver) ProjectGetAll(
 }
 
 func (r *Resolver) ProjectGet(
-	db mongo.DB, projectID bson.ObjectId, userID bson.ObjectId,
+	ctx *context, projectID bson.ObjectId,
 ) (*model.Project, error) {
 	project := &model.Project{}
-	getErr := db.Project().FindID(projectID).One(project)
+	getErr := ctx.db.Project().FindID(projectID).One(project)
 	if getErr == mgo.ErrNotFound {
 		return nil, errors.ErrNotFound
 	}
 	if getErr != nil {
 		return nil, errors.ErrInternalServerError
 	}
-	if project.UserID != userID {
+	if project.UserID != ctx.userID {
 		return nil, errors.ErrUnauthorized
 	}
 	return project, nil
 }
 
 func (r *Resolver) ProjectCreate(
-	db mongo.DB, input *model.ProjectCreateInput, userID bson.ObjectId,
+	ctx *context, input *model.ProjectCreateInput,
 ) (*model.Project, error) {
 	if err := input.Validate(); err != nil {
 		return nil, err
 	}
-	project := input.ToProject(userID)
+	project := model.NewProject(ctx.userID)
+	project.Name = input.Name
+	project.Description = input.Description
 
-	setup, setupErr := r.SimulationSetupCreateInitial(db, userID)
+	setup, setupErr := r.SimulationSetupCreateInitial(ctx)
 	if setupErr != nil {
 		return nil, setupErr
 	}
-	result, resultErr := r.SimulationResultCreateInitial(db, userID)
+	result, resultErr := r.SimulationResultCreateInitial(ctx)
 	if resultErr != nil {
 		return nil, resultErr
 	}
+	project.Versions[0].SetupID = setup.ID
+	project.Versions[0].ResultID = result.ID
 
-	project.CreateInitialVersion(setup.ID, result.ID)
-	insertErr := db.Project().Insert(project)
+	insertErr := ctx.db.Project().Insert(project)
 	if insertErr != nil {
 		return nil, errors.ErrInternalServerError
 	}
@@ -63,14 +63,14 @@ func (r *Resolver) ProjectCreate(
 }
 
 func (r *Resolver) ProjectUpdate(
-	db mongo.DB, projectID bson.ObjectId, input *model.ProjectUpdateInput, userID bson.ObjectId,
+	ctx *context, projectID bson.ObjectId, input *model.ProjectUpdateInput,
 ) error {
-	updateErr := db.Project().Update(
-		bson.M{"_id": projectID, "userId": userID},
-		bson.M{"$set": input},
+	updateErr := ctx.db.Project().Update(
+		M{"_id": projectID, "userId": ctx.userID},
+		M{"$set": input},
 	)
 	if updateErr == mgo.ErrNotFound {
-		log.Debug("updated failed %s, reason: not found", projectID.Hex())
+		log.Warnf("project %s update failed, reason: not found", projectID.Hex())
 		return errors.ErrNotFound
 	}
 	if updateErr != nil {
@@ -83,13 +83,17 @@ func (r *Resolver) ProjectUpdate(
 }
 
 func (r *Resolver) ProjectRemove(
-	db mongo.DB, projectID bson.ObjectId, userID bson.ObjectId,
+	ctx *context, projectID bson.ObjectId,
 ) error {
-	removeErr := db.Project().Remove(bson.M{"_id": projectID})
+	removeErr := ctx.db.Project().Remove(bson.M{
+		"_id":    projectID,
+		"userId": ctx.userID,
+	})
 	if removeErr == mgo.ErrNotFound {
 		return errors.ErrNotFound
 	}
 	if removeErr != nil {
+		log.Errorf(removeErr.Error())
 		return errors.ErrInternalServerError
 	}
 	return nil

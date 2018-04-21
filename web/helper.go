@@ -9,6 +9,7 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi"
+	"github.com/yaptide/app/model/action"
 	"github.com/yaptide/app/model/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
@@ -17,6 +18,13 @@ type contextKeyType string
 
 const contextUserIDKey contextKeyType = "userId"
 const contextDBSessionKey contextKeyType = "dbSession"
+
+func extractActionContext(ctx context.Context) *action.Context {
+	return action.NewContext(
+		extractDBSession(ctx),
+		extractUserId(ctx),
+	)
+}
 
 func extractDBSession(ctx context.Context) mongo.DB {
 	dbSessionObj := ctx.Value(contextDBSessionKey)

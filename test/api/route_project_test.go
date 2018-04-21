@@ -1,3 +1,5 @@
+// +build integration
+
 package api
 
 import (
@@ -8,6 +10,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	mgo "gopkg.in/mgo.v2"
+	"gopkg.in/mgo.v2/bson"
 )
 
 var projectTestCasses = []apiTestCase{
@@ -82,6 +85,13 @@ var projectTestCasses = []apiTestCase{
 			require.True(t, setttingsOk)
 			assert.Zero(t, versionSettings["computingLibrary"])
 			assert.Zero(t, versionSettings["simulationEngine"])
+
+			// db checks
+			var dbproject map[string]interface{}
+			require.Nil(t, session.DB("").C("project").FindId(bson.ObjectIdHex(body["id"].(string))).One(&dbproject))
+
+			assert.Equal(t, "project name", dbproject["name"])
+			assert.Equal(t, "project description", dbproject["description"])
 		},
 	},
 	apiTestCase{
@@ -109,6 +119,13 @@ var projectTestCasses = []apiTestCase{
 
 			assert.Equal(t, http.StatusOK, r.code)
 			assert.True(t, body)
+
+			// db checks
+			createBody, createOk := responses[2].body.(map[string]interface{})
+			require.True(t, createOk)
+
+			var dbproject interface{}
+			require.Error(t, session.DB("").C("project").FindId(bson.ObjectIdHex(createBody["id"].(string))).One(&dbproject))
 		},
 	},
 	apiTestCase{
@@ -140,6 +157,16 @@ var projectTestCasses = []apiTestCase{
 			assert.Equal(t, http.StatusOK, r.code)
 			assert.Equal(t, "new name", body["name"])
 			assert.Equal(t, "new description", body["description"])
+
+			// db checks
+			createBody, createOk := responses[2].body.(map[string]interface{})
+			require.True(t, createOk)
+
+			var dbproject map[string]interface{}
+			require.Nil(t, session.DB("").C("project").FindId(bson.ObjectIdHex(createBody["id"].(string))).One(&dbproject))
+
+			assert.Equal(t, "new name", dbproject["name"])
+			assert.Equal(t, "new description", dbproject["description"])
 		},
 	},
 	apiTestCase{
@@ -199,6 +226,42 @@ var projectTestCasses = []apiTestCase{
 			assert.Equal(t, "project name", body["name"])
 			assert.Equal(t, "project description", body["description"])
 			assertMongoID(t, body["id"])
+		},
+	},
+	apiTestCase{
+		name: "check setup and results objects in project",
+		requests: []func(*testing.T, []response) request{
+			createDefaultUserRequest,
+			loginAsDefaultUserRequest,
+			createProjectRequest,
+		},
+		validate: func(t *testing.T, responses []response, session *mgo.Session) {
+			r := responses[2]
+			t.Logf("%+v", r)
+			assert.Equal(t, http.StatusOK, r.code)
+			projectID := extractStringFromInterface(t, r.body, "id")
+
+			var project map[string]interface{}
+			require.Nil(t,
+				session.DB("").C("project").
+					FindId(bson.ObjectIdHex(projectID)).One(&project),
+			)
+			versions := extractFromMapInterface(t, project, "versions")
+			version := extractFromSliceInterface(t, versions, 0)
+
+			setupID := extractFromMapInterface(t, version, "setupId")
+			resultID := extractFromMapInterface(t, version, "resultId")
+
+			var setup M
+			var result M
+			require.Nil(t,
+				session.DB("").C("simulationSetup").
+					FindId(setupID).One(&setup),
+			)
+			require.Nil(t,
+				session.DB("").C("simulationResult").
+					FindId(resultID).One(&result),
+			)
 		},
 	},
 }

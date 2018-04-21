@@ -90,6 +90,7 @@ func runTestCase(t *testing.T, c apiTestCase) {
 		}
 	}
 
+	printEntireDB(t, session)
 	c.validate(t, responses, session)
 }
 

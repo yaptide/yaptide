@@ -11,11 +11,10 @@ import (
 func (h *handler) getSimulationResult(
 	ctx context.Context,
 ) (*model.SimulationResult, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 	resultID := extractSimualtionSetupId(ctx)
 
-	result, resultErr := h.Resolver.SimulationResultGet(db, resultID, userID)
+	result, resultErr := h.Resolver.SimulationResultGet(a, resultID)
 	if resultErr != nil {
 		return nil, resultErr
 	}
@@ -26,11 +25,10 @@ func (h *handler) getSimulationResult(
 func (h *handler) getSimulationSetup(
 	ctx context.Context,
 ) (*model.SimulationSetup, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 	setupID := extractSimualtionSetupId(ctx)
 
-	setup, setupErr := h.Resolver.SimulationSetupGet(db, setupID, userID)
+	setup, setupErr := h.Resolver.SimulationSetupGet(a, setupID)
 	if setupErr != nil {
 		return nil, setupErr
 	}
@@ -42,18 +40,16 @@ func (h *handler) updateSimulationSetup(
 	input *converter.Setup,
 	ctx context.Context,
 ) (*model.SimulationSetup, error) {
-	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	a := extractActionContext(ctx)
 	setupID := extractSimualtionSetupId(ctx)
 
-	setup, getErr := h.Resolver.SimulationSetupGet(db, setupID, userID)
-	if getErr != nil {
-		return nil, getErr
+	if err := h.Resolver.SimulationSetupUpdate(a, setupID, input); err != nil {
+		return nil, err
 	}
 
-	setup, setupErr := h.Resolver.SimulationSetupUpdate(db, setup, input)
-	if setupErr != nil {
-		return nil, setupErr
+	setup, getErr := h.Resolver.SimulationSetupGet(a, setupID)
+	if getErr != nil {
+		return nil, getErr
 	}
 
 	return setup, nil

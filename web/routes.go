@@ -18,13 +18,20 @@ type handler struct {
 func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, error) {
 	w := requestWrapper
 
-	router := chi.NewRouter()
 	cors := cors.New(cors.Options{
 		AllowedOrigins: []string{"*"},
 		AllowedMethods: []string{"GET", "POST", "DELETE", "PUT", "OPTIONS"},
 		AllowedHeaders: []string{"Accept", "X-Auth-Token", "Content-Type", "X-CSRF-Token"},
 	})
 
+	router := chi.NewRouter()
+	router.Use(func(next http.Handler) http.Handler {
+		handler := func(w http.ResponseWriter, r *http.Request) {
+			log.Debugf("[HTTP] %s %s", r.Method, r.URL.Path)
+			next.ServeHTTP(w, r)
+		}
+		return http.HandlerFunc(handler)
+	})
 	router.Use(db.middleware)
 	router.Use(cors.Handler)
 	router.Route("/auth", func(router chi.Router) {
@@ -45,7 +52,7 @@ func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, err
 
 		router.Post("/{projectId}", w(h.createProjectVersionHandler))
 		router.Post("/{projectId}/from/{versionId}", w(h.createProjectVersionFromHandler))
-		router.Put("/{projectId}/{versionId}", w(h.updateProjectVersionHandler))
+		router.Put("/{projectId}/{versionId}/settings", w(h.updateProjectVersionSettingsHandler))
 	})
 
 	router.Route("/simulation/setup", func(router chi.Router) {
@@ -61,7 +68,11 @@ func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, err
 		router.Get("/{resultId}", w(h.getSimulationResult))
 	})
 
-	router.Post("/simulation/run", w(h.runSimulationHandler))
+	router.Route("/simulation/run", func(router chi.Router) {
+		router.Use(jwt.middleware)
+
+		router.Post("/", w(h.runSimulationHandler))
+	})
 	router.Get("/server_configuration", w(h.getConfiguration))
 
 	return router, nil

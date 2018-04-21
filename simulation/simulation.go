@@ -34,13 +34,19 @@ func NewHandler(action *action.Resolver, db mongo.DB) *Handler {
 
 // HandleSimulation processes simulation.
 func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userID bson.ObjectId) error {
-	version, versionErr := p.action.ProjectVersionGet(p.db, projectID, versionID, userID)
-	if versionErr != nil {
-		log.Warning("[SimulationProcessor] Unable to fetch version. Reason: %s", versionErr.Error())
-		return versionErr
+	ctx := action.NewContext(p.db, userID)
+	project, projectErr := p.action.ProjectGet(ctx, projectID)
+	if projectErr != nil {
+		log.Warnf("project %s get failed [%s]", projectID.Hex(), projectErr.Error())
+		return projectErr
 	}
+	if len(project.Versions) >= versionID {
+		log.Warnf("project %s don't have version %d", projectID.Hex(), versionID)
+		return errors.ErrNotFound
+	}
+	version := project.Versions[versionID]
 
-	setup, setupErr := p.action.SimulationSetupGet(p.db, version.SetupID, userID)
+	setup, setupErr := p.action.SimulationSetupGet(ctx, version.SetupID)
 	if setupErr != nil {
 		return setupErr
 	}
@@ -48,7 +54,6 @@ func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userI
 	if err := version.Settings.IsValid(); err != nil {
 		return err
 	}
-	log.Debug("[SimulationProcessor] Start simulation request")
 
 	request, requestErr := p.selectRequestFormSettings(version, projectID)
 	if requestErr != nil {
@@ -71,7 +76,7 @@ func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userI
 }
 
 func (h *Handler) selectRequestFormSettings(
-	version *model.Version, projectID bson.ObjectId,
+	version model.Version, projectID bson.ObjectId,
 ) (request, error) {
 	switch version.Settings.ComputingLibrary {
 	case model.ShieldLibrary:
