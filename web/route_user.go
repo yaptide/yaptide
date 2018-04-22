@@ -15,7 +15,7 @@ func (h *handler) userGetHandler(
 	ctx context.Context,
 ) (*model.User, error) {
 	db := extractDBSession(ctx)
-	userID := extractUserId(ctx)
+	userID := extractUserID(ctx)
 
 	user, userErr := h.Resolver.UserGet(db, userID)
 	if userErr != nil {
@@ -25,7 +25,7 @@ func (h *handler) userGetHandler(
 }
 
 func (h *handler) userLoginHandler(
-	input *model.UserLoginInput, ctx context.Context,
+	ctx context.Context, input *model.UserLoginInput,
 ) (*userLoginResponse, error) {
 	db := extractDBSession(ctx)
 
@@ -40,7 +40,7 @@ func (h *handler) userLoginHandler(
 }
 
 func (h *handler) userRegisterHandler(
-	form *model.UserRegisterInput, ctx context.Context,
+	ctx context.Context, form *model.UserRegisterInput,
 ) (*model.User, error) {
 	db := extractDBSession(ctx)
 	log.Debug("Register request")

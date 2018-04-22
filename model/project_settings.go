@@ -11,6 +11,7 @@ type Settings struct {
 	ComputingLibrary ComputingLibrary `json:"computingLibrary" bson:"computingLibrary"`
 }
 
+// IsValid ...
 func (s Settings) IsValid() error {
 	if s.ComputingLibrary != ShieldLibrary || s.SimulationEngine != LocalMachine {
 		return fmt.Errorf("simultionEngin and ComputingLibrary need to be selected")

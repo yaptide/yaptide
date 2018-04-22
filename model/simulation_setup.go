@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// SimulationSetup ...
 type SimulationSetup struct {
 	ID     bson.ObjectId `json:"id" bson:"_id"`
 	UserID bson.ObjectId `json:"userId" bson:"userId"`
@@ -14,6 +15,7 @@ type SimulationSetup struct {
 	MarshalDisabler
 }
 
+// InitialSimulationSetup ...
 func InitialSimulationSetup(userID bson.ObjectId) *SimulationSetup {
 	return &SimulationSetup{
 		ID:        bson.NewObjectId(),
@@ -22,6 +24,7 @@ func InitialSimulationSetup(userID bson.ObjectId) *SimulationSetup {
 	}
 }
 
+// MarshalDisabler ...
 // very very ugly solution
 // TODO refactor that as fast as possible
 // temporary fix to enable reversible marshaling of bsons
@@ -33,18 +36,22 @@ func InitialSimulationSetup(userID bson.ObjectId) *SimulationSetup {
 type MarshalDisabler struct {
 }
 
+// GetBSON ...
 func (m MarshalDisabler) GetBSON() (interface{}, error) {
 	return nil, nil
 }
 
+// SetBSON ...
 func (s *MarshalDisabler) SetBSON(raw bson.Raw) error {
 	return nil
 }
 
+// SetupSpec ...
 type SetupSpec struct {
 	converter.Setup `bson:",inline"`
 }
 
+// GetBSON ...
 func (s SetupSpec) GetBSON() (interface{}, error) {
 	data, jsonErr := json.Marshal(s)
 	if jsonErr != nil {
@@ -58,6 +65,7 @@ func (s SetupSpec) GetBSON() (interface{}, error) {
 	return rawObject, nil
 }
 
+// SetBSON ...
 func (s *SetupSpec) SetBSON(raw bson.Raw) error {
 	var rawMap map[string]interface{}
 	bsonUnmarshalErr := raw.Unmarshal(&rawMap)

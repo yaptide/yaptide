@@ -12,7 +12,7 @@ func (h *handler) getSimulationResult(
 	ctx context.Context,
 ) (*model.SimulationResult, error) {
 	a := extractActionContext(ctx)
-	resultID := extractSimualtionSetupId(ctx)
+	resultID := extractSimualtionSetupID(ctx)
 
 	result, resultErr := h.Resolver.SimulationResultGet(a, resultID)
 	if resultErr != nil {
@@ -26,7 +26,7 @@ func (h *handler) getSimulationSetup(
 	ctx context.Context,
 ) (*model.SimulationSetup, error) {
 	a := extractActionContext(ctx)
-	setupID := extractSimualtionSetupId(ctx)
+	setupID := extractSimualtionSetupID(ctx)
 
 	setup, setupErr := h.Resolver.SimulationSetupGet(a, setupID)
 	if setupErr != nil {
@@ -37,11 +37,10 @@ func (h *handler) getSimulationSetup(
 }
 
 func (h *handler) updateSimulationSetup(
-	input *converter.Setup,
-	ctx context.Context,
+	ctx context.Context, input *converter.Setup,
 ) (*model.SimulationSetup, error) {
 	a := extractActionContext(ctx)
-	setupID := extractSimualtionSetupId(ctx)
+	setupID := extractSimualtionSetupID(ctx)
 
 	if err := h.Resolver.SimulationSetupUpdate(a, setupID, input); err != nil {
 		return nil, err
@@ -56,12 +55,12 @@ func (h *handler) updateSimulationSetup(
 }
 
 func (h *handler) runSimulationHandler(
+	ctx context.Context,
 	args *struct {
 		ProjectID bson.ObjectId `json:"projectId"`
 		VersionID int           `json:"versionId"`
 	},
-	ctx context.Context,
 ) error {
-	userID := extractUserId(ctx)
+	userID := extractUserID(ctx)
 	return h.simulationHandler.HandleSimulation(args.ProjectID, args.VersionID, userID)
 }

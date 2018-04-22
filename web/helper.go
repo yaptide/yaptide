@@ -22,7 +22,7 @@ const contextDBSessionKey contextKeyType = "dbSession"
 func extractActionContext(ctx context.Context) *action.Context {
 	return action.NewContext(
 		extractDBSession(ctx),
-		extractUserId(ctx),
+		extractUserID(ctx),
 	)
 }
 
@@ -40,30 +40,30 @@ func extractDBSession(ctx context.Context) mongo.DB {
 	return dbSession
 }
 
-func extractUserId(ctx context.Context) bson.ObjectId {
-	userIdObj := ctx.Value(contextUserIDKey)
-	if userIdObj == nil {
+func extractUserID(ctx context.Context) bson.ObjectId {
+	userIDObj := ctx.Value(contextUserIDKey)
+	if userIDObj == nil {
 		return ""
 	}
-	userId, assertOk := userIdObj.(bson.ObjectId)
+	userID, assertOk := userIDObj.(bson.ObjectId)
 	if !assertOk {
-		log.Errorf("[ASSERT] Wrong type for userId in contex [%+v]", userIdObj)
+		log.Errorf("[ASSERT] Wrong type for userId in contex [%+v]", userIDObj)
 		debug.PrintStack()
 	}
-	return userId
+	return userID
 }
 
-func extractBsonURLParamIdContext(ctx context.Context, name string) bson.ObjectId {
+func extractBsonURLParamIDContext(ctx context.Context, name string) bson.ObjectId {
 	chiContext := chi.RouteContext(ctx)
-	stringId := chiContext.URLParam(name)
-	id, idErr := mongo.ConvertToObjectId(stringId)
+	stringID := chiContext.URLParam(name)
+	id, idErr := mongo.ConvertToObjectId(stringID)
 	if idErr != nil {
 		panic(fmt.Errorf("malformed %s", name))
 	}
 	return id
 }
 
-func extractIntURLParamIdContext(ctx context.Context, name string) int {
+func extractIntURLParamIDContext(ctx context.Context, name string) int {
 	chiContext := chi.RouteContext(ctx)
 	stringID := chiContext.URLParam(name)
 	id, idErr := strconv.Atoi(stringID)
@@ -73,17 +73,17 @@ func extractIntURLParamIdContext(ctx context.Context, name string) int {
 	return id
 }
 
-func extractProjectId(ctx context.Context) bson.ObjectId {
-	return extractBsonURLParamIdContext(ctx, "projectId")
+func extractProjectID(ctx context.Context) bson.ObjectId {
+	return extractBsonURLParamIDContext(ctx, "projectId")
 }
-func extractVersionId(ctx context.Context) int {
-	return extractIntURLParamIdContext(ctx, "versionId")
+func extractVersionID(ctx context.Context) int {
+	return extractIntURLParamIDContext(ctx, "versionId")
 }
-func extractSimualtionSetupId(ctx context.Context) bson.ObjectId {
-	return extractBsonURLParamIdContext(ctx, "setupId")
+func extractSimualtionSetupID(ctx context.Context) bson.ObjectId {
+	return extractBsonURLParamIDContext(ctx, "setupId")
 }
-func extractSimulationResultId(ctx context.Context) bson.ObjectId {
-	return extractBsonURLParamIdContext(ctx, "resultId")
+func extractSimulationResultID(ctx context.Context) bson.ObjectId {
+	return extractBsonURLParamIDContext(ctx, "resultId")
 }
 
 func writeJSONResponse(w http.ResponseWriter, httpStatus int, body interface{}) error {

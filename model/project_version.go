@@ -19,6 +19,7 @@ type Version struct {
 	UpdatedAt time.Time     `json:"updatedAt" bson:"updatedAt"`
 }
 
+// UpdateStatus ...
 func (v *Version) UpdateStatus(status VersionStatus) error {
 	if v.Status.IsFinal() {
 		log.Errorf("[ASSERT] version with status %v shouldn't be updated", v.Status)
@@ -79,10 +80,12 @@ func (v VersionStatus) IsRunnable() bool {
 	return v.IsModifable() && v != New
 }
 
+// IsValid ...
 func (v VersionStatus) IsValid() bool {
 	return v != Undefined
 }
 
+// IsFinal ...
 func (v VersionStatus) IsFinal() bool {
 	return v == Success || v == Archived
 }

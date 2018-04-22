@@ -18,25 +18,30 @@ func (p ProjectCreateInput) Validate() error {
 	return nil
 }
 
+// ProjectUpdateInput ...
 type ProjectUpdateInput struct {
 	Name        *string `json:"name,omitempty"`
 	Description *string `json:"description,omitempty"`
 }
 
+// Validate ...
 func (p ProjectUpdateInput) Validate() error {
 	return nil
 }
 
+// ProjectVersionUpdateSettings ...
 type ProjectVersionUpdateSettings struct {
 	SimulationEngine *SimulationEngine `json:"simulationEngine,omitempty" bson:"simulationEngine,omitempty"`
 	ComputingLibrary *ComputingLibrary `json:"computingLibrary,omitempty" bson:"computingLibrary,omitempty"`
 }
 
+// UserLoginInput ...
 type UserLoginInput struct {
 	Username string
 	Password string
 }
 
+// Validate ...
 func (u UserLoginInput) Validate() error {
 	if u.Username == "" {
 		return fmt.Errorf("Username can't be empty")
@@ -50,6 +55,7 @@ func (u UserLoginInput) Validate() error {
 	return nil
 }
 
+// ValidatePassword ...
 func (u UserLoginInput) ValidatePassword(hashedPassword string) error {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(u.Password))
 	if err != nil {
@@ -58,12 +64,14 @@ func (u UserLoginInput) ValidatePassword(hashedPassword string) error {
 	return nil
 }
 
+// UserRegisterInput ...
 type UserRegisterInput struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
 	Password string `json:"password"`
 }
 
+// Validate ...
 func (u UserRegisterInput) Validate() error {
 	if u.Username == "" {
 		return fmt.Errorf("Username can't be empty")
@@ -80,6 +88,7 @@ func (u UserRegisterInput) Validate() error {
 	return nil
 }
 
+// ToUser ...
 func (u UserRegisterInput) ToUser() *User {
 	return &User{
 		ID:           bson.NewObjectId(),

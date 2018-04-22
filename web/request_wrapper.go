@@ -22,9 +22,8 @@ func requestWrapper(handlerFunc interface{}) webHandler {
 
 	if inputType == nil {
 		return requestWrapperCallContextOnly(reflect.ValueOf(handlerFunc))
-	} else {
-		return requestWrapperCallWithBody(reflect.ValueOf(handlerFunc), inputType)
 	}
+	return requestWrapperCallWithBody(reflect.ValueOf(handlerFunc), inputType)
 }
 
 func requestWrapperValidateSignature(handler interface{}) (reflect.Type, error) {
@@ -35,7 +34,7 @@ func requestWrapperValidateSignature(handler interface{}) (reflect.Type, error) 
 
 	handlerType := handlerValue.Type()
 	if handlerValue.Kind() != reflect.Func {
-		return nil, fmt.Errorf("handler %c is not a function", handlerType)
+		return nil, fmt.Errorf("handler %T is not a function", handlerType)
 	}
 
 	contextType := reflect.TypeOf((*context.Context)(nil)).Elem()
@@ -44,11 +43,11 @@ func requestWrapperValidateSignature(handler interface{}) (reflect.Type, error) 
 			return nil, fmt.Errorf("first argument of %v is not of a type context.Context", handlerType)
 		}
 	} else if handlerType.NumIn() == 2 {
-		if !handlerType.In(1).Implements(contextType) {
-			return nil, fmt.Errorf("second argument of %v is not of a type context.Context", handlerType)
+		if !handlerType.In(0).Implements(contextType) {
+			return nil, fmt.Errorf("first argument of %v is not of a type context.Context", handlerType)
 		}
-		if handlerType.In(0).Kind() != reflect.Ptr {
-			return nil, fmt.Errorf("first argument of %v is not ptr", handlerType)
+		if handlerType.In(1).Kind() != reflect.Ptr {
+			return nil, fmt.Errorf("second argument of %v is not ptr", handlerType)
 		}
 	} else {
 		return nil, fmt.Errorf("handler %v has to much arguments %d", handlerType, handlerType.NumIn())
@@ -68,7 +67,7 @@ func requestWrapperValidateSignature(handler interface{}) (reflect.Type, error) 
 	}
 
 	if handlerType.NumIn() == 2 {
-		return handlerType.In(0).Elem(), nil
+		return handlerType.In(1).Elem(), nil
 	}
 	return nil, nil
 }
@@ -90,8 +89,8 @@ func requestWrapperCallWithBody(handler reflect.Value, inputType reflect.Type) w
 			return
 		}
 		response := handler.Call([]reflect.Value{
-			reflect.ValueOf(arg),
 			reflect.ValueOf(r.Context()),
+			reflect.ValueOf(arg),
 		})
 		requestWrapperResultHandler(w, response)
 	}
@@ -112,7 +111,7 @@ func requestWrapperResultHandler(w http.ResponseWriter, results []reflect.Value)
 		return
 	} else if len(results) == 1 {
 		if results[0].IsNil() {
-			writeJSONResponse(w, http.StatusOK, map[string]string{"status": "ok"})
+			_ = writeJSONResponse(w, http.StatusOK, map[string]string{"status": "ok"})
 		} else {
 			responseErr := results[0].Interface().(error)
 			handleRequestErr(w, responseErr)
@@ -120,7 +119,7 @@ func requestWrapperResultHandler(w http.ResponseWriter, results []reflect.Value)
 	} else if len(results) == 2 {
 		if results[1].IsNil() {
 			responseObj := results[0].Interface()
-			writeJSONResponse(w, http.StatusOK, responseObj)
+			_ = writeJSONResponse(w, http.StatusOK, responseObj)
 		} else {
 			responseErr := results[1].Interface().(error)
 			handleRequestErr(w, responseErr)

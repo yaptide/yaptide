@@ -23,14 +23,20 @@ var localConfig = config{
 	backendPort:       3002,
 	backendPublicUrl:  "localhost:3002",
 	frontendPublicUrl: "localhost:3001",
-	dbUser:            "yaptide",
-	dbPassword:        "password",
 	dbName:            "yaptide-local",
 	dbHost:            "localhost",
-	dbPort:            3003,
+	dbPort:            27017,
 }
 
 func (c config) dbUrl() string {
+	if c.dbPassword == "" {
+		return fmt.Sprintf(
+			"mongodb://%s:%d/%s",
+			c.dbHost,
+			c.dbPort,
+			c.dbName,
+		)
+	}
 	return fmt.Sprintf(
 		"mongodb://%s:%s@%s:%d/%s",
 		c.dbUser,

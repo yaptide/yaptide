@@ -18,7 +18,7 @@ func (h *handler) getProjectsHandler(ctx context.Context) ([]model.Project, erro
 
 func (h *handler) getProjectHandler(ctx context.Context) (*model.Project, error) {
 	a := extractActionContext(ctx)
-	projectID := extractProjectId(ctx)
+	projectID := extractProjectID(ctx)
 
 	log.Debugf("Request get project %s for user %s", projectID.Hex(), a.UserID().Hex())
 
@@ -26,7 +26,7 @@ func (h *handler) getProjectHandler(ctx context.Context) (*model.Project, error)
 }
 
 func (h *handler) createProjectHandler(
-	input *model.ProjectCreateInput, ctx context.Context,
+	ctx context.Context, input *model.ProjectCreateInput,
 ) (*model.Project, error) {
 	a := extractActionContext(ctx)
 
@@ -38,10 +38,10 @@ func (h *handler) createProjectHandler(
 }
 
 func (h *handler) updateProjectHandler(
-	input *model.ProjectUpdateInput, ctx context.Context,
+	ctx context.Context, input *model.ProjectUpdateInput,
 ) (*model.Project, error) {
 	a := extractActionContext(ctx)
-	projectID := extractProjectId(ctx)
+	projectID := extractProjectID(ctx)
 
 	log.Infof("Request update project %s for user %s", projectID.Hex(), a.UserID().Hex())
 
@@ -60,7 +60,7 @@ func (h *handler) removeProjectHandler(
 	ctx context.Context,
 ) (bool, error) {
 	a := extractActionContext(ctx)
-	projectID := extractProjectId(ctx)
+	projectID := extractProjectID(ctx)
 
 	log.Infof("Request delete project %s", projectID.Hex())
 
