@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/yaptide/builder"
+	"github.com/yaptide/yaptide/cmd/builder"
 )
 
 func main() {

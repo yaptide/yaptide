@@ -98,10 +98,10 @@
   version = "v1.0.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/sergi/go-diff"
   packages = ["diffmatchpatch"]
-  revision = "da645544ed44df016359bd4c0e3dc60ee3a0da43"
+  revision = "1744e2970ca51c86172c8190fadad617561ed6e7"
+  version = "v1.0.0"
 
 [[projects]]
   name = "github.com/sirupsen/logrus"
@@ -119,12 +119,6 @@
   version = "v1.2.1"
 
 [[projects]]
-  branch = "master"
-  name = "github.com/yaptide/builder"
-  packages = ["."]
-  revision = "ee3fc79c34209e15ed3a767e1093479a9befc043"
-
-[[projects]]
   name = "github.com/yudai/gojsondiff"
   packages = [
     ".",
@@ -134,10 +128,9 @@
   version = "1.0.0"
 
 [[projects]]
-  branch = "master"
   name = "github.com/yudai/golcs"
   packages = ["."]
-  revision = "ecda9a501e8220fae3b4b600c3db4b0ba22cfc68"
+  revision = "d1c525dea8ce39ea9a783d33cf08932305373f2c"
 
 [[projects]]
   branch = "master"
@@ -191,6 +184,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "d0fbf885ade8c6a9a68950c20f2c651a237cc3ad6878af4dff31c64ce1779727"
+  inputs-digest = "e028be88125b479e342ce08a18241d374f239c2cf5973c17a426157772f0ca83"
   solver-name = "gps-cdcl"
   solver-version = 1

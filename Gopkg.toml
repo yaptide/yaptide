@@ -1,14 +1,40 @@
+
+
 [[constraint]]
   name = "github.com/davecgh/go-spew"
   version = "1.1.0"
 
 [[constraint]]
   name = "github.com/dgrijalva/jwt-go"
-  version = "3.1.0"
+  version = "3.2.0"
 
 [[constraint]]
-  branch = "master"
+  name = "github.com/go-chi/chi"
+  version = "3.3.2"
+
+[[constraint]]
+  name = "github.com/go-chi/cors"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/gorilla/websocket"
+  version = "1.2.0"
+
+[[constraint]]
   name = "github.com/sergi/go-diff"
+  version = "1.0.0"
+
+[[constraint]]
+  name = "github.com/sirupsen/logrus"
+  version = "1.0.5"
+
+[[constraint]]
+  name = "github.com/stretchr/testify"
+  version = "1.2.1"
+
+[[constraint]]
+  name = "github.com/yudai/gojsondiff"
+  version = "1.0.0"
 
 [[constraint]]
   branch = "master"
@@ -17,3 +43,7 @@
 [[constraint]]
   branch = "v2"
   name = "gopkg.in/mgo.v2"
+
+[prune]
+  go-tests = true
+  unused-packages = true
