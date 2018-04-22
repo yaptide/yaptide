@@ -8,7 +8,7 @@ type Color struct {
 	A uint8 `json:"a"`
 }
 
-// New construct new color.
+// NewColor construct new color.
 func NewColor(R, G, B, A uint8) Color {
 	return Color{R: R, G: G, B: B, A: A}
 }

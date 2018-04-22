@@ -20,6 +20,7 @@ type ProjectDetails struct {
 	Versions    []Version `json:"versions" bson:"versions"`
 }
 
+// NewProject ...
 func NewProject(userID bson.ObjectId) *Project {
 	return &Project{
 		ID:     bson.NewObjectId(),

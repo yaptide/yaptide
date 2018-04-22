@@ -10,7 +10,7 @@ func (h *handler) createProjectVersionHandler(
 	ctx context.Context,
 ) (*model.Project, error) {
 	a := extractActionContext(ctx)
-	projectID := extractProjectId(ctx)
+	projectID := extractProjectID(ctx)
 
 	log.Infof("Request create new version for project %s", projectID.Hex())
 
@@ -29,8 +29,8 @@ func (h *handler) createProjectVersionFromHandler(
 	ctx context.Context,
 ) (*model.Project, error) {
 	a := extractActionContext(ctx)
-	projectID := extractProjectId(ctx)
-	versionID := extractVersionId(ctx)
+	projectID := extractProjectID(ctx)
+	versionID := extractVersionID(ctx)
 
 	log.Infof(
 		"Request create new version from version %d for project %s",
@@ -49,12 +49,11 @@ func (h *handler) createProjectVersionFromHandler(
 }
 
 func (h *handler) updateProjectVersionSettingsHandler(
-	input *model.ProjectVersionUpdateSettings,
-	ctx context.Context,
+	ctx context.Context, input *model.ProjectVersionUpdateSettings,
 ) (*model.Project, error) {
 	a := extractActionContext(ctx)
-	projectID := extractProjectId(ctx)
-	versionID := extractVersionId(ctx)
+	projectID := extractProjectID(ctx)
+	versionID := extractVersionID(ctx)
 
 	if err := h.Resolver.ProjectVersionUpdateSettings(a, projectID, versionID, input); err != nil {
 		return nil, err

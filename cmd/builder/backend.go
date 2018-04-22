@@ -76,7 +76,7 @@ func createFile(path string, content string) error {
 
 func setupDockerDb(conf config) error {
 	if conf.dbHost != "localhost" {
-		return fmt.Errorf("unable to setup docker iamge on remote host")
+		return fmt.Errorf("unable to setup docker image on remote host")
 	}
 	cli, err := client.NewEnvClient()
 	if err != nil {
@@ -88,7 +88,7 @@ func setupDockerDb(conf config) error {
 	}
 	for _, container := range containers {
 		for _, name := range container.Names {
-			if name == "/yaptide_db_local" {
+			if name == "/mongodb" {
 				fmt.Println("Docker exists")
 				if container.State != "running" {
 					startErr := cli.ContainerStart(context.Background(), container.ID, types.ContainerStartOptions{})
@@ -116,7 +116,7 @@ func setupDockerDb(conf config) error {
 			),
 		},
 		&network.NetworkingConfig{},
-		"yaptide_db_local",
+		"mongodb",
 	)
 	if createErr != nil {
 		return createErr
@@ -130,39 +130,7 @@ func setupDockerDb(conf config) error {
 		return startErr
 	}
 
-	time.Sleep(time.Second * 4)
-	setupCmd := fmt.Sprintf("docker exec yaptide_db_local mongo admin --eval 'db.createUser({ user: \"root\", pwd: \"password\", roles: [ { role: \"root\", db: \"admin\" } ] });'")
-	userCmd := fmt.Sprintf("%s '%s'",
-		"docker exec yaptide_db_local mongo admin -u root -p password --eval",
-		fmt.Sprintf(
-			"db.getSiblingDB(\"%s\").createUser({ user: \"%s\", pwd: \"%s\", roles: [ { role: \"readWrite\", db: \"%s\" }] });",
-			conf.dbName,
-			conf.dbUser,
-			conf.dbPassword,
-			conf.dbName,
-		),
-	)
-	setupCommand := exec.Command(
-		"bash",
-		"-c",
-		setupCmd,
-	)
-	setupCommand.Stdout = os.Stdout
-	setupCommand.Stderr = os.Stderr
-	if err := setupCommand.Run(); err != nil {
-		return nil
-	}
-
-	userCommand := exec.Command(
-		"bash",
-		"-c",
-		userCmd,
-	)
-	userCommand.Stdout = os.Stdout
-	userCommand.Stderr = os.Stderr
-	if err := userCommand.Run(); err != nil {
-		return nil
-	}
+	time.Sleep(time.Second * 2)
 
 	return nil
 }

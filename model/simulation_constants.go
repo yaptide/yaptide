@@ -29,6 +29,7 @@ type IsotopeRecord struct {
 	Disable bool   `json:"-"`
 }
 
+// PredefinedParticlesList ...
 // TODO write test checking if all ids where used
 var PredefinedParticlesList = []PredefinedParticleRecord{
 	PredefinedParticleRecord{Value: "all", Name: "All particles"},
@@ -59,6 +60,7 @@ var PredefinedParticlesList = []PredefinedParticleRecord{
 	PredefinedParticleRecord{Value: "he_3", Name: "He-3"},
 }
 
+// ScoringTypesList ...
 var ScoringTypesList = []ScoringTypeRecord{
 	ScoringTypeRecord{Value: "dose", Name: "Dose"},
 	ScoringTypeRecord{Value: "energy", Name: "Energy"},
@@ -77,6 +79,7 @@ var ScoringTypesList = []ScoringTypeRecord{
 
 var waterColor = NewColor(0x00, 0x93, 0xDD, 0xFF)
 
+// PredefinedMaterialsList ...
 var PredefinedMaterialsList = []PredefinedMaterialRecord{
 	PredefinedMaterialRecord{Value: "hydrogen", Name: "Hydrogen (Z: 1)", Color: White},
 	PredefinedMaterialRecord{Value: "helium", Name: "Helium (Z: 2)", Color: Gray},
@@ -360,6 +363,7 @@ var PredefinedMaterialsList = []PredefinedMaterialRecord{
 	PredefinedMaterialRecord{Value: "vacuum", Name: "Vaccum", Color: Gray},
 }
 
+// IsotopesList ...
 var IsotopesList = []IsotopeRecord{
 	IsotopeRecord{Value: "h-1 - hydrogen", Name: "H-1 - Hydrogen"},
 	IsotopeRecord{Value: "h-2 - deuterium", Name: "H-2 - Deuterium"},

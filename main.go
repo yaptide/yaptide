@@ -20,7 +20,7 @@ func main() {
 
 	router, serverCleanup, routerErr := web.SetupWeb(config)
 	if routerErr != nil {
-		log.Errorf("Setup router error [%s]", configErr.Error())
+		log.Errorf("Setup router error [%s]", routerErr.Error())
 		os.Exit(-1)
 	}
 	defer serverCleanup()

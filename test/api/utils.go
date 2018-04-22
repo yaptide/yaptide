@@ -11,6 +11,7 @@ import (
 	mgo "gopkg.in/mgo.v2"
 )
 
+// M ...
 type M map[string]interface{}
 
 func extractStringFromInterface(t *testing.T, object interface{}, field string) string {
