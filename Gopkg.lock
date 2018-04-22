@@ -69,6 +69,7 @@
     "shield/geometry",
     "shield/mapping",
     "shield/material",
+    "test",
     "utils",
     "validate"
   ]
@@ -136,6 +137,6 @@
 [solve-meta]
   analyzer-name = "dep"
   analyzer-version = 1
-  inputs-digest = "56a6d832160911d821500386fa50c9d46977bbbd521c185d74aad36bae72a663"
+  inputs-digest = "56e772f16560b38d6f44851e21d9ca15cca2a93e46ac441f44fb41189f7aec0c"
   solver-name = "gps-cdcl"
   solver-version = 1
