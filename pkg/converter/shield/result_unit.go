@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/yaptide/converter/log"
+	"github.com/yaptide/yaptide/pkg/converter/log"
 )
 
 type bdoDataUnit string

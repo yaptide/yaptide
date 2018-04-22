@@ -1,9 +1,9 @@
 package shield
 
 import (
-	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield/geometry"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/shield/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 // SerializationContext is struct used to recover data lost in process of

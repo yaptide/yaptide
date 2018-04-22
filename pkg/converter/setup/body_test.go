@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/yaptide/converter/geometry"
-	test "github.com/yaptide/converter/test"
+	"github.com/yaptide/yaptide/pkg/converter/geometry"
+	test "github.com/yaptide/yaptide/pkg/converter/test"
 )
 
 var bodyTestCasses = test.MarshallingCases{

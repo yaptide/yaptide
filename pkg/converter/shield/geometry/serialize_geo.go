@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/yaptide/converter/format"
+	"github.com/yaptide/yaptide/pkg/converter/format"
 )
 
 // Serialize ...

@@ -1,10 +1,10 @@
 package shield
 
 import (
-	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield/detector"
-	"github.com/yaptide/converter/shield/geometry"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/shield/detector"
+	"github.com/yaptide/yaptide/pkg/converter/shield/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 // RawShieldSetup is input for shield Serialize function.

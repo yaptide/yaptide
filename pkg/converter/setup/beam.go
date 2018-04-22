@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/yaptide/converter/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/geometry"
 )
 
 // Beam ...

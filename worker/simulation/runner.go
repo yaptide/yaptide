@@ -5,7 +5,7 @@ import (
 	"errors"
 	"sort"
 
-	"github.com/yaptide/worker/process"
+	"github.com/yaptide/yaptide/worker/process"
 )
 
 // ErrComputingLibrariesNotFound error.

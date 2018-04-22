@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/log"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/log"
 )
 
 // TODO: support for big endian (for no litle endian files and host system is assumed)

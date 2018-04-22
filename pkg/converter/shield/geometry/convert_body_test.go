@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/geometry"
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 func TestSuccessfullBodiesConvert(t *testing.T) {

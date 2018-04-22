@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/yaptide/app/model/mongo"
+	"github.com/yaptide/yaptide/model/mongo"
 )
 
 type dbProvider func() mongo.DB

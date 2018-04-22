@@ -1,7 +1,7 @@
 package mapping
 
 import (
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 // MaterialICRU is representation of predefined materials in shield mat.dat file.

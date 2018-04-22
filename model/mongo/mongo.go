@@ -1,7 +1,7 @@
 package mongo
 
 import (
-	conf "github.com/yaptide/app/config"
+	conf "github.com/yaptide/yaptide/config"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )

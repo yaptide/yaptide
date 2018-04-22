@@ -3,9 +3,9 @@ package geometry
 import (
 	"fmt"
 
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 type operation struct {

@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/web"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/web"
 )
 
 var log = conf.NamedLogger("main")

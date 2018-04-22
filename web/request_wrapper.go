@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"reflect"
 
-	"github.com/yaptide/app/errors"
+	"github.com/yaptide/yaptide/errors"
 )
 
 type webHandler = func(w http.ResponseWriter, r *http.Request)

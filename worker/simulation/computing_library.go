@@ -1,6 +1,6 @@
 package simulation
 
-import "github.com/yaptide/worker/process"
+import "github.com/yaptide/yaptide/worker/process"
 
 type computingLibrary interface {
 	process.CreateCMD

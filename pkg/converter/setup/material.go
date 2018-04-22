@@ -3,7 +3,7 @@ package setup
 import (
 	"encoding/json"
 
-	"github.com/yaptide/converter/utils"
+	"github.com/yaptide/yaptide/pkg/converter/utils"
 )
 
 var materialType = struct {

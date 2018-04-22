@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 func genZoneToMaterials(n int) []ZoneToMaterial {

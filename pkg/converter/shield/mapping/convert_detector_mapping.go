@@ -3,7 +3,7 @@ package mapping
 import (
 	"fmt"
 
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 // ParticleToShield map Particle to shield format.

@@ -3,10 +3,10 @@ package shield
 import (
 	"fmt"
 
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/shield/detector"
-	"github.com/yaptide/converter/shield/geometry"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/shield/detector"
+	"github.com/yaptide/yaptide/pkg/converter/shield/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 // Convert simulation setup model to easily serializable data,

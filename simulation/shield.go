@@ -1,10 +1,10 @@
 package simulation
 
 import (
-	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/runner/file"
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/shield"
+	"github.com/yaptide/yaptide/model"
+	"github.com/yaptide/yaptide/runner/file"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/shield"
 )
 
 type shieldProcessor struct {

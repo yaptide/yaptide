@@ -1,7 +1,7 @@
 package model
 
 import (
-	"github.com/yaptide/converter"
+	"github.com/yaptide/yaptide/pkg/converter"
 	"gopkg.in/mgo.v2/bson"
 )
 

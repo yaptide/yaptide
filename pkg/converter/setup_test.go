@@ -3,8 +3,8 @@ package converter
 import (
 	"testing"
 
-	"github.com/yaptide/converter/setup"
-	test "github.com/yaptide/converter/test"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	test "github.com/yaptide/yaptide/pkg/converter/test"
 )
 
 var setupTestCasses = test.MarshallingCases{

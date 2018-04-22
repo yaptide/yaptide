@@ -1,9 +1,9 @@
 package simulation
 
 import (
-	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/model/action"
-	"github.com/yaptide/app/model/mongo"
+	"github.com/yaptide/yaptide/model"
+	"github.com/yaptide/yaptide/model/action"
+	"github.com/yaptide/yaptide/model/mongo"
 )
 
 type request interface {

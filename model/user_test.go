@@ -3,7 +3,7 @@ package model
 import (
 	"testing"
 
-	"github.com/yaptide/app/test"
+	"github.com/yaptide/yaptide/test"
 
 	"gopkg.in/mgo.v2/bson"
 )

@@ -1,6 +1,6 @@
 package converter
 
-import "github.com/yaptide/converter/setup"
+import "github.com/yaptide/yaptide/pkg/converter/setup"
 
 // MaterialMap type used in Setup structure.
 type MaterialMap map[setup.MaterialID]setup.Material

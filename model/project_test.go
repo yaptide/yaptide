@@ -5,7 +5,7 @@ import (
 
 	"gopkg.in/mgo.v2/bson"
 
-	"github.com/yaptide/app/test"
+	"github.com/yaptide/yaptide/test"
 )
 
 var testCases = test.MarshallingCases{

@@ -4,10 +4,10 @@ package web
 import (
 	"net/http"
 
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/model/action"
-	"github.com/yaptide/app/model/mongo"
-	"github.com/yaptide/app/simulation"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/model/action"
+	"github.com/yaptide/yaptide/model/mongo"
+	"github.com/yaptide/yaptide/simulation"
 	mgo "gopkg.in/mgo.v2"
 )
 

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/yaptide/converter/log"
+	"github.com/yaptide/yaptide/pkg/converter/log"
 )
 
 var predefinedScoringTypes = map[string]bool{

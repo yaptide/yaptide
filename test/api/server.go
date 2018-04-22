@@ -9,8 +9,8 @@ import (
 	"os"
 	"testing"
 
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/web"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/web"
 	mgo "gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/dbtest"
 )

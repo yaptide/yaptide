@@ -1,8 +1,8 @@
 package converter
 
 import (
-	"github.com/yaptide/converter/result"
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/result"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 // Result contains all simulation result data.

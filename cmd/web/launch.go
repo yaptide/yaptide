@@ -59,11 +59,11 @@ func Launch() {
 		fmt.Print(help)
 
 	case "deploy:backend:master":
-		deployFromRepo("backend", "https://github.com/yaptide/app.git", "master")
+		deployFromRepo("backend", "https://github.com/yaptide/yaptide.git", "master")
 		fmt.Println("not implemented")
 		fmt.Print(help)
 	case "deploy:backend:develop":
-		deployFromRepo("backend", "https://github.com/yaptide/app.git", "develop")
+		deployFromRepo("backend", "https://github.com/yaptide/yaptide.git", "develop")
 		fmt.Println("not implemented")
 		fmt.Print(help)
 	case "deploy:backend:staging":

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 func TestConvertTreeToZones(t *testing.T) {

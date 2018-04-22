@@ -3,7 +3,7 @@ package setup
 import (
 	"encoding/json"
 
-	"github.com/yaptide/converter/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/geometry"
 )
 
 // SphereBody represent sphere with given radius in space.

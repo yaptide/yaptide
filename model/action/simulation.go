@@ -1,9 +1,9 @@
 package action
 
 import (
-	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/model/mongo"
-	"github.com/yaptide/converter"
+	"github.com/yaptide/yaptide/model"
+	"github.com/yaptide/yaptide/model/mongo"
+	"github.com/yaptide/yaptide/pkg/converter"
 	"gopkg.in/mgo.v2/bson"
 )
 

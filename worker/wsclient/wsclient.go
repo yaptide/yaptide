@@ -11,14 +11,14 @@ import (
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
-	"github.com/yaptide/worker/config"
-	"github.com/yaptide/worker/protocol"
-	"github.com/yaptide/worker/simulation"
+	"github.com/yaptide/yaptide/worker/config"
+	"github.com/yaptide/yaptide/worker/protocol"
+	"github.com/yaptide/yaptide/worker/simulation"
 )
 
 // ConnectAndServe connect to yaptide backend by webscocket protocol,
 // then waits for simulation RunSimulationMessages from yaptide backend.
-// It use JSON messages from github.com/yaptide/worker/protocol as protocol.
+// It use JSON messages from github.com/yaptide/yaptide/worker/protocol as protocol.
 func ConnectAndServe(config config.Config, simulationRunner simulation.Runner) error {
 	conn := connect(config.Address, protocol.YaptideListenPath)
 	defer conn.Close()

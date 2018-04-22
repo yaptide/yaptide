@@ -1,9 +1,9 @@
 package geometry
 
 import (
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 // Geometry represent ready to serialize data for geo.dat file.

@@ -1,8 +1,8 @@
 package action
 
 import (
-	"github.com/yaptide/app/errors"
-	"github.com/yaptide/app/model"
+	"github.com/yaptide/yaptide/errors"
+	"github.com/yaptide/yaptide/model"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )

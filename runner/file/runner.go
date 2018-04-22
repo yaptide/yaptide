@@ -4,8 +4,8 @@ package file
 import (
 	"fmt"
 
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/model"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/model"
 )
 
 var log = conf.NamedLogger("file_runner")

@@ -3,7 +3,7 @@ package setup
 import (
 	"fmt"
 
-	"github.com/yaptide/converter/validate"
+	"github.com/yaptide/yaptide/pkg/converter/validate"
 )
 
 // Validate ...

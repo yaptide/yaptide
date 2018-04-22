@@ -1,8 +1,8 @@
 package action
 
 import (
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/model/mongo"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/model/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 

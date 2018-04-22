@@ -3,7 +3,7 @@ package setup
 import (
 	"testing"
 
-	test "github.com/yaptide/converter/test"
+	test "github.com/yaptide/yaptide/pkg/converter/test"
 )
 
 var zoneTestCases = test.MarshallingCases{

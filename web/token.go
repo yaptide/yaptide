@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/errors"
-	"github.com/yaptide/app/model/mongo"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/errors"
+	"github.com/yaptide/yaptide/model/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 

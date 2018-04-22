@@ -1,10 +1,10 @@
 package simulation
 
 import (
-	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/model/action"
-	"github.com/yaptide/app/runner/file"
-	"github.com/yaptide/converter"
+	"github.com/yaptide/yaptide/model"
+	"github.com/yaptide/yaptide/model/action"
+	"github.com/yaptide/yaptide/runner/file"
+	"github.com/yaptide/yaptide/pkg/converter"
 )
 
 type fileProcessor interface {

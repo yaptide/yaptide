@@ -1,11 +1,11 @@
 package shield
 
 import (
-	"github.com/yaptide/converter/log"
-	"github.com/yaptide/converter/shield/beam"
-	"github.com/yaptide/converter/shield/detector"
-	"github.com/yaptide/converter/shield/geometry"
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter/log"
+	"github.com/yaptide/yaptide/pkg/converter/shield/beam"
+	"github.com/yaptide/yaptide/pkg/converter/shield/detector"
+	"github.com/yaptide/yaptide/pkg/converter/shield/geometry"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 // SerializeData ...

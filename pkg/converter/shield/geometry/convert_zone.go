@@ -1,7 +1,7 @@
 package geometry
 
 import (
-	"github.com/yaptide/converter/shield/material"
+	"github.com/yaptide/yaptide/pkg/converter/shield/material"
 )
 
 // ShieldZoneID ...

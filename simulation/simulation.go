@@ -4,12 +4,12 @@ package simulation
 import (
 	"fmt"
 
-	conf "github.com/yaptide/app/config"
-	"github.com/yaptide/app/errors"
-	"github.com/yaptide/app/model"
-	"github.com/yaptide/app/model/action"
-	"github.com/yaptide/app/model/mongo"
-	"github.com/yaptide/app/runner/file"
+	conf "github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/errors"
+	"github.com/yaptide/yaptide/model"
+	"github.com/yaptide/yaptide/model/action"
+	"github.com/yaptide/yaptide/model/mongo"
+	"github.com/yaptide/yaptide/runner/file"
 	"gopkg.in/mgo.v2/bson"
 )
 

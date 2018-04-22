@@ -15,8 +15,8 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
-const backendModule = "github.com/yaptide/app"
-const converterModule = "github.com/yaptide/converter"
+const backendModule = "github.com/yaptide/yaptide"
+const converterModule = "github.com/yaptide/yaptide/pkg/converter"
 
 func startDevBackend(conf config) (*exec.Cmd, error) {
 	dockerErr := setupDockerDb(conf)

@@ -6,8 +6,8 @@ import (
 
 	"github.com/go-chi/chi"
 	"github.com/go-chi/cors"
-	"github.com/yaptide/app/model/action"
-	"github.com/yaptide/app/simulation"
+	"github.com/yaptide/yaptide/model/action"
+	"github.com/yaptide/yaptide/simulation"
 )
 
 type handler struct {

@@ -1,7 +1,7 @@
 package geometry
 
 import (
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 type oetType int

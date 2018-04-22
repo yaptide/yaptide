@@ -4,10 +4,10 @@ import (
 	"os"
 
 	log "github.com/sirupsen/logrus"
-	"github.com/yaptide/worker/config"
-	"github.com/yaptide/worker/process"
-	"github.com/yaptide/worker/simulation"
-	"github.com/yaptide/worker/wsclient"
+	"github.com/yaptide/yaptide/worker/config"
+	"github.com/yaptide/yaptide/worker/process"
+	"github.com/yaptide/yaptide/worker/simulation"
+	"github.com/yaptide/yaptide/worker/wsclient"
 )
 
 func main() {

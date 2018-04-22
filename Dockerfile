@@ -1,6 +1,6 @@
 FROM golang:1.9-stretch AS backend_build
 
-RUN mkdir -p /go/src/github.com/yaptide/app && \
+RUN mkdir -p /go/src/github.com/yaptide/yaptide && \
   mkdir -p /build && \
   go get -u github.com/golang/dep/cmd/dep
 
@@ -8,9 +8,9 @@ RUN wget https://neptun.phys.au.dk/~bassler/SHIELD_HIT/DEMO/shield_hit12a_x86_64
   tar -xf shield_hit12a_x86_64_demo_gfortran_v0.7.2.tar.gz && \
   cp shield_hit12a_x86_64_demo_gfortran_v0.7.2/bin/shieldhit /build/shieldhit
 
-COPY . /go/src/github.com/yaptide/app
+COPY . /go/src/github.com/yaptide/yaptide
 
-RUN cd /go/src/github.com/yaptide/app && \
+RUN cd /go/src/github.com/yaptide/yaptide && \
     rm -rf vendodor && \
     dep ensure && \
     go build -i -o /build/yaptide_backend

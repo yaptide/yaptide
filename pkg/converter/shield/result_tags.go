@@ -5,8 +5,8 @@ import (
 	"encoding/binary"
 	"fmt"
 
-	"github.com/yaptide/converter/log"
-	"github.com/yaptide/converter/result"
+	"github.com/yaptide/yaptide/pkg/converter/log"
+	"github.com/yaptide/yaptide/pkg/converter/result"
 )
 
 const (

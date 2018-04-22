@@ -3,7 +3,7 @@
 package model
 
 import (
-	conf "github.com/yaptide/app/config"
+	conf "github.com/yaptide/yaptide/config"
 )
 
 var log = conf.NamedLogger("web")

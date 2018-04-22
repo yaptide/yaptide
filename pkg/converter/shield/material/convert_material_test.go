@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/yaptide/converter"
-	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield/mapping"
+	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/shield/mapping"
 )
 
 func TestSuccessfullMaterialsConvert(t *testing.T) {

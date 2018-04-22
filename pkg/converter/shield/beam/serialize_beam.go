@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/yaptide/converter/format"
-	"github.com/yaptide/converter/log"
-	"github.com/yaptide/converter/setup"
-	"github.com/yaptide/converter/shield/mapping"
+	"github.com/yaptide/yaptide/pkg/converter/format"
+	"github.com/yaptide/yaptide/pkg/converter/log"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/shield/mapping"
 )
 
 type beamCardSerializerFunc func(setup.Beam, setup.SimulationOptions) string

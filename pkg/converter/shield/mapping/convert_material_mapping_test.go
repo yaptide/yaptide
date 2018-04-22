@@ -3,7 +3,7 @@ package mapping
 import (
 	"testing"
 
-	"github.com/yaptide/converter/setup"
+	"github.com/yaptide/yaptide/pkg/converter/setup"
 )
 
 func TestPredefinedMaterialsToShieldICRUMapping(t *testing.T) {

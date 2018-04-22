@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaptide/app/config"
-	"github.com/yaptide/app/model"
+	"github.com/yaptide/yaptide/config"
+	"github.com/yaptide/yaptide/model"
 )
 
 const (

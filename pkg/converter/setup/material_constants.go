@@ -1,7 +1,7 @@
 package setup
 
 import (
-	"github.com/yaptide/converter/common/color"
+	"github.com/yaptide/yaptide/pkg/converter/common/color"
 )
 
 // PredefinedMaterialRecord contains data needed on frontend related to PredefinedMaterials.

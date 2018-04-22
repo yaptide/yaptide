@@ -3,7 +3,7 @@ package web
 import (
 	"context"
 
-	"github.com/yaptide/app/model"
+	"github.com/yaptide/yaptide/model"
 )
 
 type userLoginResponse struct {

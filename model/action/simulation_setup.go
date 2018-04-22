@@ -1,9 +1,9 @@
 package action
 
 import (
-	"github.com/yaptide/app/errors"
-	"github.com/yaptide/app/model"
-	"github.com/yaptide/converter"
+	"github.com/yaptide/yaptide/errors"
+	"github.com/yaptide/yaptide/model"
+	"github.com/yaptide/yaptide/pkg/converter"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/mgo.v2/bson"
 )

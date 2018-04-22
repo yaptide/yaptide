@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/yaptide/app/errors"
+	"github.com/yaptide/yaptide/errors"
 	"gopkg.in/mgo.v2/bson"
 )
 

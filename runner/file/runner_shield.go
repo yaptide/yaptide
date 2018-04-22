@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"path"
 
-	conf "github.com/yaptide/app/config"
+	conf "github.com/yaptide/yaptide/config"
 )
 
 const (

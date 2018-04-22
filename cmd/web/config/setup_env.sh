@@ -48,9 +48,9 @@ if [[ -z $GOPATH ]]; then
 fi
 
 go get github.com/yaptide/builder
-go get github.com/yaptide/app
+go get github.com/yaptide/yaptide
 go get github.com/yaptide/ui
-go get github.com/yaptide/converter
+go get github.com/yaptide/yaptide/pkg/converter
 
 set -e
 

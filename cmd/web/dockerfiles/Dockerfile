@@ -14,13 +14,13 @@ RUN mv /root/app/static /build
 
 FROM golang:1.9-stretch AS backend
 
-RUN mkdir -p /go/src/github.com/yaptide/app && \
+RUN mkdir -p /go/src/github.com/yaptide/yaptide && \
   mkdir -p /build && \
   go get -u github.com/golang/dep/cmd/dep
 
-COPY ./app /go/src/github.com/yaptide/app
+COPY ./app /go/src/github.com/yaptide/yaptide
 
-RUN cd /go/src/github.com/yaptide/app && \
+RUN cd /go/src/github.com/yaptide/yaptide && \
     dep ensure && \
     go build -i -o /build/yaptide
 

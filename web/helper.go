@@ -9,8 +9,8 @@ import (
 	"strconv"
 
 	"github.com/go-chi/chi"
-	"github.com/yaptide/app/model/action"
-	"github.com/yaptide/app/model/mongo"
+	"github.com/yaptide/yaptide/model/action"
+	"github.com/yaptide/yaptide/model/mongo"
 	"gopkg.in/mgo.v2/bson"
 )
 
