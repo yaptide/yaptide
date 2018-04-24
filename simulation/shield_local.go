@@ -3,14 +3,14 @@ package simulation
 import (
 	"github.com/yaptide/yaptide/model"
 	"github.com/yaptide/yaptide/model/action"
-	"github.com/yaptide/yaptide/runner/file"
 	"github.com/yaptide/yaptide/pkg/converter"
+	"github.com/yaptide/yaptide/runner/file"
 )
 
 type fileProcessor interface {
 	ConvertModel(setup *model.SimulationSetup) error
 	Files() map[string]string
-	HandleFileResults(file.FileSimulationResults) (*converter.Result, error)
+	HandleFileResults(file.SimulationResults) (*converter.Result, error)
 }
 
 type fileRequest struct {
@@ -28,7 +28,7 @@ func (fr *fileRequest) StartSimulation() error {
 	return nil
 }
 
-func (fr *fileRequest) ResultCallback(simResults file.FileSimulationResults) {
+func (fr *fileRequest) ResultCallback(simResults file.SimulationResults) {
 	results, parseErr := fr.HandleFileResults(simResults)
 	if parseErr != nil {
 		fr.SimulationContext.StatusUpdate(model.Failure)

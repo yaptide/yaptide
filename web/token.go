@@ -25,6 +25,7 @@ func newJwtProvider(config *conf.Config) (jwtProvider, error) {
 	if err != nil {
 		return jwtProvider{}, err
 	}
+	_ = config.DbURL
 	return jwtProvider{
 		jwtKey: []byte("rwfwer"), // TODO: constant key in dev environment
 		header: "X-Auth-Token",
@@ -79,7 +80,7 @@ func (jp jwtProvider) middleware(next http.Handler) http.Handler {
 			return
 		}
 
-		converted, convertErr := mongo.ConvertToObjectId(claims["id"].(string))
+		converted, convertErr := mongo.ConvertToObjectID(claims["id"].(string))
 		if convertErr != nil {
 			handleRequestErr(w, errors.ErrMalformed)
 			return

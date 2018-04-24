@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// SimulationResultGet ...
 func (r *Resolver) SimulationResultGet(
 	ctx *context, resultID bson.ObjectId,
 ) (*model.SimulationResult, error) {
@@ -27,6 +28,7 @@ func (r *Resolver) SimulationResultGet(
 	return result, nil
 }
 
+// SimulationResultCreateInitial ...
 func (r *Resolver) SimulationResultCreateInitial(
 	ctx *context,
 ) (*model.SimulationResult, error) {

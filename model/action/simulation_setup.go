@@ -8,6 +8,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// SimulationSetupGet ...
 func (r *Resolver) SimulationSetupGet(
 	ctx *context, setupID bson.ObjectId,
 ) (*model.SimulationSetup, error) {

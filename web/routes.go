@@ -38,6 +38,11 @@ func setupRoutes(h *handler, db dbProvider, jwt *jwtProvider) (http.Handler, err
 		router.Post("/login", w(h.userLoginHandler))
 		router.Post("/register", w(h.userRegisterHandler))
 	})
+	router.Route("/user", func(router chi.Router) {
+		router.Use(jwt.middleware)
+
+		router.Get("/", w(h.userGetHandler))
+	})
 	router.Route("/projects", func(router chi.Router) {
 		router.Use(jwt.middleware)
 

@@ -8,8 +8,10 @@ import (
 
 var log = conf.NamedLogger("action")
 
+// M ...
 type M = bson.M
 
+// Context ...
 type Context struct {
 	userID bson.ObjectId
 	db     mongo.DB
@@ -17,6 +19,7 @@ type Context struct {
 
 type context = Context
 
+// NewContext ...
 func NewContext(db mongo.DB, userID bson.ObjectId) *Context {
 	return &Context{
 		userID: userID,
@@ -24,14 +27,17 @@ func NewContext(db mongo.DB, userID bson.ObjectId) *Context {
 	}
 }
 
+// UserID ...
 func (c Context) UserID() bson.ObjectId {
 	return c.userID
 }
 
+// DB ...
 func (c Context) DB() mongo.DB {
 	return c.db
 }
 
+// Resolver ...
 type Resolver struct {
 	GenerateToken func(userID bson.ObjectId) (string, error)
 	Config        *conf.Config

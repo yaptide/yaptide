@@ -17,24 +17,28 @@ var (
 	ErrMalformed = fmt.Errorf("malformed")
 	// ErrExpired token expired error.
 	ErrExpired = fmt.Errorf("expired")
-	// ErrFormError form error.
+	// ErrInvalidForm form error.
 	ErrInvalidForm = fmt.Errorf("formerror")
 	// ErrInternalServerError Internal Server Error.
 	ErrInternalServerError = fmt.Errorf("internal")
-	// ErrNotImplemented
+	// ErrNotImplemented ...
 	ErrNotImplemented = fmt.Errorf("notimplemented")
 )
 
+// FormError ...
 type FormError map[string]string
 
+// NewFormError ...
 func NewFormError() FormError {
 	return FormError{"reason": ErrInvalidForm.Error()}
 }
 
+// Error ...
 func (fe FormError) Error() string {
 	return fmt.Sprintf("%+v", fe)
 }
 
+// MarshalJSON ...
 func (fe FormError) MarshalJSON() ([]byte, error) {
 	return json.Marshal(map[string]string(fe))
 }

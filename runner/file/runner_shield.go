@@ -15,8 +15,6 @@ const (
 	materialsDatFile = "mat.dat"
 )
 
-type shieldFiles map[string]string
-
 func generateShieldPath(workDir string) []string {
 	cmd := []string{
 		shieldBinaryName,
@@ -28,6 +26,7 @@ func generateShieldPath(workDir string) []string {
 	return cmd
 }
 
+// SetupShieldRunner ...
 func SetupShieldRunner(config *conf.Config) *Runner {
 	return SetupRunner(config, generateShieldPath)
 }

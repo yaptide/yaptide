@@ -9,23 +9,27 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// ProjectVersionCreateNew ...
 func (r *Resolver) ProjectVersionCreateNew(
 	ctx *context, projectID bson.ObjectId,
 ) error {
 	project, getErr := r.ProjectGet(ctx, projectID)
 	if getErr != nil {
+		log.Warn(getErr)
 		return getErr
 	}
 	versionErr := r.projectVersionCreateFromExisting(
 		ctx, projectID, len(project.Versions)-1,
 	)
 	if versionErr != nil {
+		log.Warn(versionErr)
 		return versionErr
 	}
 
 	return nil
 }
 
+// ProjectVersionCreateFrom ...
 func (r *Resolver) ProjectVersionCreateFrom(
 	ctx *context, projectID bson.ObjectId, versionID int,
 ) error {
@@ -33,10 +37,12 @@ func (r *Resolver) ProjectVersionCreateFrom(
 		ctx, projectID, versionID,
 	)
 	if versionErr != nil {
+		log.Warn(versionErr)
 		return versionErr
 	}
 	return nil
 }
+
 func (r *Resolver) projectVersionCreateFromExisting(
 	ctx *context, projectID bson.ObjectId, versionID int,
 ) error {
@@ -46,6 +52,7 @@ func (r *Resolver) projectVersionCreateFromExisting(
 		return getErr
 	}
 	if len(project.Versions) <= versionID {
+		log.Warn("no version with that id")
 		return errors.ErrNotFound
 	}
 
@@ -93,6 +100,7 @@ func (r *Resolver) projectVersionCreateFromExisting(
 	return nil
 }
 
+// ProjectVersionUpdateSettings ...
 func (r *Resolver) ProjectVersionUpdateSettings(
 	ctx *context, projectID bson.ObjectId, versionID int,
 	input *model.ProjectVersionUpdateSettings,
@@ -109,12 +117,14 @@ func (r *Resolver) ProjectVersionUpdateSettings(
 		},
 	})
 	if updateErr != nil {
+		log.Warn(updateErr)
 		return updateErr
 	}
 
 	return nil
 }
 
+// EnsureLastProjectVersionStatus ...
 func (r *Resolver) EnsureLastProjectVersionStatus(
 	ctx *context, projectID bson.ObjectId,
 ) error {
@@ -127,6 +137,7 @@ func (r *Resolver) EnsureLastProjectVersionStatus(
 	if lastVersionStatus.IsFinal() {
 		createErr := r.ProjectVersionCreateNew(ctx, projectID)
 		if createErr != nil {
+			log.Warn(createErr)
 			return errors.ErrInternalServerError
 		}
 	}

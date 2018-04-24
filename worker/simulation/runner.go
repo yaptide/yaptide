@@ -42,7 +42,8 @@ func NewRunner(processRunner process.Runner) (Runner, error) {
 	return runner, nil
 }
 
-// AvailableComputingLibrariesNames return list of availables computing libraries names.
+// AvailableComputingLibrariesNames return list of availables computing
+// libraries names.
 func (r *Runner) AvailableComputingLibrariesNames() []string {
 	names := []string{}
 	for name := range r.computingLibraries {
@@ -55,7 +56,9 @@ func (r *Runner) AvailableComputingLibrariesNames() []string {
 
 // Run simulation.
 // Return error, if computingLibrary is not registered.
-func (r *Runner) Run(computingLibraryName string, inputFiles map[string]string) (resultFiles map[string]string, errors []string) {
+func (r *Runner) Run(
+	computingLibraryName string, inputFiles map[string]string,
+) (resultFiles map[string]string, errors []string) {
 	computingLibrary, found := r.computingLibraries[computingLibraryName]
 	if !found {
 		return resultFiles, []string{"computing library not found/available"}

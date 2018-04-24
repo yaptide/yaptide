@@ -81,286 +81,286 @@ var waterColor = NewColor(0x00, 0x93, 0xDD, 0xFF)
 
 // PredefinedMaterialsList ...
 var PredefinedMaterialsList = []PredefinedMaterialRecord{
-	PredefinedMaterialRecord{Value: "hydrogen", Name: "Hydrogen (Z: 1)", Color: White},
-	PredefinedMaterialRecord{Value: "helium", Name: "Helium (Z: 2)", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium", Name: "Lithium (Z: 3)", Color: Gray},
-	PredefinedMaterialRecord{Value: "beryllium", Name: "Beryllium (Z: 4)", Color: Gray},
-	PredefinedMaterialRecord{Value: "boron", Name: "Boron (Z: 5)", Color: Gray},
-	PredefinedMaterialRecord{Value: "carbon", Name: "Carbon (Z: 6), Amorphous (density 2.0 g/cm3)", Color: Gray},
-	PredefinedMaterialRecord{Value: "graphite", Name: "Graphite (Z: 6) (density 1.7 g/cm3)", Color: Gray},
-	PredefinedMaterialRecord{Value: "nitrogen", Name: "Nitrogen (Z: 7)", Color: Gray},
-	PredefinedMaterialRecord{Value: "oxygen", Name: "Oxygen (Z: 8)", Color: Gray},
-	PredefinedMaterialRecord{Value: "fluorine", Name: "Fluorine (Z: 9)", Color: Gray},
-	PredefinedMaterialRecord{Value: "neon", Name: "Neon (Z: 10)", Color: Gray},
-	PredefinedMaterialRecord{Value: "sodium", Name: "Sodium (Z: 11)", Color: Gray},
-	PredefinedMaterialRecord{Value: "magnesium", Name: "Magnesium (Z: 12)", Color: Gray},
-	PredefinedMaterialRecord{Value: "aluminum", Name: "Aluminum (Z: 13)", Color: Gray},
-	PredefinedMaterialRecord{Value: "silicon", Name: "Silicon (Z: 14)", Color: Gray},
-	PredefinedMaterialRecord{Value: "phosphorus", Name: "Phosphorus (Z: 15)", Color: Gray},
-	PredefinedMaterialRecord{Value: "sulfur", Name: "Sulfur (Z: 16)", Color: Gray},
-	PredefinedMaterialRecord{Value: "chlorine", Name: "Chlorine (Z: 17)", Color: Gray},
-	PredefinedMaterialRecord{Value: "argon", Name: "Argon (Z: 18)", Color: Gray},
-	PredefinedMaterialRecord{Value: "potassium", Name: "Potassium (Z: 19)", Color: Gray},
-	PredefinedMaterialRecord{Value: "calcium", Name: "Calcium (Z: 20)", Color: Gray},
-	PredefinedMaterialRecord{Value: "scandium", Name: "Scandium (Z: 21)", Color: Gray},
-	PredefinedMaterialRecord{Value: "titanium", Name: "Titanium (Z: 22)", Color: Gray},
-	PredefinedMaterialRecord{Value: "vanadium", Name: "Vanadium (Z: 23)", Color: Gray},
-	PredefinedMaterialRecord{Value: "chromium", Name: "Chromium (Z: 24)", Color: Gray},
-	PredefinedMaterialRecord{Value: "manganese", Name: "Manganese (Z: 25)", Color: Gray},
-	PredefinedMaterialRecord{Value: "iron", Name: "Iron (Z: 26)", Color: Gray},
-	PredefinedMaterialRecord{Value: "cobalt", Name: "Cobalt (Z: 27)", Color: Gray},
-	PredefinedMaterialRecord{Value: "nickel", Name: "Nickel (Z: 28)", Color: Gray},
-	PredefinedMaterialRecord{Value: "copper", Name: "Copper (Z: 29)", Color: Gray},
-	PredefinedMaterialRecord{Value: "zinc", Name: "Zinc (Z: 30)", Color: Gray},
-	PredefinedMaterialRecord{Value: "gallium", Name: "Gallium (Z: 31)", Color: Gray},
-	PredefinedMaterialRecord{Value: "germanium", Name: "Germanium (Z: 32)", Color: Gray},
-	PredefinedMaterialRecord{Value: "arsenic", Name: "Arsenic (Z: 33)", Color: Gray},
-	PredefinedMaterialRecord{Value: "selenium", Name: "Selenium (Z: 34)", Color: Gray},
-	PredefinedMaterialRecord{Value: "bromine", Name: "Bromine (Z: 35)", Color: Gray},
-	PredefinedMaterialRecord{Value: "krypton", Name: "Krypton (Z: 36)", Color: Gray},
-	PredefinedMaterialRecord{Value: "rubidium", Name: "Rubidium (Z: 37)", Color: Gray},
-	PredefinedMaterialRecord{Value: "strontium", Name: "Strontium (Z: 38)", Color: Gray},
-	PredefinedMaterialRecord{Value: "yttrium", Name: "Yttrium (Z: 39)", Color: Gray},
-	PredefinedMaterialRecord{Value: "zirconium", Name: "Zirconium (Z: 40)", Color: Gray},
-	PredefinedMaterialRecord{Value: "niobium", Name: "Niobium (Z: 41)", Color: Gray},
-	PredefinedMaterialRecord{Value: "molybdenum", Name: "Molybdenum (Z: 42)", Color: Gray},
-	PredefinedMaterialRecord{Value: "technetium", Name: "Technetium (Z: 43)", Color: Gray},
-	PredefinedMaterialRecord{Value: "ruthenium", Name: "Ruthenium (Z: 44)", Color: Gray},
-	PredefinedMaterialRecord{Value: "rhodium", Name: "Rhodium (Z: 45)", Color: Gray},
-	PredefinedMaterialRecord{Value: "palladium", Name: "Palladium (Z: 46)", Color: Gray},
-	PredefinedMaterialRecord{Value: "silver", Name: "Silver (Z: 47)", Color: Gray},
-	PredefinedMaterialRecord{Value: "cadmium", Name: "Cadmium (Z: 48)", Color: Gray},
-	PredefinedMaterialRecord{Value: "indium", Name: "Indium (Z: 49)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tin", Name: "Tin (Z: 50)", Color: Gray},
-	PredefinedMaterialRecord{Value: "antimony", Name: "Antimony (Z: 51)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tellurium", Name: "Tellurium (Z: 52)", Color: Gray},
-	PredefinedMaterialRecord{Value: "iodine", Name: "Iodine (Z: 53)", Color: Gray},
-	PredefinedMaterialRecord{Value: "xenon", Name: "Xenon (Z: 54)", Color: Gray},
-	PredefinedMaterialRecord{Value: "cesium", Name: "Cesium (Z: 55)", Color: Gray},
-	PredefinedMaterialRecord{Value: "barium", Name: "Barium (Z: 56)", Color: Gray},
-	PredefinedMaterialRecord{Value: "lanthanum", Name: "Lanthanum (Z: 57)", Color: Gray},
-	PredefinedMaterialRecord{Value: "cerium", Name: "Cerium (Z: 58)", Color: Gray},
-	PredefinedMaterialRecord{Value: "praseodymium", Name: "Praseodymium (Z: 59)", Color: Gray},
-	PredefinedMaterialRecord{Value: "neodymium", Name: "Neodymium (Z: 60)", Color: Gray},
-	PredefinedMaterialRecord{Value: "promethium", Name: "Promethium (Z: 61)", Color: Gray},
-	PredefinedMaterialRecord{Value: "samarium", Name: "Samarium (Z: 62)", Color: Gray},
-	PredefinedMaterialRecord{Value: "europium", Name: "Europium (Z: 63)", Color: Gray},
-	PredefinedMaterialRecord{Value: "gadolinium", Name: "Gadolinium (Z: 64)", Color: Gray},
-	PredefinedMaterialRecord{Value: "terbium", Name: "Terbium (Z: 65)", Color: Gray},
-	PredefinedMaterialRecord{Value: "dysprosium", Name: "Dysprosium (Z: 66)", Color: Gray},
-	PredefinedMaterialRecord{Value: "holmium", Name: "Holmium (Z: 67)", Color: Gray},
-	PredefinedMaterialRecord{Value: "erbium", Name: "Erbium (Z: 68)", Color: Gray},
-	PredefinedMaterialRecord{Value: "thulium", Name: "Thulium (Z: 69)", Color: Gray},
-	PredefinedMaterialRecord{Value: "ytterbium", Name: "Ytterbium (Z: 70)", Color: Gray},
-	PredefinedMaterialRecord{Value: "lutetium", Name: "Lutetium (Z: 71)", Color: Gray},
-	PredefinedMaterialRecord{Value: "hafnium", Name: "Hafnium (Z: 72)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tantalum", Name: "Tantalum (Z: 73)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tungsten", Name: "Tungsten (Z: 74)", Color: Gray},
-	PredefinedMaterialRecord{Value: "rhenium", Name: "Rhenium (Z: 75)", Color: Gray},
-	PredefinedMaterialRecord{Value: "osmium", Name: "Osmium (Z: 76)", Color: Gray},
-	PredefinedMaterialRecord{Value: "iridium", Name: "Iridium (Z: 77)", Color: Gray},
-	PredefinedMaterialRecord{Value: "platinum", Name: "Platinum (Z: 78)", Color: Gray},
-	PredefinedMaterialRecord{Value: "gold", Name: "Gold (Z: 79)", Color: Gray},
-	PredefinedMaterialRecord{Value: "mercury", Name: "Mercury (Z: 80)", Color: Gray},
-	PredefinedMaterialRecord{Value: "thallium", Name: "Thallium (Z: 81)", Color: Gray},
-	PredefinedMaterialRecord{Value: "lead", Name: "Lead (Z: 82)", Color: Gray},
-	PredefinedMaterialRecord{Value: "bismuth", Name: "Bismuth (Z: 83)", Color: Gray},
-	PredefinedMaterialRecord{Value: "polonium", Name: "Polonium (Z: 84)", Color: Gray},
-	PredefinedMaterialRecord{Value: "astatine", Name: "Astatine (Z: 85)", Color: Gray},
-	PredefinedMaterialRecord{Value: "radon", Name: "Radon (Z: 86)", Color: Gray},
-	PredefinedMaterialRecord{Value: "francium", Name: "Francium (Z: 87)", Color: Gray},
-	PredefinedMaterialRecord{Value: "radium", Name: "Radium (Z: 88)", Color: Gray},
-	PredefinedMaterialRecord{Value: "actinium", Name: "Actinium (Z: 89)", Color: Gray},
-	PredefinedMaterialRecord{Value: "thorium", Name: "Thorium (Z: 90)", Color: Gray},
-	PredefinedMaterialRecord{Value: "protactinium", Name: "Protactinium (Z: 91)", Color: Gray},
-	PredefinedMaterialRecord{Value: "uranium", Name: "Uranium (Z: 92)", Color: Gray},
-	PredefinedMaterialRecord{Value: "neptunium", Name: "Neptunium (Z: 93)", Color: Gray},
-	PredefinedMaterialRecord{Value: "plutonium", Name: "Plutonium (Z: 94)", Color: Gray},
-	PredefinedMaterialRecord{Value: "americium", Name: "Americium (Z: 95)", Color: Gray},
-	PredefinedMaterialRecord{Value: "curium", Name: "Curium (Z: 96)", Color: Gray},
-	PredefinedMaterialRecord{Value: "berkelium", Name: "Berkelium (Z: 97)", Color: Gray},
-	PredefinedMaterialRecord{Value: "californium", Name: "Californium (Z: 98)", Color: Gray},
-	PredefinedMaterialRecord{Value: "a_150", Name: "A-150 Tissue-Equivalent Plastic", Color: Gray},
-	PredefinedMaterialRecord{Value: "acetone", Name: "Acetone", Color: Gray},
-	PredefinedMaterialRecord{Value: "acetylene", Name: "Acetylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "adenine", Name: "Adenine", Color: Gray},
-	PredefinedMaterialRecord{Value: "adipose", Name: "Adipose Tissue (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "air_dry", Name: "Air, Dry (near sea level)", Color: Gray},
-	PredefinedMaterialRecord{Value: "alanine", Name: "Alanine", Color: Gray},
-	PredefinedMaterialRecord{Value: "aluminum_oxide", Name: "Aluminum Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "amber", Name: "Amber", Color: Gray},
-	PredefinedMaterialRecord{Value: "ammonia", Name: "Ammonia", Color: Gray},
-	PredefinedMaterialRecord{Value: "aniline", Name: "Aniline", Color: Gray},
-	PredefinedMaterialRecord{Value: "anthracene", Name: "Anthracene", Color: Gray},
-	PredefinedMaterialRecord{Value: "b_100", Name: "B-100 Bone-Equivalent Plastic", Color: Gray},
-	PredefinedMaterialRecord{Value: "bakelite", Name: "Bakelite", Color: Gray},
-	PredefinedMaterialRecord{Value: "barium_fluoride", Name: "Barium Fluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "barium_sulfate", Name: "Barium Sulfate", Color: Gray},
-	PredefinedMaterialRecord{Value: "benzene", Name: "Benzene", Color: Gray},
-	PredefinedMaterialRecord{Value: "beryllium_oxide", Name: "Beryllium oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "bismuth_germanium_oxide", Name: "Bismuth Germanium oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "blood", Name: "Blood (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "bone_compact", Name: "Bone, Compact (ICRU)", Color: Gray},
-	PredefinedMaterialRecord{Value: "bone_cortical", Name: "Bone, Cortical (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "boron_carbide", Name: "Boron Carbide", Color: Gray},
-	PredefinedMaterialRecord{Value: "boron_oxide", Name: "Boron Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "brain", Name: "Brain (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "butane", Name: "Butane", Color: Gray},
-	PredefinedMaterialRecord{Value: "n_butyl_alcohol", Name: "N-Butyl Alcohol", Color: Gray},
-	PredefinedMaterialRecord{Value: "c_552", Name: "C-552 Air-Equivalent Plastic", Color: Gray},
-	PredefinedMaterialRecord{Value: "cadmium_telluride", Name: "Cadmium Telluride", Color: Gray},
-	PredefinedMaterialRecord{Value: "cadmium_tungstate", Name: "Cadmium Tungstate", Color: Gray},
-	PredefinedMaterialRecord{Value: "calcium_carbonate", Name: "Calcium Carbonate", Color: Gray},
-	PredefinedMaterialRecord{Value: "calcium_fluoride", Name: "Calcium Fluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "calcium_oxide", Name: "Calcium Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "calcium_sulfate", Name: "Calcium Sulfate", Color: Gray},
-	PredefinedMaterialRecord{Value: "calcium_tungstate", Name: "Calcium Tungstate", Color: Gray},
-	PredefinedMaterialRecord{Value: "carbon_dioxide", Name: "Carbon Dioxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "carbon_tetrachloride", Name: "Carbon Tetrachloride", Color: Gray},
-	PredefinedMaterialRecord{Value: "cellulose_acetate_cellophane", Name: "Cellulose Acetate, Cellophane", Color: Gray},
-	PredefinedMaterialRecord{Value: "cellulose_acetate_butyrate", Name: "Cellulose Acetate Butyrate", Color: Gray},
-	PredefinedMaterialRecord{Value: "cellulose_nitrate", Name: "Cellulose Nitrate", Color: Gray},
-	PredefinedMaterialRecord{Value: "ceric_sulfate_dosimeter_solution", Name: "Ceric Sulfate Dosimeter Solution", Color: Gray},
-	PredefinedMaterialRecord{Value: "cesium_fluoride", Name: "Cesium Fluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "cesium_iodide", Name: "Cesium Iodide", Color: Gray},
-	PredefinedMaterialRecord{Value: "chlorobenzene", Name: "Chlorobenzene", Color: Gray},
-	PredefinedMaterialRecord{Value: "chloroform", Name: "Chloroform", Color: Gray},
-	PredefinedMaterialRecord{Value: "concrete_portland", Name: "Concrete, Portland", Color: Gray},
-	PredefinedMaterialRecord{Value: "cyclohexane", Name: "Cyclohexane", Color: Gray},
-	PredefinedMaterialRecord{Value: "1_2_ddihlorobenzene", Name: "1,2-Ddihlorobenzene", Color: Gray},
-	PredefinedMaterialRecord{Value: "dichlorodiethyl_ether", Name: "Dichlorodiethyl Ether", Color: Gray},
-	PredefinedMaterialRecord{Value: "1_2_dichloroethane", Name: "1,2-Dichloroethane", Color: Gray},
-	PredefinedMaterialRecord{Value: "diethyl_ether", Name: "Diethyl Ether", Color: Gray},
-	PredefinedMaterialRecord{Value: "n_n_dimethyl_formamide", Name: "N,N-Dimethyl Formamide", Color: Gray},
-	PredefinedMaterialRecord{Value: "dimethyl_sulfoxide", Name: "Dimethyl Sulfoxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "ethane", Name: "Ethane", Color: Gray},
-	PredefinedMaterialRecord{Value: "ethyl_alcohol", Name: "Ethyl Alcohol", Color: Gray},
-	PredefinedMaterialRecord{Value: "ethyl_cellulose", Name: "Ethyl Cellulose", Color: Gray},
-	PredefinedMaterialRecord{Value: "ethylene", Name: "Ethylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "eye_lens", Name: "Eye Lens (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "ferric_oxide", Name: "Ferric Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "ferroboride", Name: "Ferroboride", Color: Gray},
-	PredefinedMaterialRecord{Value: "ferrous_oxide", Name: "Ferrous Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "ferrous_sulfate_dosimeter_solution", Name: "Ferrous Sulfate Dosimeter Solution", Color: Gray},
-	PredefinedMaterialRecord{Value: "freon_12", Name: "Freon-12", Color: Gray},
-	PredefinedMaterialRecord{Value: "freon_12b2", Name: "Freon-12B2", Color: Gray},
-	PredefinedMaterialRecord{Value: "freon_13", Name: "Freon-13", Color: Gray},
-	PredefinedMaterialRecord{Value: "freon_13b1", Name: "Freon-13B1", Color: Gray},
-	PredefinedMaterialRecord{Value: "freon_13i1", Name: "Freon-13I1", Color: Gray},
-	PredefinedMaterialRecord{Value: "gadolinium_oxysulfide", Name: "Gadolinium Oxysulfide", Color: Gray},
-	PredefinedMaterialRecord{Value: "gallium_arsenide", Name: "Gallium Arsenide", Color: Gray},
-	PredefinedMaterialRecord{Value: "gel_in_photographic_emulsion", Name: "Gel in Photographic Emulsion", Color: Gray},
-	PredefinedMaterialRecord{Value: "glass_lead", Name: "Glass, Lead", Color: Gray},
-	PredefinedMaterialRecord{Value: "glass_plate", Name: "Glass, Plate", Color: Gray},
-	PredefinedMaterialRecord{Value: "glass_pyrex", Name: "Glass, Pyrex", Color: Gray},
-	PredefinedMaterialRecord{Value: "glucose", Name: "Glucose", Color: Gray},
-	PredefinedMaterialRecord{Value: "glutamine", Name: "Glutamine", Color: Gray},
-	PredefinedMaterialRecord{Value: "glycerol", Name: "Glycerol", Color: Gray},
-	PredefinedMaterialRecord{Value: "guanine", Name: "Guanine", Color: Gray},
-	PredefinedMaterialRecord{Value: "gypsum", Name: "Gypsum, Plaster of Paris", Color: Gray},
-	PredefinedMaterialRecord{Value: "n_heptane", Name: "N-Heptane", Color: Gray},
-	PredefinedMaterialRecord{Value: "n_hexane", Name: "N-Hexane", Color: Gray},
-	PredefinedMaterialRecord{Value: "kapton_polyimide_film", Name: "Kapton Polyimide Film", Color: Gray},
-	PredefinedMaterialRecord{Value: "lanthanum_oxybromide", Name: "Lanthanum Oxybromide", Color: Gray},
-	PredefinedMaterialRecord{Value: "lanthanum_oxysulfide", Name: "Lanthanum Oxysulfide", Color: Gray},
-	PredefinedMaterialRecord{Value: "lead_oxide", Name: "Lead Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_amide", Name: "Lithium Amide", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_carbonate", Name: "Lithium Carbonate", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_fluoride", Name: "Lithium Fluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_hydride", Name: "Lithium Hydride", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_iodide", Name: "Lithium Iodide", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_oxide", Name: "Lithium Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "lithium_tetraborate", Name: "Lithium Tetraborate", Color: Gray},
-	PredefinedMaterialRecord{Value: "lung", Name: "Lung (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "m3_wax", Name: "M3 Wax", Color: Gray},
-	PredefinedMaterialRecord{Value: "magnesium_carbonate", Name: "Magnesium Carbonate", Color: Gray},
-	PredefinedMaterialRecord{Value: "magnesium_fluoride", Name: "Magnesium Fluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "magnesium_oxide", Name: "Magnesium Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "magnesium_tetraborate", Name: "Magnesium Tetraborate", Color: Gray},
-	PredefinedMaterialRecord{Value: "mercuric_iodide", Name: "Mercuric Iodide", Color: Gray},
-	PredefinedMaterialRecord{Value: "methane", Name: "Methane", Color: Gray},
-	PredefinedMaterialRecord{Value: "methanol", Name: "Methanol", Color: Gray},
-	PredefinedMaterialRecord{Value: "mix_d_wax", Name: "Mix D Wax", Color: Gray},
-	PredefinedMaterialRecord{Value: "ms20_tissue_substitute", Name: "MS20 Tissue Substitute", Color: Gray},
-	PredefinedMaterialRecord{Value: "muscle_skeletal", Name: "Muscle, Skeletal", Color: Gray},
-	PredefinedMaterialRecord{Value: "muscle_striated", Name: "Muscle, Striated", Color: Gray},
-	PredefinedMaterialRecord{Value: "muscle_equivalent_liquid_with_sucrose", Name: "Muscle-Equivalent Liquid, with Sucrose", Color: Gray},
-	PredefinedMaterialRecord{Value: "muscle_equivalent_liquid_without_sucrose", Name: "Muscle-Equivalent Liquid, without Sucrose", Color: Gray},
-	PredefinedMaterialRecord{Value: "naphthalene", Name: "Naphthalene", Color: Gray},
-	PredefinedMaterialRecord{Value: "nitrobenzene", Name: "Nitrobenzene", Color: Gray},
-	PredefinedMaterialRecord{Value: "nitrous_oxide", Name: "Nitrous Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "nylon_du_pont_elvamide_8062", Name: "Nylon, Du Pont ELVAmide 8062", Color: Gray},
-	PredefinedMaterialRecord{Value: "nylon_type_6_and_type_6/6", Name: "Nylon, type 6 and type 6/6", Color: Gray},
-	PredefinedMaterialRecord{Value: "nylon_type_6/10", Name: "Nylon, type 6/10", Color: Gray},
-	PredefinedMaterialRecord{Value: "nylon_type_11_rilsan", Name: "Nylon, type 11 (Rilsan)", Color: Gray},
-	PredefinedMaterialRecord{Value: "octane_liquid", Name: "Octane, Liquid", Color: Gray},
-	PredefinedMaterialRecord{Value: "paraffin_wax", Name: "Paraffin Wax", Color: Gray},
-	PredefinedMaterialRecord{Value: "n_pentane", Name: "N-Pentane", Color: Gray},
-	PredefinedMaterialRecord{Value: "photographic_emulsion", Name: "Photographic Emulsion", Color: Gray},
-	PredefinedMaterialRecord{Value: "plastic_scintillator", Name: "Plastic Scintillator (Vinyltoluene based)", Color: Gray},
-	PredefinedMaterialRecord{Value: "plutonium_dioxide", Name: "Plutonium Dioxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyacrylonitrile", Name: "Polyacrylonitrile", Color: Gray},
-	PredefinedMaterialRecord{Value: "polycarbonate", Name: "Polycarbonate (Makrolon, Lexan)", Color: Gray},
-	PredefinedMaterialRecord{Value: "polychlorostyrene", Name: "Polychlorostyrene", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyethylene", Name: "Polyethylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyethylene_terephthalate", Name: "Polyethylene Terephthalate (Mylar)", Color: Gray},
-	PredefinedMaterialRecord{Value: "polymethyl_methacralate", Name: "Polymethyl Methacralate (Lucite, Perspex)", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyoxymethylene", Name: "Polyoxymethylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "polypropylene", Name: "Polypropylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "polystyrene", Name: "Polystyrene", Color: Gray},
-	PredefinedMaterialRecord{Value: "polytetrafluoroethylene", Name: "Polytetrafluoroethylene (Teflon)", Color: Gray},
-	PredefinedMaterialRecord{Value: "polytrifluorochloroethylene", Name: "Polytrifluorochloroethylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinyl_acetate", Name: "Polyvinyl Acetate", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinyl_alcohol", Name: "Polyvinyl Alcohol", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinyl_butyral", Name: "Polyvinyl Butyral", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinyl_chloride", Name: "Polyvinyl Chloride", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinylidene_chloride_saran", Name: "Polyvinylidene Chloride, Saran", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinylidene_fluoride", Name: "Polyvinylidene Fluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "polyvinyl_pyrrolidone", Name: "Polyvinyl Pyrrolidone", Color: Gray},
-	PredefinedMaterialRecord{Value: "potassium_iodide", Name: "Potassium Iodide", Color: Gray},
-	PredefinedMaterialRecord{Value: "potassium_oxide", Name: "Potassium Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "propane", Name: "Propane", Color: Gray},
-	PredefinedMaterialRecord{Value: "propane_liquid", Name: "Propane, Liquid", Color: Gray},
-	PredefinedMaterialRecord{Value: "n_propyl_alcohol", Name: "N-Propyl Alcohol", Color: Gray},
-	PredefinedMaterialRecord{Value: "pyridine", Name: "Pyridine", Color: Gray},
-	PredefinedMaterialRecord{Value: "rubber_butyl", Name: "Rubber, Butyl", Color: Gray},
-	PredefinedMaterialRecord{Value: "rubber_natural", Name: "Rubber, Natural", Color: Gray},
-	PredefinedMaterialRecord{Value: "rubber_neoprene", Name: "Rubber, Neoprene", Color: Gray},
-	PredefinedMaterialRecord{Value: "silicon_dioxide", Name: "Silicon Dioxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "silver_bromide", Name: "Silver Bromide", Color: Gray},
-	PredefinedMaterialRecord{Value: "silver_chloride", Name: "Silver Chloride", Color: Gray},
-	PredefinedMaterialRecord{Value: "silver_halides_in_photographic_emulsion", Name: "Silver Halides in Photographic Emulsion", Color: Gray},
-	PredefinedMaterialRecord{Value: "silver_iodide", Name: "Silver Iodide", Color: Gray},
-	PredefinedMaterialRecord{Value: "skin", Name: "Skin (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "sodium_carbonate", Name: "Sodium Carbonate", Color: Gray},
-	PredefinedMaterialRecord{Value: "sodium_iodide", Name: "Sodium Iodide", Color: Gray},
-	PredefinedMaterialRecord{Value: "sodium_monoxide", Name: "Sodium Monoxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "sodium_nitrate", Name: "Sodium Nitrate", Color: Gray},
-	PredefinedMaterialRecord{Value: "stilbene", Name: "Stilbene", Color: Gray},
-	PredefinedMaterialRecord{Value: "sucrose", Name: "Sucrose", Color: Gray},
-	PredefinedMaterialRecord{Value: "terphenyl", Name: "Terphenyl", Color: Gray},
-	PredefinedMaterialRecord{Value: "testes", Name: "Testes (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tetrachloroethylene", Name: "Tetrachloroethylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "thallium_chloride", Name: "Thallium Chloride", Color: Gray},
-	PredefinedMaterialRecord{Value: "tissue_soft_icrp", Name: "Tissue, Soft (ICRP)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tissue_soft_icru_four_component", Name: "Tissue, Soft (ICRU four-component)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tissue_equivalent_gas_methane_based", Name: "Tissue-Equivalent GAS (Methane based)", Color: Gray},
-	PredefinedMaterialRecord{Value: "tissue_equivalent_gas_propane_based", Name: "Tissue-Equivalent GAS (Propane based)", Color: Gray},
-	PredefinedMaterialRecord{Value: "titanium_dioxide", Name: "Titanium Dioxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "toluene", Name: "Toluene", Color: Gray},
-	PredefinedMaterialRecord{Value: "trichloroethylene", Name: "Trichloroethylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "triethyl_phosphate", Name: "Triethyl Phosphate", Color: Gray},
-	PredefinedMaterialRecord{Value: "tungsten_hexafluoride", Name: "Tungsten Hexafluoride", Color: Gray},
-	PredefinedMaterialRecord{Value: "uranium_dicarbide", Name: "Uranium Dicarbide", Color: Gray},
-	PredefinedMaterialRecord{Value: "uranium_monocarbide", Name: "Uranium Monocarbide", Color: Gray},
-	PredefinedMaterialRecord{Value: "uranium_oxide", Name: "Uranium Oxide", Color: Gray},
-	PredefinedMaterialRecord{Value: "urea", Name: "Urea", Color: Gray},
-	PredefinedMaterialRecord{Value: "valine", Name: "Valine", Color: Gray},
-	PredefinedMaterialRecord{Value: "viton_fluoroelastomer", Name: "Viton Fluoroelastomer", Color: Gray},
-	PredefinedMaterialRecord{Value: "water_liquid", Name: "Water, Liquid", Color: waterColor},
-	PredefinedMaterialRecord{Value: "water_vapor", Name: "Water Vapor", Color: waterColor},
-	PredefinedMaterialRecord{Value: "xylene", Name: "Xylene", Color: Gray},
-	PredefinedMaterialRecord{Value: "vacuum", Name: "Vaccum", Color: Gray},
+	PredefinedMaterialRecord{Value: "hydrogen", Name: "Hydrogen (Z: 1)", Color: White},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "helium", Name: "Helium (Z: 2)", Color: Gray},                                                               // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium", Name: "Lithium (Z: 3)", Color: Gray},                                                             // nolint: lll
+	PredefinedMaterialRecord{Value: "beryllium", Name: "Beryllium (Z: 4)", Color: Gray},                                                         // nolint: lll
+	PredefinedMaterialRecord{Value: "boron", Name: "Boron (Z: 5)", Color: Gray},                                                                 // nolint: lll
+	PredefinedMaterialRecord{Value: "carbon", Name: "Carbon (Z: 6), Amorphous (density 2.0 g/cm3)", Color: Gray},                                // nolint: lll
+	PredefinedMaterialRecord{Value: "graphite", Name: "Graphite (Z: 6) (density 1.7 g/cm3)", Color: Gray},                                       // nolint: lll
+	PredefinedMaterialRecord{Value: "nitrogen", Name: "Nitrogen (Z: 7)", Color: Gray},                                                           // nolint: lll
+	PredefinedMaterialRecord{Value: "oxygen", Name: "Oxygen (Z: 8)", Color: Gray},                                                               // nolint: lll
+	PredefinedMaterialRecord{Value: "fluorine", Name: "Fluorine (Z: 9)", Color: Gray},                                                           // nolint: lll
+	PredefinedMaterialRecord{Value: "neon", Name: "Neon (Z: 10)", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "sodium", Name: "Sodium (Z: 11)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "magnesium", Name: "Magnesium (Z: 12)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "aluminum", Name: "Aluminum (Z: 13)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "silicon", Name: "Silicon (Z: 14)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "phosphorus", Name: "Phosphorus (Z: 15)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "sulfur", Name: "Sulfur (Z: 16)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "chlorine", Name: "Chlorine (Z: 17)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "argon", Name: "Argon (Z: 18)", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "potassium", Name: "Potassium (Z: 19)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "calcium", Name: "Calcium (Z: 20)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "scandium", Name: "Scandium (Z: 21)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "titanium", Name: "Titanium (Z: 22)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "vanadium", Name: "Vanadium (Z: 23)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "chromium", Name: "Chromium (Z: 24)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "manganese", Name: "Manganese (Z: 25)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "iron", Name: "Iron (Z: 26)", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "cobalt", Name: "Cobalt (Z: 27)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "nickel", Name: "Nickel (Z: 28)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "copper", Name: "Copper (Z: 29)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "zinc", Name: "Zinc (Z: 30)", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "gallium", Name: "Gallium (Z: 31)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "germanium", Name: "Germanium (Z: 32)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "arsenic", Name: "Arsenic (Z: 33)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "selenium", Name: "Selenium (Z: 34)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "bromine", Name: "Bromine (Z: 35)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "krypton", Name: "Krypton (Z: 36)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "rubidium", Name: "Rubidium (Z: 37)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "strontium", Name: "Strontium (Z: 38)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "yttrium", Name: "Yttrium (Z: 39)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "zirconium", Name: "Zirconium (Z: 40)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "niobium", Name: "Niobium (Z: 41)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "molybdenum", Name: "Molybdenum (Z: 42)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "technetium", Name: "Technetium (Z: 43)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "ruthenium", Name: "Ruthenium (Z: 44)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "rhodium", Name: "Rhodium (Z: 45)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "palladium", Name: "Palladium (Z: 46)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "silver", Name: "Silver (Z: 47)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "cadmium", Name: "Cadmium (Z: 48)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "indium", Name: "Indium (Z: 49)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "tin", Name: "Tin (Z: 50)", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "antimony", Name: "Antimony (Z: 51)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "tellurium", Name: "Tellurium (Z: 52)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "iodine", Name: "Iodine (Z: 53)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "xenon", Name: "Xenon (Z: 54)", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "cesium", Name: "Cesium (Z: 55)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "barium", Name: "Barium (Z: 56)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "lanthanum", Name: "Lanthanum (Z: 57)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "cerium", Name: "Cerium (Z: 58)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "praseodymium", Name: "Praseodymium (Z: 59)", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "neodymium", Name: "Neodymium (Z: 60)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "promethium", Name: "Promethium (Z: 61)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "samarium", Name: "Samarium (Z: 62)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "europium", Name: "Europium (Z: 63)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "gadolinium", Name: "Gadolinium (Z: 64)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "terbium", Name: "Terbium (Z: 65)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "dysprosium", Name: "Dysprosium (Z: 66)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "holmium", Name: "Holmium (Z: 67)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "erbium", Name: "Erbium (Z: 68)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "thulium", Name: "Thulium (Z: 69)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "ytterbium", Name: "Ytterbium (Z: 70)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "lutetium", Name: "Lutetium (Z: 71)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "hafnium", Name: "Hafnium (Z: 72)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "tantalum", Name: "Tantalum (Z: 73)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "tungsten", Name: "Tungsten (Z: 74)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "rhenium", Name: "Rhenium (Z: 75)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "osmium", Name: "Osmium (Z: 76)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "iridium", Name: "Iridium (Z: 77)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "platinum", Name: "Platinum (Z: 78)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "gold", Name: "Gold (Z: 79)", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "mercury", Name: "Mercury (Z: 80)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "thallium", Name: "Thallium (Z: 81)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "lead", Name: "Lead (Z: 82)", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "bismuth", Name: "Bismuth (Z: 83)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "polonium", Name: "Polonium (Z: 84)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "astatine", Name: "Astatine (Z: 85)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "radon", Name: "Radon (Z: 86)", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "francium", Name: "Francium (Z: 87)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "radium", Name: "Radium (Z: 88)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "actinium", Name: "Actinium (Z: 89)", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "thorium", Name: "Thorium (Z: 90)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "protactinium", Name: "Protactinium (Z: 91)", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "uranium", Name: "Uranium (Z: 92)", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "neptunium", Name: "Neptunium (Z: 93)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "plutonium", Name: "Plutonium (Z: 94)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "americium", Name: "Americium (Z: 95)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "curium", Name: "Curium (Z: 96)", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "berkelium", Name: "Berkelium (Z: 97)", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "californium", Name: "Californium (Z: 98)", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "a_150", Name: "A-150 Tissue-Equivalent Plastic", Color: Gray},                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "acetone", Name: "Acetone", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "acetylene", Name: "Acetylene", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "adenine", Name: "Adenine", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "adipose", Name: "Adipose Tissue (ICRP)", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "air_dry", Name: "Air, Dry (near sea level)", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "alanine", Name: "Alanine", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "aluminum_oxide", Name: "Aluminum Oxide", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "amber", Name: "Amber", Color: Gray},                                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "ammonia", Name: "Ammonia", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "aniline", Name: "Aniline", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "anthracene", Name: "Anthracene", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "b_100", Name: "B-100 Bone-Equivalent Plastic", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "bakelite", Name: "Bakelite", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "barium_fluoride", Name: "Barium Fluoride", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "barium_sulfate", Name: "Barium Sulfate", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "benzene", Name: "Benzene", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "beryllium_oxide", Name: "Beryllium oxide", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "bismuth_germanium_oxide", Name: "Bismuth Germanium oxide", Color: Gray},                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "blood", Name: "Blood (ICRP)", Color: Gray},                                                                 // nolint: lll
+	PredefinedMaterialRecord{Value: "bone_compact", Name: "Bone, Compact (ICRU)", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "bone_cortical", Name: "Bone, Cortical (ICRP)", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "boron_carbide", Name: "Boron Carbide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "boron_oxide", Name: "Boron Oxide", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "brain", Name: "Brain (ICRP)", Color: Gray},                                                                 // nolint: lll
+	PredefinedMaterialRecord{Value: "butane", Name: "Butane", Color: Gray},                                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "n_butyl_alcohol", Name: "N-Butyl Alcohol", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "c_552", Name: "C-552 Air-Equivalent Plastic", Color: Gray},                                                 // nolint: lll
+	PredefinedMaterialRecord{Value: "cadmium_telluride", Name: "Cadmium Telluride", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "cadmium_tungstate", Name: "Cadmium Tungstate", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "calcium_carbonate", Name: "Calcium Carbonate", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "calcium_fluoride", Name: "Calcium Fluoride", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "calcium_oxide", Name: "Calcium Oxide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "calcium_sulfate", Name: "Calcium Sulfate", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "calcium_tungstate", Name: "Calcium Tungstate", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "carbon_dioxide", Name: "Carbon Dioxide", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "carbon_tetrachloride", Name: "Carbon Tetrachloride", Color: Gray},                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "cellulose_acetate_cellophane", Name: "Cellulose Acetate, Cellophane", Color: Gray},                         // nolint: lll
+	PredefinedMaterialRecord{Value: "cellulose_acetate_butyrate", Name: "Cellulose Acetate Butyrate", Color: Gray},                              // nolint: lll
+	PredefinedMaterialRecord{Value: "cellulose_nitrate", Name: "Cellulose Nitrate", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "ceric_sulfate_dosimeter_solution", Name: "Ceric Sulfate Dosimeter Solution", Color: Gray},                  // nolint: lll
+	PredefinedMaterialRecord{Value: "cesium_fluoride", Name: "Cesium Fluoride", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "cesium_iodide", Name: "Cesium Iodide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "chlorobenzene", Name: "Chlorobenzene", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "chloroform", Name: "Chloroform", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "concrete_portland", Name: "Concrete, Portland", Color: Gray},                                               // nolint: lll
+	PredefinedMaterialRecord{Value: "cyclohexane", Name: "Cyclohexane", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "1_2_ddihlorobenzene", Name: "1,2-Ddihlorobenzene", Color: Gray},                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "dichlorodiethyl_ether", Name: "Dichlorodiethyl Ether", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "1_2_dichloroethane", Name: "1,2-Dichloroethane", Color: Gray},                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "diethyl_ether", Name: "Diethyl Ether", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "n_n_dimethyl_formamide", Name: "N,N-Dimethyl Formamide", Color: Gray},                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "dimethyl_sulfoxide", Name: "Dimethyl Sulfoxide", Color: Gray},                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "ethane", Name: "Ethane", Color: Gray},                                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "ethyl_alcohol", Name: "Ethyl Alcohol", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "ethyl_cellulose", Name: "Ethyl Cellulose", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "ethylene", Name: "Ethylene", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "eye_lens", Name: "Eye Lens (ICRP)", Color: Gray},                                                           // nolint: lll
+	PredefinedMaterialRecord{Value: "ferric_oxide", Name: "Ferric Oxide", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "ferroboride", Name: "Ferroboride", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "ferrous_oxide", Name: "Ferrous Oxide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "ferrous_sulfate_dosimeter_solution", Name: "Ferrous Sulfate Dosimeter Solution", Color: Gray},              // nolint: lll
+	PredefinedMaterialRecord{Value: "freon_12", Name: "Freon-12", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "freon_12b2", Name: "Freon-12B2", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "freon_13", Name: "Freon-13", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "freon_13b1", Name: "Freon-13B1", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "freon_13i1", Name: "Freon-13I1", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "gadolinium_oxysulfide", Name: "Gadolinium Oxysulfide", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "gallium_arsenide", Name: "Gallium Arsenide", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "gel_in_photographic_emulsion", Name: "Gel in Photographic Emulsion", Color: Gray},                          // nolint: lll
+	PredefinedMaterialRecord{Value: "glass_lead", Name: "Glass, Lead", Color: Gray},                                                             // nolint: lll
+	PredefinedMaterialRecord{Value: "glass_plate", Name: "Glass, Plate", Color: Gray},                                                           // nolint: lll
+	PredefinedMaterialRecord{Value: "glass_pyrex", Name: "Glass, Pyrex", Color: Gray},                                                           // nolint: lll
+	PredefinedMaterialRecord{Value: "glucose", Name: "Glucose", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "glutamine", Name: "Glutamine", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "glycerol", Name: "Glycerol", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "guanine", Name: "Guanine", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "gypsum", Name: "Gypsum, Plaster of Paris", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "n_heptane", Name: "N-Heptane", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "n_hexane", Name: "N-Hexane", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "kapton_polyimide_film", Name: "Kapton Polyimide Film", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "lanthanum_oxybromide", Name: "Lanthanum Oxybromide", Color: Gray},                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "lanthanum_oxysulfide", Name: "Lanthanum Oxysulfide", Color: Gray},                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "lead_oxide", Name: "Lead Oxide", Color: Gray},                                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_amide", Name: "Lithium Amide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_carbonate", Name: "Lithium Carbonate", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_fluoride", Name: "Lithium Fluoride", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_hydride", Name: "Lithium Hydride", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_iodide", Name: "Lithium Iodide", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_oxide", Name: "Lithium Oxide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "lithium_tetraborate", Name: "Lithium Tetraborate", Color: Gray},                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "lung", Name: "Lung (ICRP)", Color: Gray},                                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "m3_wax", Name: "M3 Wax", Color: Gray},                                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "magnesium_carbonate", Name: "Magnesium Carbonate", Color: Gray},                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "magnesium_fluoride", Name: "Magnesium Fluoride", Color: Gray},                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "magnesium_oxide", Name: "Magnesium Oxide", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "magnesium_tetraborate", Name: "Magnesium Tetraborate", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "mercuric_iodide", Name: "Mercuric Iodide", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "methane", Name: "Methane", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "methanol", Name: "Methanol", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "mix_d_wax", Name: "Mix D Wax", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "ms20_tissue_substitute", Name: "MS20 Tissue Substitute", Color: Gray},                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "muscle_skeletal", Name: "Muscle, Skeletal", Color: Gray},                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "muscle_striated", Name: "Muscle, Striated", Color: Gray},                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "muscle_equivalent_liquid_with_sucrose", Name: "Muscle-Equivalent Liquid, with Sucrose", Color: Gray},       // nolint: lll
+	PredefinedMaterialRecord{Value: "muscle_equivalent_liquid_without_sucrose", Name: "Muscle-Equivalent Liquid, without Sucrose", Color: Gray}, // nolint: lll
+	PredefinedMaterialRecord{Value: "naphthalene", Name: "Naphthalene", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "nitrobenzene", Name: "Nitrobenzene", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "nitrous_oxide", Name: "Nitrous Oxide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "nylon_du_pont_elvamide_8062", Name: "Nylon, Du Pont ELVAmide 8062", Color: Gray},                           // nolint: lll
+	PredefinedMaterialRecord{Value: "nylon_type_6_and_type_6/6", Name: "Nylon, type 6 and type 6/6", Color: Gray},                               // nolint: lll
+	PredefinedMaterialRecord{Value: "nylon_type_6/10", Name: "Nylon, type 6/10", Color: Gray},                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "nylon_type_11_rilsan", Name: "Nylon, type 11 (Rilsan)", Color: Gray},                                       // nolint: lll
+	PredefinedMaterialRecord{Value: "octane_liquid", Name: "Octane, Liquid", Color: Gray},                                                       // nolint: lll
+	PredefinedMaterialRecord{Value: "paraffin_wax", Name: "Paraffin Wax", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "n_pentane", Name: "N-Pentane", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "photographic_emulsion", Name: "Photographic Emulsion", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "plastic_scintillator", Name: "Plastic Scintillator (Vinyltoluene based)", Color: Gray},                     // nolint: lll
+	PredefinedMaterialRecord{Value: "plutonium_dioxide", Name: "Plutonium Dioxide", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "polyacrylonitrile", Name: "Polyacrylonitrile", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "polycarbonate", Name: "Polycarbonate (Makrolon, Lexan)", Color: Gray},                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "polychlorostyrene", Name: "Polychlorostyrene", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "polyethylene", Name: "Polyethylene", Color: Gray},                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "polyethylene_terephthalate", Name: "Polyethylene Terephthalate (Mylar)", Color: Gray},                      // nolint: lll
+	PredefinedMaterialRecord{Value: "polymethyl_methacralate", Name: "Polymethyl Methacralate (Lucite, Perspex)", Color: Gray},                  // nolint: lll
+	PredefinedMaterialRecord{Value: "polyoxymethylene", Name: "Polyoxymethylene", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "polypropylene", Name: "Polypropylene", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "polystyrene", Name: "Polystyrene", Color: Gray},                                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "polytetrafluoroethylene", Name: "Polytetrafluoroethylene (Teflon)", Color: Gray},                           // nolint: lll
+	PredefinedMaterialRecord{Value: "polytrifluorochloroethylene", Name: "Polytrifluorochloroethylene", Color: Gray},                            // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinyl_acetate", Name: "Polyvinyl Acetate", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinyl_alcohol", Name: "Polyvinyl Alcohol", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinyl_butyral", Name: "Polyvinyl Butyral", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinyl_chloride", Name: "Polyvinyl Chloride", Color: Gray},                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinylidene_chloride_saran", Name: "Polyvinylidene Chloride, Saran", Color: Gray},                       // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinylidene_fluoride", Name: "Polyvinylidene Fluoride", Color: Gray},                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "polyvinyl_pyrrolidone", Name: "Polyvinyl Pyrrolidone", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "potassium_iodide", Name: "Potassium Iodide", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "potassium_oxide", Name: "Potassium Oxide", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "propane", Name: "Propane", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "propane_liquid", Name: "Propane, Liquid", Color: Gray},                                                     // nolint: lll
+	PredefinedMaterialRecord{Value: "n_propyl_alcohol", Name: "N-Propyl Alcohol", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "pyridine", Name: "Pyridine", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "rubber_butyl", Name: "Rubber, Butyl", Color: Gray},                                                         // nolint: lll
+	PredefinedMaterialRecord{Value: "rubber_natural", Name: "Rubber, Natural", Color: Gray},                                                     // nolint: lll
+	PredefinedMaterialRecord{Value: "rubber_neoprene", Name: "Rubber, Neoprene", Color: Gray},                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "silicon_dioxide", Name: "Silicon Dioxide", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "silver_bromide", Name: "Silver Bromide", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "silver_chloride", Name: "Silver Chloride", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "silver_halides_in_photographic_emulsion", Name: "Silver Halides in Photographic Emulsion", Color: Gray},    // nolint: lll
+	PredefinedMaterialRecord{Value: "silver_iodide", Name: "Silver Iodide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "skin", Name: "Skin (ICRP)", Color: Gray},                                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "sodium_carbonate", Name: "Sodium Carbonate", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "sodium_iodide", Name: "Sodium Iodide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "sodium_monoxide", Name: "Sodium Monoxide", Color: Gray},                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "sodium_nitrate", Name: "Sodium Nitrate", Color: Gray},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "stilbene", Name: "Stilbene", Color: Gray},                                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "sucrose", Name: "Sucrose", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "terphenyl", Name: "Terphenyl", Color: Gray},                                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "testes", Name: "Testes (ICRP)", Color: Gray},                                                               // nolint: lll
+	PredefinedMaterialRecord{Value: "tetrachloroethylene", Name: "Tetrachloroethylene", Color: Gray},                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "thallium_chloride", Name: "Thallium Chloride", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "tissue_soft_icrp", Name: "Tissue, Soft (ICRP)", Color: Gray},                                               // nolint: lll
+	PredefinedMaterialRecord{Value: "tissue_soft_icru_four_component", Name: "Tissue, Soft (ICRU four-component)", Color: Gray},                 // nolint: lll
+	PredefinedMaterialRecord{Value: "tissue_equivalent_gas_methane_based", Name: "Tissue-Equivalent GAS (Methane based)", Color: Gray},          // nolint: lll
+	PredefinedMaterialRecord{Value: "tissue_equivalent_gas_propane_based", Name: "Tissue-Equivalent GAS (Propane based)", Color: Gray},          // nolint: lll
+	PredefinedMaterialRecord{Value: "titanium_dioxide", Name: "Titanium Dioxide", Color: Gray},                                                  // nolint: lll
+	PredefinedMaterialRecord{Value: "toluene", Name: "Toluene", Color: Gray},                                                                    // nolint: lll
+	PredefinedMaterialRecord{Value: "trichloroethylene", Name: "Trichloroethylene", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "triethyl_phosphate", Name: "Triethyl Phosphate", Color: Gray},                                              // nolint: lll
+	PredefinedMaterialRecord{Value: "tungsten_hexafluoride", Name: "Tungsten Hexafluoride", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "uranium_dicarbide", Name: "Uranium Dicarbide", Color: Gray},                                                // nolint: lll
+	PredefinedMaterialRecord{Value: "uranium_monocarbide", Name: "Uranium Monocarbide", Color: Gray},                                            // nolint: lll
+	PredefinedMaterialRecord{Value: "uranium_oxide", Name: "Uranium Oxide", Color: Gray},                                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "urea", Name: "Urea", Color: Gray},                                                                          // nolint: lll
+	PredefinedMaterialRecord{Value: "valine", Name: "Valine", Color: Gray},                                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "viton_fluoroelastomer", Name: "Viton Fluoroelastomer", Color: Gray},                                        // nolint: lll
+	PredefinedMaterialRecord{Value: "water_liquid", Name: "Water, Liquid", Color: waterColor},                                                   // nolint: lll
+	PredefinedMaterialRecord{Value: "water_vapor", Name: "Water Vapor", Color: waterColor},                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "xylene", Name: "Xylene", Color: Gray},                                                                      // nolint: lll
+	PredefinedMaterialRecord{Value: "vacuum", Name: "Vacuum", Color: Gray},                                                                      // nolint: lll
 }
 
 // IsotopesList ...

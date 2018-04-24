@@ -15,7 +15,7 @@ func TestMessagesMarshalling(t *testing.T) {
 		message     interface{}
 	}{
 		{
-			jsonMessage: `{"MessageType": "HelloRequest", "Token":"abc", "AvailableComputingLibrariesNames": ["shield", "fluka"]}`,
+			jsonMessage: `{"MessageType": "HelloRequest", "Token":"abc", "AvailableComputingLibrariesNames": ["shield", "fluka"]}`, // nolint: lll
 			message: &HelloRequestMessage{
 				Token: "abc",
 				AvailableComputingLibrariesNames: []string{"shield", "fluka"},
@@ -28,7 +28,7 @@ func TestMessagesMarshalling(t *testing.T) {
 			},
 		},
 		{
-			jsonMessage: `{"MessageType": "RunSimulation", "ComputingLibraryName": "shield", "Files": {"mat.dat": "*", "geo.dat": "**"}}`,
+			jsonMessage: `{"MessageType": "RunSimulation", "ComputingLibraryName": "shield", "Files": {"mat.dat": "*", "geo.dat": "**"}}`, // nolint: lll
 			message: &RunSimulationMessage{
 				ComputingLibraryName: "shield",
 				Files: map[string]string{
@@ -38,7 +38,7 @@ func TestMessagesMarshalling(t *testing.T) {
 			},
 		},
 		{
-			jsonMessage: `{"MessageType": "SimulationResults", "Files": {"a.dat": "x", "b.dat": "D"}, "Errors": ["some error occurred"]}`,
+			jsonMessage: `{"MessageType": "SimulationResults", "Files": {"a.dat": "x", "b.dat": "D"}, "Errors": ["some error occurred"]}`, // nolint: lll
 			message: &SimulationResultsMessage{
 				Files: map[string]string{
 					"a.dat": "x",

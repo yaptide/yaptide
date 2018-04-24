@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/yaptide/yaptide/config"
 	"github.com/yaptide/yaptide/model"
 )
 
@@ -26,21 +25,20 @@ type worker struct {
 	dirInPath           string
 	dirOutPath          string
 	workerFinishChannel chan bool
-	job                 FileSimulationInput
-	results             FileSimulationResults
+	job                 SimulationInput
+	results             SimulationResults
 	outbuf              bytes.Buffer
 	errbuf              bytes.Buffer
 }
 
 func createWorker(
-	config *config.Config,
-	job FileSimulationInput,
+	job SimulationInput,
 	cmdCreator cmdCreator,
 ) (*worker, error) {
 	w := &worker{
 		job:                 job,
 		workerFinishChannel: make(chan bool),
-		results: FileSimulationResults{
+		results: SimulationResults{
 			Errors: map[string]string{},
 			Files:  map[string]string{},
 		},
@@ -107,7 +105,10 @@ func (w *worker) setupExecution() error {
 	log.Debug(binaryName)
 	binaryPath, lookupErr := exec.LookPath(binaryName)
 	if lookupErr != nil {
-		log.Error("[Runner.Local] Unable to find %s on PATH. Reason: %s", binaryName, lookupErr.Error())
+		log.Error(
+			"[Runner.Local] Unable to find %s on PATH. Reason: %s",
+			binaryName, lookupErr.Error(),
+		)
 		return lookupErr
 	}
 
@@ -183,7 +184,10 @@ func (w *worker) postSimulationSteps() {
 	for _, fileInfo := range files {
 		content, readFileErr := ioutil.ReadFile(path.Join(w.dirOutPath, fileInfo.Name()))
 		if readFileErr != nil {
-			log.Error("[Runner][Local] Can't open %s in simulation directory. Reason: %s", fileInfo.Name(), readFileErr.Error())
+			log.Error(
+				"[Runner][Local] Can't open %s in simulation directory. Reason: %s",
+				fileInfo.Name(), readFileErr.Error(),
+			)
 			w.results.Errors["readResultFiles"] = readFileErr.Error()
 			return
 		}

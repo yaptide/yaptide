@@ -20,7 +20,8 @@ const (
 
 var errBadMessageType = errors.New("Bad MessageType")
 
-// MarshalJSON custom implementation. It encode additional "MessageType" key to distinct message type.
+// MarshalJSON custom implementation. It encode additional "MessageType" key
+// to distinct message type.
 func (m *HelloRequestMessage) MarshalJSON() ([]byte, error) {
 	type Alias HelloRequestMessage
 	return json.Marshal(struct {
@@ -47,7 +48,8 @@ func (m *HelloRequestMessage) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, (Alias)(m))
 }
 
-// MarshalJSON custom implementation. It encode additional "MessageType" key to distinct message type.
+// MarshalJSON custom implementation. It encode additional "MessageType" key to
+// distinct message type.
 func (m *HelloResponseMessage) MarshalJSON() ([]byte, error) {
 	type Alias HelloResponseMessage
 	return json.Marshal(struct {
@@ -74,7 +76,8 @@ func (m *HelloResponseMessage) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, (Alias)(m))
 }
 
-// MarshalJSON custom implementation. It encode additional "MessageType" key to distinct message type.
+// MarshalJSON custom implementation. It encode additional "MessageType" key to distinct
+// message type.
 func (m *RunSimulationMessage) MarshalJSON() ([]byte, error) {
 	type Alias RunSimulationMessage
 	return json.Marshal(struct {
@@ -101,7 +104,8 @@ func (m *RunSimulationMessage) UnmarshalJSON(b []byte) error {
 	return json.Unmarshal(b, (Alias)(m))
 }
 
-// MarshalJSON custom implementation. It encode additional "MessageType" key to distinct message type.
+// MarshalJSON custom implementation. It encode additional "MessageType" key to distinct
+// message type.
 func (m *SimulationResultsMessage) MarshalJSON() ([]byte, error) {
 	type Alias SimulationResultsMessage
 	return json.Marshal(struct {

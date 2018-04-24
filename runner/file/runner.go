@@ -1,4 +1,5 @@
-// Package file implements mechanism of starting and supervising simulations. Simulations are started by running binary configured using config files.
+// Package file implements mechanism of starting and supervising simulations.
+// Simulations are started by running binary configured using config files.
 package file
 
 import (
@@ -18,22 +19,22 @@ type cmdCreator = func(string) []string
 
 // Runner starts and supervises running of shield simulations.
 type Runner struct {
-	jobsChannel        chan FileSimulationInput
+	jobsChannel        chan SimulationInput
 	workerReleased     chan bool
 	maxNumberOfWorkers int64
 	workers            map[*worker]bool
 	cmdCreator         func(workDir string) []string
 }
 
-// FileSimulationInput localSimulationInput.
-type FileSimulationInput interface {
+// SimulationInput localSimulationInput.
+type SimulationInput interface {
 	Files() map[string]string
-	ResultCallback(FileSimulationResults)
+	ResultCallback(SimulationResults)
 	StatusUpdate(model.VersionStatus)
 }
 
-// FileSimulationResults localSimulationResults.
-type FileSimulationResults struct {
+// SimulationResults localSimulationResults.
+type SimulationResults struct {
 	Files     map[string]string
 	LogStdOut string
 	LogStdErr string
@@ -43,7 +44,7 @@ type FileSimulationResults struct {
 // SetupRunner is RunnerSupervisor constructor.
 func SetupRunner(config *conf.Config, cmdCreator cmdCreator) *Runner {
 	runner := &Runner{
-		jobsChannel:        make(chan FileSimulationInput, maxNumberOfPendingJobs),
+		jobsChannel:        make(chan SimulationInput, maxNumberOfPendingJobs),
 		workerReleased:     make(chan bool, maxNumberOfPendingJobs),
 		maxNumberOfWorkers: 2,
 		workers:            map[*worker]bool{},
@@ -54,13 +55,13 @@ func SetupRunner(config *conf.Config, cmdCreator cmdCreator) *Runner {
 		runner.workerReleased <- true
 	}
 
-	go runner.listenForNewJobs(config)
+	go runner.listenForNewJobs()
 	return runner
 }
 
 // SubmitSimulation starts local simulation using file configured library.
-func (r *Runner) SubmitSimulation(simultion FileSimulationInput) error {
-	// TODO: potentialy blocking
+func (r *Runner) SubmitSimulation(simultion SimulationInput) error {
+	// TODO: potentially blocking
 	if len(r.jobsChannel) < maxNumberOfPendingJobs {
 		log.Debug("Add pending simulation")
 		r.jobsChannel <- simultion //pending}
@@ -69,11 +70,11 @@ func (r *Runner) SubmitSimulation(simultion FileSimulationInput) error {
 	return fmt.Errorf("too much jobs pending")
 }
 
-func (r *Runner) listenForNewJobs(config *conf.Config) {
+func (r *Runner) listenForNewJobs() {
 	for {
 		<-r.workerReleased
 		job := <-r.jobsChannel
-		newWorker, createErr := createWorker(config, job, r.cmdCreator)
+		newWorker, createErr := createWorker(job, r.cmdCreator)
 		if createErr != nil {
 			continue
 		}

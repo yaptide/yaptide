@@ -21,7 +21,11 @@ import (
 // It use JSON messages from github.com/yaptide/yaptide/worker/protocol as protocol.
 func ConnectAndServe(config config.Config, simulationRunner simulation.Runner) error {
 	conn := connect(config.Address, protocol.YaptideListenPath)
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Error(err)
+		}
+	}()
 
 	isValidToken, err := helloMessageHandshake(conn, config.Token, simulationRunner)
 
@@ -58,7 +62,9 @@ func connect(address, path string) *websocket.Conn {
 	}
 }
 
-func helloMessageHandshake(conn *websocket.Conn, token string, simRunner simulation.Runner) (bool, error) {
+func helloMessageHandshake(
+	conn *websocket.Conn, token string, simRunner simulation.Runner,
+) (bool, error) {
 	err := conn.WriteJSON(
 		protocol.HelloRequestMessage{
 			Token: token,
@@ -108,14 +114,17 @@ func messageReadLoop(conn *websocket.Conn, simulationRunner simulation.Runner) {
 }
 
 func closeConnectionOnInterruptSignal(conn *websocket.Conn) {
-	interrupt := make(chan os.Signal)
+	interrupt := make(chan os.Signal, 10)
 	signal.Notify(interrupt, os.Interrupt)
 
 	<-interrupt
 	log.Info("interrupt")
-	conn.WriteMessage(
+	writeErr := conn.WriteMessage(
 		websocket.CloseMessage,
 		websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
 	)
+	if writeErr != nil {
+		log.Error(writeErr)
+	}
 	time.Sleep(2 * time.Second)
 }
