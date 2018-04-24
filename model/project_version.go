@@ -26,7 +26,7 @@ func (v *Version) UpdateStatus(status VersionStatus) error {
 		return errors.ErrInternalServerError
 	}
 	if status == New {
-		return fmt.Errorf("can't change status of exisitng version to new")
+		return fmt.Errorf("can't change status of existing version to new")
 	}
 	v.Status = status
 	return nil
@@ -59,7 +59,7 @@ const (
 	Failure
 
 	// Interrupted version status. It is set, when simulation processing is interrupted
-	// due to technical difficultes like broken connection or server crash.
+	// due to technical difficulties like broken connection or server crash.
 	Interrupted
 
 	// Canceled version status. It is after request to cancel simulation.
@@ -88,19 +88,6 @@ func (v VersionStatus) IsValid() bool {
 // IsFinal ...
 func (v VersionStatus) IsFinal() bool {
 	return v == Success || v == Archived
-}
-
-func defaultProjectVersion(
-	setupID bson.ObjectId, resultID bson.ObjectId,
-) Version {
-	return Version{
-		ID:        0,
-		Status:    New,
-		Settings:  defaultProjectVersionSettings(),
-		SetupID:   setupID,
-		ResultID:  resultID,
-		UpdatedAt: time.Now(),
-	}
 }
 
 var mapVersionStatusToJSON = map[VersionStatus]string{

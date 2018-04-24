@@ -5,10 +5,11 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
-func ConvertToObjectId(id string) (binaryId bson.ObjectId, convertErr error) {
+// ConvertToObjectID ...
+func ConvertToObjectID(id string) (binaryID bson.ObjectId, convertErr error) {
 	defer func() {
 		if err := recover(); err != nil {
-			binaryId = ""
+			binaryID = ""
 			convertErr = errors.ErrNotFound
 		}
 	}()

@@ -43,15 +43,21 @@ func (c collection) RemoveID(id bson.ObjectId) error {
 func (c collection) Update(selector bson.M, update interface{}) error {
 	return c.collection.Update(selector, update)
 }
-func (c collection) UpdateAll(selector bson.M, update interface{}) (info *mgo.ChangeInfo, err error) {
+func (c collection) UpdateAll(
+	selector bson.M, update interface{},
+) (info *mgo.ChangeInfo, err error) {
 	return c.collection.UpdateAll(selector, update)
 }
 func (c collection) UpdateID(id bson.ObjectId, update interface{}) error {
 	return c.collection.UpdateId(id, update)
 }
-func (c collection) Upsert(selector bson.M, update interface{}) (info *mgo.ChangeInfo, err error) {
+func (c collection) Upsert(
+	selector bson.M, update interface{},
+) (info *mgo.ChangeInfo, err error) {
 	return c.collection.Upsert(selector, update)
 }
-func (c collection) UpsertID(id bson.ObjectId, update interface{}) (info *mgo.ChangeInfo, err error) {
+func (c collection) UpsertID(
+	id bson.ObjectId, update interface{},
+) (info *mgo.ChangeInfo, err error) {
 	return c.collection.UpsertId(id, update)
 }

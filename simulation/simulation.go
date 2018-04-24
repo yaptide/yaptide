@@ -1,4 +1,5 @@
-// Package processor implements processing all simulation requests. Is responsible for serialization, starting simulation and processing results.
+// Package simulation implements processing all simulation requests. Is responsible
+// for serialization, starting simulation and processing results.
 package simulation
 
 import (
@@ -22,7 +23,7 @@ type Handler struct {
 	shieldFileLocalRunner *file.Runner
 }
 
-// NewProcessor constructor.
+// NewHandler constructor.
 func NewHandler(action *action.Resolver, db mongo.DB) *Handler {
 	processor := &Handler{
 		action: action,
@@ -33,9 +34,11 @@ func NewHandler(action *action.Resolver, db mongo.DB) *Handler {
 }
 
 // HandleSimulation processes simulation.
-func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userID bson.ObjectId) error {
-	ctx := action.NewContext(p.db, userID)
-	project, projectErr := p.action.ProjectGet(ctx, projectID)
+func (h *Handler) HandleSimulation(
+	projectID bson.ObjectId, versionID int, userID bson.ObjectId,
+) error {
+	ctx := action.NewContext(h.db, userID)
+	project, projectErr := h.action.ProjectGet(ctx, projectID)
 	if projectErr != nil {
 		log.Warnf("project %s get failed [%s]", projectID.Hex(), projectErr.Error())
 		return projectErr
@@ -46,7 +49,7 @@ func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userI
 	}
 	version := project.Versions[versionID]
 
-	setup, setupErr := p.action.SimulationSetupGet(ctx, version.SetupID)
+	setup, setupErr := h.action.SimulationSetupGet(ctx, version.SetupID)
 	if setupErr != nil {
 		return setupErr
 	}
@@ -55,7 +58,7 @@ func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userI
 		return err
 	}
 
-	request, requestErr := p.selectRequestFormSettings(version, projectID)
+	request, requestErr := h.selectRequestFormSettings(version, projectID)
 	if requestErr != nil {
 		return requestErr
 	}
@@ -69,6 +72,7 @@ func (p *Handler) HandleSimulation(projectID bson.ObjectId, versionID int, userI
 	log.Debug("[SimulationProcessor] Start simulation request (enqueue in runner)")
 	startSimulationErr := request.StartSimulation()
 	if startSimulationErr != nil {
+		log.Warn("simulation start failed with Error[%s]", startSimulationErr.Error())
 		return startSimulationErr
 	}
 

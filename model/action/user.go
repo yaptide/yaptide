@@ -8,6 +8,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// UserGet ...
 func (r *Resolver) UserGet(
 	db mongo.DB, userID bson.ObjectId,
 ) (*model.User, error) {
@@ -22,6 +23,7 @@ func (r *Resolver) UserGet(
 	return user, nil
 }
 
+// UserRegister ...
 func (r *Resolver) UserRegister(
 	db mongo.DB, input *model.UserRegisterInput,
 ) (*model.User, error) {
@@ -39,11 +41,15 @@ func (r *Resolver) UserRegister(
 	return user, nil
 }
 
+// UserLogin ...
 func (r *Resolver) UserLogin(
 	db mongo.DB, input *model.UserLoginInput,
 ) (string, *model.User, error) {
 	user := &model.User{}
-	db.User().Find(bson.M{mongo.UserIDKeyUsername: input.Username}).One(user)
+	if err := db.User().Find(bson.M{"username": input.Username}).One(user); err != nil {
+		log.Warn(err)
+		return "", nil, errors.ErrNotFound
+	}
 	if err := input.Validate(); err != nil {
 		log.Warning(err.Error())
 		return "", nil, err

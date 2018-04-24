@@ -24,7 +24,10 @@ func Read() Config {
 	config := Config{}
 
 	flag.StringVar(&config.Address, "address", "", "yaptide host:port")
-	flag.StringVar(&config.LoggingLevel, "logging-level", "info", "logging level, one of: "+availableLoggingLevelsString)
+	flag.StringVar(
+		&config.LoggingLevel, "logging-level", "info",
+		fmt.Sprintf("logging level, one of: %s", availableLoggingLevelsString),
+	)
 	flag.StringVar(&config.Token, "token", "", "token used for authentication")
 	flag.Parse()
 

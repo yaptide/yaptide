@@ -17,7 +17,6 @@
         "safesql",
         "structcheck",
         "unconvert",
-        "unparam",
         "varcheck",
         "_dupl",
         "_govet",

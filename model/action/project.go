@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// ProjectGetAll ...
 func (r *Resolver) ProjectGetAll(ctx *context) ([]model.Project, error) {
 	projects := []model.Project{}
 	getErr := ctx.db.Project().Find(bson.M{"userId": ctx.userID}).All(&projects)
@@ -16,6 +17,7 @@ func (r *Resolver) ProjectGetAll(ctx *context) ([]model.Project, error) {
 	return projects, nil
 }
 
+// ProjectGet ...
 func (r *Resolver) ProjectGet(
 	ctx *context, projectID bson.ObjectId,
 ) (*model.Project, error) {
@@ -33,6 +35,7 @@ func (r *Resolver) ProjectGet(
 	return project, nil
 }
 
+// ProjectCreate ...
 func (r *Resolver) ProjectCreate(
 	ctx *context, input *model.ProjectCreateInput,
 ) (*model.Project, error) {
@@ -62,6 +65,7 @@ func (r *Resolver) ProjectCreate(
 	return project, nil
 }
 
+// ProjectUpdate ...
 func (r *Resolver) ProjectUpdate(
 	ctx *context, projectID bson.ObjectId, input *model.ProjectUpdateInput,
 ) error {
@@ -82,6 +86,7 @@ func (r *Resolver) ProjectUpdate(
 	return nil
 }
 
+// ProjectRemove ...
 func (r *Resolver) ProjectRemove(
 	ctx *context, projectID bson.ObjectId,
 ) error {

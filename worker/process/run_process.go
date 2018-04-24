@@ -16,7 +16,9 @@ const (
 	maxJobDuration = 1000 * time.Second
 )
 
-func runProcess(createCMD CreateCMD, inputFiles map[string]string, maxJobDuration time.Duration) Result {
+func runProcess(
+	createCMD CreateCMD, inputFiles map[string]string, maxJobDuration time.Duration,
+) Result {
 	result := Result{Errors: []string{}}
 
 	workingDirPath, resultsDirPath, err := setupWorkingDirectory(inputFiles)
@@ -52,7 +54,9 @@ func runProcess(createCMD CreateCMD, inputFiles map[string]string, maxJobDuratio
 	return result
 }
 
-func setupWorkingDirectory(inputFiles map[string]string) (workingDirPath string, resultsDirPath string, err error) {
+func setupWorkingDirectory(
+	inputFiles map[string]string,
+) (workingDirPath string, resultsDirPath string, err error) {
 	workingDirPath, err = ioutil.TempDir("", "yaptide-worker-working-dir-")
 	if err != nil {
 		return "", "", fmt.Errorf("working dir creation error: %s", err.Error())
@@ -80,7 +84,9 @@ func setupWorkingDirectory(inputFiles map[string]string) (workingDirPath string,
 	return workingDirPath, resultsDirPath, err
 }
 
-func runCmdAndWaitForResults(cmd *exec.Cmd, maxJobDuration time.Duration) (stdout string, stderr string, err error) {
+func runCmdAndWaitForResults(
+	cmd *exec.Cmd, maxJobDuration time.Duration,
+) (stdout string, stderr string, err error) {
 	processFinished := make(chan error)
 
 	stdoutBuff := &bytes.Buffer{}

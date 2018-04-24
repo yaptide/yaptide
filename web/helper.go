@@ -56,14 +56,14 @@ func extractUserID(ctx context.Context) bson.ObjectId {
 func extractBsonURLParamIDContext(ctx context.Context, name string) bson.ObjectId {
 	chiContext := chi.RouteContext(ctx)
 	stringID := chiContext.URLParam(name)
-	id, idErr := mongo.ConvertToObjectId(stringID)
+	id, idErr := mongo.ConvertToObjectID(stringID)
 	if idErr != nil {
 		panic(fmt.Errorf("malformed %s", name))
 	}
 	return id
 }
 
-func extractIntURLParamIDContext(ctx context.Context, name string) int {
+func extractIntURLParamIDContext(ctx context.Context, name string) int { // nolint: unparam
 	chiContext := chi.RouteContext(ctx)
 	stringID := chiContext.URLParam(name)
 	id, idErr := strconv.Atoi(stringID)
@@ -79,7 +79,7 @@ func extractProjectID(ctx context.Context) bson.ObjectId {
 func extractVersionID(ctx context.Context) int {
 	return extractIntURLParamIDContext(ctx, "versionId")
 }
-func extractSimualtionSetupID(ctx context.Context) bson.ObjectId {
+func extractSimulationSetupID(ctx context.Context) bson.ObjectId {
 	return extractBsonURLParamIDContext(ctx, "setupId")
 }
 func extractSimulationResultID(ctx context.Context) bson.ObjectId {
@@ -95,14 +95,6 @@ func writeJSONResponse(w http.ResponseWriter, httpStatus int, body interface{}) 
 	w.WriteHeader(httpStatus)
 	_, writeErr := w.Write(marshaled)
 	return writeErr
-}
-
-func decodeJSONRequest(r *http.Request, unpackObject interface{}) error {
-	err := json.NewDecoder(r.Body).Decode(unpackObject)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 func handleRequestErr(w http.ResponseWriter, err error) {

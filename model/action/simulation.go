@@ -7,6 +7,7 @@ import (
 	"gopkg.in/mgo.v2/bson"
 )
 
+// SimulationContext ...
 type SimulationContext struct {
 	db             mongo.DB
 	actionResolver *Resolver
@@ -14,7 +15,10 @@ type SimulationContext struct {
 	versionID      int
 }
 
-func (r *Resolver) NewSimulationContext(db mongo.DB, projectID bson.ObjectId, versionID int) *SimulationContext {
+// NewSimulationContext ...
+func (r *Resolver) NewSimulationContext(
+	db mongo.DB, projectID bson.ObjectId, versionID int,
+) *SimulationContext {
 	return &SimulationContext{
 		db:             db,
 		actionResolver: r,
@@ -23,11 +27,15 @@ func (r *Resolver) NewSimulationContext(db mongo.DB, projectID bson.ObjectId, ve
 	}
 }
 
+// StatusUpdate ...
 func (s *SimulationContext) StatusUpdate(newStatus model.VersionStatus) {
 
 }
 
-func (s *SimulationContext) SetProjectResults(results *converter.Result, simulationErr error) error {
+// SetProjectResults ...
+func (s *SimulationContext) SetProjectResults(
+	results *converter.Result, simulationErr error,
+) error {
 	project := model.Project{}
 	getErr := s.db.Project().FindID(s.projectID).One(&project)
 	if getErr != nil {

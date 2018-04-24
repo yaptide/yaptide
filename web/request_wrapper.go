@@ -50,20 +50,32 @@ func requestWrapperValidateSignature(handler interface{}) (reflect.Type, error) 
 			return nil, fmt.Errorf("second argument of %v is not ptr", handlerType)
 		}
 	} else {
-		return nil, fmt.Errorf("handler %v has to much arguments %d", handlerType, handlerType.NumIn())
+		return nil, fmt.Errorf(
+			"handler %v has to much arguments %d",
+			handlerType, handlerType.NumIn(),
+		)
 	}
 
 	errorType := reflect.TypeOf((*error)(nil)).Elem()
 	if handlerType.NumOut() == 1 {
 		if !handlerType.Out(0).Implements(errorType) {
-			return nil, fmt.Errorf("first return value of %v doesn't implement error interface", handlerType)
+			return nil, fmt.Errorf(
+				"first return value of %v doesn't implement error interface",
+				handlerType,
+			)
 		}
 	} else if handlerType.NumOut() == 2 {
 		if !handlerType.Out(1).Implements(errorType) {
-			return nil, fmt.Errorf("second return value of %v doesn't implement error interface", handlerType)
+			return nil, fmt.Errorf(
+				"second return value of %v doesn't implement error interface",
+				handlerType,
+			)
 		}
 	} else {
-		return nil, fmt.Errorf("handler %v has to much return values %d", handlerType, handlerType.NumOut())
+		return nil, fmt.Errorf(
+			"handler %v has to much return values %d", handlerType,
+			handlerType.NumOut(),
+		)
 	}
 
 	if handlerType.NumIn() == 2 {

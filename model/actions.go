@@ -31,8 +31,8 @@ func (p ProjectUpdateInput) Validate() error {
 
 // ProjectVersionUpdateSettings ...
 type ProjectVersionUpdateSettings struct {
-	SimulationEngine *SimulationEngine `json:"simulationEngine,omitempty" bson:"simulationEngine,omitempty"`
-	ComputingLibrary *ComputingLibrary `json:"computingLibrary,omitempty" bson:"computingLibrary,omitempty"`
+	SimulationEngine *SimulationEngine `json:"simulationEngine,omitempty" bson:"simulationEngine,omitempty"` // nolint: lll
+	ComputingLibrary *ComputingLibrary `json:"computingLibrary,omitempty" bson:"computingLibrary,omitempty"` // nolint: lll
 }
 
 // UserLoginInput ...

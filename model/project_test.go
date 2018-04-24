@@ -33,7 +33,7 @@ var onlyMarshalling = test.MarshallingCases{
 	{
 		&Version{ID: 1,
 			Status:   New,
-			Settings: NewSettings(),
+			Settings: Settings{},
 			SetupID:  bson.ObjectIdHex("bbbbbbbbbbbbbbbbbbbbbbbb"),
 			ResultID: bson.ObjectIdHex("aaaaaaaaaaaaaaaaaaaaaaaa"),
 		},

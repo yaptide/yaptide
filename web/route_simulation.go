@@ -12,7 +12,7 @@ func (h *handler) getSimulationResult(
 	ctx context.Context,
 ) (*model.SimulationResult, error) {
 	a := extractActionContext(ctx)
-	resultID := extractSimualtionSetupID(ctx)
+	resultID := extractSimulationResultID(ctx)
 
 	result, resultErr := h.Resolver.SimulationResultGet(a, resultID)
 	if resultErr != nil {
@@ -26,7 +26,7 @@ func (h *handler) getSimulationSetup(
 	ctx context.Context,
 ) (*model.SimulationSetup, error) {
 	a := extractActionContext(ctx)
-	setupID := extractSimualtionSetupID(ctx)
+	setupID := extractSimulationSetupID(ctx)
 
 	setup, setupErr := h.Resolver.SimulationSetupGet(a, setupID)
 	if setupErr != nil {
@@ -40,7 +40,7 @@ func (h *handler) updateSimulationSetup(
 	ctx context.Context, input *converter.Setup,
 ) (*model.SimulationSetup, error) {
 	a := extractActionContext(ctx)
-	setupID := extractSimualtionSetupID(ctx)
+	setupID := extractSimulationSetupID(ctx)
 
 	if err := h.Resolver.SimulationSetupUpdate(a, setupID, input); err != nil {
 		return nil, err

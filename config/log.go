@@ -23,6 +23,7 @@ func NamedLogger(name string) logrus.Logger {
 	}
 }
 
+// CustomTextFormatter ...
 type CustomTextFormatter struct {
 	logrus.TextFormatter
 }

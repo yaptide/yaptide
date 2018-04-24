@@ -42,7 +42,7 @@ func (m MarshalDisabler) GetBSON() (interface{}, error) {
 }
 
 // SetBSON ...
-func (s *MarshalDisabler) SetBSON(raw bson.Raw) error {
+func (m *MarshalDisabler) SetBSON(raw bson.Raw) error {
 	return nil
 }
 

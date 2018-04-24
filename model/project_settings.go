@@ -44,13 +44,6 @@ const (
 	LocalMachine
 )
 
-func defaultProjectVersionSettings() Settings {
-	return Settings{
-		SimulationEngine: UnassignedEngine,
-		ComputingLibrary: UnassignedLibrary,
-	}
-}
-
 var mapComputingLibraryToJSON = map[ComputingLibrary]string{
 	UnassignedLibrary: "",
 	ShieldLibrary:     "shield",
@@ -73,11 +66,6 @@ var mapJSONToSimulationEngine = map[string]SimulationEngine{
 	"local": LocalMachine,
 }
 
-// NewSettings constructor.
-func NewSettings() Settings {
-	return Settings{}
-}
-
 // MarshalJSON json.Marshaller implementation.
 func (l ComputingLibrary) MarshalJSON() ([]byte, error) {
 	res, ok := mapComputingLibraryToJSON[l]
@@ -97,7 +85,10 @@ func (l *ComputingLibrary) UnmarshalJSON(b []byte) error {
 
 	lib, ok := mapJSONToComputingLibrary[input]
 	if !ok {
-		return fmt.Errorf("[Model.ComputingLibrary.UnmarshalJSON] Warning: can not convert %s to ComputingLibrary", input)
+		return fmt.Errorf(
+			"[Model.ComputingLibrary.UnmarshalJSON] Warning: can not convert %s to ComputingLibrary",
+			input,
+		)
 	}
 	*l = lib
 	return nil
@@ -122,7 +113,10 @@ func (s *SimulationEngine) UnmarshalJSON(b []byte) error {
 
 	engine, ok := mapJSONToSimulationEngine[input]
 	if !ok {
-		return fmt.Errorf("[Model.SimulationEngine.UnmarshalJSON] Warning: can not convert %s to SimulationEngine", input)
+		return fmt.Errorf(
+			"[Model.SimulationEngine.UnmarshalJSON] Warning: can not convert %s to SimulationEngine",
+			input,
+		)
 	}
 	*s = engine
 	return nil
