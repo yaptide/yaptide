@@ -42,7 +42,7 @@
             "IsFast":            true
         }
     },
-    "Exclude": ["^test/", "^cmd/builder/"],
+    "Exclude": ["^test/"],
     "Cyclo": 20,
     "Test": true,
     "LineLength": 100
