@@ -11,11 +11,7 @@ from django.urls import reverse
 from yaptide.users.forms import UserChangeForm
 from yaptide.users.models import User
 from yaptide.users.tests.factories import UserFactory
-from yaptide.users.views import (
-    UserRedirectView,
-    UserUpdateView,
-    user_detail_view,
-)
+from yaptide.users.views import UserRedirectView, UserUpdateView, user_detail_view
 
 pytestmark = pytest.mark.django_db
 
