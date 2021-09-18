@@ -1,6 +1,6 @@
 from warnings import resetwarnings
-from packages import api, db
-from packages.models import ExampleUserModel
+from yaptide.persistence.database import db
+from yaptide.persistence.models import ExampleUserModel
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 
 
@@ -57,8 +57,9 @@ class ExampleUserResource(Resource):
         print(user)
         return user, 202
 
-
-api.add_resource(ExampleUserResource,
-                 "/example_user/<int:user_id>", "/example_user")
-
 ############################################
+
+
+def initialize_routes(api):
+    api.add_resource(ExampleUserResource,
+                     "/example_user/<int:user_id>", "/example_user")

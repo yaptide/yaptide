@@ -1,5 +1,4 @@
-from os import name
-from packages import db
+from yaptide.persistence.database import db
 
 ############### Example user ###############
 # (this is an example model, demonstration pourpose only)
@@ -14,3 +13,6 @@ class ExampleUserModel(db.Model):
 
 
 ############################################
+
+def create_models():
+    db.create_all()
