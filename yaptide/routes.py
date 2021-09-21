@@ -3,6 +3,19 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 
+resources = []
+
+############### Hello world ###############
+# (this is used to test if app is running)
+
+
+class HelloWorld(Resource):
+    def get(self):
+        return {'message': 'Hello world!'}
+
+
+############################################
+
 
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
@@ -63,3 +76,4 @@ class ExampleUserResource(Resource):
 def initialize_routes(api):
     api.add_resource(ExampleUserResource,
                      "/example_user/<int:user_id>", "/example_user")
+    api.add_resource(HelloWorld, "/")
