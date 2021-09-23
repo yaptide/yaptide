@@ -24,6 +24,3 @@ def test_app_started(client):
     resp = client.get("/")
 
     assert resp.json['message'] == 'Hello world!'
-
-
-def test_
