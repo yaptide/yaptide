@@ -22,10 +22,10 @@ docker build -t yaptide .
 Once built, you can run a container using the following command:
 
 ```shell
-docker run -dp 5000:5000 yaptide
+docker run -dp 5000:5000 --name=yaptide yaptide
 ```
 
-Once it's running, the app will be available at [http://localhost:5000](http://localhost:5000).
+Once it's running, the app will be available at [http://localhost:5000](http://localhost:5000). If you get an error saying the container name is already in use, stop and remove the container and then try again.
 
 When you're ready to stop the container, use the following command:
 
