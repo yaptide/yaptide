@@ -26,3 +26,10 @@ docker run -dp 5000:5000 yaptide
 ```
 
 Once it's running, the app will be available at [http://localhost:5000](http://localhost:5000).
+
+When you're ready to stop the container, use the following command:
+
+```shell
+docker stop yaptide
+docker rm yaptide
+```
