@@ -11,3 +11,18 @@ Run: ```$ pip install -r requrements.txt```
    * To persist the database between runs this ```with app.app_context():
         models.create_models()``` in yaptide/application.py inside the ```create_app``` factory.
 
+# Building/Running with Docker
+
+You can build the app using the following command:
+
+```shell
+docker build -t yaptide .
+```
+
+Once built, you can run a container using the following command:
+
+```shell
+docker run -dp 5000:5000 yaptide
+```
+
+Once it's running, the app will be available at [http://localhost:5000](http://localhost:5000).
