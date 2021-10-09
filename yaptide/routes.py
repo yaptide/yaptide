@@ -3,7 +3,6 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 
-<<<<<<< HEAD
 resources = []
 
 ############### Hello world ###############
@@ -17,8 +16,6 @@ class HelloWorld(Resource):
 
 ############################################
 
-=======
->>>>>>> 453880b (Refactor of project structure, application and database)
 
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
@@ -79,7 +76,4 @@ class ExampleUserResource(Resource):
 def initialize_routes(api):
     api.add_resource(ExampleUserResource,
                      "/example_user/<int:user_id>", "/example_user")
-<<<<<<< HEAD
     api.add_resource(HelloWorld, "/")
-=======
->>>>>>> 453880b (Refactor of project structure, application and database)
