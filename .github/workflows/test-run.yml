@@ -1,4 +1,4 @@
-# A basic CI workflow that tests if the app works and then deploys it on a openstack machine
+# A basic CI workflow that tests if the app works and then deploys it on an openstack machine
 
 name: CI
 
