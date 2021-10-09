@@ -45,6 +45,7 @@ jobs:
       #add secret to ssh-agent (the key secret cannot be directly supplied to scp command since it requires a file containig the key, not the key itself)
       #the ssh-agent action adds the key to the ssh-agent on the ubuntu machine that executes this workflow without the need to write the key to a file
       - name: Add key to ssh-agent
+        # if: github.ref == 'refs/heads/master'
         uses: webfactory/ssh-agent@v0.5.3
         with: 
           ssh-private-key: ${{ secrets.DEPLOY_C3_TEST }}
