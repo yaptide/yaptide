@@ -31,6 +31,6 @@ jobs:
       - name: Instal dependencies
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt
+          pip3 install -r requrements.txt
       - name: Run main tests
         run: pytest
