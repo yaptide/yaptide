@@ -2,4 +2,8 @@ flask
 flask-sqlalchemy
 flask-restful
 pytest
+<<<<<<< HEAD
 environs
+=======
+environs
+>>>>>>> a9d85a0 (Fix missing requirements again)
