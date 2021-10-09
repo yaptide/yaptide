@@ -16,13 +16,15 @@ jobs:
 
     steps:
       # Get repository
-      - uses: actions/checkout@v2
       - name: Checkout
-
-        #install requirements.txt
+        uses: actions/checkout@v2
+      
+      - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: "3.8"
+          
+      #install requirements.txt
       - name: Instal dependencies
         run: |
           python3 -m pip install --upgrade pip
@@ -37,8 +39,8 @@ jobs:
     needs: [build-and-test]
     steps:
       #get the repo
-      - uses: actions/checkout@v2
       - name: Checkout
+        uses: actions/checkout@v2
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
@@ -48,7 +50,7 @@ jobs:
 
       - name: Build and run the app via ssh
         # if: github.ref == 'refs/heads/master'
-      - uses: appleboy/ssh-action@master
+        uses: appleboy/ssh-action@master
         with:
           host: ubuntu@30.30.30.8
           key: ${{ secrets.DEPLOY_C3_TEST }}
