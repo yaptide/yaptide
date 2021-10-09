@@ -45,7 +45,7 @@ jobs:
 
       - name: Build and run the app via ssh
         # if: github.ref == 'refs/heads/master'
-        uses: appleboy/ssh-action@master
+      - uses: appleboy/ssh-action@master
         with:
           host: ubuntu@30.30.30.8
           key: ${{ secrets.DEPLOY_C3_TEST }}
