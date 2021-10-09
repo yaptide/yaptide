@@ -24,3 +24,9 @@ def test_app_started(client):
     resp = client.get("/")
 
     assert resp.json['message'] == 'Hello world!'
+<<<<<<< HEAD
+=======
+
+
+def test_
+>>>>>>> 7314096 (Fixed tests)
