@@ -54,7 +54,7 @@ jobs:
       - name: Copy files to machine
         # if: github.ref == 'refs/heads/master'
         run: |
-          scp -A -oProxyJump="ubuntu@149.156.182.181" -r ..\yaptide ubuntu@30.30.30.8:~
+          scp -3 -oProxyJump="ubuntu@149.156.182.181" -r ..\yaptide ubuntu@30.30.30.8:~
 
       - name: Build and run the app via ssh
         # if: github.ref == 'refs/heads/master'
