@@ -1,9 +1,5 @@
 flask
 flask-sqlalchemy
 flask-restful
-<<<<<<< HEAD
 pytest
 environs
-=======
-pytest
->>>>>>> daeb6ab (Created app skeleton, added model and route examples)
