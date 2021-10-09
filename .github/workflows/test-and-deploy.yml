@@ -39,11 +39,12 @@ jobs:
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
         run: |
           scp -oProxyJump="ubuntu@149.156.182.181" -i ${{ secrets.DEPLOY_C3_TEST }} -r ..\yaptide ubuntu@30.30.30.8:~
 
       - name: Build and run the app via ssh
+        # if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: ubuntu@30.30.30.8
