@@ -49,7 +49,10 @@ jobs:
 #         uses: webfactory/ssh-agent@v0.5.3
 #         with: 
 #           ssh-private-key: ${{ secrets.DEPLOY_C3_TEST }}
-
+      - name: create test file
+        run: |
+          echo "test" >> pipelinetest.txt
+          ls
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
@@ -60,7 +63,7 @@ jobs:
           key: ${{ secrets.DEPLOY_C3_TEST }}
           proxy_host: ubuntu@149.156.182.181
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
-          source: $GITHUB_WORKSPACE
+          source: "./pipelinetest.txt"
           target: "~/yaptideTEST"
       
 #       - name: Copy files to machine
