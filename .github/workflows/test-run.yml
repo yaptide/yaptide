@@ -53,7 +53,10 @@ jobs:
           username: ubuntu
           key: ${{ secrets.DEPLOY_C3_TEST }}
           source: "./*"
-          target: "/yaptideTEST"
+          target: "/scptest"
+#       - name: Copy files to machine
+#         run: |
+#           echo ${{ secrets.DEPLOY_C3_TEST }} scp -i /dev/stdin -oProxyJump="ubuntu@149.156.182.181" -r ./* ubuntu@30.30.30.8:~/scptest
 
       - name: Build and run the app via ssh
 #         if: github.ref == 'refs/heads/master'
