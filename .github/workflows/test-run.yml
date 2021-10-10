@@ -54,6 +54,7 @@ jobs:
         uses: appleboy/ssh-action@master
         with:
           proxy_host: "149.156.182.181"
+          proxy_username: ubuntu
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           host: "30.30.30.8"
           username: ubuntu
