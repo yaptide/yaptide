@@ -67,7 +67,7 @@ jobs:
           username: ubuntu
           key: ${{ secrets.DEPLOY_C3_TEST }}
           source: "./test.txt"
-          target: "~/yaptideTEST"
+          target: "/yaptideTEST"
 
       - name: Build and run the app via ssh
 #         if: github.ref == 'refs/heads/master'
