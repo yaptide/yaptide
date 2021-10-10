@@ -44,29 +44,36 @@ jobs:
         
       #add secret to ssh-agent (the key secret cannot be directly supplied to scp command since it requires a file containig the key, not the key itself)
       #the ssh-agent action adds the key to the ssh-agent on the ubuntu machine that executes this workflow without the need to write the key to a file
-      - name: Add key to ssh-agent
-        # if: github.ref == 'refs/heads/master'
-        uses: webfactory/ssh-agent@v0.5.3
-        with: 
-          ssh-private-key: ${{ secrets.DEPLOY_C3_TEST }}
-          
-      #test connection (added for debugging)
-      - name: test ssh connection
-        run: ssh ubuntu@30.30.30.8
+#       - name: Add key to ssh-agent
+#         if: github.ref == 'refs/heads/master'
+#         uses: webfactory/ssh-agent@v0.5.3
+#         with: 
+#           ssh-private-key: ${{ secrets.DEPLOY_C3_TEST }}
+
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
-        # if: github.ref == 'refs/heads/master'
-        run: |
-          scp -3 -oProxyJump="ubuntu@149.156.182.181" -r ..\yaptide ubuntu@30.30.30.8:~
+#         if: github.ref == 'refs/heads/master'
+        uses: appleboy/scp-action@master
+        with:
+          host: ubuntu@30.30.30.8
+          key: ${{ secrets.DEPLOY_C3_TEST }}
+          proxy_host: ubuntu@149.156.182.181
+          proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
+      
+#       - name: Copy files to machine
+#         if: github.ref == 'refs/heads/master'
+#         run: |
+#           scp -3 -oProxyJump="ubuntu@149.156.182.181" -r ..\yaptide ubuntu@30.30.30.8:~
 
       - name: Build and run the app via ssh
-        # if: github.ref == 'refs/heads/master'
+#         if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: ubuntu@30.30.30.8
           key: ${{ secrets.DEPLOY_C3_TEST }}
           proxy_host: ubuntu@149.156.182.181
+          proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
             cd /yaptide
             python3 -m venv env
