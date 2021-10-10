@@ -2,6 +2,7 @@ from warnings import resetwarnings
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
+from yaptide.pymchelper.example import run_shieldhit
 
 resources = []
 
@@ -18,8 +19,7 @@ class HelloWorld(Resource):
 
 class ShieldhitDemo(Resource):
     def get(self):
-        # call shieldhit here
-        demo_result = {"some label": "some data"}
+        demo_result = run_shieldhit()
         return demo_result
 
 
@@ -83,3 +83,4 @@ def initialize_routes(api):
     api.add_resource(ExampleUserResource,
                      "/example_user/<int:user_id>", "/example_user")
     api.add_resource(HelloWorld, "/")
+    api.add_resource(ShieldhitDemo, "/sh/demo")
