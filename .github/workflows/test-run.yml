@@ -60,8 +60,8 @@ jobs:
           key: ${{ secrets.DEPLOY_C3_TEST }}
           proxy_host: ubuntu@149.156.182.181
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
-          source: ..\yaptide
-          target: ~/
+          source: "../yaptide"
+          target: "~"
       
 #       - name: Copy files to machine
 #         if: github.ref == 'refs/heads/master'
