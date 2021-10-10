@@ -16,6 +16,12 @@ class HelloWorld(Resource):
 
 ############################################
 
+class ShieldhitDemo(Resource):
+    def get(self):
+        # call shieldhit here
+        demo_result = {"some label": "some data"}
+        return demo_result
+
 
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
