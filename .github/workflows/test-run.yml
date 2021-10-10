@@ -52,7 +52,7 @@ jobs:
           
       #test connection (added for debugging)
       - name: test ssh connection
-        run: ssh -J ubuntu@149.156.182.181 ubuntu@30.30.30.8
+        run: ssh ubuntu@30.30.30.8
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
