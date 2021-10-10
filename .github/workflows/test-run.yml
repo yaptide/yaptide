@@ -49,6 +49,10 @@ jobs:
         uses: webfactory/ssh-agent@v0.5.3
         with: 
           ssh-private-key: ${{ secrets.DEPLOY_C3_TEST }}
+          
+      #test connection (added for debugging)
+      - name: test ssh connection
+        run: ssh -J ubuntu@149.156.182.181 ubuntu@30.30.30.8
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
