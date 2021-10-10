@@ -53,7 +53,8 @@ jobs:
       - name: Testing connection
         uses: appleboy/ssh-action@master
         with:
-          host: "149.156.182.181"
+          proxy_host: "149.156.182.181"
+          host: "30.30.30.8"
           username: ubuntu
           key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
