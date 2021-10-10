@@ -51,6 +51,7 @@ jobs:
         uses: shimataro/ssh-key-action@v2
         with:
           key: ${{ secrets.DEPLOY_C3_TEST }}
+          known_hosts: "149.156.182.181,149.156.182.181"
 
       #send it to the openstack machine via scp
       - name: Copy files to machine
