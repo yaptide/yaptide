@@ -2,7 +2,7 @@ from warnings import resetwarnings
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
-from yaptide.pymchelper.example import run_shieldhit
+from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 
 resources = []
 
