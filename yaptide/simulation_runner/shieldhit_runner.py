@@ -5,6 +5,8 @@ import logging
 import sys
 import argparse
 import timeit
+import shutil
+import tempfile
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import OutputDataType, Runner
@@ -25,7 +27,7 @@ def run_shieldhit(args=None):
     hardcode_jobs = 12
 
     # hardcoded path on ubuntu
-    hardcode_outputpath = '/home/ubuntu/test_output'
+    tmp_output_directory_path = tempfile.mkdtemp()
 
     settings = SimulationSettings(input_path=hardcode_inputpath,
                                   simulator_exec_path=hardcode_simulator_exec_path,
@@ -34,7 +36,7 @@ def run_shieldhit(args=None):
     # create runner object based on MC options and dedicated parallel jobs number
     # note that runner object is only created here, no simulation is started at this point
     # and no directories are being created
-    runner_obj = Runner(jobs=hardcode_jobs, keep_workspace_after_run=False, output_directory=hardcode_outputpath)
+    runner_obj = Runner(jobs=hardcode_jobs, keep_workspace_after_run=False, output_directory=tmp_output_directory_path)
 
     # start parallel execution of MC simulation
     # temporary directories needed for parallel execution as well as the output are being saved in `outdir`
@@ -51,7 +53,9 @@ def run_shieldhit(args=None):
     # and values being pymchelper `Estimator` objects (which keep i.e. numpy arrays with results)
     data_dict = runner_obj.get_data()
     
-    runner_obj.clean()
+    # runner_obj.clean()
+
+    shutil.rmtree(tmp_output_directory_path)
 
     return data_dict
 
