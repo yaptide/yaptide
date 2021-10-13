@@ -42,8 +42,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
     
+      - name: Install ssh key
+        uses: shimataro/ssh-key-action@v2.3.1
+        with:
+          key: ${{ secrets.DEPLOY_C3_TEST }}
+  
       - name: Copy files to machine
-        run: rsync -e "echo '${{ secrets.DEPLOY_C3_TEST }}' | ssh -i /dev/stdin ubuntu@149.156.182.181 echo '${{ secrets.DEPLOY_C3_TEST }}' | ssh -i /dev/stdin" . ubuntu@30.30.30.8:~/
+        run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" . ubuntu@30.30.30.8:~/
 
       - name: Build and run the app via ssh
 #         if: github.ref == 'refs/heads/master'
