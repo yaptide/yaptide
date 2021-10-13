@@ -42,11 +42,14 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v2
     
+      - name: set known_hosts env variable
+        run: expo
+      
       - name: Install ssh key
         uses: shimataro/ssh-key-action@v2.3.1
         with:
           key: ${{ secrets.DEPLOY_C3_TEST }}
-          known_hosts: "149.156.182.181,30.30.30.8"
+          known_hosts: ${{ secrets.DEPLOY_C3_KNOWN_HOSTS}}
   
       - name: Copy files to machine
         run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" . ubuntu@30.30.30.8:~/
