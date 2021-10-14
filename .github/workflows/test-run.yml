@@ -30,7 +30,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
 
-      - name: Test rsync
+      - name: Test rsync 
         run: |
           rsync -azv -e "ssh -o StrictHostKeyChecking=no -A -J ubuntu@149.156.182.181" yaptide ubuntu@30.30.30.8:/home/ubuntu/yaptide
 
