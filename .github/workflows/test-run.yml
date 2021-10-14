@@ -33,5 +33,5 @@ jobs:
       - name: Test rsync 
         run: |
           ssh-keyscan -H 149.156.182.181 >> ~/.ssh/known_hosts
-          rsync -azv -e "ssh -o StrictHostKeyChecking=no -A -J ubuntu@149.156.182.181" yaptide ubuntu@30.30.30.8:/home/ubuntu/yaptide
+          rsync -azv -e "ssh -A -J ubuntu@149.156.182.181" yaptide ubuntu@30.30.30.8:/home/ubuntu/yaptide
 
