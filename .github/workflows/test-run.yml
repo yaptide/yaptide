@@ -47,5 +47,5 @@ jobs:
       # inspired by https://superuser.com/questions/1115715/rsync-files-via-intermediate-host
       - name: Test rsync to backend
         run: |
-          rsync -azv -e "ssh -A -J ubuntu@149.156.182.181" yaptide ubuntu@30.30.30.8:/home/ubuntu/yaptide
+          rsync -azv -e "ssh -o StrictHostKeyChecking=no -A -J ubuntu@149.156.182.181" yaptide ubuntu@30.30.30.8:/home/ubuntu/yaptide
 
