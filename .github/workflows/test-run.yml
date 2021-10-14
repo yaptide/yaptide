@@ -30,8 +30,16 @@ jobs:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
 
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 .ssh
+          touch ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+          ssh-keyscan -H 149.156.182.181 >> ~/.ssh/known_hosts
+
+      # inspired by https://superuser.com/questions/1115715/rsync-files-via-intermediate-host
       - name: Test rsync 
         run: |
-          ssh-keyscan -H 149.156.182.181 >> ~/.ssh/known_hosts
           rsync -azv -e "ssh -A -J ubuntu@149.156.182.181" yaptide ubuntu@30.30.30.8:/home/ubuntu/yaptide
 
