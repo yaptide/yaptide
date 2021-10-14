@@ -24,28 +24,8 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
-      - name: setup app
-        uses: actions/setup-python@v2
-        with:
-          python-version: "3.8"
-      - name: Instal dependencies
-        run: |
-          python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt
 
-      - uses: omahn/wireguard-ssh-github-action@v1.4
-        with:
-          # Required. IP address of your WireGuard peer/endpoint. Must be publicly reachable.
-          peer_ip: '149.156.182.161'
-          # Required. SSH public key as a string.
-          ssh_public_key: ${{ secrets.WIREGUARD_PUBLIC_KEY }}
-          # Port of WireGuard peer.
-          peer_port: '51820'
-          # Private IP of GitHub WireGuard peer.
-          github_ip: '192.168.192.1'
-          # Seconds to wait for SSH connection.
-          ssh_connection_timeout: '300'
-          # Seconds to timeout SSH session.
-          session_timeout: 3600          
-      - name: Run main tests
-        run: pytest
+      - name: Test rsync
+        run: |
+          rsync -e "ssh -A ubuntu@149.156.182.181 ssh" . ubuntu@30.30.30.8:~/
+
