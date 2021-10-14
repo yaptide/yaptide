@@ -27,5 +27,5 @@ jobs:
 
       - name: Test rsync
         run: |
-          rsync -e "ssh -A ubuntu@149.156.182.181 ssh" . ubuntu@30.30.30.8:~/
+          rsync -e "ssh -o StrictHostKeyChecking=no -A ubuntu@149.156.182.181 ssh" . ubuntu@30.30.30.8:~/
 
