@@ -25,6 +25,11 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - uses: actions/checkout@v2
 
+      - uses: webfactory/ssh-agent@v0.5.3
+        with:
+          ssh-private-key: |
+            ${{ secrets.DEPLOY_C3_TEST }}
+
       - name: Test rsync
         run: |
           rsync -e "ssh -o StrictHostKeyChecking=no -A ubuntu@149.156.182.181 ssh" . ubuntu@30.30.30.8:~/
