@@ -49,7 +49,7 @@ jobs:
           known_hosts: ${{ secrets.DEPLOY_C3_KNOWN_HOSTS}}
   
       - name: Copy files to machine
-        run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" ./* ubuntu@30.30.30.8:~/yaptide
+        run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" ./* ubuntu@30.30.30.8:~/yaptide --delete
 
       - name: Build and run the app via ssh
 #         if: github.ref == 'refs/heads/master'
