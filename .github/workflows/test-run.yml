@@ -47,7 +47,16 @@ jobs:
         with:
           key: ${{ secrets.DEPLOY_C3_TEST }}
           known_hosts: ${{ secrets.DEPLOY_C3_KNOWN_HOSTS}}
-  
+          
+      - name: Kill flask app
+        uses: appleboy/ssh-action@master
+        with:
+          host: ubuntu@30.30.30.8
+          key: ${{ secrets.DEPLOY_C3_TEST }}
+          proxy_host: ubuntu@149.156.182.181
+          proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
+          script: pkill flask
+          
       - name: Copy files to machine
         run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" ./* ubuntu@30.30.30.8:~/yaptide --delete --recursive
 
