@@ -41,9 +41,6 @@ jobs:
       #get the repo
       - name: Checkout
         uses: actions/checkout@v2
-    
-      - name: set known_hosts env variable
-        run: expo
       
       - name: Install ssh key
         uses: shimataro/ssh-key-action@v2.3.1
