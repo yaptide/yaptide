@@ -51,9 +51,11 @@ jobs:
       - name: Kill flask app
         uses: appleboy/ssh-action@master
         with:
-          host: ubuntu@30.30.30.8
+          host: 30.30.30.8
+          username: ubuntu
           key: ${{ secrets.DEPLOY_C3_TEST }}
-          proxy_host: ubuntu@149.156.182.181
+          proxy_host: 149.156.182.181
+          proxy_username: ubuntu
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: pkill flask
           
@@ -64,9 +66,11 @@ jobs:
 #         if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
-          host: ubuntu@30.30.30.8
+          host: 30.30.30.8
+          username: ubuntu
           key: ${{ secrets.DEPLOY_C3_TEST }}
-          proxy_host: ubuntu@149.156.182.181
+          proxy_host: 149.156.182.181
+          proxy_username: ubuntu
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
             cd /yaptide
