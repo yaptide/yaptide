@@ -57,7 +57,7 @@ jobs:
           proxy_host: 149.156.182.181
           proxy_username: ubuntu
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
-          script: if pgrep flask; then pkill flask fi
+          script: if pgrep flask; then pkill flask; fi
           
       - name: Copy files to machine
         run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" ./* ubuntu@30.30.30.8:~/yaptide --delete --recursive
