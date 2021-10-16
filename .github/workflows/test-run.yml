@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
-          ssh-keyscan -H ${{ env.BACKEND_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.FRONTEND_HOST }} >> ~/.ssh/known_hosts
       
       # if the flask app is already running on the openstack machine, then kill it before updating the source code
       - name: Kill flask app
