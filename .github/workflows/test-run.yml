@@ -47,6 +47,13 @@ jobs:
         with:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
+            
+      
+      - name: Add host to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          ssh-keyscan -H 149.156.182.181 >> ~/.ssh/known_hosts
       
       # if the flask app is already running on the openstack machine, then kill it before updating the source code
       - name: Kill flask app
