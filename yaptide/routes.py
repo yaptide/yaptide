@@ -32,8 +32,7 @@ class ShieldhitDemo(Resource):
             return errors
 
         param_dict = shschema.load(args)
-        print(param_dict)
-        # simulation_result = run_shieldhit(param_dict)
+        simulation_result = run_shieldhit(param_dict)
 
         return {"status":"ok"}
 

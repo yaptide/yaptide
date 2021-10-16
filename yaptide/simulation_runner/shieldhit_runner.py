@@ -11,7 +11,6 @@ import pathlib
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import OutputDataType, Runner
-from pymchelper.writers.plots import PlotDataWriter, ImageWriter
 
 input_cfg_templ = {}
 input_cfg_templ['beam.dat'] = """
@@ -63,7 +62,7 @@ def run_shieldhit(param_dict):
     import pymchelper
 
     input_dict = input_cfg_templ.copy()
-    # TODO: change energy to parsed argument
+    
     input_dict['beam.dat'] = input_dict['beam.dat'].format(energy=param_dict['energy'])
 
     # create temporary directory 
@@ -77,9 +76,7 @@ def run_shieldhit(param_dict):
     # path to example input
     # example_inputpath = str(pathlib.Path().resolve())+"\\runner_example"
     
-
-    # TODO: remove hardcoded path -> load from env
-    hardcode_simulator_exec_path = '/home/ubuntu/shield_hit12a_x86_64_demo_gfortran_v0.9.2/bin/shieldhit'
+    hardcode_simulator_exec_path = None
 
     settings = SimulationSettings(input_path=tmp_output_directory_path,
                                   simulator_exec_path=hardcode_simulator_exec_path,
