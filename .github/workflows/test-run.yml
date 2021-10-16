@@ -38,10 +38,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: [build-and-test]
     env:
-      BACKEND_HOST = 30.30.30.8
-      BACKEND_USER = ubuntu
-      FRONTEND_HOST = 149.156.182.181
-      FRONTEND_USER = ubuntu
+      BACKEND_HOST: 30.30.30.8
+      BACKEND_USER: ubuntu
+      FRONTEND_HOST: 149.156.182.181
+      FRONTEND_USER: ubuntu
 
     steps:
       # get the repo to the github agent
