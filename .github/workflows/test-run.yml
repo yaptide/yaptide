@@ -43,14 +43,14 @@ jobs:
         uses: actions/checkout@v2
       
       - name: Install ssh key
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: shimataro/ssh-key-action@v2.3.1
         with:
           key: ${{ secrets.DEPLOY_C3_TEST }}
           known_hosts: ${{ secrets.DEPLOY_C3_KNOWN_HOSTS}}
           
       - name: Kill flask app
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: 30.30.30.8
@@ -62,11 +62,11 @@ jobs:
           script: if pgrep flask; then pkill flask; fi
           
       - name: Copy files to the machine
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" ./* ubuntu@30.30.30.8:~/yaptide --delete --recursive
 
       - name: Build and run the app via ssh
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: 30.30.30.8
