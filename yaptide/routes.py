@@ -3,6 +3,8 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
+from marshmallow import Schema, fields
+from flask import request
 
 resources = []
 
@@ -17,11 +19,23 @@ class HelloWorld(Resource):
 
 ############################################
 
+class SHSchema(Schema):
+    jobs = fields.Integer(missing=1)
+    energy = fields.Float(required=True)
+
 class ShieldhitDemo(Resource):
     def get(self):
-        demo_result = run_shieldhit()
-        return demo_result
+        shschema = SHSchema()
+        args = request.args
+        errors = shschema.validate(args)
+        if errors:
+            return errors
 
+        param_dict = shschema.load(args)
+        print(param_dict)
+        # simulation_result = run_shieldhit(param_dict)
+
+        return {"status":"ok"}
 
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
