@@ -48,7 +48,7 @@ jobs:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
             
-      
+      # Create the known_hosts file with the open stack machines public keys
       - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
@@ -57,7 +57,7 @@ jobs:
       
       # if the flask app is already running on the openstack machine, then kill it before updating the source code
       - name: Kill flask app
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: 30.30.30.8
@@ -70,7 +70,7 @@ jobs:
           
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         run: rsync -e "ssh -A ubuntu@149.156.182.181 ssh" ./* ubuntu@30.30.30.8:~/yaptide --delete --recursive
       
       # recreate env (it was destroyed by rsync during copying)
@@ -78,7 +78,7 @@ jobs:
       # set flask environment to developement and specify the package containing the app factory
       # then run the app detatched using screen (inspired by: https://unix.stackexchange.com/questions/266571/remotely-starting-a-screen-session-through-ssh-and-closing-the-ssh-session-immed)
       - name: Build and run the app via ssh
-#         if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: 30.30.30.8
