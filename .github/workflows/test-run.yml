@@ -18,6 +18,8 @@ jobs:
       # Get repository
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
       
       - name: Setup Python
         uses: actions/setup-python@v2
@@ -48,6 +50,8 @@ jobs:
       # get the repo to the github agent
       - name: Checkout
         uses: actions/checkout@v2
+        with:
+          submodules: true
       
       # add keys to the SSH agent
       - uses: webfactory/ssh-agent@v0.5.3
