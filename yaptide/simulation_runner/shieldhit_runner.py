@@ -66,7 +66,10 @@ input_cfg_templ['geo.dat'] = """
 
 
 def run_shieldhit(param_dict):
-    ''' Shieldhit runner '''
+    '''
+    Shieldhit runner
+    v1
+    '''
     import pymchelper
 
     input_dict = input_cfg_templ.copy()
@@ -104,7 +107,7 @@ def run_shieldhit(param_dict):
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
             return None
-        
+
         elapsed = timeit.default_timer() - start_time
         print("MC simulation took {:.3f} seconds".format(elapsed))
 

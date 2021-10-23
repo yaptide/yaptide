@@ -21,8 +21,11 @@ class HelloWorld(Resource):
 
 class SHSchema(Schema):
 
-    ''' Class specifies API parameters '''
-    
+    '''
+    Class specifies API parameters
+    v1
+    '''
+
     jobs = fields.Integer(missing=1)
     energy = fields.Float(missing=150.0)
     nstat = fields.Integer(missing=1000)
@@ -35,11 +38,17 @@ class SHSchema(Schema):
 
 class ShieldhitDemo(Resource):
 
-    ''' Class responsible for Shieldhit Demo running '''
+    '''
+    Class responsible for Shieldhit Demo running
+    v1
+    '''
 
     @staticmethod
     def get():
-        ''' Method handling running shieldhit with server '''
+        '''
+        Method handling running shieldhit with server
+        v1
+        '''
         shschema = SHSchema()
         args = request.args
         errors = shschema.validate(args)
@@ -53,11 +62,10 @@ class ShieldhitDemo(Resource):
             return {"status": "ok"}
         return {"status": "error"}
 
+
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
 example_user_args = reqparse.RequestParser()
-
-
 example_user_args.add_argument(
     "name", type=str, help="Example user name is required and must be a string.", required=True)
 
