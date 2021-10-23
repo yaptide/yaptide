@@ -20,10 +20,7 @@ class HelloWorld(Resource):
 ############################################
 
 class SHSchema(Schema):
-
-    """
-    Class specifies API parameters
-    """
+    """Class specifies API parameters"""
 
     jobs = fields.Integer(missing=1)
     energy = fields.Float(missing=150.0)
@@ -36,16 +33,11 @@ class SHSchema(Schema):
 
 
 class ShieldhitDemo(Resource):
-
-    """
-    Class responsible for Shieldhit Demo running
-    """
+    """Class responsible for Shieldhit Demo running"""
 
     @staticmethod
     def get():
-        """
-        Method handling running shieldhit with server
-        """
+        """Method handling running shieldhit with server"""
         shschema = SHSchema()
         args = request.args
         errors = shschema.validate(args)
