@@ -66,10 +66,13 @@ input_cfg_templ['geo.dat'] = """
 
 
 def run_shieldhit(param_dict):
+    '''
+    Shieldhit runner
+    '''
     import pymchelper
 
     input_dict = input_cfg_templ.copy()
-    
+
     input_dict['beam.dat'] = input_dict['beam.dat'].format(
         energy=param_dict['energy'],
         nstat=param_dict['nstat']
@@ -84,29 +87,30 @@ def run_shieldhit(param_dict):
     )
 
     # create temporary directory
-    with tempfile.TemporaryDirectory() as tmp_output_directory_path:
+    with tempfile.TemporaryDirectory() as tmp_output_path:
 
         for config_filename in input_dict:
-            absolute_path_temp_input_file = os.path.join(tmp_output_directory_path, config_filename)
-            with open(absolute_path_temp_input_file, 'w') as temp_input_file:
+            abs_input_path = os.path.join(tmp_output_path, config_filename)
+            with open(abs_input_path, 'w') as temp_input_file:
                 temp_input_file.write(input_dict[config_filename])
 
-        settings = SimulationSettings(input_path=tmp_output_directory_path,
-                                    simulator_exec_path=None,
-                                    cmdline_opts='')
+        settings = SimulationSettings(input_path=tmp_output_path,
+                                      simulator_exec_path=None,
+                                      cmdline_opts='')
 
-        runner_obj = Runner(jobs=param_dict['jobs'], 
-                            keep_workspace_after_run=False, 
-                            output_directory=tmp_output_directory_path)
+        runner_obj = Runner(jobs=param_dict['jobs'],
+                            keep_workspace_after_run=False,
+                            output_directory=tmp_output_path)
 
         start_time = timeit.default_timer()
         isRunOk = runner_obj.run(settings=settings)
         elapsed = timeit.default_timer() - start_time
         print("MC simulation took {:.3f} seconds".format(elapsed))
-        
+
         estimator = runner_obj.get_data()
 
         return estimator
+
 
 if __name__ == '__main__':
     sys.exit(run_shieldhit(sys.argv[1:]))

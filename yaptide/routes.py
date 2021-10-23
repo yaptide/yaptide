@@ -1,10 +1,10 @@
+from flask import request
+from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
-from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 from marshmallow import Schema, fields
-from flask import request
 
 resources = []
 
@@ -20,6 +20,9 @@ class HelloWorld(Resource):
 ############################################
 
 class SHSchema(Schema):
+    '''
+    Class specifies API parameters
+    '''
     jobs = fields.Integer(missing=1)
     energy = fields.Float(missing=150.0)
     nstat = fields.Integer(missing=1000)
@@ -29,8 +32,16 @@ class SHSchema(Schema):
     mesh_ny = fields.Integer(missing=100)
     mesh_nz = fields.Integer(missing=300)
 
+
 class ShieldhitDemo(Resource):
-    def get(self):
+    '''
+    Class responsible for Shieldhit Demo running
+    '''
+    @staticmethod
+    def get():
+        '''
+        Method handling running shieldhit with server
+        '''
         shschema = SHSchema()
         args = request.args
         errors = shschema.validate(args)
@@ -40,7 +51,9 @@ class ShieldhitDemo(Resource):
         param_dict = shschema.load(args)
         simulation_result = run_shieldhit(param_dict)
 
-        return {"status":"ok"}
+        if simulation_result:
+            return { "status" : "ok" }
+        return { "status" : "error" }
 
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
