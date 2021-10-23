@@ -1,7 +1,11 @@
+from flask import request
+from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
-from flask_restful import Resource, reqparse, fields, marshal_with, abort
+from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
+from marshmallow import Schema
+from marshmallow import fields as fld
 
 resources = []
 
@@ -15,6 +19,38 @@ class HelloWorld(Resource):
 
 
 ############################################
+
+class SHSchema(Schema):
+    """Class specifies API parameters"""
+
+    jobs = fld.Integer(missing=1)
+    energy = fld.Float(missing=150.0)
+    nstat = fld.Integer(missing=1000)
+    cyl_nr = fld.Integer(missing=1)
+    cyl_nz = fld.Integer(missing=400)
+    mesh_nx = fld.Integer(missing=1)
+    mesh_ny = fld.Integer(missing=100)
+    mesh_nz = fld.Integer(missing=300)
+
+
+class ShieldhitDemo(Resource):
+    """Class responsible for Shieldhit Demo running"""
+
+    @staticmethod
+    def get():
+        """Method handling running shieldhit with server"""
+        shschema = SHSchema()
+        args = request.args
+        errors = shschema.validate(args)
+        if errors:
+            return errors
+
+        param_dict = shschema.load(args)
+        simulation_result = run_shieldhit(param_dict)
+
+        if simulation_result:
+            return {"status": "ok"}
+        return {"status": "error"}
 
 
 ############### Example user ###############
@@ -77,3 +113,4 @@ def initialize_routes(api):
     api.add_resource(ExampleUserResource,
                      "/example_user/<int:user_id>", "/example_user")
     api.add_resource(HelloWorld, "/")
+    api.add_resource(ShieldhitDemo, "/sh/demo")

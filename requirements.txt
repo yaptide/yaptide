@@ -3,3 +3,4 @@ flask-sqlalchemy
 flask-restful
 pytest
 environs
+pymchelper>=1.9.0
