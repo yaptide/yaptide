@@ -66,10 +66,7 @@ input_cfg_templ['geo.dat'] = """
 
 
 def run_shieldhit(param_dict):
-    '''
-    Shieldhit runner
-    v1
-    '''
+    """Shieldhit runner"""
     import pymchelper
 
     input_dict = input_cfg_templ.copy()
