@@ -4,7 +4,7 @@ from warnings import resetwarnings
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
-from marshmallow import Schema, fields
+from marshmallow import Schema
 
 resources = []
 
