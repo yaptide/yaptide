@@ -83,33 +83,30 @@ def run_shieldhit(param_dict):
         mesh_nz=param_dict['mesh_nz']
     )
 
-    # create temporary directory 
-    tmp_output_directory_path = tempfile.mkdtemp()
+    # create temporary directory
+    with tempfile.TemporaryDirectory() as tmp_output_directory_path:
 
-    for config_filename in input_dict:
-        absolute_path_temp_input_file = os.path.join(tmp_output_directory_path, config_filename)
-        with open(absolute_path_temp_input_file, 'w') as temp_input_file:
-            temp_input_file.write(input_dict[config_filename])
+        for config_filename in input_dict:
+            absolute_path_temp_input_file = os.path.join(tmp_output_directory_path, config_filename)
+            with open(absolute_path_temp_input_file, 'w') as temp_input_file:
+                temp_input_file.write(input_dict[config_filename])
 
-    settings = SimulationSettings(input_path=tmp_output_directory_path,
-                                  simulator_exec_path=None,
-                                  cmdline_opts='')
+        settings = SimulationSettings(input_path=tmp_output_directory_path,
+                                    simulator_exec_path=None,
+                                    cmdline_opts='')
 
-    runner_obj = Runner(jobs=param_dict['jobs'], 
-                        keep_workspace_after_run=False, 
-                        output_directory=tmp_output_directory_path)
+        runner_obj = Runner(jobs=param_dict['jobs'], 
+                            keep_workspace_after_run=False, 
+                            output_directory=tmp_output_directory_path)
 
-    start_time = timeit.default_timer()
-    isRunOk = runner_obj.run(settings=settings)
-    elapsed = timeit.default_timer() - start_time
-    print("MC simulation took {:.3f} seconds".format(elapsed))
-    
-    data_dict = runner_obj.get_data()
+        start_time = timeit.default_timer()
+        isRunOk = runner_obj.run(settings=settings)
+        elapsed = timeit.default_timer() - start_time
+        print("MC simulation took {:.3f} seconds".format(elapsed))
+        
+        estimator = runner_obj.get_data()
 
-    shutil.rmtree(tmp_output_directory_path)
-
-    return data_dict
-
+        return estimator
 
 if __name__ == '__main__':
     sys.exit(run_shieldhit(sys.argv[1:]))
