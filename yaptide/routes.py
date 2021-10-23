@@ -5,6 +5,7 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 from marshmallow import Schema
+from marshmallow import fields as fld
 
 resources = []
 
@@ -22,14 +23,14 @@ class HelloWorld(Resource):
 class SHSchema(Schema):
     """Class specifies API parameters"""
 
-    jobs = fields.Integer(missing=1)
-    energy = fields.Float(missing=150.0)
-    nstat = fields.Integer(missing=1000)
-    cyl_nr = fields.Integer(missing=1)
-    cyl_nz = fields.Integer(missing=400)
-    mesh_nx = fields.Integer(missing=1)
-    mesh_ny = fields.Integer(missing=100)
-    mesh_nz = fields.Integer(missing=300)
+    jobs = fld.Integer(missing=1)
+    energy = fld.Float(missing=150.0)
+    nstat = fld.Integer(missing=1000)
+    cyl_nr = fld.Integer(missing=1)
+    cyl_nz = fld.Integer(missing=400)
+    mesh_nx = fld.Integer(missing=1)
+    mesh_ny = fld.Integer(missing=100)
+    mesh_nz = fld.Integer(missing=300)
 
 
 class ShieldhitDemo(Resource):
