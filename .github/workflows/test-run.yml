@@ -34,7 +34,7 @@ jobs:
 
       #run pytest unit tests
       - name: Run main tests
-        run: pytest
+        run: pytest tests/
 
   deploy:
     runs-on: ubuntu-latest
