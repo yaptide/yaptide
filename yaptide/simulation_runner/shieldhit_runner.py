@@ -12,8 +12,8 @@ import pathlib
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
-# from ..converter.converter.converter import DummmyParser
-# from ..converter.converter.converter import Runner as ConvertRunner
+from ..converter.converter.converter import DummmyParser
+from ..converter.converter.converter import Runner as ConvertRunner
 
 input_cfg_templ = {}
 input_cfg_templ['beam.dat'] = """
@@ -70,34 +70,34 @@ input_cfg_templ['geo.dat'] = """
 
 def run_shieldhit(param_dict, json_to_convert):
     """Shieldhit runner"""
-    input_dict = input_cfg_templ.copy()
+    # input_dict = input_cfg_templ.copy()
 
-    input_dict['beam.dat'] = input_dict['beam.dat'].format(
-        energy=param_dict['energy'],
-        nstat=param_dict['nstat']
-    )
+    # input_dict['beam.dat'] = input_dict['beam.dat'].format(
+    #     energy=param_dict['energy'],
+    #     nstat=param_dict['nstat']
+    # )
 
-    input_dict['detect.dat'] = input_dict['detect.dat'].format(
-        cyl_nr=param_dict['cyl_nr'],
-        cyl_nz=param_dict['cyl_nz'],
-        mesh_nx=param_dict['mesh_nx'],
-        mesh_ny=param_dict['mesh_ny'],
-        mesh_nz=param_dict['mesh_nz']
-    )
+    # input_dict['detect.dat'] = input_dict['detect.dat'].format(
+    #     cyl_nr=param_dict['cyl_nr'],
+    #     cyl_nz=param_dict['cyl_nz'],
+    #     mesh_nx=param_dict['mesh_nx'],
+    #     mesh_ny=param_dict['mesh_ny'],
+    #     mesh_nz=param_dict['mesh_nz']
+    # )
 
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
-        # convert_runner = ConvertRunner(parser=DummmyParser(),
-        #                                input_data=json_to_convert,
-        #                                output_dir=tmp_output_path)
+        convert_runner = ConvertRunner(parser=DummmyParser(),
+                                       input_data=json_to_convert,
+                                       output_dir=tmp_output_path)
 
-        # convert_runner.run_parser()
+        convert_runner.run_parser()
 
-        for config_filename in input_dict:
-            abs_input_path = os.path.join(tmp_output_path, config_filename)
-            with open(abs_input_path, 'w') as temp_input_file:
-                temp_input_file.write(input_dict[config_filename])
+        # for config_filename in input_dict:
+        #     abs_input_path = os.path.join(tmp_output_path, config_filename)
+        #     with open(abs_input_path, 'w') as temp_input_file:
+        #         temp_input_file.write(input_dict[config_filename])
 
         print(os.listdir(tmp_output_path))
         settings = SimulationSettings(input_path=tmp_output_path,
