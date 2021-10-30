@@ -39,14 +39,20 @@ class ShieldhitDemo(Resource):
     @staticmethod
     def get():
         """Method handling running shieldhit with server"""
+
         shschema = SHSchema()
         args = request.args
         errors = shschema.validate(args)
         if errors:
             return errors
-
         param_dict = shschema.load(args)
-        simulation_result = run_shieldhit(param_dict)
+
+        json_data = request.json
+        if not json_data:
+            return {"status": "error"}
+
+        simulation_result = run_shieldhit(param_dict=param_dict,
+                                          json_to_convert=json_data)
 
         if simulation_result:
             return {"status": "ok"}
