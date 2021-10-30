@@ -39,7 +39,6 @@ class ShieldhitDemo(Resource):
     @staticmethod
     def get():
         """Method handling running shieldhit with server"""
-
         shschema = SHSchema()
         args = request.args
         errors = shschema.validate(args)

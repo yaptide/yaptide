@@ -68,9 +68,8 @@ input_cfg_templ['geo.dat'] = """
 """
 
 
-def run_shieldhit(param_dict,json_to_convert):
+def run_shieldhit(param_dict, json_to_convert):
     """Shieldhit runner"""
-
     input_dict = input_cfg_templ.copy()
 
     input_dict['beam.dat'] = input_dict['beam.dat'].format(
@@ -110,7 +109,7 @@ def run_shieldhit(param_dict,json_to_convert):
                             output_directory=tmp_output_path)
 
         start_time = timeit.default_timer()
-        isRunOk = False # runner_obj.run(settings=settings)
+        isRunOk = False     # runner_obj.run(settings=settings)
         if not isRunOk:
             return None
 
@@ -123,4 +122,4 @@ def run_shieldhit(param_dict,json_to_convert):
 
 
 if __name__ == '__main__':
-    sys.exit(run_shieldhit(sys.argv[1:]))
+    sys.exit(run_shieldhit(sys.argv[2:]))
