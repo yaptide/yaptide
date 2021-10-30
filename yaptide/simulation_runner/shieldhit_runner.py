@@ -105,8 +105,8 @@ def run_shieldhit(param_dict, json_to_convert):
                                       cmdline_opts='')
 
         runner_obj = SHRunner(jobs=param_dict['jobs'],
-                            keep_workspace_after_run=False,
-                            output_directory=tmp_output_path)
+                              keep_workspace_after_run=False,
+                              output_directory=tmp_output_path)
 
         start_time = timeit.default_timer()
         isRunOk = False     # runner_obj.run(settings=settings)
@@ -119,7 +119,3 @@ def run_shieldhit(param_dict, json_to_convert):
         estimator = runner_obj.get_data()
 
         return estimator
-
-
-if __name__ == '__main__':
-    sys.exit(run_shieldhit(sys.argv[2:]))
