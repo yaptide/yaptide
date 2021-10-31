@@ -51,7 +51,7 @@ class ShieldhitDemo(Resource):
             return {"status": "Bad Request"}
 
         simulation_result = run_shieldhit(param_dict=param_dict,
-                                          json_to_convert=json_data)
+                                          json_to_conv=json_data)
 
         if simulation_result:
             return {"status": "OK"}
