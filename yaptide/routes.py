@@ -37,7 +37,7 @@ class ShieldhitDemo(Resource):
     """Class responsible for Shieldhit Demo running"""
 
     @staticmethod
-    def get():
+    def post():
         """Method handling running shieldhit with server"""
         shschema = SHSchema()
         args = request.args
