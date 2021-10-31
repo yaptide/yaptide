@@ -18,7 +18,6 @@ from ..converter.converter.converter import Runner as ConvertRunner
 
 def run_shieldhit(param_dict, json_to_convert):
     """Shieldhit runner"""
-
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
