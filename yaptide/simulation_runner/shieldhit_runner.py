@@ -21,11 +21,11 @@ def run_shieldhit(param_dict, json_to_conv):
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
-        convert_runner = ConvRunner(parser=DummmyParser(),
-                                       input_data=json_to_conv,
-                                       output_dir=tmp_output_path)
+        conv_runner = ConvRunner(parser=DummmyParser(),
+                                 input_data=json_to_conv,
+                                 output_dir=tmp_output_path)
 
-        convert_runner.run_parser()
+        conv_runner.run_parser()
 
         print(os.listdir(tmp_output_path))
         settings = SimulationSettings(input_path=tmp_output_path,
