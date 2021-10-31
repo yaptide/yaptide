@@ -1,4 +1,5 @@
 from flask import request
+from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
 from yaptide.persistence.database import db
@@ -48,14 +49,17 @@ class ShieldhitDemo(Resource):
 
         json_data = request.json
         if not json_data:
-            return {"status": "Bad Request"}
+            return ({"message": "Input Json Error"},
+                    api_status.HTTP_400_BAD_REQUEST)
 
         simulation_result = run_shieldhit(param_dict=param_dict,
                                           raw_input_dict=json_data)
 
         if simulation_result:
-            return {"status": "OK"}
-        return {"status": "Simulation Error"}
+            return ({"message": "Simulation Output"},
+                    api_status.HTTP_200_OK)
+        return ({"message": "Simulation Error"},
+                api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 ############### Example user ###############
