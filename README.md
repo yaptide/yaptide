@@ -1,5 +1,5 @@
 # Installation
-Run: ```$ pip install -r requrements.txt```
+Run: ```$ pip install -r requirements.txt```
 
 # Running the app
 1. Set FLASK_APP env variable ([explanation](https://flask.palletsprojects.com/en/2.0.x/cli/)):
