@@ -48,14 +48,14 @@ class ShieldhitDemo(Resource):
 
         json_data = request.json
         if not json_data:
-            return {"status": "error"}
+            return {"status": "json error"}
 
         simulation_result = run_shieldhit(param_dict=param_dict,
                                           json_to_convert=json_data)
 
         if simulation_result:
             return {"status": "ok"}
-        return {"status": "error"}
+        return {"status": "sim error"}
 
 
 ############### Example user ###############
