@@ -106,6 +106,52 @@ def run_shieldhit(param_dict, json_to_convert):
         elapsed = timeit.default_timer() - start_time
         print("MC simulation took {:.3f} seconds".format(elapsed))
 
-        estimator = runner_obj.get_data()
+        estimator_list = runner_obj.get_data()
 
-        return estimator['mesh_']
+        return convert_output(estimator_list)
+
+
+def convert_output(estimator_list):
+    """Function for converint simulation output to dictionary"""
+    if not estimator_list:
+        return {"result":"None"}
+        
+    result_dict = {"estimators" : []}
+    for est_name in estimator_list:
+
+        estimator_dict = {
+            "name" : est_name,
+            "pages": []}
+        for page in estimator_list[est_name].pages:
+
+            page_dict = {"axis": []}
+            for i in range(5):
+                axis_dict = {
+                    "n": int(page.axis(i).n),
+                    "min_val": float(page.axis(i).min_val),
+                    "max_val": float(page.axis(i).max_val),
+                    "name": str(page.axis(i).name),
+                    "unit": str(page.axis(i).unit),
+                    "binning": str(page.axis(i).binning),
+                    "data": []
+                }
+                if i == 0:
+                    for val in page.data[:,0,0,0,0]:
+                        axis_dict["data"].append(float(val))
+                elif i == 1:
+                    for val in page.data[0,:,0,0,0]:
+                        axis_dict["data"].append(float(val))
+                elif i == 2:
+                    for val in page.data[0,0,:,0,0]:
+                        axis_dict["data"].append(float(val))
+                elif i == 3:
+                    for val in page.data[0,0,0,:,0]:
+                        axis_dict["data"].append(float(val))
+                elif i == 4:
+                    for val in page.data[0,0,0,0,:]:
+                        axis_dict["data"].append(float(val))
+                page_dict["axis"].append(axis_dict)
+            estimator_dict["pages"].append(page_dict)
+        result_dict["estimators"].append(estimator_dict)
+
+    return result_dict

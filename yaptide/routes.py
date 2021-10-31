@@ -1,4 +1,4 @@
-from flask import request
+from flask import request, jsonify
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
 from yaptide.persistence.database import db
@@ -54,8 +54,7 @@ class ShieldhitDemo(Resource):
                                           json_to_convert=json_data)
 
         if simulation_result:
-            print(simulation_result)
-            return {"status": "ok"}
+            return jsonify(result=simulation_result)
         return {"status": "error"}
 
 
