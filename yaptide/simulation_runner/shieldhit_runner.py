@@ -16,13 +16,13 @@ from ..converter.converter.converter import DummmyParser
 from ..converter.converter.converter import Runner as ConvRunner
 
 
-def run_shieldhit(param_dict, json_to_conv):
+def run_shieldhit(param_dict, raw_input_dict):
     """Shieldhit runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
         conv_runner = ConvRunner(parser=DummmyParser(),
-                                 input_data=json_to_conv,
+                                 input_data=raw_input_dict,
                                  output_dir=tmp_output_path)
 
         conv_runner.run_parser()
