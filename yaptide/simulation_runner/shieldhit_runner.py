@@ -100,8 +100,7 @@ def run_shieldhit(param_dict, json_to_convert):
                               output_directory=tmp_output_path)
 
         start_time = timeit.default_timer()
-        isRunOk = runner_obj.run(settings=settings)
-        if not isRunOk:
+        if not runner_obj.run(settings=settings):
             return None
 
         elapsed = timeit.default_timer() - start_time

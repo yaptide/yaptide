@@ -54,6 +54,7 @@ class ShieldhitDemo(Resource):
                                           json_to_convert=json_data)
 
         if simulation_result:
+            print(simulation_result)
             return {"status": "ok"}
         return {"status": "error"}
 
