@@ -69,6 +69,9 @@ def run_shieldhit(param_dict, json_to_convert):
     """Shieldhit runner"""
     input_dict = input_cfg_templ.copy()
 
+    if json_to_convert:
+        print("deepsource please be quiet for now")
+
     input_dict['beam.dat'] = input_dict['beam.dat'].format(
         energy=param_dict['energy'],
         nstat=param_dict['nstat']
@@ -114,9 +117,9 @@ def run_shieldhit(param_dict, json_to_convert):
 def convert_output(estimator_list):
     """Function for converint simulation output to dictionary"""
     if not estimator_list:
-        return {"result":"None"}
-        
-    result_dict = {"estimators" : []}
+        return {"result": "None"}
+
+    result_dict = {"estimators": []}
     for est_name in estimator_list:
 
         estimator_dict = {
@@ -136,19 +139,19 @@ def convert_output(estimator_list):
                     "data": []
                 }
                 if i == 0:
-                    for val in page.data[:,0,0,0,0]:
+                    for val in page.data[:, 0, 0, 0, 0]:
                         axis_dict["data"].append(float(val))
                 elif i == 1:
-                    for val in page.data[0,:,0,0,0]:
+                    for val in page.data[0, :, 0, 0, 0]:
                         axis_dict["data"].append(float(val))
                 elif i == 2:
-                    for val in page.data[0,0,:,0,0]:
+                    for val in page.data[0, 0, :, 0, 0]:
                         axis_dict["data"].append(float(val))
                 elif i == 3:
-                    for val in page.data[0,0,0,:,0]:
+                    for val in page.data[0, 0, 0, :, 0]:
                         axis_dict["data"].append(float(val))
                 elif i == 4:
-                    for val in page.data[0,0,0,0,:]:
+                    for val in page.data[0, 0, 0, 0, :]:
                         axis_dict["data"].append(float(val))
                 page_dict["axis"].append(axis_dict)
             estimator_dict["pages"].append(page_dict)
