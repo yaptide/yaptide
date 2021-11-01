@@ -132,26 +132,29 @@ def dummy_convert_output(estimators_dict):
         for page in estimators_dict[estimator].pages:
 
             page_dim = page.dimension
-            # page_dict contains the list axes and number of dimensions
-            page_dict = {
-                "dimensions" : page_dim,
-                "axes": []
-            }
-            for i in range(page_dim):
-                axis = page.plot_axis(i)
-                axis_dict = {
-                    "n": int(axis.n),
-                    "min_val": float(axis.min_val),
-                    "max_val": float(axis.max_val),
-                    "name": str(axis.name),
+
+            # if statement below is just for the sake of used dummy data
+            if page_dim == 1:
+                axis = page.plot_axis(0)
+                x_values = axis.data
+                y_values = page.data_raw.flatten()
+
+                # for 1 dimension page, dict contains:
+                # "dimensions" indicating it is 1 dim page
+                # "unit"
+                # "x_y_pairs" which is list of x any y values pairs
+                page_dict = {
+                    "dimensions" : page_dim,
                     "unit": str(axis.unit),
-                    "binning": str(axis.binning),
-                    "data": []
+                    "x_y_pairs": []
                 }
-                for val in axis.data:
-                    axis_dict["data"].append(float(val))
-                page_dict["axes"].append(axis_dict)
-            estimator_dict["pages"].append(page_dict)
+                for i in range(axis.n):
+                    page_dict["x_y_pairs"].append({
+                        x_values[i] : y_values[i]
+                    })
+                estimator_dict["pages"].append(page_dict)
+            else:
+                return {"result": "Wrong dimension"}
         result_dict["estimators"].append(estimator_dict)
 
     return result_dict
