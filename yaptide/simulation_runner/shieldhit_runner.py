@@ -150,7 +150,8 @@ def dummy_convert_output(estimators_dict):
                 }
                 for i in range(axis.n):
                     page_dict["x_y_pairs"].append({
-                        x_values[i] : y_values[i]
+                        "x" : x_values[i],
+                        "y" : y_values[i]
                     })
                 estimator_dict["pages"].append(page_dict)
             else:
