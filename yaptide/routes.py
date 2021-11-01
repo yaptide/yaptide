@@ -1,4 +1,4 @@
-from flask import request, jsonify
+from flask import request, json
 from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
@@ -49,16 +49,14 @@ class ShieldhitDemo(Resource):
 
         json_data = request.get_json(force=True)
         if not json_data:
-            print("Json Error")
-            return jsonify({"msg": "Json Error"})
+            return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
 
-        simulation_result = None #run_shieldhit(param_dict=param_dict,
-                            #              raw_input_dict=json_data)
+        simulation_result = run_shieldhit(param_dict=param_dict,
+                                          raw_input_dict=json_data)
 
         if simulation_result:
-            return simulation_result, api_status.HTTP_200_OK
-        print("SH Error")
-        return {"msg": "SH Error"}, api_status.HTTP_200_OK
+            return json.dumps(simulation_result), api_status.HTTP_200_OK
+        return json.dumps({"msg": "Sim Error"}), api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 ############### Example user ###############
