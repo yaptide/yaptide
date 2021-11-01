@@ -38,7 +38,7 @@ def run_shieldhit(param_dict, raw_input_dict):
                               output_directory=tmp_output_path)
 
         start_time = timeit.default_timer()
-
+        
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
             return None
