@@ -61,13 +61,13 @@ def dummy_convert_output(estimators_dict):
 
     # result_dict contains the list of estimators
     result_dict = {"estimators": []}
-    for estimator in estimators_dict:
+    for est_name in estimators_dict:
 
-        # estimator_dict contains list of pages
-        estimator_dict = {
-            "name" : estimator,
+        # est_dict contains list of pages
+        est_dict = {
+            "name" : est_name,
             "pages": []}
-        for page in estimators_dict[estimator].pages:
+        for page in estimators_dict[est_name].pages:
 
             page_dim = page.dimension
 
@@ -80,21 +80,21 @@ def dummy_convert_output(estimators_dict):
                 # for 1 dimension page, dict contains:
                 # "dimensions" indicating it is 1 dim page
                 # "unit"
-                # "x_y_pairs" which is list of x any y values pairs
+                # "x_values" which is list of x values
+                # "y_values" which is list of y values
                 page_dict = {
                     "dimensions" : page_dim,
                     "unit": str(axis.unit),
-                    "x_y_pairs": []
+                    "x_values": [],
+                    "y_values": []
                 }
                 for i in range(axis.n):
-                    page_dict["x_y_pairs"].append({
-                        "x" : x_values[i],
-                        "y" : y_values[i]
-                    })
-                estimator_dict["pages"].append(page_dict)
+                    page_dict["x_values"].append( x_values[i] )
+                    page_dict["y_values"].append( y_values[i] )
+                est_dict["pages"].append(page_dict)
             else:
                 # handlers for more dimensions aren't implemented yet
                 return {"message": "Wrong dimension"}
-        result_dict["estimators"].append(estimator_dict)
+        result_dict["estimators"].append(est_dict)
 
     return result_dict
