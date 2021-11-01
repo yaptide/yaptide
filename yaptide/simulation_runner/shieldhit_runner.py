@@ -116,7 +116,7 @@ def run_shieldhit(param_dict, json_to_convert):
 def dummy_convert_output(estimators_dict):
     """Dummy function for converting simulation output to dictionary"""
     if not estimators_dict:
-        return {"result": "None"}
+        return {"message": "No estimators"}
 
     # result_dict is the dictionary object, which is later converted to json
     # to provide readable api response for fronted
@@ -156,7 +156,7 @@ def dummy_convert_output(estimators_dict):
                 estimator_dict["pages"].append(page_dict)
             else:
                 # handlers for more dimensions aren't implemented yet
-                return {"result": "Wrong dimension"}
+                return {"message": "Wrong dimension"}
         result_dict["estimators"].append(estimator_dict)
 
     return result_dict
