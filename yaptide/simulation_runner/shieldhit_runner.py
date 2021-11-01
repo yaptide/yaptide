@@ -133,7 +133,7 @@ def dummy_convert_output(estimators_dict):
 
             page_dim = page.dimension
 
-            # if statement below is just for the sake of used dummy data
+            # handling 1 dimension page
             if page_dim == 1:
                 axis = page.plot_axis(0)
                 x_values = axis.data
@@ -155,6 +155,7 @@ def dummy_convert_output(estimators_dict):
                     })
                 estimator_dict["pages"].append(page_dict)
             else:
+                # handlers for more dimensions aren't implemented yet
                 return {"result": "Wrong dimension"}
         result_dict["estimators"].append(estimator_dict)
 
