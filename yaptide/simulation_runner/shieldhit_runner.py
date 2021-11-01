@@ -46,6 +46,55 @@ def run_shieldhit(param_dict, raw_input_dict):
         elapsed = timeit.default_timer() - start_time
         print("MC simulation took {:.3f} seconds".format(elapsed))
 
-        estimator = runner_obj.get_data()
+        estimators_dict = runner_obj.get_data()
 
-        return estimator['mesh_']
+        return dummy_convert_output(estimators_dict)
+
+
+def dummy_convert_output(estimators_dict):
+    """Dummy function for converting simulation output to dictionary"""
+    if not estimators_dict:
+        return {"message": "No estimators"}
+
+    # result_dict is the dictionary object, which is later converted to json
+    # to provide readable api response for fronted
+
+    # result_dict contains the list of estimators
+    result_dict = {"estimators": []}
+    for estimator in estimators_dict:
+
+        # estimator_dict contains list of pages
+        estimator_dict = {
+            "name" : estimator,
+            "pages": []}
+        for page in estimators_dict[estimator].pages:
+
+            page_dim = page.dimension
+
+            # handling 1 dimension page
+            if page_dim == 1:
+                axis = page.plot_axis(0)
+                x_values = axis.data
+                y_values = page.data_raw.flatten()
+
+                # for 1 dimension page, dict contains:
+                # "dimensions" indicating it is 1 dim page
+                # "unit"
+                # "x_y_pairs" which is list of x any y values pairs
+                page_dict = {
+                    "dimensions" : page_dim,
+                    "unit": str(axis.unit),
+                    "x_y_pairs": []
+                }
+                for i in range(axis.n):
+                    page_dict["x_y_pairs"].append({
+                        "x" : x_values[i],
+                        "y" : y_values[i]
+                    })
+                estimator_dict["pages"].append(page_dict)
+            else:
+                # handlers for more dimensions aren't implemented yet
+                return {"message": "Wrong dimension"}
+        result_dict["estimators"].append(estimator_dict)
+
+    return result_dict

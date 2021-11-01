@@ -1,4 +1,4 @@
-from flask import request
+from flask import request, jsonify
 from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
@@ -56,7 +56,7 @@ class ShieldhitDemo(Resource):
                                           raw_input_dict=json_data)
 
         if simulation_result:
-            return ({"message": "Simulation Output"},
+            return (simulation_result,
                     api_status.HTTP_200_OK)
         return ({"message": "Simulation Error"},
                 api_status.HTTP_500_INTERNAL_SERVER_ERROR)
