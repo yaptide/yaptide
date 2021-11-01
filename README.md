@@ -33,3 +33,17 @@ When you're ready to stop the container, use the following command:
 docker stop yaptide
 docker rm yaptide
 ```
+
+# Curl
+
+Currently dummy converter ignores the content of json sent in request's body so it can contains anything.
+
+Example curl for Windows:
+```shell
+curl -i -X POST -H "Content-Type:application/json" -d "{\"Dummy\": \"Curl\" }" http://localhost:5000/sh/demo
+```
+
+And for Linux:
+```shell
+curl -i -X POST -H "Content-Type:application/json" -d '{"Dummy": "Curl" }' "http://localhost:5000/sh/demo"
+```
