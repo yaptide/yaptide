@@ -93,7 +93,6 @@ def run_shieldhit(param_dict, json_to_convert):
             with open(abs_input_path, 'w') as temp_input_file:
                 temp_input_file.write(input_dict[config_filename])
 
-        print(os.listdir(tmp_output_path))
         settings = SimulationSettings(input_path=tmp_output_path,
                                       simulator_exec_path=None,
                                       cmdline_opts='')
@@ -132,9 +131,13 @@ def dummy_convert_output(estimators_dict):
             "pages": []}
         for page in estimators_dict[estimator].pages:
 
-            # page_dict contains the list axes
-            page_dict = {"axes": []}
             page_dim = page.dimension
+            print("Page dimensions: "+str(page_dim))
+            # page_dict contains the list axes
+            page_dict = {
+                "dimension" : page_dim,
+                "axes": []
+            }
             for i in range(page_dim):
                 axis = page.plot_axis(i)
                 axis_dict = {
