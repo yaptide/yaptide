@@ -49,14 +49,16 @@ class ShieldhitDemo(Resource):
 
         json_data = request.get_json(force=True)
         if not json_data:
-            return {"msg": "Json Error"}, api_status.HTTP_400_BAD_REQUEST
+            print("Json Error")
+            return jsonify({"msg": "Json Error"})
 
-        simulation_result = run_shieldhit(param_dict=param_dict,
-                                          raw_input_dict=json_data)
+        simulation_result = None #run_shieldhit(param_dict=param_dict,
+                            #              raw_input_dict=json_data)
 
         if simulation_result:
             return simulation_result, api_status.HTTP_200_OK
-        return {"msg": "SH Error"}, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+        print("SH Error")
+        return {"msg": "SH Error"}, api_status.HTTP_200_OK
 
 
 ############### Example user ###############
