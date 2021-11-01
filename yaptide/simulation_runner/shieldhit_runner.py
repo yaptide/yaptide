@@ -135,7 +135,7 @@ def dummy_convert_output(estimators_dict):
             print("Page dimensions: "+str(page_dim))
             # page_dict contains the list axes
             page_dict = {
-                "dimension" : page_dim,
+                "dimensions" : page_dim,
                 "axes": []
             }
             for i in range(page_dim):
@@ -151,22 +151,6 @@ def dummy_convert_output(estimators_dict):
                 }
                 for val in axis.data:
                     axis_dict["data"].append(float(val))
-                # if i == 0:        page.axis(i).min_val
-                #     for val in page.data[:, 0, 0, 0, 0]:
-                #         axis_dict["data"].append(float(val))
-                # elif i == 1:
-                #     for val in page.data[0, :, 0, 0, 0]:
-                #         axis_dict["data"].append(float(val))
-                # elif i == 2:
-                #     for val in page.data[0, 0, :, 0, 0]:
-                #         axis_dict["data"].append(float(val))
-                # elif i == 3:
-                #     for val in page.data[0, 0, 0, :, 0]:
-                #         axis_dict["data"].append(float(val))
-                # elif i == 4:
-                #     for val in page.data[0, 0, 0, 0, :]:
-                #         axis_dict["data"].append(float(val))
-                page_dict["axes"].append(axis_dict)
                 page_dict["axes"].append(axis_dict)
             estimator_dict["pages"].append(page_dict)
         result_dict["estimators"].append(estimator_dict)
