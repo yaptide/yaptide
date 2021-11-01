@@ -29,7 +29,6 @@ def run_shieldhit(param_dict, raw_input_dict):
 
         conv_runner.run_parser()
 
-        print(os.listdir(tmp_output_path))
         settings = SimulationSettings(input_path=tmp_output_path,
                                       simulator_exec_path=None,
                                       cmdline_opts='')
