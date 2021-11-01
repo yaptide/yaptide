@@ -121,41 +121,50 @@ def dummy_convert_output(estimators_dict):
 
     # result_dict is the dictionary object, which is later converted to json
     # to provide readable api response for fronted
+
+    # result_dict contains the list of estimators
     result_dict = {"estimators": []}
     for estimator in estimators_dict:
 
+        # estimator_dict contains list of pages
         estimator_dict = {
             "name" : estimator,
             "pages": []}
         for page in estimators_dict[estimator].pages:
 
-            page_dict = {"axis": []}
-            for i in range(5):
+            # page_dict contains the list axes
+            page_dict = {"axes": []}
+            page_dim = page.dimension
+            for i in range(page_dim):
+                axis = page.plot_axis(i)
                 axis_dict = {
-                    "n": int(page.axis(i).n),
-                    "min_val": float(page.axis(i).min_val),
-                    "max_val": float(page.axis(i).max_val),
-                    "name": str(page.axis(i).name),
-                    "unit": str(page.axis(i).unit),
-                    "binning": str(page.axis(i).binning),
+                    "n": int(axis.n),
+                    "min_val": float(axis.min_val),
+                    "max_val": float(axis.max_val),
+                    "name": str(axis.name),
+                    "unit": str(axis.unit),
+                    "binning": str(axis.binning),
                     "data": []
                 }
-                if i == 0:
-                    for val in page.data[:, 0, 0, 0, 0]:
-                        axis_dict["data"].append(float(val))
-                elif i == 1:
-                    for val in page.data[0, :, 0, 0, 0]:
-                        axis_dict["data"].append(float(val))
-                elif i == 2:
-                    for val in page.data[0, 0, :, 0, 0]:
-                        axis_dict["data"].append(float(val))
-                elif i == 3:
-                    for val in page.data[0, 0, 0, :, 0]:
-                        axis_dict["data"].append(float(val))
-                elif i == 4:
-                    for val in page.data[0, 0, 0, 0, :]:
-                        axis_dict["data"].append(float(val))
-                page_dict["axis"].append(axis_dict)
+                for val in axis.data:
+                    axis_dict["data"].append(float(val))
+                # if i == 0:        page.axis(i).min_val
+                #     for val in page.data[:, 0, 0, 0, 0]:
+                #         axis_dict["data"].append(float(val))
+                # elif i == 1:
+                #     for val in page.data[0, :, 0, 0, 0]:
+                #         axis_dict["data"].append(float(val))
+                # elif i == 2:
+                #     for val in page.data[0, 0, :, 0, 0]:
+                #         axis_dict["data"].append(float(val))
+                # elif i == 3:
+                #     for val in page.data[0, 0, 0, :, 0]:
+                #         axis_dict["data"].append(float(val))
+                # elif i == 4:
+                #     for val in page.data[0, 0, 0, 0, :]:
+                #         axis_dict["data"].append(float(val))
+                page_dict["axes"].append(axis_dict)
+                page_dict["axes"].append(axis_dict)
             estimator_dict["pages"].append(page_dict)
         result_dict["estimators"].append(estimator_dict)
 
