@@ -21,7 +21,8 @@ def run_shieldhit(param_dict, raw_input_dict):
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
-        # digest dictionary with project data (extracted from JSON file) and generate SHIELD-HIT12A input files
+        # digest dictionary with project data (extracted from JSON file)
+        # and generate SHIELD-HIT12A input files
         conv_runner = ConvRunner(parser=DummmyParser(),
                                  input_data=raw_input_dict,
                                  output_dir=tmp_output_path)
