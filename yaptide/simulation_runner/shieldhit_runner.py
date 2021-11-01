@@ -132,8 +132,7 @@ def dummy_convert_output(estimators_dict):
         for page in estimators_dict[estimator].pages:
 
             page_dim = page.dimension
-            print("Page dimensions: "+str(page_dim))
-            # page_dict contains the list axes
+            # page_dict contains the list axes and number of dimensions
             page_dict = {
                 "dimensions" : page_dim,
                 "axes": []
