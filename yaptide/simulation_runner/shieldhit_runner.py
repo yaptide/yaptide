@@ -109,23 +109,25 @@ def run_shieldhit(param_dict, json_to_convert):
         elapsed = timeit.default_timer() - start_time
         print("MC simulation took {:.3f} seconds".format(elapsed))
 
-        estimator_list = runner_obj.get_data()
+        estimators_dict = runner_obj.get_data()
 
-        return convert_output(estimator_list)
+        return dummy_convert_output(estimators_dict)
 
 
-def convert_output(estimator_list):
-    """Function for converint simulation output to dictionary"""
-    if not estimator_list:
+def dummy_convert_output(estimators_dict):
+    """Dummy function for converting simulation output to dictionary"""
+    if not estimators_dict:
         return {"result": "None"}
 
+    # result_dict is the dictionary object, which is later converted to json
+    # to provide readable api response for fronted
     result_dict = {"estimators": []}
-    for est_name in estimator_list:
+    for estimator in estimators_dict:
 
         estimator_dict = {
-            "name" : est_name,
+            "name" : estimator,
             "pages": []}
-        for page in estimator_list[est_name].pages:
+        for page in estimators_dict[estimator].pages:
 
             page_dict = {"axis": []}
             for i in range(5):
