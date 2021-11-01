@@ -47,19 +47,16 @@ class ShieldhitDemo(Resource):
             return errors
         param_dict = shschema.load(args)
 
-        json_data = request.json
+        json_data = request.get_json(force=True)
         if not json_data:
-            return ({"message": "Input Json Error"},
-                    api_status.HTTP_400_BAD_REQUEST)
+            return {"msg": "Json Error"}, api_status.HTTP_400_BAD_REQUEST
 
         simulation_result = run_shieldhit(param_dict=param_dict,
                                           raw_input_dict=json_data)
 
         if simulation_result:
-            return (simulation_result,
-                    api_status.HTTP_200_OK)
-        return ({"message": "Simulation Error"},
-                api_status.HTTP_500_INTERNAL_SERVER_ERROR)
+            return simulation_result, api_status.HTTP_200_OK
+        return {"msg": "SH Error"}, api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 ############### Example user ###############
