@@ -105,7 +105,7 @@ jobs:
           command_timeout: 30m
           script: |
             cd yaptide
-            cp -r /home/ubuntu/usr/shieldhit ./shieldhit/
-            docker build --build-arg SHIELDHIT_PATH=/shieldhit -t yaptide .
-            rm -r ./shieldhit
+            cp /home/ubuntu/usr/shieldhit/v0.9.2/bin/shieldhit .
+            docker build --build-arg SHIELDHIT_PATH=shieldhit -t yaptide .
+            rm -r shieldhit
             docker run -dp 5000:5000 --name=yaptide yaptide
