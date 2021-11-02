@@ -105,6 +105,6 @@ jobs:
           script: |
             cd yaptide
             cp -r /home/ubuntu/usr/shieldhit ./shieldhit/
-            docker build --buld-arg SHIELDHIT_PATH=/shieldhit -t yaptide .
+            docker build --build-arg SHIELDHIT_PATH=/shieldhit -t yaptide .
             rm -r ./shieldhit
             docker run -dp 5000:5000 --name=yaptide yaptide
