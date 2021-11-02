@@ -78,7 +78,9 @@ jobs:
           proxy_host: ${{ env.FRONTEND_HOST }}
           proxy_username: ${{ env.BACKEND_USER }}
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
-          script: if pgrep flask; then pkill flask; fi
+          script: |
+            docker stop yaptide
+            docker rm yaptide
           
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
@@ -101,9 +103,5 @@ jobs:
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
             cd yaptide
-            rm -rf venv
-            python3 -m venv env
-            source env/bin/activate
-            python3 -m pip install --upgrade pip
-            pip3 install -r requirements.txt
-            FLASK_ENV=developement FLASK_APP=yaptide.application PATH=$PATH:${{ env.SHIELDHIT_PATH }} screen -d -m flask run --host 0.0.0.0
+            docker build -t yaptide .
+            docker run -dp 5000:5000 --name=yaptide yaptide
