@@ -20,12 +20,12 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
-      
+
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: "3.9"
-          
+
       #install requirements.txt
       - name: Install dependencies
         run: |
@@ -44,7 +44,7 @@ jobs:
       BACKEND_USER: ubuntu
       FRONTEND_HOST: 149.156.182.181
       FRONTEND_USER: ubuntu
-      SHIELDHIT_PATH: '/home/ubuntu/usr/shieldhit/v0.9.2/bin'
+      SHIELDHIT_PATH: "/home/ubuntu/usr/shieldhit/v0.9.2/bin"
 
     steps:
       # get the repo to the github agent
@@ -52,21 +52,21 @@ jobs:
         uses: actions/checkout@v2
         with:
           submodules: true
-      
+
       # add keys to the SSH agent
       - uses: webfactory/ssh-agent@v0.5.3
         #if: github.ref == 'refs/heads/master'
         with:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
-            
+
       # Create the known_hosts file with the open stack machines public keys
       - name: Add host to known_hosts
         run: |
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
           ssh-keyscan -H ${{ env.FRONTEND_HOST }} >> ~/.ssh/known_hosts
-      
+
       # if the flask app is already running on the openstack machine, then kill it before updating the source code
       - name: Kill flask app
         #if: github.ref == 'refs/heads/master'
@@ -81,12 +81,12 @@ jobs:
           script: |
             docker stop yaptide
             docker rm yaptide
-          
+
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
         #if: github.ref == 'refs/heads/master'
         run: rsync -e "ssh -A ${{ env.FRONTEND_USER }}@${{ env.FRONTEND_HOST }} ssh" . ${{ env.BACKEND_USER }}@${{ env.BACKEND_HOST }}:~/yaptide --delete --recursive
-      
+
       # recreate env (it was destroyed by rsync during copying)
       # enter env and install requirements
       # set flask environment to developement and specify the package containing the app factory
@@ -101,6 +101,7 @@ jobs:
           proxy_host: ${{ env.FRONTEND_HOST }}
           proxy_username: ${{ env.BACKEND_USER }}
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
+          command_timeout: 30m
           script: |
             cd yaptide
             docker build -t yaptide .
