@@ -61,21 +61,17 @@ def dummy_convert_output(estimators_dict):
 
     # result_dict contains the list of estimators
     result_dict = {"estimators": []}
-    for est_name in estimators_dict:
+    for estimator_name, estimator_obj in estimators_dict.items():
 
         # est_dict contains list of pages
         est_dict = {
-            "name" : est_name,
+            "name" : estimator_name,
             "pages": []}
-        for page in estimators_dict[est_name].pages:
-
-            page_dim = page.dimension
+        for page in estimator_obj.pages:
 
             # handling 1 dimension page
-            if page_dim == 1:
+            if page.dimension == 1:
                 axis = page.plot_axis(0)
-                x_values = axis.data
-                y_values = page.data_raw.flatten()
 
                 # for 1 dimension page, dict contains:
                 # "dimensions" indicating it is 1 dim page
@@ -83,14 +79,11 @@ def dummy_convert_output(estimators_dict):
                 # "x_values" which is list of x values
                 # "y_values" which is list of y values
                 page_dict = {
-                    "dimensions" : page_dim,
+                    "dimensions" : page.dimension,
                     "unit": str(axis.unit),
-                    "x_values": [],
-                    "y_values": []
+                    "x_values": axis.data,
+                    "y_values": page.data_raw.flatten()
                 }
-                for i in range(axis.n):
-                    page_dict["x_values"].append( x_values[i] )
-                    page_dict["y_values"].append( y_values[i] )
                 est_dict["pages"].append(page_dict)
             else:
                 # handlers for more dimensions aren't implemented yet
