@@ -69,6 +69,7 @@ jobs:
 
       # if the flask app is already running on the openstack machine, then kill it before updating the source code
       - name: Kill flask app
+        continue-on-error: true
         #if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
