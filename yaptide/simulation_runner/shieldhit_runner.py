@@ -76,13 +76,20 @@ def dummy_convert_output(estimators_dict):
                 # for 1 dimension page, dict contains:
                 # "dimensions" indicating it is 1 dim page
                 # "unit"
-                # "x_values" which is list of x values
-                # "y_values" which is list of y values
+                # "first_axis" which has unit, name and list of axis values
+                # "data" which has unit, name and list of data values
                 page_dict = {
                     "dimensions" : page.dimension,
-                    "unit": str(axis.unit),
-                    "x_values": axis.data,
-                    "y_values": page.data_raw.flatten()
+                    "first_axis": {
+                        "unit": str(axis.unit),
+                        "name": str(axis.name),
+                        "values": axis.data
+                    },
+                    "data" : {
+                        "unit": str(page.unit),
+                        "name": str(page.name),
+                        "values": page.data_raw.flatten()
+                    }
                 }
                 est_dict["pages"].append(page_dict)
             else:
