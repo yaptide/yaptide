@@ -77,12 +77,13 @@ jobs:
           username: ${{ env.BACKEND_USER }}
           key: ${{ secrets.DEPLOY_C3_TEST }}
           proxy_host: ${{ env.FRONTEND_HOST }}
-          proxy_username: ${{ env.BACKEND_USER }}
+          proxy_username: ${{ env.FRONTEND_USER }}
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
             docker stop yaptide
             docker rm yaptide
-
+            docker system prune
+    
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
         if: github.ref == 'refs/heads/master'
