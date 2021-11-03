@@ -83,7 +83,7 @@ jobs:
             docker stop yaptide
             docker rm yaptide
             docker system prune
-          
+    
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
         #if: github.ref == 'refs/heads/master'
