@@ -55,7 +55,7 @@ jobs:
 
       # add keys to the SSH agent
       - uses: webfactory/ssh-agent@v0.5.3
-        #if: github.ref == 'refs/heads/master'
+        if: github.ref == 'refs/heads/master'
         with:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
