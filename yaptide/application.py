@@ -17,6 +17,7 @@ def create_app(config_object="yaptide.settings"):
 
     api = Api(app)
     initialize_routes(api)
+
     return app
 
 

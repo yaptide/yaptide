@@ -1,4 +1,5 @@
-from flask import request
+from flask import request, json
+from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
 from yaptide.persistence.database import db
@@ -37,20 +38,25 @@ class ShieldhitDemo(Resource):
     """Class responsible for Shieldhit Demo running"""
 
     @staticmethod
-    def get():
+    def post():
         """Method handling running shieldhit with server"""
         shschema = SHSchema()
         args = request.args
         errors = shschema.validate(args)
         if errors:
             return errors
-
         param_dict = shschema.load(args)
-        simulation_result = run_shieldhit(param_dict)
+
+        json_data = request.get_json(force=True)
+        if not json_data:
+            return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
+
+        simulation_result = run_shieldhit(param_dict=param_dict,
+                                          raw_input_dict=json_data)
 
         if simulation_result:
-            return {"status": "ok"}
-        return {"status": "error"}
+            return json.dumps(simulation_result), api_status.HTTP_200_OK
+        return json.dumps({"msg": "Sim Error"}), api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 ############### Example user ###############
