@@ -37,14 +37,9 @@ def run_shieldhit(param_dict, raw_input_dict):
                               keep_workspace_after_run=False,
                               output_directory=tmp_output_path)
 
-        start_time = timeit.default_timer()
-
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
             return None
-
-        elapsed = timeit.default_timer() - start_time
-        print("MC simulation took {:.3f} seconds".format(elapsed))
 
         estimators_dict = runner_obj.get_data()
 
