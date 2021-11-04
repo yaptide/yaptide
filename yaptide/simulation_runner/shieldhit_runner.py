@@ -92,14 +92,6 @@ def dummy_convert_output(estimators_dict):
                     "name": str(axis.name),
                     "values": axis.data.tolist()
                 }
-            # if page.dimension > 0:
-            # if page.dimension > 1:
-            #     axis = page.plot_axis(1)
-            #     page_dict["second_axis"] = {
-            #         "unit": str(axis.unit),
-            #         "name": str(axis.name),
-            #         "values": axis.data.tolist()
-            #     }
 
             est_dict["pages"].append(page_dict)
         result_dict["estimators"].append(est_dict)
