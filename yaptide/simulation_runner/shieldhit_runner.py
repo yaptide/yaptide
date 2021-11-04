@@ -76,27 +76,31 @@ def dummy_convert_output(estimators_dict):
             # "dimensions" indicating it is 1 dim page
             # "data" which has unit, name and list of data values
             page_dict = {
-                "dimensions" : page.dimension,
-                "data" : {
+                "dimensions" : page.dimension
+            }
+            # currently output is returned only when dimension == 1 due to
+            # problems in efficient testing of other dimensions
+            if page.dimension == 1:
+                page_dict["data"] = {
                     "unit": str(page.unit),
                     "name": str(page.name),
                     "values": page.data_raw.flatten().tolist()
                 }
-            }
-            if page.dimension > 0:
                 axis = page.plot_axis(0)
                 page_dict["first_axis"] = {
                     "unit": str(axis.unit),
                     "name": str(axis.name),
                     "values": axis.data.tolist()
                 }
-            if page.dimension > 1:
-                axis = page.plot_axis(1)
-                page_dict["second_axis"] = {
-                    "unit": str(axis.unit),
-                    "name": str(axis.name),
-                    "values": axis.data.tolist()
-                }
+            # if page.dimension > 0:
+            # if page.dimension > 1:
+            #     axis = page.plot_axis(1)
+            #     page_dict["second_axis"] = {
+            #         "unit": str(axis.unit),
+            #         "name": str(axis.name),
+            #         "values": axis.data.tolist()
+            #     }
+
             est_dict["pages"].append(page_dict)
         result_dict["estimators"].append(est_dict)
 
