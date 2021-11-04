@@ -34,9 +34,9 @@ docker stop yaptide
 docker rm yaptide
 ```
 
-# Curl
+# Testing API with command-line tools
 
-Currently dummy converter ignores the content of json sent in request's body so it can contains anything.
+Currently, the dummy converter ignores the JSON content sent in the request's body so it can contain anything.
 
 Example curl for Windows:
 ```shell
