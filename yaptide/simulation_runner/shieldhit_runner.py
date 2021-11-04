@@ -69,6 +69,9 @@ def dummy_convert_output(estimators_dict):
             "pages": []}
         for page in estimator_obj.pages:
 
+            # currently we are handling for sure only 1-D results
+            # 0-D and 2-D results aren't tested yet, due to testing problems
+
             # page_dict contains:
             # "dimensions" indicating it is 1 dim page
             # "data" which has unit, name and list of data values
@@ -80,8 +83,6 @@ def dummy_convert_output(estimators_dict):
                     "values": page.data_raw.flatten().tolist()
                 }
             }
-            if page.dimension == 0:
-                page_dict["data"]
             if page.dimension > 0:
                 axis = page.plot_axis(0)
                 page_dict["first_axis"] = {
@@ -96,7 +97,6 @@ def dummy_convert_output(estimators_dict):
                     "name": str(axis.name),
                     "values": axis.data.tolist()
                 }
-            
             est_dict["pages"].append(page_dict)
         result_dict["estimators"].append(est_dict)
 
