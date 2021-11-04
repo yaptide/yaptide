@@ -77,7 +77,7 @@ def dummy_convert_output(estimators_dict):
                 "data" : {
                     "unit": str(page.unit),
                     "name": str(page.name),
-                    # "values": page.data_raw.flatten()
+                    "values": page.data_raw.flatten().tolist()
                 }
             }
             if page.dimension == 0:
@@ -87,14 +87,14 @@ def dummy_convert_output(estimators_dict):
                 page_dict["first_axis"] = {
                     "unit": str(axis.unit),
                     "name": str(axis.name),
-                    "values": axis.data
+                    "values": axis.data.tolist()
                 }
             if page.dimension > 1:
                 axis = page.plot_axis(1)
                 page_dict["second_axis"] = {
                     "unit": str(axis.unit),
                     "name": str(axis.name),
-                    "values": axis.data
+                    "values": axis.data.tolist()
                 }
             
             est_dict["pages"].append(page_dict)
