@@ -10,7 +10,7 @@ from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 from marshmallow import Schema
 from marshmallow import fields as fld
 
-from typing import Union, List, Literal
+from typing import Union, Literal
 
 resources = []
 
@@ -49,7 +49,7 @@ class ShieldhitDemo(Resource):
         """Method handling running shieldhit with server"""
         shschema = SHSchema()
         args: MultiDict[str, str] = request.args
-        errors: dict[str, List[str]] = shschema.validate(args)
+        errors: dict[str, list[str]] = shschema.validate(args)
         if errors:
             return errors
         param_dict: dict = shschema.load(args)
