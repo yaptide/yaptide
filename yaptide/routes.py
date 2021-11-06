@@ -10,7 +10,7 @@ from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 from marshmallow import Schema
 from marshmallow import fields as fld
 
-from typing import Union, Dict, List, Literal
+from typing import Union, List, Literal
 
 resources = []
 
@@ -40,9 +40,9 @@ class SHSchema(Schema):
 
 class ShieldhitDemo(Resource):
     """Class responsible for Shieldhit Demo running"""
-    
+
     @staticmethod
-    def post() -> Union[Dict[str, List[str]],
+    def post() -> Union[dict[str, list[str]],
                         tuple[str, Literal[400]],
                         tuple[str, Literal[200]],
                         tuple[str, Literal[500]]]:
