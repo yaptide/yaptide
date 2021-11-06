@@ -55,7 +55,7 @@ class ShieldhitDemo(Resource):
             return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
 
         simulation_result: dict = run_shieldhit(param_dict=param_dict,
-                                          raw_input_dict=json_data)
+                                                raw_input_dict=json_data)
 
         if simulation_result:
             return json.dumps(simulation_result), api_status.HTTP_200_OK
