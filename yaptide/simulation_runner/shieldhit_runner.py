@@ -1,22 +1,18 @@
 #!/usr/bin/env python
 
-import os
-import logging
-import sys
-import argparse
-import timeit
-import shutil
 import tempfile
-import pathlib
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
+from pymchelper.estimator import Estimator
+from pymchelper.page import Page
+from pymchelper.axis import MeshAxis
 
 from ..converter.converter.converter import DummmyParser
 from ..converter.converter.converter import Runner as ConvRunner
 
 
-def run_shieldhit(param_dict, raw_input_dict):
+def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
@@ -41,12 +37,12 @@ def run_shieldhit(param_dict, raw_input_dict):
         if not isRunOk:
             return None
 
-        estimators_dict = runner_obj.get_data()
+        estimators_dict: dict = runner_obj.get_data()
 
         return dummy_convert_output(estimators_dict)
 
 
-def dummy_convert_output(estimators_dict):
+def dummy_convert_output(estimators_dict: dict) -> dict:
     """Dummy function for converting simulation output to dictionary"""
     if not estimators_dict:
         return {"message": "No estimators"}
@@ -56,12 +52,15 @@ def dummy_convert_output(estimators_dict):
 
     # result_dict contains the list of estimators
     result_dict = {"estimators": []}
+    estimator_obj: Estimator
     for estimator_name, estimator_obj in estimators_dict.items():
 
         # est_dict contains list of pages
         est_dict = {
             "name" : estimator_name,
             "pages": []}
+
+        page: Page   # type is still marked as Never
         for page in estimator_obj.pages:
 
             # currently we are handling for sure only 1-D results
@@ -81,7 +80,7 @@ def dummy_convert_output(estimators_dict):
                     "name": str(page.name),
                     "values": page.data_raw.flatten().tolist()
                 }
-                axis = page.plot_axis(0)
+                axis: MeshAxis = page.plot_axis(0)
                 page_dict["first_axis"] = {
                     "unit": str(axis.unit),
                     "name": str(axis.name),

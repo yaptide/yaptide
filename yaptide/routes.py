@@ -2,11 +2,15 @@ from flask import request, json
 from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
+
+from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 from marshmallow import Schema
 from marshmallow import fields as fld
+
+from typing import Union, List, Literal
 
 resources = []
 
@@ -38,21 +42,24 @@ class ShieldhitDemo(Resource):
     """Class responsible for Shieldhit Demo running"""
 
     @staticmethod
-    def post():
+    def post() -> Union[dict[str, list[str]],
+                        tuple[str, Literal[400]],
+                        tuple[str, Literal[200]],
+                        tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
         shschema = SHSchema()
-        args = request.args
-        errors = shschema.validate(args)
+        args: MultiDict[str, str] = request.args
+        errors: dict[str, List[str]] = shschema.validate(args)
         if errors:
             return errors
-        param_dict = shschema.load(args)
+        param_dict: dict = shschema.load(args)
 
-        json_data = request.get_json(force=True)
+        json_data: dict = request.get_json(force=True)
         if not json_data:
             return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
 
-        simulation_result = run_shieldhit(param_dict=param_dict,
-                                          raw_input_dict=json_data)
+        simulation_result: dict = run_shieldhit(param_dict=param_dict,
+                                                raw_input_dict=json_data)
 
         if simulation_result:
             return json.dumps(simulation_result), api_status.HTTP_200_OK
