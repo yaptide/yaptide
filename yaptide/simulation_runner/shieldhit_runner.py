@@ -59,9 +59,9 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
         est_dict = {
             "name" : estimator_name,
             "pages": []}
-        page: Page
+            
+        page: Page # type is still marked as Never
         for page in estimator_obj.pages:
-            page = Page(page)
 
             # currently we are handling for sure only 1-D results
             # 0-D and 2-D results aren't tested yet, due to testing problems
