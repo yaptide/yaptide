@@ -45,9 +45,9 @@ class ShieldhitDemo(Resource):
         errors = shschema.validate(args)
         if errors:
             return errors
-        param_dict = shschema.load(args)
+        param_dict: dict = shschema.load(args)
 
-        json_data = request.get_json(force=True)
+        json_data: dict = request.get_json(force=True)
         if not json_data:
             return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
 
