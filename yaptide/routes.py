@@ -40,8 +40,12 @@ class SHSchema(Schema):
 
 class ShieldhitDemo(Resource):
     """Class responsible for Shieldhit Demo running"""
+    
     @staticmethod
-    def post() -> Union[Dict[str, List[str]] , tuple[str, Literal[400]] , tuple[str, Literal[200]] , tuple[str, Literal[500]]]:
+    def post() -> Union[Dict[str, List[str]],
+                        tuple[str, Literal[400]],
+                        tuple[str, Literal[200]],
+                        tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
         shschema = SHSchema()
         args: MultiDict[str, str] = request.args
