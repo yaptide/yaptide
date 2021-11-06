@@ -12,7 +12,7 @@ from ..converter.converter.converter import DummmyParser
 from ..converter.converter.converter import Runner as ConvRunner
 
 
-def run_shieldhit(param_dict: dict, raw_input_dict: dict):
+def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
