@@ -1,19 +1,21 @@
 #!/usr/bin/env python
 
 import tempfile
+import celery
 
-from pymchelper.executor.options import SimulationSettings
-from pymchelper.executor.runner import Runner as SHRunner
-from pymchelper.estimator import Estimator
-from pymchelper.page import Page
-from pymchelper.axis import MeshAxis
+celery = celery.Celery("application")
+celery.conf.broker_url = 'redis://localhost:6379/0'
+celery.conf.result_backend = 'redis://localhost:6379/0'
 
-from ..converter.converter.converter import DummmyParser
-from ..converter.converter.converter import Runner as ConvRunner
-
-
-def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
+@celery.task(bind=True)
+def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
+    from pymchelper.executor.options import SimulationSettings
+    from pymchelper.executor.runner import Runner as SHRunner
+
+    from ..converter.converter.converter import DummmyParser
+    from ..converter.converter.converter import Runner as ConvRunner
+    
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
@@ -24,6 +26,7 @@ def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
                                  output_dir=tmp_output_path)
 
         conv_runner.run_parser()
+        self.update_state(state='PENDING')
 
         settings = SimulationSettings(input_path=tmp_output_path,
                                       simulator_exec_path=None,
@@ -39,11 +42,18 @@ def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
 
         estimators_dict: dict = runner_obj.get_data()
 
-        return dummy_convert_output(estimators_dict)
+        self.update_state(state='PENDING')
+
+        result: dict = dummy_convert_output(estimators_dict)
+
+        return {'status' : 'COMPLETED', 'result': result}
 
 
 def dummy_convert_output(estimators_dict: dict) -> dict:
     """Dummy function for converting simulation output to dictionary"""
+    from pymchelper.estimator import Estimator
+    from pymchelper.page import Page
+    from pymchelper.axis import MeshAxis
     if not estimators_dict:
         return {"message": "No estimators"}
 
