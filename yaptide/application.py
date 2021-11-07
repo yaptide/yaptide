@@ -4,8 +4,6 @@ from yaptide.routes import initialize_routes
 from yaptide.persistence.database import db
 from yaptide.persistence import models
 
-from celery import Celery
-
 
 def create_app(config_object="yaptide.settings"):
     app = Flask(__name__.split('.')[0])

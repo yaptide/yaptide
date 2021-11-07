@@ -9,7 +9,6 @@ celery = celery.Celery("application")
 celery.conf.broker_url = 'redis://localhost:6379/0'
 celery.conf.result_backend = 'redis://localhost:6379/0'
 
-
 @celery.task(bind=True)
 def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
