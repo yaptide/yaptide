@@ -3,12 +3,11 @@
 import os
 import sys
 import tempfile
+import celery
 
-from pymchelper.executor.options import SimulationSettings
-from pymchelper.executor.runner import Runner as SHRunner
-from pymchelper.estimator import Estimator
-from pymchelper.page import Page
-from pymchelper.axis import MeshAxis
+celery = celery.Celery("application")
+celery.conf.broker_url = 'redis://localhost:6379/0'
+celery.conf.result_backend = 'redis://localhost:6379/0'
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append('yaptide/converter')
@@ -16,7 +15,15 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 
 def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
+@celery.task(bind=True)
+def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
+    from pymchelper.executor.options import SimulationSettings
+    from pymchelper.executor.runner import Runner as SHRunner
+
+    from ..converter.converter.converter import DummmyParser
+    from ..converter.converter.converter import Runner as ConvRunner
+    
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
@@ -39,11 +46,18 @@ def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
 
         estimators_dict: dict = runner_obj.get_data()
 
-        return dummy_convert_output(estimators_dict)
+        self.update_state(state='PENDING')
+
+        result: dict = dummy_convert_output(estimators_dict)
+
+        return {'status' : 'COMPLETED', 'result': result}
 
 
 def dummy_convert_output(estimators_dict: dict) -> dict:
     """Dummy function for converting simulation output to dictionary"""
+    from pymchelper.estimator import Estimator
+    from pymchelper.page import Page
+    from pymchelper.axis import MeshAxis
     if not estimators_dict:
         return {"message": "No estimators"}
 
