@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+
+  worker:
+    build: .
+    command: celery --app yaptide.simulation_runner.shieldhit_runner.celery worker --loglevel=info
+    volumes:
+      - .:/usr/src/app
+    environment:
+      - FLASK_DEBUG=1
+      - APP_SETTINGS=project.server.config.DevelopmentConfig
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:6-alpine

@@ -1,4 +1,4 @@
-from flask import request, json
+from flask import request, json, jsonify
 from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 from warnings import resetwarnings
@@ -9,6 +9,8 @@ from yaptide.persistence.models import ExampleUserModel
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
 from marshmallow import Schema
 from marshmallow import fields as fld
+
+from celery.result import AsyncResult
 
 from typing import Union, Literal
 
@@ -25,7 +27,7 @@ class HelloWorld(Resource):
 
 ############################################
 
-class SHSchema(Schema):
+class SHRunSchema(Schema):
     """Class specifies API parameters"""
 
     jobs = fld.Integer(missing=1)
@@ -38,7 +40,7 @@ class SHSchema(Schema):
     mesh_nz = fld.Integer(missing=300)
 
 
-class ShieldhitDemo(Resource):
+class ShieldhitDemoRun(Resource):
     """Class responsible for Shieldhit Demo running"""
 
     @staticmethod
@@ -47,23 +49,66 @@ class ShieldhitDemo(Resource):
                         tuple[str, Literal[200]],
                         tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
-        shschema = SHSchema()
+        schema = SHRunSchema()
         args: MultiDict[str, str] = request.args
-        errors: dict[str, list[str]] = shschema.validate(args)
+        errors: dict[str, list[str]] = schema.validate(args)
         if errors:
             return errors
-        param_dict: dict = shschema.load(args)
+        param_dict: dict = schema.load(args)
 
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
 
-        simulation_result: dict = run_shieldhit(param_dict=param_dict,
-                                                raw_input_dict=json_data)
+        task = run_shieldhit.delay(param_dict=param_dict,
+                                   raw_input_dict=json_data)
 
-        if simulation_result:
-            return json.dumps(simulation_result), api_status.HTTP_200_OK
-        return json.dumps({"msg": "Sim Error"}), api_status.HTTP_500_INTERNAL_SERVER_ERROR
+        return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
+        # if simulation_result:
+        #     return json.dumps(simulation_result), api_status.HTTP_200_OK
+        # return json.dumps({"msg": "Sim Error"}), api_status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class SHStatusSchema(Schema):
+    """Class specifies API parameters"""
+
+    task_id = fld.Integer()
+
+
+class ShieldhitDemoStatus(Resource):
+    """Class responsible for returning Shieldhit Demo status and result"""
+
+    @staticmethod
+    def get():
+        schema = SHStatusSchema()
+        args: MultiDict[str, str] = request.args
+        errors: dict[str, list[str]] = schema.validate(args)
+        if errors:
+            return errors
+
+        task_id = schema.load(args)["task_id"]
+        task = AsyncResult(task_id)
+
+        if task.state == 'PENDING':
+            response = {
+                'state': task.state,
+                'status': 'Pending...'
+            }
+        elif task.state != 'FAILURE':
+            response = {
+                'state': task.state,
+                'status': task.info.get('status', '')
+            }
+            if 'result' in task.info:
+                response['result'] = task.info['result']
+        else:
+            # something went wrong in the background job
+            response = {
+                'state': task.state,
+                'status': str(task.info),  # this is the exception raised
+            }
+        return jsonify(response)
+
 
 
 ############### Example user ###############
@@ -126,4 +171,5 @@ def initialize_routes(api):
     api.add_resource(ExampleUserResource,
                      "/example_user/<int:user_id>", "/example_user")
     api.add_resource(HelloWorld, "/")
-    api.add_resource(ShieldhitDemo, "/sh/demo")
+    api.add_resource(ShieldhitDemoRun, "/sh/run")
+    api.add_resource(ShieldhitDemoStatus, "/sh/status")
