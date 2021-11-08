@@ -41,9 +41,6 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
 
         estimators_dict: dict = runner_obj.get_data()
 
-        self.update_state(state='PENDING',
-                          meta={"status" : "parsing output"})
-
         result: dict = dummy_convert_output(estimators_dict)
 
         return {'status' : 'COMPLETED', 'result': result}
