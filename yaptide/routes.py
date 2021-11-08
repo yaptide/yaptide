@@ -112,7 +112,6 @@ class ShieldhitDemoStatus(Resource):
         return json.dumps(response)
 
 
-
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
 example_user_args = reqparse.RequestParser()
