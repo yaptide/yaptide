@@ -7,6 +7,16 @@ import time
 from celery import Celery, states
 from celery import exceptions as celery_exceptions
 
+from pymchelper.executor.options import SimulationSettings
+from pymchelper.executor.runner import Runner as SHRunner
+from pymchelper.estimator import Estimator
+from pymchelper.page import Page
+from pymchelper.axis import MeshAxis
+
+# dirty hack needed to properly handle relative imports in the converter submodule
+sys.path.append('yaptide/converter')
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
+
 celery_app = Celery(
     "celery-app",
     backend='redis://localhost',
@@ -16,12 +26,6 @@ celery_app = Celery(
 @celery_app.task(bind=True)
 def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
     """Shieldhit runner"""
-    from pymchelper.executor.options import SimulationSettings
-    from pymchelper.executor.runner import Runner as SHRunner
-
-    # dirty hack needed to properly handle relative imports in the converter submodule
-    sys.path.append('yaptide/converter')
-    from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
@@ -55,9 +59,6 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
 
 def dummy_convert_output(estimators_dict: dict) -> dict:
     """Dummy function for converting simulation output to dictionary"""
-    from pymchelper.estimator import Estimator
-    from pymchelper.page import Page
-    from pymchelper.axis import MeshAxis
     if not estimators_dict:
         return {"message": "No estimators"}
 
