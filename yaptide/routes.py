@@ -88,6 +88,7 @@ class ShieldhitDemoStatus(Resource):
 
         task_id = schema.load(args)["task_id"]
         task = AsyncResult(task_id)
+        print(task.info)
 
         if task.state == 'PENDING':
             response = {
