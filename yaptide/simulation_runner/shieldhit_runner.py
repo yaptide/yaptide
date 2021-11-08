@@ -9,20 +9,16 @@ celery = celery.Celery("application")
 celery.conf.broker_url = 'redis://localhost:6379/0'
 celery.conf.result_backend = 'redis://localhost:6379/0'
 
-# dirty hack needed to properly handle relative imports in the converter submodule
-sys.path.append('yaptide/converter')
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
-
-def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
 @celery.task(bind=True)
 def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
     from pymchelper.executor.options import SimulationSettings
     from pymchelper.executor.runner import Runner as SHRunner
-
-    from ..converter.converter.converter import DummmyParser
-    from ..converter.converter.converter import Runner as ConvRunner
+    
+    # dirty hack needed to properly handle relative imports in the converter submodule
+    sys.path.append('yaptide/converter')
+    from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
     
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
