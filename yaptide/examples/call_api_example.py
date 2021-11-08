@@ -4,6 +4,7 @@ import time
 
 
 def call_api():
+    """Example backend endpoint call"""
     api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status?task_id={task_id}'
 
@@ -15,7 +16,7 @@ def call_api():
     for key in json.loads(res.json()):
         if key == 'task_id':
             task_id = data[key]
-        if task_id != None:
+        if task_id:
             while True:
                 time.sleep(5)
                 res = requests.get(api_get.format(task_id=task_id))
@@ -25,7 +26,7 @@ def call_api():
                     print(res.json())
                     # data = json.loads(str(res.json()))
 
-                except Exception: # skipcq: FLK-E402
+                except Exception:  # skipcq: PYL-W0703
                     print(Exception)
 
 

@@ -80,6 +80,7 @@ class ShieldhitDemoStatus(Resource):
 
     @staticmethod
     def get():
+        """Method returning task status and results"""
         schema = SHStatusSchema()
         args: MultiDict[str, str] = request.args
         errors: dict[str, list[str]] = schema.validate(args)
