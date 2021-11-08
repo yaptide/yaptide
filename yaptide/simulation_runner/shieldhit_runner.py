@@ -26,7 +26,8 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
                                  output_dir=tmp_output_path)
 
         conv_runner.run_parser()
-        self.update_state(state='PENDING')
+        self.update_state(state='PENDING',
+                          meta={"status" : "parsed input"})
 
         settings = SimulationSettings(input_path=tmp_output_path,
                                       simulator_exec_path=None,
@@ -36,13 +37,14 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
                               keep_workspace_after_run=False,
                               output_directory=tmp_output_path)
 
-        isRunOk = runner_obj.run(settings=settings)
+        isRunOk = False #runner_obj.run(settings=settings)
         if not isRunOk:
             return None
 
         estimators_dict: dict = runner_obj.get_data()
 
-        self.update_state(state='PENDING')
+        self.update_state(state='PENDING',
+                          meta={"status" : "parsing output"})
 
         result: dict = dummy_convert_output(estimators_dict)
 
