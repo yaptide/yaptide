@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 
+import os
+import sys
 import tempfile
 
 from pymchelper.executor.options import SimulationSettings
@@ -8,9 +10,9 @@ from pymchelper.estimator import Estimator
 from pymchelper.page import Page
 from pymchelper.axis import MeshAxis
 
-from ..converter.converter.converter import DummmyParser
-from ..converter.converter.converter import Runner as ConvRunner
-
+# dirty hack needed to properly handle relative imports in the converter submodule
+sys.path.append('yaptide/converter')
+from ..converter.converter.api import get_parser_from_str, run_parser
 
 def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
@@ -19,11 +21,8 @@ def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate SHIELD-HIT12A input files
-        conv_runner = ConvRunner(parser=DummmyParser(),
-                                 input_data=raw_input_dict,
-                                 output_dir=tmp_output_path)
-
-        conv_runner.run_parser()
+        conv_parser = get_parser_from_str("dummy")
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_output_path)
 
         settings = SimulationSettings(input_path=tmp_output_path,
                                       simulator_exec_path=None,
