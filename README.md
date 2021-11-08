@@ -66,3 +66,5 @@ And for Linux:
 ```shell
 curl -i "http://localhost:5000/sh/run?task_id=<task_id>"
 ```
+
+Although it might be inefficient way of testing so there is a prepared example ```call_api_example.py``` in yaptide/examples folder
