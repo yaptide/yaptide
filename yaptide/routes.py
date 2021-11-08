@@ -107,7 +107,8 @@ class ShieldhitDemoStatus(Resource):
                 'state': task.state,
                 'status': str(task.info),  # this is the exception raised
             }
-        return jsonify(response)
+        print(response)
+        return json.dumps(response)
 
 
 
