@@ -7,7 +7,7 @@ def call_api():
     api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status?task_id={task_id}'
 
-    res = requests.post(api_post, json = {"some": "json"})
+    res = requests.post(api_post, json={"some": "json"})
 
     task_id = None
     data = json.loads(res.json())
@@ -25,8 +25,9 @@ def call_api():
                     print(res.json())
                     # data = json.loads(str(res.json()))
 
-                except Exception:
+                except Exception: # skipcq: FLK-E402
                     print(Exception)
+
 
 if __name__ == "__main__":
     call_api()
