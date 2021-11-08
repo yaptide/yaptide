@@ -1,3 +1,7 @@
+# dedicated image with python 3.9 installed
+image:
+  file: .gitpod.dockerfile
+
 tasks:
   - before: |
       export FLASK_APP=yaptide.application
