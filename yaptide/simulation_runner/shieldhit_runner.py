@@ -12,7 +12,8 @@ from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append('yaptide/converter')
-from ..converter.converter.api import get_parser_from_str, run_parser
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
+
 
 def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
     """Shieldhit runner"""
