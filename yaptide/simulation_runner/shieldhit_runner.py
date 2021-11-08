@@ -2,15 +2,19 @@
 
 import sys
 import tempfile
-import celery
+import time
 
-celery = celery.Celery("application")
-celery.conf.broker_url = 'redis://localhost:6379/0'
-celery.conf.result_backend = 'redis://localhost:6379/0'
+from celery import Celery, states
+from celery import exceptions as celery_exceptions
+
+celery_app = Celery(
+    "celery-app",
+    backend='redis://localhost',
+    broker='redis://localhost')
 
 
-@celery.task(bind=True)
-def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
+@celery_app.task(bind=True)
+def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
     """Shieldhit runner"""
     from pymchelper.executor.options import SimulationSettings
     from pymchelper.executor.runner import Runner as SHRunner
@@ -35,9 +39,12 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict) -> dict:
                               keep_workspace_after_run=False,
                               output_directory=tmp_output_path)
 
+        time.sleep(4)
         isRunOk = False  # runner_obj.run(settings=settings)
         if not isRunOk:
-            return None
+            self.update_state(
+                state=states.FAILURE)
+            raise celery_exceptions.TaskError
 
         estimators_dict: dict = runner_obj.get_data()
 

@@ -6,7 +6,7 @@ from warnings import resetwarnings
 from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
 from yaptide.persistence.models import ExampleUserModel
-from yaptide.simulation_runner.shieldhit_runner import run_shieldhit
+from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
 from marshmallow import Schema
 from marshmallow import fields as fld
 
@@ -72,7 +72,7 @@ class ShieldhitDemoRun(Resource):
 class SHStatusSchema(Schema):
     """Class specifies API parameters"""
 
-    task_id = fld.Integer()
+    task_id = fld.String()
 
 
 class ShieldhitDemoStatus(Resource):
@@ -83,13 +83,13 @@ class ShieldhitDemoStatus(Resource):
         """Method returning task status and results"""
         schema = SHStatusSchema()
         args: MultiDict[str, str] = request.args
+        
         errors: dict[str, list[str]] = schema.validate(args)
         if errors:
             return errors
 
         task_id = schema.load(args)["task_id"]
-        task = AsyncResult(task_id)
-        print(task.info)
+        task = AsyncResult(task_id,app=celery_app)
 
         if task.state == 'PENDING':
             response = {

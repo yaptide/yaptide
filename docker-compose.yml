@@ -21,7 +21,7 @@ services:
 
   worker:
     build: .
-    command: celery --app yaptide.simulation_runner.shieldhit_runner.celery worker -P threads --loglevel=info
+    command: celery --app yaptide.simulation_runner.shieldhit_runner.celery_app worker -P threads --loglevel=info
     volumes:
       - .:/usr/src/app
     environment:
