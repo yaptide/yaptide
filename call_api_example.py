@@ -3,7 +3,7 @@ import json
 import time
 
 
-def test_api():
+def call_api():
     api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status?task_id={task_id}'
 
@@ -29,4 +29,4 @@ def test_api():
                     print(Exception)
 
 if __name__ == "__main__":
-    test_api()
+    call_api()
