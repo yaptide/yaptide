@@ -9,7 +9,7 @@ Run: ```$ pip install -r requirements.txt```
    * * ```$ docker pull redis```
    * * ```$ docker run -dp 6379:6379 redis```
 
-2. Run Celery with ```$ celery --app yaptide.simulation_runneelery worker -P threads --loglevel=info```
+2. Run Celery with ```$ celery --app yaptide.simulation_runner.celery_app worker -P threads --loglevel=info```
    * If u ran redis with docker you can use the same terminal
    
 3. In new terminal set FLASK_APP env variable ([explanation](https://flask.palletsprojects.com/en/2.0.x/cli/)):

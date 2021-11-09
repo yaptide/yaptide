@@ -28,7 +28,6 @@ def call_api():
                         print("sth went wrong")
                         return
 
-
                 except Exception:  # skipcq: PYL-W0703
                     print(Exception)
                 time.sleep(5)

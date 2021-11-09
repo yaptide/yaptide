@@ -26,7 +26,6 @@ celery_app = Celery(
 @celery_app.task(bind=True)
 def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
     """Shieldhit runner"""
-
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 

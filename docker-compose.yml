@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
 
-  yaptide-flask:
+  yaptide_flask:
     build: .
-    image: yaptide-flask
-    container_name: yaptide-flask
+    image: yaptide_flask
+    container_name: yaptide_flask
     ports:
       - 5000:5000
     command: flask run --host=0.0.0.0
@@ -18,8 +18,9 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
+      - yaptide_worker
 
-  worker:
+  yaptide_worker:
     build: .
     command: celery --app yaptide.simulation_runner.shieldhit_runner.celery_app worker -P threads --loglevel=info
     volumes:
@@ -30,7 +31,6 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
-      - yaptide-flask
 
   redis:
     image: redis:6-alpine

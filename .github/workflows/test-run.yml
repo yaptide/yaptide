@@ -80,10 +80,10 @@ jobs:
           proxy_username: ${{ env.FRONTEND_USER }}
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
-            docker-compose stop yaptide
-            docker-compose stop worker
+            docker-compose stop yaptide_flask
+            docker-compose stop yaptide_worker
             docker-compose stop redis
-            docker rmi yaptide-flask
+            docker rmi yaptide_flask
             docker rmi yaptide_worker
             docker system prune
     
