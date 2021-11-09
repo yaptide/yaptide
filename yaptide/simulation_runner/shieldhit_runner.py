@@ -45,8 +45,7 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
         time.sleep(20)
         isRunOk = False  # runner_obj.run(settings=settings)
         if not isRunOk:
-            self.update_state(
-                state=states.FAILURE)
+            self.update_state(state=states.FAILURE)
             raise celery_exceptions.TaskError
 
         estimators_dict: dict = runner_obj.get_data()
