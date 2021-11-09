@@ -1,11 +1,7 @@
-FROM python:3.9-alpine
+FROM python:3.9-slim
 ARG SHIELDHIT_PATH
 COPY $SHIELDHIT_PATH /usr/local/bin/
 WORKDIR /usr/local/app
-
-# set environment variables
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
 
 # install dependencies
 COPY ./requirements.txt ./
