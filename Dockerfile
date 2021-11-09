@@ -1,9 +1,6 @@
 FROM python:3.9-alpine
 ARG SHIELDHIT_PATH
 COPY $SHIELDHIT_PATH /usr/local/bin/
-# COPY yaptide ./yaptide
-# ENV FLASK_APP=yaptide.application
-# CMD ["flask", "run", "--host=0.0.0.0"]
 WORKDIR /usr/local/app
 
 # set environment variables
