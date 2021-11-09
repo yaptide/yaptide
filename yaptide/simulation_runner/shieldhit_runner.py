@@ -43,7 +43,7 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
                               keep_workspace_after_run=False,
                               output_directory=tmp_output_path)
 
-        time.sleep(4)
+        time.sleep(20)
         isRunOk = False  # runner_obj.run(settings=settings)
         if not isRunOk:
             self.update_state(
