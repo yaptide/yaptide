@@ -8,16 +8,16 @@ def call_api():
     api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status?task_id={task_id}'
 
-    res = requests.post(api_post, json={"some": "json"})
+    res: requests.Response = requests.post(api_post, json={"some": "json"})
 
-    task_id = None
+    task_id: str = ""
     data = json.loads(res.json())
     for key in data:
         if key == 'task_id':
             task_id = data[key]
-        if task_id:
+        if task_id != "":
             while True:
-                res = requests.get(api_get.format(task_id=task_id))
+                res: requests.Response = requests.get(api_get.format(task_id=task_id))
                 try:
                     print(res.json())
                     data = json.loads(str(res.json()))

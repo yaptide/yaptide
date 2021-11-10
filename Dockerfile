@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.9-alpine
 ARG SHIELDHIT_PATH
 COPY $SHIELDHIT_PATH /usr/local/bin/
 WORKDIR /usr/local/app

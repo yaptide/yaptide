@@ -18,7 +18,6 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
-      - yaptide_worker
 
   yaptide_worker:
     build: .
@@ -31,6 +30,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://redis:6379/0
     depends_on:
       - redis
+      - yaptide_flask
 
   redis:
     image: redis:6-alpine
