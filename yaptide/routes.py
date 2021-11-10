@@ -65,9 +65,6 @@ class ShieldhitDemoRun(Resource):
                                    raw_input_dict=json_data)
 
         return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
-        # if simulation_result:
-        #     return json.dumps(simulation_result), api_status.HTTP_200_OK
-        # return json.dumps({"msg": "Sim Error"}), api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 class SHStatusSchema(Schema):
@@ -110,7 +107,6 @@ class ShieldhitDemoStatus(Resource):
                 'state': task.state,
                 'status': str(task.info),  # this is the exception raised
             }
-        print(response)
         return json.dumps(response)
 
 

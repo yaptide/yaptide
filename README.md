@@ -6,11 +6,10 @@ Run: ```$ pip install -r requirements.txt```
    * If you already use it just start it on port ```6379```
    * If not good solution would comes with help of docker:
    * * Run the following commands
-   * * ```$ docker pull redis```
    * * ```$ docker run -dp 6379:6379 redis```
 
 2. Run Celery with ```$ celery --app yaptide.simulation_runner.celery_app worker -P threads --loglevel=info```
-   * If u ran redis with docker you can use the same terminal
+   * You can reuse the same terminal, as for redis, as docker sends redis process to the background
    
 3. In new terminal set FLASK_APP env variable ([explanation](https://flask.palletsprojects.com/en/2.0.x/cli/)):
    * Windows CMD: ```$ set FLASK_APP=yaptide.application```
@@ -65,12 +64,12 @@ The result of curl contains the task_id by which you can access the status of ta
 
 Example curl for Windows:
 ```shell
-curl -i http://localhost:5000/sh/run?task_id=<task_id>
+curl -i http://localhost:5000/sh/status?task_id=<task_id>
 ```
 
 And for Linux:
 ```shell
-curl -i "http://localhost:5000/sh/run?task_id=<task_id>"
+curl -i "http://localhost:5000/sh/status?task_id=<task_id>"
 ```
 
 Although it might be inefficient way of testing so there is a prepared example ```call_api_example.py``` in yaptide/examples folder
