@@ -26,8 +26,14 @@ Run: ```$ pip install -r requirements.txt```
 
 You can build and run the app using the following command:
 
+Linux:
 ```shell
-docker-compose up -d --build
+SHIELDHIT_PATH=path/to/shieldhit docker-compose up -d --build
+```
+
+Windows Powershell:
+```shell
+$env:SHIELDHIT_PATH = "path.to.shieldhit"
 ```
 
 Once it's running, the app will be available at [http://localhost:5000](http://localhost:5000). If you get an error saying the container name is already in use, stop and remove the container and then try again.
