@@ -109,4 +109,6 @@ jobs:
           command_timeout: 30m
           script: |
             cd yaptide
-            SHIELDHIT_PATH=/home/ubuntu/usr/shieldhit/v0.9.2/bin/shieldhit docker-compose up -d --build
+            cp /home/ubuntu/usr/shieldhit/v0.9.2/bin/shieldhit .
+            SHIELDHIT_PATH=shieldhit docker-compose up -d --build
+            rm -r shieldhit
