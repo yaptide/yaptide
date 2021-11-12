@@ -1,0 +1,38 @@
+version: '3.3'
+
+services:
+
+  yaptide_flask:
+    build: .
+    image: yaptide_flask
+    container_name: yaptide_flask
+    ports:
+      - 5000:5000
+    command: flask run --host=0.0.0.0
+    environment:
+      - FLASK_APP=yaptide.application
+      - APP_SETTINGS=yaptide.settings
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+
+  yaptide_worker:
+    build: 
+      context: .
+      args:
+        SHIELDHIT_PATH: ${SHIELDHIT_PATH}
+    image: yaptide_worker
+    container_name: yaptide_worker
+    command: celery --app yaptide.simulation_runner.shieldhit_runner.celery_app worker -P threads --loglevel=info
+    environment:
+      - FLASK_DEBUG=1
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      - redis
+      - yaptide_flask
+
+  redis:
+    image: redis:6-alpine
+    container_name: yaptide_redis

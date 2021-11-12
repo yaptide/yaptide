@@ -1,8 +1,11 @@
 #!/usr/bin/env python
 
-import os
 import sys
 import tempfile
+import time
+
+from celery import Celery, states
+from celery import exceptions as celery_exceptions
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
@@ -14,8 +17,14 @@ from pymchelper.axis import MeshAxis
 sys.path.append('yaptide/converter')
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
+celery_app = Celery(
+    "celery-app",
+    backend='redis://localhost',
+    broker='redis://localhost')
 
-def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
+
+@celery_app.task(bind=True)
+def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
     """Shieldhit runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
@@ -25,7 +34,7 @@ def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
         conv_parser = get_parser_from_str("dummy")
         run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_output_path)
 
-        settings = SimulationSettings(input_path=tmp_output_path,
+        settings = SimulationSettings(input_path=tmp_output_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
                                       cmdline_opts='')
 
@@ -35,11 +44,14 @@ def run_shieldhit(param_dict: dict, raw_input_dict: dict) -> dict:
 
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
-            return None
+            self.update_state(state=states.FAILURE)
+            raise celery_exceptions.TaskError
 
         estimators_dict: dict = runner_obj.get_data()
 
-        return dummy_convert_output(estimators_dict)
+        result: dict = dummy_convert_output(estimators_dict)
+
+        return {'status' : 'COMPLETED', 'result': result}
 
 
 def dummy_convert_output(estimators_dict: dict) -> dict:

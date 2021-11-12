@@ -80,9 +80,12 @@ jobs:
           proxy_username: ${{ env.FRONTEND_USER }}
           proxy_key: ${{ secrets.DEPLOY_C3_TEST }}
           script: |
-            docker stop yaptide
-            docker rm yaptide
+            docker stop yaptide_flask
+            docker stop yaptide_worker
+            docker stop yaptide_redis
             docker system prune
+            docker rmi yaptide_flask
+            docker rmi yaptide_worker
     
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
@@ -107,6 +110,5 @@ jobs:
           script: |
             cd yaptide
             cp /home/ubuntu/usr/shieldhit/v0.9.2/bin/shieldhit .
-            docker build --build-arg SHIELDHIT_PATH=shieldhit -t yaptide .
+            SHIELDHIT_PATH=shieldhit docker-compose up -d --build
             rm -r shieldhit
-            docker run -dp 5000:5000 --name=yaptide yaptide
