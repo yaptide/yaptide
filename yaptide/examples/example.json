@@ -1,0 +1,94 @@
+{
+	"metadata": {
+		"version": 0.1,
+		"type": "Editor",
+		"generator": "Editor.toJSON"
+	},
+	"project": {
+		"shadows": true,
+		"shadowType": 1,
+		"physicallyCorrectLights": false,
+		"toneMapping": 0,
+		"toneMappingExposure": 1
+	},
+	"camera": {
+		"metadata": {
+			"version": 4.5,
+			"type": "Object",
+			"generator": "Object3D.toJSON"
+		},
+		"object": {
+			"uuid": "531B1593-75A5-4679-90A6-4DE2B77C63C0",
+			"type": "PerspectiveCamera",
+			"name": "Camera",
+			"layers": 1,
+			"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,5,10,1],
+			"fov": 50,
+			"zoom": 1,
+			"near": 0.01,
+			"far": 1000,
+			"focus": 10,
+			"aspect": 1.8757396449704142,
+			"filmGauge": 35,
+			"filmOffset": 0
+		}
+	},
+	"scene": {
+		"metadata": {
+			"version": 4.5,
+			"type": "Object",
+			"generator": "Object3D.toJSON"
+		},
+		"object": {
+			"uuid": "3C87FB43-7A69-4BCE-A73C-2CD9216D2787",
+			"type": "Scene",
+			"name": "Scene",
+			"layers": 1,
+			"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1]
+		}
+	},
+	"scripts": {},
+	"history": {
+		"undos": [],
+		"redos": []
+	},
+	"zonesManager": {
+		"zones": [],
+		"uuid": "E11E2B91-BAC0-4BC3-8D74-31754BB0FD93",
+		"name": "",
+		"boundingZone": {
+			"center": {
+				"x": 0,
+				"y": 0,
+				"z": 0
+			},
+			"size": {
+				"x": 0,
+				"y": 0,
+				"z": 0
+			},
+			"type": "BoundingZone",
+			"geometryType": "box",
+			"name": "World Zone",
+			"color": 16711680,
+			"marginMultiplier": 1.1
+		}
+	},
+	"beam": {
+		"type": "Beam",
+		"position": [0,0,0],
+		"direction": [0,0,-1],
+		"energy": 150
+	},
+	"materialsManager": [
+		{
+			"data": {
+				"id": "98",
+				"name": "CALIFORNIUM"
+			},
+			"color": 16580413,
+			"flatShading": true,
+			"opacity": 1,
+			"transparent": true
+		}]
+}

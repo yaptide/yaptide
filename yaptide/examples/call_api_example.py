@@ -8,7 +8,10 @@ def call_api():
     api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status?task_id={task_id}'
 
-    res: requests.Response = requests.post(api_post, json={"some": "json"})
+    with open('example.json') as json_file:
+        data_to_send = json.load(json_file)
+
+    res: requests.Response = requests.post(api_post, json=data_to_send)
 
     task_id: str = ""
     data = json.loads(res.json())
