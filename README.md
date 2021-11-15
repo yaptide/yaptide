@@ -37,6 +37,7 @@ Windows Powershell:
 
 ```shell
 $env:SHIELDHIT_PATH = "path.to.shieldhit"
+docker-compose up -d --build
 ```
 
 Due to docker specific limitations, shieldhit path cannot be absolute path. shieldhit binary needs to be located in the same or in one of yaptide subdirectories (at the same or lower level than Dockerfile).
