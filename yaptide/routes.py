@@ -5,7 +5,7 @@ from warnings import resetwarnings
 
 from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
-from yaptide.persistence.models import ExampleUserModel
+from yaptide.persistence.models import UserModel
 
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
 from marshmallow import Schema
@@ -28,21 +28,21 @@ class HelloWorld(Resource):
 
 ############################################
 
-class SHRunSchema(Schema):
-    """Class specifies API parameters"""
-
-    jobs = fld.Integer(missing=1)
-    energy = fld.Float(missing=150.0)
-    nstat = fld.Integer(missing=1000)
-    cyl_nr = fld.Integer(missing=1)
-    cyl_nz = fld.Integer(missing=400)
-    mesh_nx = fld.Integer(missing=1)
-    mesh_ny = fld.Integer(missing=100)
-    mesh_nz = fld.Integer(missing=300)
-
 
 class ShieldhitDemoRun(Resource):
     """Class responsible for Shieldhit Demo running"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        jobs = fld.Integer(missing=1)
+        energy = fld.Float(missing=150.0)
+        nstat = fld.Integer(missing=1000)
+        cyl_nr = fld.Integer(missing=1)
+        cyl_nz = fld.Integer(missing=400)
+        mesh_nx = fld.Integer(missing=1)
+        mesh_ny = fld.Integer(missing=100)
+        mesh_nz = fld.Integer(missing=300)
 
     @staticmethod
     def post() -> Union[dict[str, list[str]],
@@ -50,7 +50,7 @@ class ShieldhitDemoRun(Resource):
                         tuple[str, Literal[200]],
                         tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
-        schema = SHRunSchema()
+        schema = ShieldhitDemoRun._Schema()
         args: MultiDict[str, str] = request.args
         errors: dict[str, list[str]] = schema.validate(args)
         if errors:
@@ -67,19 +67,18 @@ class ShieldhitDemoRun(Resource):
         return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
 
 
-class SHStatusSchema(Schema):
-    """Class specifies API parameters"""
-
-    task_id = fld.String()
-
-
 class ShieldhitDemoStatus(Resource):
     """Class responsible for returning Shieldhit Demo status and result"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        task_id = fld.String()
 
     @staticmethod
     def get():
         """Method returning task status and results"""
-        schema = SHStatusSchema()
+        schema = ShieldhitDemoStatus._Schema()
         args: MultiDict[str, str] = request.args
 
         errors: dict[str, list[str]] = schema.validate(args)
@@ -110,51 +109,59 @@ class ShieldhitDemoStatus(Resource):
         return json.dumps(response)
 
 
+class UserLogIn(Resource):
+    """Class responsible for user log in"""
+
+    @staticmethod
+    def post():
+        """Method returning token if logging in ends successfully"""
+
+
 ############### Example user ###############
 # (this is an example route, demonstration pourpose only)
-example_user_args = reqparse.RequestParser()
-example_user_args.add_argument(
+user_args = reqparse.RequestParser()
+user_args.add_argument(
     "name", type=str, help="Example user name is required and must be a string.", required=True)
 
-example_user_modify_args = reqparse.RequestParser()
-example_user_modify_args.add_argument(
+user_modify_args = reqparse.RequestParser()
+user_modify_args.add_argument(
     "name", type=str, help="Example user name is required and must be a string.")
 
-example_user_fields = {
+user_fields = {
     'id': fields.Integer,
     'name': fields.String,
 }
 
 
-class ExampleUserResource(Resource):
-    @marshal_with(example_user_fields)
+class UserResource(Resource):
+    @marshal_with(user_fields)
     def get(self, user_id):
-        user = ExampleUserModel.query.get_or_404(
+        user = UserModel.query.get_or_404(
             user_id, description=f"User with id {user_id} not found.")
         return user
 
-    @marshal_with(example_user_fields)
+    @marshal_with(user_fields)
     def put(self):
-        args = example_user_args.parse_args()
-        user = ExampleUserModel(name=args.name)
+        args = user_args.parse_args()
+        user = UserModel(name=args.name)
         db.session.add(user)
         db.session.commit()
         if not user:
             abort(500, "Something went wrong.")
         return user, 201
 
-    @marshal_with(example_user_fields)
+    @marshal_with(user_fields)
     def delete(self, user_id):
-        user = ExampleUserModel.query.get_or_404(
+        user = UserModel.query.get_or_404(
             user_id, description=f"User with id {user_id} not found.")
         db.session.delete(user)
         db.session.commit()
         return user, 202
 
-    @marshal_with(example_user_fields)
+    @marshal_with(user_fields)
     def patch(self, user_id):
-        args = example_user_modify_args.parse_args()
-        user = ExampleUserModel.query.get_or_404(
+        args = user_modify_args.parse_args()
+        user = UserModel.query.get_or_404(
             user_id, description=f"User with id {user_id} not found.")
         for key, value in args.items():
             if value:
@@ -167,8 +174,8 @@ class ExampleUserResource(Resource):
 
 
 def initialize_routes(api):
-    api.add_resource(ExampleUserResource,
-                     "/example_user/<int:user_id>", "/example_user")
+    api.add_resource(UserResource,
+                     "/user/<int:user_id>", "/user")
     api.add_resource(HelloWorld, "/")
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")
