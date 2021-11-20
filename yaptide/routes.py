@@ -1,14 +1,13 @@
-from flask import request, json, jsonify
+from flask import request, json
 from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
-from warnings import resetwarnings
 
 from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
 
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
-from marshmallow import Schema
+from marshmallow import Schema, ValidationError
 from marshmallow import fields as fld
 
 from celery.result import AsyncResult
@@ -109,12 +108,55 @@ class ShieldhitDemoStatus(Resource):
         return json.dumps(response)
 
 
+class UserRegister(Resource):
+    """Class responsible for user registration"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        login_name = fld.String()
+        password = fld.String()
+
+    @staticmethod
+    def put():
+        """Method returning status of registration"""
+
+        try:
+            json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return {'status': 'ERROR'}
+        
+        user = None  # TODO: change to query db by email
+        if not user:
+            try:
+                user = UserModel(
+                    login_name=json_data.get('login_name')
+                )
+                user.set_password(json_data.get('password'))
+
+                db.session.add(user)
+                db.session.commit()
+
+                return {"status": "OK"}
+
+            except Exception:
+                return {'status': 'ERROR'}
+        else:
+            return {'status': 'ERROR'}
+
+
 class UserLogIn(Resource):
     """Class responsible for user log in"""
 
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        login_name = fld.String()
+        password = fld.String()
+
     @staticmethod
     def post():
-        """Method returning token if logging in ends successfully"""
+        """Method returning status of logging in (and token if it was successful)"""
 
 
 ############### Example user ###############
@@ -179,3 +221,5 @@ def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")
+    api.add_resource(UserRegister, "/auth/register")
+    api.add_resource(UserLogIn, "/auth/login")

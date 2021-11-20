@@ -8,3 +8,4 @@ pymchelper>=1.9.0
 celery
 redis>=3.5.3
 requests
+pyjwt
