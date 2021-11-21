@@ -5,13 +5,12 @@ import jwt
 
 ############### Example user ###############
 # (this is an example model, demonstration pourpose only)
-
+_Test_secret_key = "secret_key"
 
 class UserModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     login_name = db.Column(db.String, nullable=False)
     password_hash = db.Column(db.String, nullable=False)
-    token_hash = db.Column(db.String, nullable=False)
 
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
@@ -32,7 +31,7 @@ class UserModel(db.Model):
             }
             return jwt.encode(
                 payload,
-                app.config.get('SECRET_KEY'),
+                _Test_secret_key,
                 algorithm='HS256'
             )
         except Exception as e:
@@ -46,7 +45,7 @@ class UserModel(db.Model):
         :return: integer|string
         """
         try:
-            payload = jwt.decode(auth_token, app.config.get('SECRET_KEY'))
+            payload = jwt.decode(auth_token, _Test_secret_key)
             return payload['sub']
         except jwt.ExpiredSignatureError:
             return 'Signature expired. Please log in again.'

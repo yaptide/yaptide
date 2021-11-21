@@ -1,4 +1,4 @@
-from flask import request, json
+from flask import request, json, make_response, jsonify
 from flask_api import status as api_status
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
 
@@ -23,9 +23,6 @@ resources = []
 class HelloWorld(Resource):
     def get(self):
         return {'message': 'Hello world!'}
-
-
-############################################
 
 
 class ShieldhitDemoRun(Resource):
@@ -124,9 +121,19 @@ class UserRegister(Resource):
         try:
             json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
         except ValidationError:
-            return {'status': 'ERROR'}
+            return {
+                'status': 'ERROR',
+                'message': 'Wrong data types provided'
+            }, api_status.HTTP_400_BAD_REQUEST
+
+        try:
+            user = db.session.query(UserModel).filter_by(login_name=json_data.get('login_name')).first()
+        except Exception as e:
+            return {
+                'status': 'ERROR',
+                'message': 'Internal server error'
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
         
-        user = None  # TODO: change to query db by email
         if not user:
             try:
                 user = UserModel(
@@ -137,12 +144,21 @@ class UserRegister(Resource):
                 db.session.add(user)
                 db.session.commit()
 
-                return {"status": "OK"}
+                return {
+                    'status': 'SUCCESS',
+                    'message': 'User created'
+                }, api_status.HTTP_201_CREATED
 
             except Exception:
-                return {'status': 'ERROR'}
+                return {
+                'status': 'ERROR',
+                'message': 'Internal server error'
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
         else:
-            return {'status': 'ERROR'}
+            return {
+                'status': 'ERROR',
+                'message': 'User existing'
+            }, api_status.HTTP_202_ACCEPTED
 
 
 class UserLogIn(Resource):
@@ -158,66 +174,43 @@ class UserLogIn(Resource):
     def post():
         """Method returning status of logging in (and token if it was successful)"""
 
+        try:
+            json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return {
+                'status': 'ERROR',
+                'message': 'Wrong data types provided'
+            }, api_status.HTTP_400_BAD_REQUEST
 
-############### Example user ###############
-# (this is an example route, demonstration pourpose only)
-user_args = reqparse.RequestParser()
-user_args.add_argument(
-    "name", type=str, help="Example user name is required and must be a string.", required=True)
-
-user_modify_args = reqparse.RequestParser()
-user_modify_args.add_argument(
-    "name", type=str, help="Example user name is required and must be a string.")
-
-user_fields = {
-    'id': fields.Integer,
-    'name': fields.String,
-}
-
-
-class UserResource(Resource):
-    @marshal_with(user_fields)
-    def get(self, user_id):
-        user = UserModel.query.get_or_404(
-            user_id, description=f"User with id {user_id} not found.")
-        return user
-
-    @marshal_with(user_fields)
-    def put(self):
-        args = user_args.parse_args()
-        user = UserModel(name=args.name)
-        db.session.add(user)
-        db.session.commit()
-        if not user:
-            abort(500, "Something went wrong.")
-        return user, 201
-
-    @marshal_with(user_fields)
-    def delete(self, user_id):
-        user = UserModel.query.get_or_404(
-            user_id, description=f"User with id {user_id} not found.")
-        db.session.delete(user)
-        db.session.commit()
-        return user, 202
-
-    @marshal_with(user_fields)
-    def patch(self, user_id):
-        args = user_modify_args.parse_args()
-        user = UserModel.query.get_or_404(
-            user_id, description=f"User with id {user_id} not found.")
-        for key, value in args.items():
-            if value:
-                setattr(user, key, value)
-        db.session.commit()
-        print(user)
-        return user, 202
-
-############################################
+        try:
+            user = db.session.query(UserModel).filter_by(
+                login_name=json_data.get('login_name')).first()
+            if not user:
+                return {
+                    'status': 'ERROR',
+                    'message': 'User not existing'
+                }, api_status.HTTP_404_NOT_FOUND
+            else:
+                if not user.check_password(password=json_data.get('password')):
+                    return {
+                        'status': 'ERROR',
+                        'message': 'Incorrect password'
+                    }, api_status.HTTP_401_UNAUTHORIZED
+                
+                token = user.encode_auth_token(user_id=user.id)
+                return {
+                    'status': 'SUCCESS',
+                    'message': 'User logged in',
+                    'token': token
+                }
+        except Exception:
+            return {
+                'status': 'ERROR',
+                'message': 'Internal server error'
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 def initialize_routes(api):
-    api.add_resource(UserResource,
-                     "/user/<int:user_id>", "/user")
     api.add_resource(HelloWorld, "/")
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")

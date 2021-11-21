@@ -25,19 +25,16 @@ def client(app):
     yield _client
 
 
-# def test_register(client):
-#     """Test if user can register"""
-#     resp = client.put("/auth/register", data=json.dumps(dict(
-#         login_name=_Login_name,
-#         password=_Password)),
-#         content_type='application/json')
+def test_register(client):
+    """Test if user can register"""
+    resp = client.put("/auth/register", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
 
-#     data = json.loads(json.loads(resp.data.decode()))
-#     print(data)
-#     print(type(data))
+    data = json.loads(resp.data.decode())
 
-#     assert data.get('status') == 'OK'  # status is a placeholder -> to be changed
-#     assert data.get('status') == 'ERROR'
+    assert data['status'] == 'SUCCESS'  # status is a placeholder -> to be changed
 
 
 def test_register_existing(client):
@@ -51,37 +48,35 @@ def test_register_existing(client):
         password=_Password)),
         content_type='application/json')
 
-    # data = json.loads(json.loads(resp.data.decode()))
     data = json.loads(resp.data.decode())
 
     assert data['status'] == 'ERROR'  # status is a placeholder -> to be changed
 
 
-# def test_log_in(client):
-#     """Test if user can log in"""
-#     client.put("/auth/register", data=json.dumps(dict(
-#         login_name=_Login_name,
-#         password=_Password)),
-#         content_type='application/json')
-#     resp = client.post("/auth/login", data=json.dumps(dict(
-#         login_name=_Login_name,
-#         password=_Password)),
-#         content_type='application/json')
+def test_log_in(client):
+    """Test if user can log in"""
+    client.put("/auth/register", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
+    resp = client.post("/auth/login", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
 
-#     data = json.loads(resp.data.decode())
+    data = json.loads(resp.data.decode())
 
-#     assert data['status'] == 'OK'  # status is a placeholder -> to be changed
-#     assert data['token']
+    assert data['status'] == 'SUCCESS'  # status is a placeholder -> to be changed
+    assert data['token']
 
 
-# def test_log_in_not_existing(client):
-#     """Test if user can log in"""
-#     resp = client.post("/auth/login", data=json.dumps(dict(
-#         login_name=_Login_name,
-#         password=_Password)),
-#         content_type='application/json')
+def test_log_in_not_existing(client):
+    """Test if user can log in"""
+    resp = client.post("/auth/login", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
 
-#     data = json.loads(resp.data.decode())
+    data = json.loads(resp.data.decode())
 
-#     # status is a placeholder -> to be changed
-#     assert data['status'] == 'ERROR'
+    assert data['status'] == 'ERROR'  # status is a placeholder -> to be changed
