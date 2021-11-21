@@ -1,5 +1,4 @@
 import pytest
-import requests
 from yaptide.persistence.database import db
 from yaptide.application import create_app
 import json
@@ -9,7 +8,7 @@ _Password = "password123456"
 
 
 @pytest.fixture
-def app():
+def app():  # skipcq: PY-D0003
     _app = create_app()
     with _app.app_context():
         db.create_all()
@@ -20,7 +19,7 @@ def app():
 
 
 @pytest.fixture
-def client(app):
+def client(app):  # skipcq: PY-D0003
     _client = app.test_client()
     yield _client
 
@@ -34,7 +33,7 @@ def test_register(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'SUCCESS'  # status is a placeholder -> to be changed
+    assert data['status'] == 'SUCCESS'  # skipcq: BAN-B101
 
 
 def test_register_existing(client):
@@ -50,7 +49,7 @@ def test_register_existing(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'ERROR'  # status is a placeholder -> to be changed
+    assert data['status'] == 'ERROR'  # skipcq: BAN-B101
 
 
 def test_log_in(client):
@@ -66,8 +65,8 @@ def test_log_in(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'SUCCESS'  # status is a placeholder -> to be changed
-    assert data['token']
+    assert data['status'] == 'SUCCESS'  # skipcq: BAN-B101
+    assert data['token']  # skipcq: BAN-B101
 
 
 def test_log_in_not_existing(client):
@@ -79,4 +78,4 @@ def test_log_in_not_existing(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'ERROR'  # status is a placeholder -> to be changed
+    assert data['status'] == 'ERROR'  # skipcq: BAN-B101

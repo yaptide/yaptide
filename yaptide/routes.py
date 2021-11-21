@@ -117,9 +117,8 @@ class UserRegister(Resource):
     @staticmethod
     def put():
         """Method returning status of registration"""
-
         try:
-            json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
+            json_data: dict = UserRegister._Schema().load(request.get_json(force=True))
         except ValidationError:
             return {
                 'status': 'ERROR',
@@ -128,12 +127,12 @@ class UserRegister(Resource):
 
         try:
             user = db.session.query(UserModel).filter_by(login_name=json_data.get('login_name')).first()
-        except Exception as e:
+        except Exception:  # skipcq: PYL-W0703
             return {
                 'status': 'ERROR',
                 'message': 'Internal server error'
             }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
-        
+
         if not user:
             try:
                 user = UserModel(
@@ -149,11 +148,11 @@ class UserRegister(Resource):
                     'message': 'User created'
                 }, api_status.HTTP_201_CREATED
 
-            except Exception:
+            except Exception:  # skipcq: PYL-W0703
                 return {
-                'status': 'ERROR',
-                'message': 'Internal server error'
-            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+                    'status': 'ERROR',
+                    'message': 'Internal server error'
+                }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
         else:
             return {
                 'status': 'ERROR',
@@ -173,7 +172,6 @@ class UserLogIn(Resource):
     @staticmethod
     def post():
         """Method returning status of logging in (and token if it was successful)"""
-
         try:
             json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
         except ValidationError:
@@ -190,20 +188,19 @@ class UserLogIn(Resource):
                     'status': 'ERROR',
                     'message': 'User not existing'
                 }, api_status.HTTP_404_NOT_FOUND
-            else:
-                if not user.check_password(password=json_data.get('password')):
-                    return {
-                        'status': 'ERROR',
-                        'message': 'Incorrect password'
-                    }, api_status.HTTP_401_UNAUTHORIZED
-                
-                token = user.encode_auth_token(user_id=user.id)
+            if not user.check_password(password=json_data.get('password')):
                 return {
-                    'status': 'SUCCESS',
-                    'message': 'User logged in',
-                    'token': token
-                }
-        except Exception:
+                    'status': 'ERROR',
+                    'message': 'Incorrect password'
+                }, api_status.HTTP_401_UNAUTHORIZED
+
+            token = user.encode_auth_token(user_id=user.id)
+            return {
+                'status': 'SUCCESS',
+                'message': 'User logged in',
+                'token': token
+            }
+        except Exception:  # skipcq: PYL-W0703
             return {
                 'status': 'ERROR',
                 'message': 'Internal server error'
