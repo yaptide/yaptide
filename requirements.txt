@@ -2,6 +2,7 @@ flask
 flask_api
 flask-sqlalchemy
 flask-restful
+flask_cors
 pytest
 environs
 pymchelper>=1.9.0
