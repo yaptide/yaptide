@@ -31,7 +31,6 @@ def test_register(client):
         password=_Password)),
         content_type='application/json')
 
-    print(resp.data.decode())
     data = json.loads(resp.data.decode())
 
     assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
