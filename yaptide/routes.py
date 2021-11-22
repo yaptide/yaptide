@@ -231,7 +231,7 @@ class UserStatus(Resource):
                 }, api_status.HTTP_200_OK
             return {
                 'status': 'ERROR',
-                'message': token
+                'message': resp
             }, api_status.HTTP_401_UNAUTHORIZED
         return {
             'status': 'ERROR',
