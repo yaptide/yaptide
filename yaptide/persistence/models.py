@@ -29,7 +29,7 @@ class UserModel(db.Model):
         """
         try:
             payload = {
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=0, seconds=5),
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=0, seconds=1800),
                 'iat': datetime.datetime.utcnow(),
                 'sub': user_id
             }
@@ -42,14 +42,14 @@ class UserModel(db.Model):
             return e
 
     @staticmethod
-    def decode_auth_token(auth_token):
+    def decode_auth_token(token):
         """
         Decodes the auth token
-        :param auth_token:
+        :param token:
         :return: integer|string
         """
         try:
-            payload = jwt.decode(auth_token, _Test_secret_key)
+            payload = jwt.decode(token, _Test_secret_key, algorithms=['HS256'])
             return payload['sub']
         except jwt.ExpiredSignatureError:
             return 'Signature expired. Please log in again.'

@@ -126,7 +126,8 @@ class UserRegister(Resource):
             }, api_status.HTTP_400_BAD_REQUEST
 
         try:
-            user = db.session.query(UserModel).filter_by(login_name=json_data.get('login_name')).first()
+            user = db.session.query(UserModel).filter_by(
+                login_name=json_data.get('login_name')).first()
         except Exception:  # skipcq: PYL-W0703
             return {
                 'status': 'ERROR',
@@ -197,7 +198,8 @@ class UserLogIn(Resource):
             token = user.encode_auth_token(user_id=user.id)
             resp = make_response({
                 'status': 'SUCCESS',
-                'message': 'User logged in'
+                'message': 'User logged in',
+                'token': token
             }, api_status.HTTP_200_OK)
             resp.set_cookie('token', token, httponly=True, samesite='Lax')
             return resp
@@ -208,9 +210,39 @@ class UserLogIn(Resource):
             }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
+class UserStatus(Resource):
+    """Class responsible for returning user status """
+
+    @staticmethod
+    def get():
+        """Method returning user's status"""
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            token = auth_header.split(" ")[1]
+        else:
+            token = ''
+        if token:
+            resp = UserModel.decode_auth_token(token=token)
+            if not isinstance(resp, str):
+                user = db.session.query(UserModel).filter_by(id=resp).first()
+                return {
+                    'status': 'SUCCESS',
+                    'login_name': user.login_name
+                }, api_status.HTTP_200_OK
+            return {
+                'status': 'ERROR',
+                'message': token
+            }, api_status.HTTP_401_UNAUTHORIZED
+        return {
+            'status': 'ERROR',
+            'message': "Invalid token"
+        }, api_status.HTTP_401_UNAUTHORIZED
+
+
 def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")
+    api.add_resource(UserStatus, "/auth/status")

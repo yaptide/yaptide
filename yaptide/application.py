@@ -12,7 +12,7 @@ def create_app(config_object="yaptide.settings"):
     db.init_app(app)
     CORS(app, supports_credentials=True)
 
-    # TODO: Find a better solution (maybe with Flask-Migrate)
+    # Find a better solution (maybe with Flask-Migrate)
     # Uncomment the two lines below to update models
     with app.app_context():
         models.create_models()

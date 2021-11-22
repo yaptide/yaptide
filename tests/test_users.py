@@ -79,3 +79,22 @@ def test_log_in_not_existing(client):
     data = json.loads(resp.data.decode())
 
     assert data.get('status') == 'ERROR'  # skipcq: BAN-B101
+
+
+def test_user_status(client):
+    """Test checking user's status"""
+    resp = client.put("/auth/register", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
+    resp = client.post("/auth/login", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
+    token = resp.headers['Set-Cookie'].split(";")[0].split("=")[1]
+    headers = dict( Authorization='Bearer '+ token)
+    resp = client.get("/auth/status",headers=headers)
+
+    data = json.loads(resp.data.decode())
+
+    assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
