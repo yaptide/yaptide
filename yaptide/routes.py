@@ -195,11 +195,12 @@ class UserLogIn(Resource):
                 }, api_status.HTTP_401_UNAUTHORIZED
 
             token = user.encode_auth_token(user_id=user.id)
-            return {
+            resp = make_response({
                 'status': 'SUCCESS',
-                'message': 'User logged in',
-                'token': token
-            }
+                'message': 'User logged in'
+            }, api_status.HTTP_200_OK)
+            resp.set_cookie('token', token)
+            return resp
         except Exception:  # skipcq: PYL-W0703
             return {
                 'status': 'ERROR',

@@ -31,9 +31,10 @@ def test_register(client):
         password=_Password)),
         content_type='application/json')
 
+    print(resp.data.decode())
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'SUCCESS'  # skipcq: BAN-B101
+    assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
 
 
 def test_register_existing(client):
@@ -49,7 +50,7 @@ def test_register_existing(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'ERROR'  # skipcq: BAN-B101
+    assert data.get('status') == 'ERROR'  # skipcq: BAN-B101
 
 
 def test_log_in(client):
@@ -65,8 +66,8 @@ def test_log_in(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'SUCCESS'  # skipcq: BAN-B101
-    assert data['token']  # skipcq: BAN-B101
+    assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
+    assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
 
 def test_log_in_not_existing(client):
@@ -78,4 +79,4 @@ def test_log_in_not_existing(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['status'] == 'ERROR'  # skipcq: BAN-B101
+    assert data.get('status') == 'ERROR'  # skipcq: BAN-B101
