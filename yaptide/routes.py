@@ -1,6 +1,6 @@
-from flask import request, json, make_response, jsonify
+from flask import request, json, make_response
 from flask_api import status as api_status
-from flask_restful import Resource, reqparse, fields, marshal_with, abort
+from flask_restful import Resource
 
 from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
@@ -199,7 +199,6 @@ class UserLogIn(Resource):
             resp = make_response({
                 'status': 'SUCCESS',
                 'message': 'User logged in',
-                'token': token
             }, api_status.HTTP_200_OK)
             resp.set_cookie('token', token, httponly=True, samesite='Lax')
             return resp
@@ -239,10 +238,45 @@ class UserStatus(Resource):
         }, api_status.HTTP_401_UNAUTHORIZED
 
 
+class UserRefresh(Resource):
+    """Class responsible for refreshing user"""
+
+    @staticmethod
+    def get():
+        """Method refreshing token"""
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            token = auth_header.split(" ")[1]
+        else:
+            token = ''
+        if token:
+            resp = UserModel.decode_auth_token(token=token)
+            if not isinstance(resp, str):
+                user = db.session.query(UserModel).filter_by(id=resp).first()
+                user.encode_auth_token(user_id=user.id)
+                resp = make_response({
+                    'status': 'SUCCESS',
+                    'message': 'User logged in',
+                }, api_status.HTTP_200_OK)
+                resp.set_cookie('token', token, httponly=True, samesite='Lax')
+                return resp
+            return {
+                'status': 'ERROR',
+                'message': resp
+            }, api_status.HTTP_401_UNAUTHORIZED
+        return {
+            'status': 'ERROR',
+            'message': "Invalid token"
+        }, api_status.HTTP_401_UNAUTHORIZED
+
+
 def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
+    
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")
+
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")
     api.add_resource(UserStatus, "/auth/status")
+    api.add_resource(UserRefresh, "/auth/refresh")
