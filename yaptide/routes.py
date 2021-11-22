@@ -187,13 +187,13 @@ class UserLogIn(Resource):
             if not user:
                 return {
                     'status': 'ERROR',
-                    'message': 'User not existing'
-                }, api_status.HTTP_404_NOT_FOUND
+                    'message': 'Unauthorized'
+                }, api_status.HTTP_403_FORBIDDEN
             if not user.check_password(password=json_data.get('password')):
                 return {
                     'status': 'ERROR',
-                    'message': 'Incorrect password'
-                }, api_status.HTTP_401_UNAUTHORIZED
+                    'message': 'Unauthorized'
+                }, api_status.HTTP_403_FORBIDDEN
 
             token = user.encode_auth_token(user_id=user.id)
             resp = make_response({
@@ -211,7 +211,7 @@ class UserLogIn(Resource):
 
 
 class UserStatus(Resource):
-    """Class responsible for returning user status """
+    """Class responsible for returning user status"""
 
     @staticmethod
     def get():

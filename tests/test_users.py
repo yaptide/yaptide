@@ -92,8 +92,8 @@ def test_user_status(client):
         password=_Password)),
         content_type='application/json')
     token = resp.headers['Set-Cookie'].split(";")[0].split("=")[1]
-    headers = dict( Authorization='Bearer '+ token)
-    resp = client.get("/auth/status",headers=headers)
+    headers = dict(Authorization='Bearer ' + token)
+    resp = client.get("/auth/status", headers=headers)
 
     data = json.loads(resp.data.decode())
 
