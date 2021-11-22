@@ -14,6 +14,8 @@ from celery.result import AsyncResult
 
 from typing import Union, Literal
 
+import datetime
+
 resources = []
 
 ############### Hello world ###############
@@ -161,6 +163,7 @@ class UserRegister(Resource):
             }, api_status.HTTP_202_ACCEPTED
 
 
+_Cookie_lifetime = 1800  # move it later to some config file
 class UserLogIn(Resource):
     """Class responsible for user log in"""
 
@@ -200,13 +203,47 @@ class UserLogIn(Resource):
                 'status': 'SUCCESS',
                 'message': 'User logged in',
             }, api_status.HTTP_200_OK)
-            resp.set_cookie('token', token, httponly=True, samesite='Lax')
+            resp.set_cookie('token', token, httponly=True, samesite='Lax',
+                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
             return resp
         except Exception:  # skipcq: PYL-W0703
             return {
                 'status': 'ERROR',
                 'message': 'Internal server error'
             }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class UserRefresh(Resource):
+    """Class responsible for refreshing user"""
+
+    @staticmethod
+    def get():
+        """Method refreshing token"""
+        auth_header = request.headers.get('Authorization')
+        if auth_header:
+            token = auth_header.split(" ")[1]
+        else:
+            token = ''
+        if token:
+            resp = UserModel.decode_auth_token(token=token)
+            if not isinstance(resp, str):
+                user = db.session.query(UserModel).filter_by(id=resp).first()
+                user.encode_auth_token(user_id=user.id)
+                resp = make_response({
+                    'status': 'SUCCESS',
+                    'message': 'User logged in',
+                }, api_status.HTTP_200_OK)
+                resp.set_cookie('token', token, httponly=True, samesite='Lax',
+                                expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
+                return resp
+            return {
+                'status': 'ERROR',
+                'message': resp
+            }, api_status.HTTP_401_UNAUTHORIZED
+        return {
+            'status': 'ERROR',
+            'message': "Invalid token"
+        }, api_status.HTTP_401_UNAUTHORIZED
 
 
 class UserStatus(Resource):
@@ -238,38 +275,6 @@ class UserStatus(Resource):
         }, api_status.HTTP_401_UNAUTHORIZED
 
 
-class UserRefresh(Resource):
-    """Class responsible for refreshing user"""
-
-    @staticmethod
-    def get():
-        """Method refreshing token"""
-        auth_header = request.headers.get('Authorization')
-        if auth_header:
-            token = auth_header.split(" ")[1]
-        else:
-            token = ''
-        if token:
-            resp = UserModel.decode_auth_token(token=token)
-            if not isinstance(resp, str):
-                user = db.session.query(UserModel).filter_by(id=resp).first()
-                user.encode_auth_token(user_id=user.id)
-                resp = make_response({
-                    'status': 'SUCCESS',
-                    'message': 'User logged in',
-                }, api_status.HTTP_200_OK)
-                resp.set_cookie('token', token, httponly=True, samesite='Lax')
-                return resp
-            return {
-                'status': 'ERROR',
-                'message': resp
-            }, api_status.HTTP_401_UNAUTHORIZED
-        return {
-            'status': 'ERROR',
-            'message': "Invalid token"
-        }, api_status.HTTP_401_UNAUTHORIZED
-
-
 def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
 
@@ -278,5 +283,5 @@ def initialize_routes(api):
 
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")
-    api.add_resource(UserStatus, "/auth/status")
     api.add_resource(UserRefresh, "/auth/refresh")
+    api.add_resource(UserStatus, "/auth/status")

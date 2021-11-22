@@ -29,7 +29,7 @@ class UserModel(db.Model):
         """
         try:
             payload = {
-                'exp': datetime.datetime.utcnow() + datetime.timedelta(days=0, seconds=1800),
+                'exp': datetime.datetime.utcnow() + datetime.timedelta(seconds=1800),
                 'iat': datetime.datetime.utcnow(),
                 'sub': user_id
             }
