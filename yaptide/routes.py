@@ -272,7 +272,7 @@ class UserRefresh(Resource):
 
 def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
-    
+
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")
 
