@@ -199,7 +199,7 @@ class UserLogIn(Resource):
                 'status': 'SUCCESS',
                 'message': 'User logged in'
             }, api_status.HTTP_200_OK)
-            resp.set_cookie('token', token)
+            resp.set_cookie('token', token, httponly=True, samesite='Lax')
             return resp
         except Exception:  # skipcq: PYL-W0703
             return {
