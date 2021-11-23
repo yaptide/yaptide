@@ -31,9 +31,7 @@ def test_register(client):
         password=_Password)),
         content_type='application/json')
 
-    data = json.loads(resp.data.decode())
-
-    assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
+    assert resp.status_code == 201  # skipcq: BAN-B101
 
 
 def test_register_existing(client):
@@ -47,9 +45,7 @@ def test_register_existing(client):
         password=_Password)),
         content_type='application/json')
 
-    data = json.loads(resp.data.decode())
-
-    assert data.get('status') == 'ERROR'  # skipcq: BAN-B101
+    assert resp.status_code == 403  # skipcq: BAN-B101
 
 
 def test_log_in(client):
@@ -63,9 +59,7 @@ def test_log_in(client):
         password=_Password)),
         content_type='application/json')
 
-    data = json.loads(resp.data.decode())
-
-    assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
+    assert resp.status_code == 202  # skipcq: BAN-B101
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
 
@@ -76,9 +70,7 @@ def test_log_in_not_existing(client):
         password=_Password)),
         content_type='application/json')
 
-    data = json.loads(resp.data.decode())
-
-    assert data.get('status') == 'ERROR'  # skipcq: BAN-B101
+    assert resp.status_code == 401  # skipcq: BAN-B101
 
 
 def test_user_status(client):
@@ -93,6 +85,9 @@ def test_user_status(client):
         content_type='application/json')
     resp = client.get("/auth/status")
 
+    data = json.loads(resp.data.decode())
+
+    assert data.get('login_name') == _Login_name  # skipcq: BAN-B101
     assert resp.status_code == 200  # skipcq: BAN-B101
 
 

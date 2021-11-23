@@ -29,7 +29,9 @@ def requires_auth(f):
     def decorated(*args, **kwargs):
         token = request.cookies.get('token')
         if token:
-            return f(*args, **kwargs)
+            resp = UserModel.decode_auth_token(token=token)
+            if not isinstance(resp, str):
+                return f(*args, **kwargs)
         raise Unauthorized(description="Unauthorized")
     return decorated
 
@@ -175,7 +177,7 @@ class UserRegister(Resource):
             return {
                 'status': 'ERROR',
                 'message': 'User existing'
-            }, api_status.HTTP_202_ACCEPTED
+            }, api_status.HTTP_403_FORBIDDEN
 
 
 _Cookie_lifetime = 1800  # move it later to some config file
@@ -208,18 +210,18 @@ class UserLogIn(Resource):
                 return {
                     'status': 'ERROR',
                     'message': 'Unauthorized'
-                }, api_status.HTTP_403_FORBIDDEN
+                }, api_status.HTTP_401_UNAUTHORIZED
             if not user.check_password(password=json_data.get('password')):
                 return {
                     'status': 'ERROR',
                     'message': 'Unauthorized'
-                }, api_status.HTTP_403_FORBIDDEN
+                }, api_status.HTTP_401_UNAUTHORIZED
 
             token = user.encode_auth_token(user_id=user.id)
             resp = make_response({
                 'status': 'SUCCESS',
                 'message': 'User logged in',
-            }, api_status.HTTP_200_OK)
+            }, api_status.HTTP_202_ACCEPTED)
             resp.set_cookie('token', token, httponly=True, samesite='Lax',
                             expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
             return resp
