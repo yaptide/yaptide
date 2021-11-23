@@ -22,6 +22,7 @@ import datetime
 
 resources = []
 
+
 def requires_auth(f):
     """Determines if the access token is valid"""
     @wraps(f)
@@ -178,6 +179,8 @@ class UserRegister(Resource):
 
 
 _Cookie_lifetime = 1800  # move it later to some config file
+
+
 class UserLogIn(Resource):
     """Class responsible for user log in"""
 
