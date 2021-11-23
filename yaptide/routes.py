@@ -27,7 +27,6 @@ def requires_auth(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = request.cookies.get('token')
-        print(request.cookies)
         if token:
             return f(*args, **kwargs)
         raise Unauthorized(description="Unauthorized")
