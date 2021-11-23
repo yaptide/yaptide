@@ -2,21 +2,36 @@ from flask import request, json, make_response
 from flask_api import status as api_status
 from flask_restful import Resource
 
-from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
 
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
+from celery.result import AsyncResult
+
 from marshmallow import Schema, ValidationError
 from marshmallow import fields as fld
 
-from celery.result import AsyncResult
-
 from typing import Union, Literal
+from werkzeug.datastructures import MultiDict
+from werkzeug.exceptions import Unauthorized
+from werkzeug import exceptions
+
+from functools import wraps
 
 import datetime
 
 resources = []
+
+def requires_auth(f):
+    """Determines if the access token is valid"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        token = request.cookies.get('token')
+        print(request.cookies)
+        if token:
+            return f(*args, **kwargs)
+        raise Unauthorized(description="Unauthorized")
+    return decorated
 
 ############### Hello world ###############
 # (this is used to test if app is running)
@@ -217,32 +232,24 @@ class UserRefresh(Resource):
     """Class responsible for refreshing user"""
 
     @staticmethod
+    @requires_auth
     def get():
         """Method refreshing token"""
-        auth_header = request.headers.get('Authorization')
-        if auth_header:
-            token = auth_header.split(" ")[1]
-        else:
-            token = ''
-        if token:
-            resp = UserModel.decode_auth_token(token=token)
-            if not isinstance(resp, str):
-                user = db.session.query(UserModel).filter_by(id=resp).first()
-                user.encode_auth_token(user_id=user.id)
-                resp = make_response({
-                    'status': 'SUCCESS',
-                    'message': 'User logged in',
-                }, api_status.HTTP_200_OK)
-                resp.set_cookie('token', token, httponly=True, samesite='Lax',
-                                expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
-                return resp
-            return {
-                'status': 'ERROR',
-                'message': resp
-            }, api_status.HTTP_401_UNAUTHORIZED
+        token = request.cookies.get('token')
+        resp = UserModel.decode_auth_token(token=token)
+        if not isinstance(resp, str):
+            user = db.session.query(UserModel).filter_by(id=resp).first()
+            token = user.encode_auth_token(user_id=user.id)
+            resp = make_response({
+                'status': 'SUCCESS',
+                'message': 'User logged in',
+            }, api_status.HTTP_200_OK)
+            resp.set_cookie('token', token, httponly=True, samesite='Lax',
+                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
+            return resp
         return {
             'status': 'ERROR',
-            'message': "Invalid token"
+            'message': resp
         }, api_status.HTTP_401_UNAUTHORIZED
 
 
@@ -250,28 +257,20 @@ class UserStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
+    @requires_auth
     def get():
         """Method returning user's status"""
-        auth_header = request.headers.get('Authorization')
-        if auth_header:
-            token = auth_header.split(" ")[1]
-        else:
-            token = ''
-        if token:
-            resp = UserModel.decode_auth_token(token=token)
-            if not isinstance(resp, str):
-                user = db.session.query(UserModel).filter_by(id=resp).first()
-                return {
-                    'status': 'SUCCESS',
-                    'login_name': user.login_name
-                }, api_status.HTTP_200_OK
+        token = request.cookies.get('token')
+        resp = UserModel.decode_auth_token(token=token)
+        if not isinstance(resp, str):
+            user = db.session.query(UserModel).filter_by(id=resp).first()
             return {
-                'status': 'ERROR',
-                'message': resp
-            }, api_status.HTTP_401_UNAUTHORIZED
+                'status': 'SUCCESS',
+                'login_name': user.login_name
+            }, api_status.HTTP_200_OK
         return {
             'status': 'ERROR',
-            'message': "Invalid token"
+            'message': resp
         }, api_status.HTTP_401_UNAUTHORIZED
 
 

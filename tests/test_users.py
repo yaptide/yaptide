@@ -91,10 +91,13 @@ def test_user_status(client):
         login_name=_Login_name,
         password=_Password)),
         content_type='application/json')
-    token = resp.headers['Set-Cookie'].split(";")[0].split("=")[1]
-    headers = dict(Authorization='Bearer ' + token)
-    resp = client.get("/auth/status", headers=headers)
+    resp = client.get("/auth/status")
 
-    data = json.loads(resp.data.decode())
+    assert resp.status_code == 200  # skipcq: BAN-B101
 
-    assert data.get('status') == 'SUCCESS'  # skipcq: BAN-B101
+
+def test_user_status_unauthorized(client):
+    """Test checking user's status"""
+    resp = client.get("/auth/status")
+
+    assert resp.status_code == 401  # skipcq: BAN-B101
