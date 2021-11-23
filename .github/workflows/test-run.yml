@@ -13,9 +13,10 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-
+    strategy:
+       matrix:
+         python-version: ['3.9', '3.10']
     steps:
-      # Get repository
       - name: Checkout
         uses: actions/checkout@v2
         with:
@@ -24,15 +25,13 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
-          python-version: "3.9"
+          python-version: ${{ matrix.python-version }}
 
-      #install requirements
       - name: Install dependencies
         run: |
           python3 -m pip install --upgrade pip
           pip3 install -r requirements.txt
 
-      #run pytest unit tests
       - name: Run main tests
         run: pytest tests/
 
