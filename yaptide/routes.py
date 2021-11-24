@@ -14,9 +14,10 @@ from marshmallow import fields as fld
 from typing import Union, Literal
 from werkzeug.datastructures import MultiDict
 from werkzeug.exceptions import Unauthorized
-from werkzeug import exceptions
 
 from functools import wraps
+
+from utils import encode_auth_token, decode_auth_token, Refresh_Token_Expiration_Time, Token_Expiration_Time
 
 import datetime
 
@@ -180,9 +181,6 @@ class UserRegister(Resource):
             }, api_status.HTTP_403_FORBIDDEN
 
 
-_Cookie_lifetime = 1800  # move it later to some config file
-
-
 class UserLogIn(Resource):
     """Class responsible for user log in"""
 
@@ -223,7 +221,7 @@ class UserLogIn(Resource):
                 'message': 'User logged in',
             }, api_status.HTTP_202_ACCEPTED)
             resp.set_cookie('token', token, httponly=True, samesite='Lax',
-                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
+                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=Token_Expiration_Time))
             return resp
         except Exception:  # skipcq: PYL-W0703
             return {
@@ -249,7 +247,7 @@ class UserRefresh(Resource):
                 'message': 'User logged in',
             }, api_status.HTTP_200_OK)
             resp.set_cookie('token', token, httponly=True, samesite='Lax',
-                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=_Cookie_lifetime))
+                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=Token_Expiration_Time))
             return resp
         return {
             'status': 'ERROR',
