@@ -12,7 +12,7 @@ Refresh_Token_Expiration_Time = 7200
 Token_Expiration_Time = 600
 
 
-def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,Exception], datetime]:
+def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str, Exception], datetime]:
     """Function encoding the token"""
     if isRefresh:
         secret = SECRET_KEY_TOKEN_REFRESH
@@ -28,7 +28,6 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
             'sub': user_id
         }
         return jwt.encode(payload, secret, algorithm='HS256'), exp
-        
     except Exception as e:  # skipcq: PYL-W0703
         return e, exp
 

@@ -4,6 +4,7 @@ from flask_restful import Resource
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
+from yaptide.utils import encode_auth_token, decode_auth_token
 
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
 from celery.result import AsyncResult
@@ -17,12 +18,11 @@ from werkzeug.exceptions import Unauthorized, Forbidden
 
 from functools import wraps
 
-from yaptide.utils import encode_auth_token, decode_auth_token
-
 resources = []
 
 
 def requires_auth(isRefresh: bool):
+    """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""
         @wraps(f)
