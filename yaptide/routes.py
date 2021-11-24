@@ -27,12 +27,11 @@ def requires_auth(isRefresh: bool):
         """Determines if the access or refresh token is valid"""
         @wraps(f)
         def wrapper(*args, **kwargs):
-            token_type = 'refresh_token' if isRefresh else 'access_token'
-            token: str = request.cookies.get(token_type)
+            token: str = request.cookies.get('refresh_token' if isRefresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp = decode_auth_token(token=token, isRefresh=isRefresh)
-            if not isinstance(resp, str):
+            resp: Union[int, str] = decode_auth_token(token=token, isRefresh=isRefresh)
+            if isinstance(resp, int):
                 user = db.session.query(UserModel).filter_by(id=resp).first()
                 if user:
                     return f(user, *args, **kwargs)
