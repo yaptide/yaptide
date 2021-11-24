@@ -13,28 +13,36 @@ from marshmallow import fields as fld
 
 from typing import Union, Literal
 from werkzeug.datastructures import MultiDict
-from werkzeug.exceptions import Unauthorized
+from werkzeug.exceptions import Unauthorized, Forbidden
 
 from functools import wraps
 
-from utils import encode_auth_token, decode_auth_token, Refresh_Token_Expiration_Time, Token_Expiration_Time
-
-import datetime
+from yaptide.utils import encode_auth_token, decode_auth_token
 
 resources = []
 
 
-def requires_auth(f):
-    """Determines if the access token is valid"""
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        token = request.cookies.get('token')
-        if token:
-            resp = UserModel.decode_auth_token(token=token)
+def requires_auth(isRefresh: bool):
+    def decorator(f):
+        """Determines if the access or refresh token is valid"""
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            token_type = 'refresh_token' if isRefresh else 'access_token'
+            token: str = request.cookies.get(token_type)
+            if not token:
+                raise Unauthorized(description="No token provided")
+            resp = decode_auth_token(token=token, isRefresh=isRefresh)
             if not isinstance(resp, str):
-                return f(*args, **kwargs)
-        raise Unauthorized(description="Unauthorized")
-    return decorated
+                user = db.session.query(UserModel).filter_by(id=resp).first()
+                if user:
+                    return f(user, *args, **kwargs)
+                raise Forbidden(description="User not found")
+            if isRefresh:
+                raise Forbidden(description="Log in again")
+            raise Forbidden(description="Refresh access token")
+        return wrapper
+    return decorator
+
 
 ############### Hello world ###############
 # (this is used to test if app is running)
@@ -61,6 +69,7 @@ class ShieldhitDemoRun(Resource):
         mesh_nz = fld.Integer(missing=300)
 
     @staticmethod
+    @requires_auth(isRefresh=False)
     def post() -> Union[dict[str, list[str]],
                         tuple[str, Literal[400]],
                         tuple[str, Literal[200]],
@@ -92,6 +101,7 @@ class ShieldhitDemoStatus(Resource):
         task_id = fld.String()
 
     @staticmethod
+    @requires_auth(isRefresh=False)
     def get():
         """Method returning task status and results"""
         schema = ShieldhitDemoStatus._Schema()
@@ -207,21 +217,29 @@ class UserLogIn(Resource):
             if not user:
                 return {
                     'status': 'ERROR',
-                    'message': 'Unauthorized'
+                    'message': 'Invalid login or password'
                 }, api_status.HTTP_401_UNAUTHORIZED
             if not user.check_password(password=json_data.get('password')):
                 return {
                     'status': 'ERROR',
-                    'message': 'Unauthorized'
+                    'message': 'Invalid login or password'
                 }, api_status.HTTP_401_UNAUTHORIZED
 
-            token = user.encode_auth_token(user_id=user.id)
+            access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+            refresh_token, refresh_exp = encode_auth_token(
+                user_id=user.id, isRefresh=True)
+
             resp = make_response({
                 'status': 'SUCCESS',
-                'message': 'User logged in',
+                'message': {
+                    'access_exp': int(access_exp.timestamp()*1000),
+                    'refresh_exp': int(refresh_exp.timestamp()*1000)
+                },
             }, api_status.HTTP_202_ACCEPTED)
-            resp.set_cookie('token', token, httponly=True, samesite='Lax',
-                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=Token_Expiration_Time))
+            resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax',
+                            expires=access_exp)
+            resp.set_cookie('refresh_token', refresh_token, httponly=True, samesite='Lax',
+                            expires=refresh_exp)
             return resp
         except Exception:  # skipcq: PYL-W0703
             return {
@@ -234,46 +252,45 @@ class UserRefresh(Resource):
     """Class responsible for refreshing user"""
 
     @staticmethod
-    @requires_auth
-    def get():
+    @requires_auth(isRefresh=True)
+    def get(user: UserModel):
         """Method refreshing token"""
-        token = request.cookies.get('token')
-        resp = UserModel.decode_auth_token(token=token)
-        if not isinstance(resp, str):
-            user = db.session.query(UserModel).filter_by(id=resp).first()
-            token = user.encode_auth_token(user_id=user.id)
-            resp = make_response({
-                'status': 'SUCCESS',
-                'message': 'User logged in',
-            }, api_status.HTTP_200_OK)
-            resp.set_cookie('token', token, httponly=True, samesite='Lax',
-                            expires=datetime.datetime.utcnow() + datetime.timedelta(seconds=Token_Expiration_Time))
-            return resp
-        return {
-            'status': 'ERROR',
-            'message': resp
-        }, api_status.HTTP_401_UNAUTHORIZED
+        access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+        resp = make_response({
+            'status': 'SUCCESS',
+            'message': 'User logged in',
+        }, api_status.HTTP_200_OK)
+        resp.set_cookie('token', access_token, httponly=True, samesite='Lax',
+                        expires=access_exp)
+        return resp
 
 
 class UserStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
-    @requires_auth
-    def get():
+    @requires_auth(isRefresh=False)
+    def get(user: UserModel):
         """Method returning user's status"""
-        token = request.cookies.get('token')
-        resp = UserModel.decode_auth_token(token=token)
-        if not isinstance(resp, str):
-            user = db.session.query(UserModel).filter_by(id=resp).first()
-            return {
-                'status': 'SUCCESS',
-                'login_name': user.login_name
-            }, api_status.HTTP_200_OK
-        return {
-            'status': 'ERROR',
-            'message': resp
-        }, api_status.HTTP_401_UNAUTHORIZED
+        resp = make_response({
+            'status': 'SUCCESS',
+            'login_name': user.login_name
+        }, api_status.HTTP_200_OK)
+        return resp
+
+
+class UserLogOut(Resource):
+    """Class responsible for user log out"""
+
+    @staticmethod
+    def delete():
+        """Method logging the user out"""
+        resp = make_response({
+            'status': 'SUCCESS'
+        }, api_status.HTTP_200_OK)
+        resp.delete_cookie('access_token')
+        resp.delete_cookie('refresh_token')
+        return resp
 
 
 def initialize_routes(api):
@@ -286,3 +303,4 @@ def initialize_routes(api):
     api.add_resource(UserLogIn, "/auth/login")
     api.add_resource(UserRefresh, "/auth/refresh")
     api.add_resource(UserStatus, "/auth/status")
+    api.add_resource(UserLogOut, "/auth/logout")

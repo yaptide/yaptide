@@ -96,3 +96,26 @@ def test_user_status_unauthorized(client):
     resp = client.get("/auth/status")
 
     assert resp.status_code == 401  # skipcq: BAN-B101
+
+
+def test_user_status_after_logout(client):
+    """Test checking user's status"""
+    client.put("/auth/register", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
+    client.post("/auth/login", data=json.dumps(dict(
+        login_name=_Login_name,
+        password=_Password)),
+        content_type='application/json')
+    resp = client.get("/auth/status")
+
+    assert resp.status_code == 200  # skipcq: BAN-B101
+
+    resp = client.delete("/auth/logout")
+
+    assert resp.status_code == 200  # skipcq: BAN-B101
+
+    resp = client.get("/auth/status")
+
+    assert resp.status_code == 401  # skipcq: BAN-B101

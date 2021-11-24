@@ -53,7 +53,7 @@ docker-compose stop worker
 docker system prune
 ```
 
-# Testing API with command-line tools
+# Testing API with command-line tools (Outdated -> authorsation is required)
 
 Currently, the dummy converter ignores the JSON content sent in the request's body so it can contain anything.
 
