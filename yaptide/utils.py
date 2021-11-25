@@ -20,6 +20,7 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
         exp_time_minutes = _Access_Token_Expiration_Time
     exp = datetime.utcnow() + timedelta(minutes=exp_time_minutes)
     try:
+        # For a description of the payload fields, take look at JSON Web Token RFC https://datatracker.ietf.org/doc/html/rfc7519
         payload = {
             'exp': exp,
             'iat': datetime.utcnow(),
