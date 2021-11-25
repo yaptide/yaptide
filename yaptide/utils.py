@@ -1,13 +1,11 @@
 from datetime import datetime, timedelta
 from typing import Union
+from secrets import token_hex
+
 import jwt
-import os
-from dotenv import load_dotenv
 
-load_dotenv()
-
-SECRET_KEY_TOKEN = os.getenv('SECRET_KEY_TOKEN')
-SECRET_KEY_TOKEN_REFRESH = os.getenv('SECRET_KEY_TOKEN_REFRESH')
+SECRET_KEY_TOKEN = token_hex(64)
+SECRET_KEY_TOKEN_REFRESH = token_hex(64)
 Refresh_Token_Expiration_Time = 7200
 Token_Expiration_Time = 600
 
