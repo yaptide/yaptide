@@ -22,7 +22,7 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
     try:
         # For a description of the payload fields, take look at JSON Web Token RFC https://datatracker.ietf.org/doc/html/rfc7519
         payload = {
-            'exp': exp,
+            'exp': exp,  # expiration time
             'iat': datetime.utcnow(),
             'sub': user_id
         }
