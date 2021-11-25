@@ -23,7 +23,7 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
         # For a description of the payload fields, take look at JSON Web Token RFC https://datatracker.ietf.org/doc/html/rfc7519
         payload = {
             'exp': exp,  # expiration time
-            'iat': datetime.utcnow(),
+            'iat': datetime.utcnow(),  # Issued At
             'sub': user_id  # Subject
         }
         return jwt.encode(payload, secret, algorithm='HS256'), exp
