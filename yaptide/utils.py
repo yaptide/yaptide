@@ -24,7 +24,7 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
         payload = {
             'exp': exp,  # expiration time
             'iat': datetime.utcnow(),
-            'sub': user_id
+            'sub': user_id  # Subject
         }
         return jwt.encode(payload, secret, algorithm='HS256'), exp
     except Exception as e:  # skipcq: PYL-W0703
