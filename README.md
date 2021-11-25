@@ -53,18 +53,49 @@ docker-compose stop worker
 docker system prune
 ```
 
-# Testing API with command-line tools (Outdated -> authorsation is required)
+# Authorisation
+
+Currently, there is a first version of authorisation. For now we need to register new user and log in.
+
+1. Register:
+Example curl for Windows:
+```shell
+curl -i -X PUT -H "Content-Type:application/json" -d "{\"login_name\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/register
+```
+
+2. Log in:
+Example curl for Windows:
+```shell
+curl -i -X POST -c cookies.txt -H "Content-Type:application/json" -d "{\"login_name\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/login
+```
+
+3. Status:
+Example curl for Windows:
+```shell
+curl -i -X GET -b cookies.txt http://localhost:5000/auth/status
+```
+
+4. Refresh:
+Example curl for Windows:
+```shell
+curl -i -X GET -b cookies.txt http://localhost:5000/auth/refresh
+```
+
+5. Logout:
+Example curl for Windows:
+```shell
+curl -i -X DELETE http://localhost:5000/auth/logout
+```
+
+# Testing API with command-line tools
 
 Currently, the dummy converter ignores the JSON content sent in the request's body so it can contain anything.
 
 Example curl for Windows:
-
 ```shell
 curl -i -X POST -H "Content-Type:application/json" -d "{\"Dummy\": \"Curl\" }" http://localhost:5000/sh/run
 ```
-
 And for Linux:
-
 ```shell
 curl -i -X POST -H "Content-Type:application/json" -d '{"Dummy": "Curl" }' "http://localhost:5000/sh/run"
 ```

@@ -1,6 +1,7 @@
 import pytest
 from yaptide.persistence.database import db
 from yaptide.application import create_app
+from time import sleep
 import json
 
 _Login_name = "login123456"
@@ -83,6 +84,9 @@ def test_user_status(client):
         login_name=_Login_name,
         password=_Password)),
         content_type='application/json')
+
+    sleep(10)
+
     resp = client.get("/auth/status")
 
     data = json.loads(resp.data.decode())
@@ -108,6 +112,9 @@ def test_user_status_after_logout(client):
         login_name=_Login_name,
         password=_Password)),
         content_type='application/json')
+
+    sleep(10)
+
     resp = client.get("/auth/status")
 
     assert resp.status_code == 200  # skipcq: BAN-B101
