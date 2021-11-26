@@ -69,7 +69,7 @@ class ShieldhitDemoRun(Resource):
 
     @staticmethod
     @requires_auth(isRefresh=False)
-    def post() -> Union[dict[str, list[str]],
+    def post(user: UserModel) -> Union[dict[str, list[str]],
                         tuple[str, Literal[400]],
                         tuple[str, Literal[200]],
                         tuple[str, Literal[500]]]:
@@ -101,7 +101,7 @@ class ShieldhitDemoStatus(Resource):
 
     @staticmethod
     @requires_auth(isRefresh=False)
-    def get():
+    def get(user: UserModel):
         """Method returning task status and results"""
         schema = ShieldhitDemoStatus._Schema()
         args: MultiDict[str, str] = request.args
