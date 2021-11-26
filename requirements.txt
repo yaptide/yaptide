@@ -1,10 +1,12 @@
 flask
-flask_api
 flask-sqlalchemy
 flask-restful
+flask_api
+flask_cors
 pytest
 environs
 pymchelper>=1.10.0
 celery
 redis>=3.5.3
 requests
+pyjwt

@@ -1,21 +1,47 @@
-from flask import request, json, jsonify
+from flask import request, json, make_response
 from flask_api import status as api_status
-from flask_restful import Resource, reqparse, fields, marshal_with, abort
-from warnings import resetwarnings
+from flask_restful import Resource
 
-from werkzeug.datastructures import MultiDict
 from yaptide.persistence.database import db
-from yaptide.persistence.models import ExampleUserModel
+from yaptide.persistence.models import UserModel
+from yaptide.utils import encode_auth_token, decode_auth_token
 
 from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
-from marshmallow import Schema
-from marshmallow import fields as fld
-
 from celery.result import AsyncResult
 
+from marshmallow import Schema, ValidationError
+from marshmallow import fields as fld
+
 from typing import Union, Literal
+from werkzeug.datastructures import MultiDict
+from werkzeug.exceptions import Unauthorized, Forbidden
+
+from functools import wraps
 
 resources = []
+
+
+def requires_auth(isRefresh: bool):
+    """Decorator for auth requirements"""
+    def decorator(f):
+        """Determines if the access or refresh token is valid"""
+        @wraps(f)
+        def wrapper(*args, **kwargs):
+            token: str = request.cookies.get('refresh_token' if isRefresh else 'access_token')
+            if not token:
+                raise Unauthorized(description="No token provided")
+            resp: Union[int, str] = decode_auth_token(token=token, isRefresh=isRefresh)
+            if isinstance(resp, int):
+                user = db.session.query(UserModel).filter_by(id=resp).first()
+                if user:
+                    return f(user, *args, **kwargs)
+                raise Forbidden(description="User not found")
+            if isRefresh:
+                raise Forbidden(description="Log in again")
+            raise Forbidden(description="Refresh access token")
+        return wrapper
+    return decorator
+
 
 ############### Hello world ###############
 # (this is used to test if app is running)
@@ -26,31 +52,29 @@ class HelloWorld(Resource):
         return {'message': 'Hello world!'}
 
 
-############################################
-
-class SHRunSchema(Schema):
-    """Class specifies API parameters"""
-
-    jobs = fld.Integer(missing=1)
-    energy = fld.Float(missing=150.0)
-    nstat = fld.Integer(missing=1000)
-    cyl_nr = fld.Integer(missing=1)
-    cyl_nz = fld.Integer(missing=400)
-    mesh_nx = fld.Integer(missing=1)
-    mesh_ny = fld.Integer(missing=100)
-    mesh_nz = fld.Integer(missing=300)
-
-
 class ShieldhitDemoRun(Resource):
     """Class responsible for Shieldhit Demo running"""
 
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        jobs = fld.Integer(missing=1)
+        energy = fld.Float(missing=150.0)
+        nstat = fld.Integer(missing=1000)
+        cyl_nr = fld.Integer(missing=1)
+        cyl_nz = fld.Integer(missing=400)
+        mesh_nx = fld.Integer(missing=1)
+        mesh_ny = fld.Integer(missing=100)
+        mesh_nz = fld.Integer(missing=300)
+
     @staticmethod
-    def post() -> Union[dict[str, list[str]],
-                        tuple[str, Literal[400]],
-                        tuple[str, Literal[200]],
-                        tuple[str, Literal[500]]]:
+    @requires_auth(isRefresh=False)
+    def post(user: UserModel) -> Union[dict[str, list[str]],
+                                       tuple[str, Literal[400]],
+                                       tuple[str, Literal[200]],
+                                       tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
-        schema = SHRunSchema()
+        schema = ShieldhitDemoRun._Schema()
         args: MultiDict[str, str] = request.args
         errors: dict[str, list[str]] = schema.validate(args)
         if errors:
@@ -67,19 +91,19 @@ class ShieldhitDemoRun(Resource):
         return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
 
 
-class SHStatusSchema(Schema):
-    """Class specifies API parameters"""
-
-    task_id = fld.String()
-
-
 class ShieldhitDemoStatus(Resource):
     """Class responsible for returning Shieldhit Demo status and result"""
 
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        task_id = fld.String()
+
     @staticmethod
-    def get():
+    @requires_auth(isRefresh=False)
+    def get(user: UserModel):
         """Method returning task status and results"""
-        schema = SHStatusSchema()
+        schema = ShieldhitDemoStatus._Schema()
         args: MultiDict[str, str] = request.args
 
         errors: dict[str, list[str]] = schema.validate(args)
@@ -110,65 +134,172 @@ class ShieldhitDemoStatus(Resource):
         return json.dumps(response)
 
 
-############### Example user ###############
-# (this is an example route, demonstration pourpose only)
-example_user_args = reqparse.RequestParser()
-example_user_args.add_argument(
-    "name", type=str, help="Example user name is required and must be a string.", required=True)
+class UserRegister(Resource):
+    """Class responsible for user registration"""
 
-example_user_modify_args = reqparse.RequestParser()
-example_user_modify_args.add_argument(
-    "name", type=str, help="Example user name is required and must be a string.")
+    class _Schema(Schema):
+        """Class specifies API parameters"""
 
-example_user_fields = {
-    'id': fields.Integer,
-    'name': fields.String,
-}
+        login_name = fld.String()
+        password = fld.String()
 
+    @staticmethod
+    def put():
+        """Method returning status of registration"""
+        try:
+            json_data: dict = UserRegister._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return {
+                'status': 'ERROR',
+                'message': 'Wrong data types provided'
+            }, api_status.HTTP_400_BAD_REQUEST
 
-class ExampleUserResource(Resource):
-    @marshal_with(example_user_fields)
-    def get(self, user_id):
-        user = ExampleUserModel.query.get_or_404(
-            user_id, description=f"User with id {user_id} not found.")
-        return user
+        try:
+            user = db.session.query(UserModel).filter_by(
+                login_name=json_data.get('login_name')).first()
+        except Exception:  # skipcq: PYL-W0703
+            return {
+                'status': 'ERROR',
+                'message': 'Internal server error'
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
 
-    @marshal_with(example_user_fields)
-    def put(self):
-        args = example_user_args.parse_args()
-        user = ExampleUserModel(name=args.name)
-        db.session.add(user)
-        db.session.commit()
         if not user:
-            abort(500, "Something went wrong.")
-        return user, 201
+            try:
+                user = UserModel(
+                    login_name=json_data.get('login_name')
+                )
+                user.set_password(json_data.get('password'))
 
-    @marshal_with(example_user_fields)
-    def delete(self, user_id):
-        user = ExampleUserModel.query.get_or_404(
-            user_id, description=f"User with id {user_id} not found.")
-        db.session.delete(user)
-        db.session.commit()
-        return user, 202
+                db.session.add(user)
+                db.session.commit()
 
-    @marshal_with(example_user_fields)
-    def patch(self, user_id):
-        args = example_user_modify_args.parse_args()
-        user = ExampleUserModel.query.get_or_404(
-            user_id, description=f"User with id {user_id} not found.")
-        for key, value in args.items():
-            if value:
-                setattr(user, key, value)
-        db.session.commit()
-        print(user)
-        return user, 202
+                return {
+                    'status': 'SUCCESS',
+                    'message': 'User created'
+                }, api_status.HTTP_201_CREATED
 
-############################################
+            except Exception:  # skipcq: PYL-W0703
+                return {
+                    'status': 'ERROR',
+                    'message': 'Internal server error'
+                }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+        else:
+            return {
+                'status': 'ERROR',
+                'message': 'User existing'
+            }, api_status.HTTP_403_FORBIDDEN
+
+
+class UserLogIn(Resource):
+    """Class responsible for user log in"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        login_name = fld.String()
+        password = fld.String()
+
+    @staticmethod
+    def post():
+        """Method returning status of logging in (and token if it was successful)"""
+        try:
+            json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return {
+                'status': 'ERROR',
+                'message': 'Wrong data types provided'
+            }, api_status.HTTP_400_BAD_REQUEST
+
+        try:
+            user = db.session.query(UserModel).filter_by(
+                login_name=json_data.get('login_name')).first()
+            if not user:
+                return {
+                    'status': 'ERROR',
+                    'message': 'Invalid login or password'
+                }, api_status.HTTP_401_UNAUTHORIZED
+            if not user.check_password(password=json_data.get('password')):
+                return {
+                    'status': 'ERROR',
+                    'message': 'Invalid login or password'
+                }, api_status.HTTP_401_UNAUTHORIZED
+
+            access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+            refresh_token, refresh_exp = encode_auth_token(
+                user_id=user.id, isRefresh=True)
+
+            resp = make_response({
+                'status': 'SUCCESS',
+                'message': {
+                    'access_exp': int(access_exp.timestamp()*1000),
+                    'refresh_exp': int(refresh_exp.timestamp()*1000)
+                },
+            }, api_status.HTTP_202_ACCEPTED)
+            resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax',
+                            expires=access_exp)
+            resp.set_cookie('refresh_token', refresh_token, httponly=True, samesite='Lax',
+                            expires=refresh_exp)
+            return resp
+        except Exception:  # skipcq: PYL-W0703
+            return {
+                'status': 'ERROR',
+                'message': 'Internal server error'
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+
+
+class UserRefresh(Resource):
+    """Class responsible for refreshing user"""
+
+    @staticmethod
+    @requires_auth(isRefresh=True)
+    def get(user: UserModel):
+        """Method refreshing token"""
+        access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+        resp = make_response({
+            'status': 'SUCCESS',
+            'message': 'User logged in',
+        }, api_status.HTTP_200_OK)
+        resp.set_cookie('token', access_token, httponly=True, samesite='Lax',
+                        expires=access_exp)
+        return resp
+
+
+class UserStatus(Resource):
+    """Class responsible for returning user status"""
+
+    @staticmethod
+    @requires_auth(isRefresh=False)
+    def get(user: UserModel):
+        """Method returning user's status"""
+        resp = make_response({
+            'status': 'SUCCESS',
+            'login_name': user.login_name
+        }, api_status.HTTP_200_OK)
+        return resp
+
+
+class UserLogOut(Resource):
+    """Class responsible for user log out"""
+
+    @staticmethod
+    def delete():
+        """Method logging the user out"""
+        resp = make_response({
+            'status': 'SUCCESS'
+        }, api_status.HTTP_200_OK)
+        resp.delete_cookie('access_token')
+        resp.delete_cookie('refresh_token')
+        return resp
 
 
 def initialize_routes(api):
-    api.add_resource(ExampleUserResource,
-                     "/example_user/<int:user_id>", "/example_user")
     api.add_resource(HelloWorld, "/")
+
     api.add_resource(ShieldhitDemoRun, "/sh/run")
     api.add_resource(ShieldhitDemoStatus, "/sh/status")
+
+    api.add_resource(UserRegister, "/auth/register")
+    api.add_resource(UserLogIn, "/auth/login")
+    api.add_resource(UserRefresh, "/auth/refresh")
+    api.add_resource(UserStatus, "/auth/status")
+    api.add_resource(UserLogOut, "/auth/logout")
