@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
+from yaptide.celery.worker import celery_app
+
 import sys
 import tempfile
-import time
 
-from celery import Celery, states
+from celery import states
 from celery import exceptions as celery_exceptions
 
 from pymchelper.executor.options import SimulationSettings
@@ -14,13 +15,8 @@ from pymchelper.page import Page
 from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
-sys.path.append('yaptide/converter')
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
-
-celery_app = Celery(
-    "celery-app",
-    backend='redis://localhost',
-    broker='redis://localhost')
+sys.path.append('yaptide/converter')
 
 
 @celery_app.task(bind=True)
@@ -32,7 +28,8 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate SHIELD-HIT12A input files
         conv_parser = get_parser_from_str("shieldhit")
-        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_output_path)
+        run_parser(parser=conv_parser, input_data=raw_input_dict,
+                   output_dir=tmp_output_path)
 
         settings = SimulationSettings(input_path=tmp_output_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
@@ -51,7 +48,7 @@ def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
 
         result: dict = dummy_convert_output(estimators_dict)
 
-        return {'status' : 'COMPLETED', 'result': result}
+        return {'status': 'COMPLETED', 'result': result}
 
 
 def dummy_convert_output(estimators_dict: dict) -> dict:
@@ -69,7 +66,7 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
 
         # est_dict contains list of pages
         est_dict = {
-            "name" : estimator_name,
+            "name": estimator_name,
             "pages": []}
 
         page: Page   # type is still marked as Never
@@ -82,7 +79,7 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
             # "dimensions" indicating it is 1 dim page
             # "data" which has unit, name and list of data values
             page_dict = {
-                "dimensions" : page.dimension
+                "dimensions": page.dimension
             }
             # currently output is returned only when dimension == 1 due to
             # problems in efficient testing of other dimensions

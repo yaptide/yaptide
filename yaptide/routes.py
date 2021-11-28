@@ -6,7 +6,9 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
 from yaptide.utils import encode_auth_token, decode_auth_token
 
-from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
+from yaptide.celery.worker import celery_app
+from yaptide.celery.tasks import run_shieldhit
+
 from celery.result import AsyncResult
 
 from marshmallow import Schema, ValidationError
@@ -27,10 +29,12 @@ def requires_auth(isRefresh: bool):
         """Determines if the access or refresh token is valid"""
         @wraps(f)
         def wrapper(*args, **kwargs):
-            token: str = request.cookies.get('refresh_token' if isRefresh else 'access_token')
+            token: str = request.cookies.get(
+                'refresh_token' if isRefresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp: Union[int, str] = decode_auth_token(token=token, isRefresh=isRefresh)
+            resp: Union[int, str] = decode_auth_token(
+                token=token, isRefresh=isRefresh)
             if isinstance(resp, int):
                 user = db.session.query(UserModel).filter_by(id=resp).first()
                 if user:
@@ -52,20 +56,13 @@ class HelloWorld(Resource):
         return {'message': 'Hello world!'}
 
 
-class ShieldhitDemoRun(Resource):
+class SimulationRun(Resource):
     """Class responsible for Shieldhit Demo running"""
 
     class _Schema(Schema):
         """Class specifies API parameters"""
 
         jobs = fld.Integer(missing=1)
-        energy = fld.Float(missing=150.0)
-        nstat = fld.Integer(missing=1000)
-        cyl_nr = fld.Integer(missing=1)
-        cyl_nz = fld.Integer(missing=400)
-        mesh_nx = fld.Integer(missing=1)
-        mesh_ny = fld.Integer(missing=100)
-        mesh_nz = fld.Integer(missing=300)
 
     @staticmethod
     @requires_auth(isRefresh=False)
@@ -74,7 +71,7 @@ class ShieldhitDemoRun(Resource):
                                        tuple[str, Literal[200]],
                                        tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
-        schema = ShieldhitDemoRun._Schema()
+        schema = SimulationRun._Schema()
         args: MultiDict[str, str] = request.args
         errors: dict[str, list[str]] = schema.validate(args)
         if errors:
@@ -91,7 +88,7 @@ class ShieldhitDemoRun(Resource):
         return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
 
 
-class ShieldhitDemoStatus(Resource):
+class SimulationStatus(Resource):
     """Class responsible for returning Shieldhit Demo status and result"""
 
     class _Schema(Schema):
@@ -103,7 +100,7 @@ class ShieldhitDemoStatus(Resource):
     @requires_auth(isRefresh=False)
     def get(user: UserModel):
         """Method returning task status and results"""
-        schema = ShieldhitDemoStatus._Schema()
+        schema = SimulationStatus._Schema()
         args: MultiDict[str, str] = request.args
 
         errors: dict[str, list[str]] = schema.validate(args)
@@ -224,7 +221,8 @@ class UserLogIn(Resource):
                     'message': 'Invalid login or password'
                 }, api_status.HTTP_401_UNAUTHORIZED
 
-            access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+            access_token, access_exp = encode_auth_token(
+                user_id=user.id, isRefresh=False)
             refresh_token, refresh_exp = encode_auth_token(
                 user_id=user.id, isRefresh=True)
 
@@ -254,7 +252,8 @@ class UserRefresh(Resource):
     @requires_auth(isRefresh=True)
     def get(user: UserModel):
         """Method refreshing token"""
-        access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+        access_token, access_exp = encode_auth_token(
+            user_id=user.id, isRefresh=False)
         resp = make_response({
             'status': 'SUCCESS',
             'message': 'User logged in',
@@ -295,8 +294,8 @@ class UserLogOut(Resource):
 def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
 
-    api.add_resource(ShieldhitDemoRun, "/sh/run")
-    api.add_resource(ShieldhitDemoStatus, "/sh/status")
+    api.add_resource(SimulationRun, "/sh/run")
+    api.add_resource(SimulationStatus, "/sh/status")
 
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")
