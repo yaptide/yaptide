@@ -15,8 +15,8 @@ from pymchelper.page import Page
 from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 sys.path.append('yaptide/converter')
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
 @celery_app.task(bind=True)
