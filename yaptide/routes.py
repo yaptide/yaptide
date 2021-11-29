@@ -62,8 +62,9 @@ class SimulationRun(Resource):
         jobs = fld.Integer(missing=1)
 
     @staticmethod
-    @requires_auth(isRefresh=False)
-    def post(user: UserModel) -> Union[dict[str, list[str]],
+    # @requires_auth(isRefresh=False)
+    # def post(user: UserModel) -> Union[dict[str, list[str]],
+    def post() -> Union[dict[str, list[str]],
                                        tuple[str, Literal[400]],
                                        tuple[str, Literal[200]],
                                        tuple[str, Literal[500]]]:
@@ -101,8 +102,9 @@ class SimulationStatus(Resource):
         task_id = fld.String()
 
     @staticmethod
-    @requires_auth(isRefresh=False)
-    def get(user: UserModel):
+    # @requires_auth(isRefresh=False)
+    # def get(user: UserModel):
+    def get():
         """Method returning task status and results"""
         try:
             json_data: dict = SimulationStatus._Schema().load(request.get_json(force=True))
@@ -117,7 +119,7 @@ class SimulationStatus(Resource):
         if result.get('status') == 'OK':
             return make_response(result.get('message'), api_status.HTTP_200_OK)
         
-        return make_response(result, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return make_response(result.get('message'), api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserRegister(Resource):
