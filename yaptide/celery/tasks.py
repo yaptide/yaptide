@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 from yaptide.celery.worker import celery_app
 
 import sys
@@ -7,6 +5,7 @@ import tempfile
 
 from celery import states
 from celery import exceptions as celery_exceptions
+from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
@@ -28,8 +27,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate SHIELD-HIT12A input files
         conv_parser = get_parser_from_str("shieldhit")
-        run_parser(parser=conv_parser, input_data=raw_input_dict,
-                   output_dir=tmp_output_path)
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_output_path)
 
         settings = SimulationSettings(input_path=tmp_output_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
@@ -100,3 +98,25 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
         result_dict["estimators"].append(est_dict)
 
     return result_dict
+
+@celery_app.task
+def simulation_task_status(task_id: str) -> dict:
+    task = AsyncResult(id=task_id, app=celery_app)
+
+    result = {
+        'status': 'OK',
+        'message': {
+            'state': task.state
+        }
+    }
+    if task.state == "PENDING":
+        result['message']['status'] = 'Pending...'
+    elif task.state != 'FAILURE':
+        result['message']['status'] = task.info.get('status', '')
+        if 'result' in task.info:
+            result['message']['result'] = task.info.get('result')
+    else:
+        result['status'] = 'ERROR'
+        result['message']['status'] = str(task.info)
+
+    return result

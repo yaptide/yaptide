@@ -10,7 +10,7 @@ Run: ``$ pip install -r requirements.txt``
    * If not good solution would comes with help of docker:
    * * Run the following commands
    * * ``$ docker run -dp 6379:6379 redis``
-2. Run Celery with ``$ celery --app yaptide.celery.celery_app worker -P threads --loglevel=info``
+2. Run Celery with ``$ celery --app yaptide.celery.worker worker -P threads --loglevel=info``
 
    * You can reuse the same terminal, as for redis, as docker sends redis process to the background
 3. In new terminal set FLASK_APP env variable ([explanation](https://flask.palletsprojects.com/en/2.0.x/cli/)):
@@ -105,13 +105,13 @@ The result of curl contains the task_id by which you can access the status of ta
 Example curl for Windows cmd:
 
 ```shell
-curl -i -X GET -b cookies.txt http://localhost:5000/sh/status?task_id=<task_id>
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{\"task_id\": \"<task_id>\"}" http://localhost:5000/sh/status
 ```
 
 And for Linux:
 
 ```shell
-curl -i -X GET -b cookies.txt "http://localhost:5000/sh/status?task_id=<task_id>"
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'task_id' : '<task_id>'}" "http://localhost:5000/sh/status"
 ```
 
 Although it might be inefficient way of testing so there is a prepared example ``call_api_example.py`` in yaptide/examples folder

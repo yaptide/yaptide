@@ -6,10 +6,7 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
 from yaptide.utils import encode_auth_token, decode_auth_token
 
-from yaptide.celery.worker import celery_app
-from yaptide.celery.tasks import run_shieldhit
-
-from celery.result import AsyncResult
+from yaptide.celery.tasks import run_simulation, simulation_task_status
 
 from marshmallow import Schema, ValidationError
 from marshmallow import fields as fld
@@ -75,17 +72,24 @@ class SimulationRun(Resource):
         args: MultiDict[str, str] = request.args
         errors: dict[str, list[str]] = schema.validate(args)
         if errors:
-            return errors
+            return make_response(errors, api_status.HTTP_400_BAD_REQUEST)
         param_dict: dict = schema.load(args)
 
         json_data: dict = request.get_json(force=True)
         if not json_data:
-            return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
+            return make_response({
+                'status': 'ERROR',
+                'message': 'JSON not provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
 
-        task = run_shieldhit.delay(param_dict=param_dict,
-                                   raw_input_dict=json_data)
-
-        return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
+        task = run_simulation.delay(
+            param_dict=param_dict, raw_input_dict=json_data)
+        return make_response({
+            'status': 'ACCEPTED',
+            'message': {
+                'task_id': task.id
+            }
+        }, api_status.HTTP_202_ACCEPTED)
 
 
 class SimulationStatus(Resource):
@@ -100,35 +104,20 @@ class SimulationStatus(Resource):
     @requires_auth(isRefresh=False)
     def get(user: UserModel):
         """Method returning task status and results"""
-        schema = SimulationStatus._Schema()
-        args: MultiDict[str, str] = request.args
+        try:
+            json_data: dict = SimulationStatus._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return make_response({
+                'status': 'ERROR',
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
 
-        errors: dict[str, list[str]] = schema.validate(args)
-        if errors:
-            return errors
+        result = simulation_task_status(task_id=json_data.get('task_id'))
 
-        task_id = schema.load(args)["task_id"]
-        task = AsyncResult(task_id, app=celery_app)
-
-        if task.state == 'PENDING':
-            response = {
-                'state': task.state,
-                'status': 'Pending...'
-            }
-        elif task.state != 'FAILURE':
-            response = {
-                'state': task.state,
-                'status': task.info.get('status', '')
-            }
-            if 'result' in task.info:
-                response['result'] = task.info['result']
-        else:
-            # something went wrong in the background job
-            response = {
-                'state': task.state,
-                'status': str(task.info),  # this is the exception raised
-            }
-        return json.dumps(response)
+        if result.get('status') == 'OK':
+            return make_response(result.get('message'), api_status.HTTP_200_OK)
+        
+        return make_response(result, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserRegister(Resource):
@@ -146,19 +135,19 @@ class UserRegister(Resource):
         try:
             json_data: dict = UserRegister._Schema().load(request.get_json(force=True))
         except ValidationError:
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'Wrong data types provided'
-            }, api_status.HTTP_400_BAD_REQUEST
+            }, api_status.HTTP_400_BAD_REQUEST)
 
         try:
             user = db.session.query(UserModel).filter_by(
                 login_name=json_data.get('login_name')).first()
         except Exception:  # skipcq: PYL-W0703
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'Internal server error'
-            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not user:
             try:
@@ -170,21 +159,21 @@ class UserRegister(Resource):
                 db.session.add(user)
                 db.session.commit()
 
-                return {
+                return make_response({
                     'status': 'SUCCESS',
                     'message': 'User created'
-                }, api_status.HTTP_201_CREATED
+                }, api_status.HTTP_201_CREATED)
 
             except Exception:  # skipcq: PYL-W0703
-                return {
+                return make_response({
                     'status': 'ERROR',
                     'message': 'Internal server error'
-                }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+                }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'User existing'
-            }, api_status.HTTP_403_FORBIDDEN
+            }, api_status.HTTP_403_FORBIDDEN)
 
 
 class UserLogIn(Resource):
@@ -202,24 +191,24 @@ class UserLogIn(Resource):
         try:
             json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
         except ValidationError:
-            return {
+            return make_response({
                 'status': 'ERROR',
-                'message': 'Wrong data types provided'
-            }, api_status.HTTP_400_BAD_REQUEST
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
 
         try:
             user = db.session.query(UserModel).filter_by(
                 login_name=json_data.get('login_name')).first()
             if not user:
-                return {
+                return make_response({
                     'status': 'ERROR',
                     'message': 'Invalid login or password'
-                }, api_status.HTTP_401_UNAUTHORIZED
+                }, api_status.HTTP_401_UNAUTHORIZED)
             if not user.check_password(password=json_data.get('password')):
-                return {
+                return make_response({
                     'status': 'ERROR',
                     'message': 'Invalid login or password'
-                }, api_status.HTTP_401_UNAUTHORIZED
+                }, api_status.HTTP_401_UNAUTHORIZED)
 
             access_token, access_exp = encode_auth_token(
                 user_id=user.id, isRefresh=False)
@@ -239,10 +228,10 @@ class UserLogIn(Resource):
                             expires=refresh_exp)
             return resp
         except Exception:  # skipcq: PYL-W0703
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'Internal server error'
-            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserRefresh(Resource):
