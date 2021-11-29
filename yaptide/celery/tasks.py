@@ -20,8 +20,8 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 
 @celery_app.task(bind=True)
-def run_shieldhit(self, param_dict: dict, raw_input_dict: dict):
-    """Shieldhit runner"""
+def run_simulation(self, param_dict: dict, raw_input_dict: dict):
+    """Simulation runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_output_path:
 
