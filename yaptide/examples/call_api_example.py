@@ -26,7 +26,6 @@ def call_api():
                     print(data["result"])
                     return
                 if data["state"] == "FAILURE":
-                    print("sth went wrong")
                     return
 
             except Exception as e:  # skipcq: PYL-W0703
