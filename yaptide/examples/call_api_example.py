@@ -6,6 +6,7 @@ import time
 def call_api():
     """Example backend endpoint call"""
     api_post = 'http://localhost:5000/sh/run?sim_type=dummy'
+    # api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status'
 
     with open('example.json') as json_file:
@@ -30,7 +31,7 @@ def call_api():
 
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)
-            time.sleep(5)
+            time.sleep(2)
 
 
 if __name__ == "__main__":

@@ -2,6 +2,7 @@ from yaptide.celery.worker import celery_app
 
 import sys
 import tempfile
+import os
 
 from celery import states
 from celery import exceptions as celery_exceptions
@@ -22,20 +23,23 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 def run_simulation(self, param_dict: dict, raw_input_dict: dict):
     """Simulation runner"""
     # create temporary directory
-    with tempfile.TemporaryDirectory() as tmp_output_path:
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        print(os.getcwd())
+        tmp_dir_path = "/usr/local/app"
+        print(tmp_dir_path)
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate SHIELD-HIT12A input files
         conv_parser = get_parser_from_str(param_dict['sim_type'])
-        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_output_path)
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
 
-        settings = SimulationSettings(input_path=tmp_output_path,  # skipcq: PYL-W0612
+        settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
                                       cmdline_opts='')
 
         runner_obj = SHRunner(jobs=param_dict['jobs'],
-                              keep_workspace_after_run=False,
-                              output_directory=tmp_output_path)
+                              keep_workspace_after_run=True,
+                              output_directory=tmp_dir_path)
 
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
