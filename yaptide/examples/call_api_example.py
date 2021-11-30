@@ -5,7 +5,7 @@ import time
 
 def call_api():
     """Example backend endpoint call"""
-    api_post = 'http://localhost:5000/sh/run'
+    api_post = 'http://localhost:5000/sh/run?sim_type=dummy'
     api_get = 'http://localhost:5000/sh/status'
 
     with open('example.json') as json_file:
@@ -21,7 +21,7 @@ def call_api():
             res: requests.Response = requests.get(api_get, json={'task_id': task_id})
             try:
                 print(res.json())
-                data = json.loads(str(res.json()))
+                data = res.json()
                 if data["state"] == "SUCCESS":
                     print(data["result"])
                     return
@@ -29,8 +29,8 @@ def call_api():
                     print("sth went wrong")
                     return
 
-            except Exception:  # skipcq: PYL-W0703
-                print(Exception)
+            except Exception as e:  # skipcq: PYL-W0703
+                print(e)
             time.sleep(5)
 
 

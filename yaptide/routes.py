@@ -60,6 +60,7 @@ class SimulationRun(Resource):
         """Class specifies API parameters"""
 
         jobs = fld.Integer(missing=1)
+        sim_type = fld.String(missing="shieldhit")
 
     @staticmethod
     # @requires_auth(isRefresh=False)
