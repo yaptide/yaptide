@@ -99,8 +99,10 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
 
     return result_dict
 
+
 @celery_app.task
 def simulation_task_status(task_id: str) -> dict:
+    """Task responsible for returning simulation status"""
     task = AsyncResult(id=task_id, app=celery_app)
 
     result = {

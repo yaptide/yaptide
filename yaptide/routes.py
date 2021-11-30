@@ -64,10 +64,13 @@ class SimulationRun(Resource):
     @staticmethod
     # @requires_auth(isRefresh=False)
     # def post(user: UserModel) -> Union[dict[str, list[str]],
+    #                                    tuple[str, Literal[400]],
+    #                                    tuple[str, Literal[200]],
+    #                                    tuple[str, Literal[500]]]:
     def post() -> Union[dict[str, list[str]],
-                                       tuple[str, Literal[400]],
-                                       tuple[str, Literal[200]],
-                                       tuple[str, Literal[500]]]:
+                             tuple[str, Literal[400]],
+                             tuple[str, Literal[200]],
+                             tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
         schema = SimulationRun._Schema()
         args: MultiDict[str, str] = request.args
@@ -118,7 +121,7 @@ class SimulationStatus(Resource):
 
         if result.get('status') == 'OK':
             return make_response(result.get('message'), api_status.HTTP_200_OK)
-        
+
         return make_response(result.get('message'), api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
