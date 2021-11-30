@@ -68,9 +68,9 @@ class SimulationRun(Resource):
     #                                    tuple[str, Literal[200]],
     #                                    tuple[str, Literal[500]]]:
     def post() -> Union[dict[str, list[str]],
-                             tuple[str, Literal[400]],
-                             tuple[str, Literal[200]],
-                             tuple[str, Literal[500]]]:
+                        tuple[str, Literal[400]],
+                        tuple[str, Literal[200]],
+                        tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
         schema = SimulationRun._Schema()
         args: MultiDict[str, str] = request.args
