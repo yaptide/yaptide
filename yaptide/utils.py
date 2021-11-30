@@ -4,10 +4,10 @@ from secrets import token_hex
 
 import jwt
 
-SECRET_KEY_TOKEN = token_hex(64)
-SECRET_KEY_TOKEN_REFRESH = token_hex(64)
-_Refresh_Token_Expiration_Time = 120
-_Access_Token_Expiration_Time = 10
+SECRET_KEY_TOKEN = token_hex(256)
+SECRET_KEY_TOKEN_REFRESH = token_hex(256)
+_Refresh_Token_Expiration_Time = 120  # minutes
+_Access_Token_Expiration_Time = 10  # minutes
 
 
 def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str, Exception], datetime]:
@@ -23,7 +23,7 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
         # For a description of the payload fields, take look
         # at JSON Web Token RFC https://datatracker.ietf.org/doc/html/rfc7519
         payload = {
-            'exp': exp,  # TExpiration Time
+            'exp': exp,  # Token Expiration Time
             'iat': datetime.utcnow(),  # Issued At Time
             'sub': user_id  # Subject
         }
