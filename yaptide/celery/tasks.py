@@ -63,17 +63,16 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
 
     # result_dict contains the list of estimators
     result_dict = {"estimators": []}
-    estimator_obj: Estimator
-    for estimator_name, estimator_obj in estimators_dict.items():
-
+    estimator: Estimator
+    for estimator_key, estimator in estimators_dict.items():
         # est_dict contains list of pages
         est_dict = {
-            "name": estimator_name,
-            "pages": []}
+            "name": estimator_key,
+            "pages": [],
+            }
 
         page: Page   # type is still marked as Never
-        for page in estimator_obj.pages:
-
+        for page in estimator.pages:
             # currently we are handling for sure only 1-D results
             # 0-D and 2-D results aren't tested yet, due to testing problems
 
@@ -81,22 +80,50 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
             # "dimensions" indicating it is 1 dim page
             # "data" which has unit, name and list of data values
             page_dict = {
-                "dimensions": page.dimension
+                "dimensions": page.dimension,
             }
             # currently output is returned only when dimension == 1 due to
             # problems in efficient testing of other dimensions
-            if page.dimension == 1:
+            if page.dimension == 0:
                 page_dict["data"] = {
                     "unit": str(page.unit),
                     "name": str(page.name),
-                    "values": page.data_raw.flatten().tolist()
+                    "values": page.data_raw[0],
+                }
+            elif page.dimension == 1:
+                page_dict["data"] = {
+                    "unit": str(page.unit),
+                    "name": str(page.name),
+                    "values": page.data_raw.tolist(),
                 }
                 axis: MeshAxis = page.plot_axis(0)
                 page_dict["first_axis"] = {
                     "unit": str(axis.unit),
                     "name": str(axis.name),
-                    "values": axis.data.tolist()
+                    "values": axis.data.tolist(),
                 }
+            elif page.dimension == 2:
+                page_dict["data"] = {
+                    "unit": str(page.unit),
+                    "name": str(page.name),
+                    "values": page.data_raw.tolist(),
+                }
+                axis: MeshAxis = page.plot_axis(0)
+                page_dict["first_axis"] = {
+                    "unit": str(axis.unit),
+                    "name": str(axis.name),
+                    "values": axis.data.tolist(),
+                }
+                axis: MeshAxis = page.plot_axis(1)
+                page_dict["second_axis"] = {
+                    "unit": str(axis.unit),
+                    "name": str(axis.name),
+                    "values": axis.data.tolist(),
+                }
+
+            else:
+            # TODO: Add info about the location of the file containging to many dimensions
+                raise ValueError(f'Invalid number of pages {page.dimensions}')
 
             est_dict["pages"].append(page_dict)
         result_dict["estimators"].append(est_dict)

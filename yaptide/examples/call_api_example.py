@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+import os
 
 
 def call_api():
@@ -9,7 +10,10 @@ def call_api():
     # api_post = 'http://localhost:5000/sh/run'
     api_get = 'http://localhost:5000/sh/status'
 
-    with open('example.json') as json_file:
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    example_path = os.path.join(example_dir, 'example.json')
+
+    with open(example_path) as json_file:
         data_to_send = json.load(json_file)
 
     res: requests.Response = requests.post(api_post, json=data_to_send)

@@ -21,7 +21,7 @@ services:
     build: 
       context: .
       args:
-        SHIELDHIT_PATH: ${SHIELDHIT_PATH}
+        SHIELDHIT_PATH: ${SHIELDHIT_PATH-/shieldhit}
     image: yaptide_worker
     container_name: yaptide_worker
     command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
