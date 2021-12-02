@@ -158,7 +158,7 @@ def simulation_task_status(task_id: str) -> dict:
 
 
 def read_shieldlog(path_to_file: str):
-    """Function responsible for reading logs of simulation and returning it's current state"""
+    """Extracts current simulation state from simulation logfile"""
     with open(path_to_file, 'r') as reader:
         flag = False
         last_result_line = ""
