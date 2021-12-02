@@ -20,7 +20,7 @@ from functools import wraps
 resources = []
 
 
-def requires_auth(isRefresh: bool):  
+def requires_auth(isRefresh: bool):
     """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""

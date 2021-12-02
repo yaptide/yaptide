@@ -38,7 +38,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
-        self.update_state(state="PROGRESS",meta={"path":tmp_dir_path})
+        self.update_state(state="PROGRESS", meta={"path": tmp_dir_path})
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
             self.update_state(state=states.FAILURE)
@@ -120,7 +120,7 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
                 }
 
             else:
-            # TODO: Add info about the location of the file containging to many dimensions
+                # Add info about the location of the file containging to many dimensions
                 raise ValueError(f'Invalid number of pages {page.dimensions}')
 
             est_dict["pages"].append(page_dict)
@@ -159,6 +159,7 @@ def simulation_task_status(task_id: str) -> dict:
 
 
 def read_shieldlog(path_to_file: str):
+    """Function responsible for reading logs of simulation and returning it's current state"""
     with open(path_to_file, 'r') as reader:
         flag = False
         last_result_line = ""
