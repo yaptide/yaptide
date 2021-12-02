@@ -24,9 +24,6 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
     """Simulation runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        print(os.getcwd())
-        tmp_dir_path = "/usr/local/app"
-        print(tmp_dir_path)
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate SHIELD-HIT12A input files
@@ -41,6 +38,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
+        self.update_state(state="PROGRESS",meta={"path":tmp_dir_path})
         isRunOk = runner_obj.run(settings=settings)
         if not isRunOk:
             self.update_state(state=states.FAILURE)
@@ -144,6 +142,11 @@ def simulation_task_status(task_id: str) -> dict:
     }
     if task.state == "PENDING":
         result['message']['status'] = 'Pending...'
+    elif task.state == "PROGRESS":
+        result['message']['status'] = task.state
+        sim_info = read_shieldlog(path_to_file=task.info.get(
+            'path')+'/run_1/shieldhit0001.log')
+        result['message']['info'] = sim_info
     elif task.state != 'FAILURE':
         result['message']['status'] = task.info.get('status', '')
         if 'result' in task.info:
@@ -153,3 +156,26 @@ def simulation_task_status(task_id: str) -> dict:
         result['message']['status'] = str(task.info)
 
     return result
+
+
+def read_shieldlog(path_to_file: str):
+    with open(path_to_file, 'r') as reader:
+        flag = False
+        last_result_line = ""
+        for line in reader:
+            if not flag:
+                flag = line.lstrip().startswith("Starting transport")
+            else:
+                if line.lstrip().startswith("Primary particle"):
+                    last_result_line = line
+
+        splited = last_result_line.split()
+        sim_info = {
+            'counted': splited[3],
+            'estimated': {
+                'hours': splited[5],
+                'minutes': splited[7],
+                'seconds': splited[9],
+            }
+        }
+        return sim_info

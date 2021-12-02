@@ -20,7 +20,7 @@ from functools import wraps
 resources = []
 
 
-def requires_auth(isRefresh: bool):
+def requires_auth(isRefresh: bool):  
     """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""
@@ -30,8 +30,7 @@ def requires_auth(isRefresh: bool):
                 'refresh_token' if isRefresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp: Union[int, str] = decode_auth_token(
-                token=token, isRefresh=isRefresh)
+            resp: Union[int, str] = decode_auth_token(token=token, isRefresh=isRefresh)
             if isinstance(resp, int):
                 user = db.session.query(UserModel).filter_by(id=resp).first()
                 if user:
@@ -117,12 +116,13 @@ class SimulationStatus(Resource):
                 'status': 'ERROR',
                 'message': 'Wrong data provided'
             }, api_status.HTTP_400_BAD_REQUEST)
-
-        result = simulation_task_status(task_id=json_data.get('task_id'))
+        task = simulation_task_status.delay(task_id=json_data.get('task_id'))
+        result = task.wait(timeout=None, interval=0.5)
+        # result = simulation_task_status(task_id=json_data.get('task_id'))
 
         if result.get('status') == 'OK':
             return make_response(result.get('message'), api_status.HTTP_200_OK)
-
+        # return make_response({'RESULT': str(result)}, api_status.HTTP_200_OK)
         return make_response(result.get('message'), api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
