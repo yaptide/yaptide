@@ -1,8 +1,8 @@
 from yaptide.celery.worker import celery_app
 
+import os
 import sys
 import tempfile
-import os
 
 from celery import states
 from celery import exceptions as celery_exceptions
