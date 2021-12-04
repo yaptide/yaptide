@@ -58,7 +58,7 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
 
     # result_dict is a dictionary, which is later converted to json
     # to provide readable API response for fronted
-   # keys in results_dict are estimator names, values are the estimator objects
+    # keys in results_dict are estimator names, values are the estimator objects
     result_dict = {'estimators': []}
     estimator: Estimator
     for estimator_key, estimator in estimators_dict.items():
@@ -139,7 +139,7 @@ def simulation_task_status(task_id: str) -> dict:
         result['message']['status'] = 'Pending...'
     elif task.state == "PROGRESS":
         result['message']['status'] = 'Calculations in progress...'
-        sim_info = sim_status_from_logfile(path_to_file=os.path.join(task.info.get('path'), 'run_1', 'shieldhit0001.log')
+        sim_info = sim_status_from_logfile(path_to_file=os.path.join(task.info.get('path'), 'run_1', 'shieldhit0001.log'))
         result['message']['info'] = sim_info
     elif task.state != 'FAILURE':
         result['message']['status'] = task.info.get('status', '')
