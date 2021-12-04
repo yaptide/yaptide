@@ -56,10 +56,9 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
     if not estimators_dict:
         return {'message': 'No estimators'}
 
-    # result_dict is the dictionary object, which is later converted to json
-    # to provide readable api response for fronted
-
-    # result_dict contains the list of estimators
+    # result_dict is a dictionary, which is later converted to json
+    # to provide readable API response for fronted
+   # keys in results_dict are estimator names, values are the estimator objects
     result_dict = {'estimators': []}
     estimator: Estimator
     for estimator_key, estimator in estimators_dict.items():
