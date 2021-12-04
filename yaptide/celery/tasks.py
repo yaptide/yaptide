@@ -155,13 +155,14 @@ def simulation_task_status(task_id: str) -> dict:
 
 def sim_status_from_logfile(path_to_file: str):
     """Extracts current simulation state from simulation logfile"""
-    # Note that this is dummy version of checking simulation status because pymchelper currently doesn't privide any information about progress
+    # This is dummy version because pymchelper currently doesn't privide any information about progress
     with open(path_to_file, 'r') as reader:
         found_line_which_starts_status_block = False
         last_result_line = ""
         for line in reader:
             if not found_line_which_starts_status_block:
-                # We are searching for lines containing progress info (they are preceded by line starting with "Starting transport")
+                # We are searching for lines containing progress info
+                # They are preceded by line starting with "Starting transport"
                 found_line_which_starts_status_block = line.lstrip().startswith("Starting transport")
             else:
                 # Searching for latest line
