@@ -46,12 +46,12 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         estimators_dict: dict = runner_obj.get_data()
 
-        result: dict = dummy_convert_output(estimators_dict)
+        result: dict = pymchelper_output_to_json(estimators_dict)
 
         return {'status': 'COMPLETED', 'result': result}
 
 
-def dummy_convert_output(estimators_dict: dict) -> dict:
+def pymchelper_output_to_json(estimators_dict: dict) -> dict:
     """Dummy function for converting simulation output to dictionary"""
     if not estimators_dict:
         return {'message': 'No estimators'}
@@ -168,7 +168,8 @@ def sim_status_from_logfile(path_to_file: str):
                 # Searching for latest line
                 if line.lstrip().startswith("Primary particle"):
                     last_result_line = line
-
+        if last_result_line == "":
+            return {'message': 'Output not yet generated'}
         splited = last_result_line.split()
         sim_info = {
             'simulated_primaries': splited[3],
