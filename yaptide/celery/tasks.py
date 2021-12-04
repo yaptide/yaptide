@@ -39,8 +39,8 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                               output_directory=tmp_dir_path)
 
         self.update_state(state="PROGRESS", meta={"path": tmp_dir_path})
-        isRunOk = runner_obj.run(settings=settings)
-        if not isRunOk:
+        is_run_ok = runner_obj.run(settings=settings)
+        if not is_run_ok:
             self.update_state(state=states.FAILURE)
             raise celery_exceptions.TaskError
 
@@ -54,19 +54,19 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 def dummy_convert_output(estimators_dict: dict) -> dict:
     """Dummy function for converting simulation output to dictionary"""
     if not estimators_dict:
-        return {"message": "No estimators"}
+        return {'message': 'No estimators'}
 
     # result_dict is the dictionary object, which is later converted to json
     # to provide readable api response for fronted
 
     # result_dict contains the list of estimators
-    result_dict = {"estimators": []}
+    result_dict = {'estimators': []}
     estimator: Estimator
     for estimator_key, estimator in estimators_dict.items():
         # est_dict contains list of pages
         est_dict = {
-            "name": estimator_key,
-            "pages": [],
+            'name': estimator_key,
+            'pages': [],
             }
 
         page: Page   # type is still marked as Never
@@ -75,56 +75,52 @@ def dummy_convert_output(estimators_dict: dict) -> dict:
             # 0-D and 2-D results aren't tested yet, due to testing problems
 
             # page_dict contains:
-            # "dimensions" indicating it is 1 dim page
-            # "data" which has unit, name and list of data values
+            # 'dimensions' indicating it is 1 dim page
+            # 'data' which has unit, name and list of data values
             page_dict = {
-                "dimensions": page.dimension,
+                'dimensions': page.dimension,
+                'data': {
+                    'unit': str(page.unit),
+                    'name': str(page.name),
+                }
             }
             # currently output is returned only when dimension == 1 due to
             # problems in efficient testing of other dimensions
             if page.dimension == 0:
-                page_dict["data"] = {
-                    "unit": str(page.unit),
-                    "name": str(page.name),
-                    "values": page.data_raw[0],
-                }
+                page_dict['data']['values'] = page.data_raw[0]
+
             elif page.dimension == 1:
-                page_dict["data"] = {
-                    "unit": str(page.unit),
-                    "name": str(page.name),
-                    "values": page.data_raw.tolist(),
-                }
+                page_dict['data']['values'] = page.data_raw.tolist()
+
                 axis: MeshAxis = page.plot_axis(0)
-                page_dict["first_axis"] = {
-                    "unit": str(axis.unit),
-                    "name": str(axis.name),
-                    "values": axis.data.tolist(),
+                page_dict['first_axis'] = {
+                    'unit': str(axis.unit),
+                    'name': str(axis.name),
+                    'values': axis.data.tolist(),
                 }
+
             elif page.dimension == 2:
-                page_dict["data"] = {
-                    "unit": str(page.unit),
-                    "name": str(page.name),
-                    "values": page.data_raw.tolist(),
-                }
+                page_dict['data']['values'] = page.data_raw.tolist()
+
                 axis: MeshAxis = page.plot_axis(0)
-                page_dict["first_axis"] = {
-                    "unit": str(axis.unit),
-                    "name": str(axis.name),
-                    "values": axis.data.tolist(),
+                page_dict['first_axis'] = {
+                    'unit': str(axis.unit),
+                    'name': str(axis.name),
+                    'values': axis.data.tolist(),
                 }
                 axis: MeshAxis = page.plot_axis(1)
-                page_dict["second_axis"] = {
-                    "unit": str(axis.unit),
-                    "name": str(axis.name),
-                    "values": axis.data.tolist(),
+                page_dict['second_axis'] = {
+                    'unit': str(axis.unit),
+                    'name': str(axis.name),
+                    'values': axis.data.tolist(),
                 }
 
             else:
                 # Add info about the location of the file containging to many dimensions
                 raise ValueError(f'Invalid number of pages {page.dimensions}')
 
-            est_dict["pages"].append(page_dict)
-        result_dict["estimators"].append(est_dict)
+            est_dict['pages'].append(page_dict)
+        result_dict['estimators'].append(est_dict)
 
     return result_dict
 
@@ -143,8 +139,8 @@ def simulation_task_status(task_id: str) -> dict:
     if task.state == "PENDING":
         result['message']['status'] = 'Pending...'
     elif task.state == "PROGRESS":
-        result['message']['status'] = task.state
-        sim_info = read_shieldlog(path_to_file=task.info.get('path')+'/run_1/shieldhit0001.log')
+        result['message']['status'] = 'Calculations in progress...'
+        sim_info = sim_status_from_logfile(path_to_file=task.info.get('path')+'/run_1/shieldhit0001.log')
         result['message']['info'] = sim_info
     elif task.state != 'FAILURE':
         result['message']['status'] = task.info.get('status', '')
@@ -157,21 +153,24 @@ def simulation_task_status(task_id: str) -> dict:
     return result
 
 
-def read_shieldlog(path_to_file: str):
+def sim_status_from_logfile(path_to_file: str):
     """Extracts current simulation state from simulation logfile"""
+    # Note that this is dummy version of checking simulation status because pymchelper currently doesn't privide any information about progress
     with open(path_to_file, 'r') as reader:
-        flag = False
+        found_line_which_starts_status_block = False
         last_result_line = ""
         for line in reader:
-            if not flag:
-                flag = line.lstrip().startswith("Starting transport")
+            if not found_line_which_starts_status_block:
+                # We are searching for lines containing progress info (they are preceded by line starting with "Starting transport")
+                found_line_which_starts_status_block = line.lstrip().startswith("Starting transport")
             else:
+                # Searching for latest line
                 if line.lstrip().startswith("Primary particle"):
                     last_result_line = line
 
         splited = last_result_line.split()
         sim_info = {
-            'counted': splited[3],
+            'simulated_primaries': splited[3],
             'estimated': {
                 'hours': splited[5],
                 'minutes': splited[7],
