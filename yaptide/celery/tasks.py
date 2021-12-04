@@ -26,7 +26,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
     with tempfile.TemporaryDirectory() as tmp_dir_path:
 
         # digest dictionary with project data (extracted from JSON file)
-        # and generate SHIELD-HIT12A input files
+        # and generate simulation input files
         conv_parser = get_parser_from_str(param_dict['sim_type'])
         run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
 
