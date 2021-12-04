@@ -29,7 +29,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         # and generate simulation input files
         conv_parser = get_parser_from_str(param_dict['sim_type'])
         run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
-        # we assume here that the simulation executable is available in the PATH env variable and will be automatically discovered by pymchelper
+        # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
                                       cmdline_opts='')
@@ -139,7 +139,8 @@ def simulation_task_status(task_id: str) -> dict:
         result['message']['status'] = 'Pending...'
     elif task.state == "PROGRESS":
         result['message']['status'] = 'Calculations in progress...'
-        sim_info = sim_status_from_logfile(path_to_file=os.path.join(task.info.get('path'), 'run_1', 'shieldhit0001.log'))
+        sim_info = sim_status_from_logfile(path_to_file=os.path.join(
+            task.info.get('path'), 'run_1', 'shieldhit0001.log'))
         result['message']['info'] = sim_info
     elif task.state != 'FAILURE':
         result['message']['status'] = task.info.get('status', '')
