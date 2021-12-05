@@ -233,8 +233,7 @@ class UserLogIn(Resource):
                     'message': 'Invalid login or password'
                 }, api_status.HTTP_401_UNAUTHORIZED)
 
-            access_token, access_exp = encode_auth_token(
-                user_id=user.id, isRefresh=False)
+            access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
             refresh_token, refresh_exp = encode_auth_token(
                 user_id=user.id, isRefresh=True)
 
