@@ -263,8 +263,7 @@ class UserRefresh(Resource):
     @requires_auth(isRefresh=True)
     def get(user: UserModel):
         """Method refreshing token"""
-        access_token, access_exp = encode_auth_token(
-            user_id=user.id, isRefresh=False)
+        access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
         resp = make_response({
             'status': 'SUCCESS',
             'message': 'User logged in',
