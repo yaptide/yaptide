@@ -6,8 +6,7 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
 from yaptide.utils import encode_auth_token, decode_auth_token
 
-from yaptide.simulation_runner.shieldhit_runner import run_shieldhit, celery_app
-from celery.result import AsyncResult
+from yaptide.celery.tasks import run_simulation, simulation_task_status, get_input_files
 
 from marshmallow import Schema, ValidationError
 from marshmallow import fields as fld
@@ -21,22 +20,22 @@ from functools import wraps
 resources = []
 
 
-def requires_auth(isRefresh: bool):
+def requires_auth(is_refresh: bool):
     """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""
         @wraps(f)
         def wrapper(*args, **kwargs):
-            token: str = request.cookies.get('refresh_token' if isRefresh else 'access_token')
+            token: str = request.cookies.get('refresh_token' if is_refresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp: Union[int, str] = decode_auth_token(token=token, isRefresh=isRefresh)
+            resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
                 user = db.session.query(UserModel).filter_by(id=resp).first()
                 if user:
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")
-            if isRefresh:
+            if is_refresh:
                 raise Forbidden(description="Log in again")
             raise Forbidden(description="Refresh access token")
         return wrapper
@@ -52,46 +51,46 @@ class HelloWorld(Resource):
         return {'message': 'Hello world!'}
 
 
-class ShieldhitDemoRun(Resource):
+class SimulationRun(Resource):
     """Class responsible for Shieldhit Demo running"""
 
     class _Schema(Schema):
         """Class specifies API parameters"""
 
         jobs = fld.Integer(missing=1)
-        energy = fld.Float(missing=150.0)
-        nstat = fld.Integer(missing=1000)
-        cyl_nr = fld.Integer(missing=1)
-        cyl_nz = fld.Integer(missing=400)
-        mesh_nx = fld.Integer(missing=1)
-        mesh_ny = fld.Integer(missing=100)
-        mesh_nz = fld.Integer(missing=300)
+        sim_type = fld.String(missing="shieldhit")
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def post(user: UserModel) -> Union[dict[str, list[str]],
                                        tuple[str, Literal[400]],
                                        tuple[str, Literal[200]],
                                        tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
-        schema = ShieldhitDemoRun._Schema()
+        schema = SimulationRun._Schema()
         args: MultiDict[str, str] = request.args
         errors: dict[str, list[str]] = schema.validate(args)
         if errors:
-            return errors
+            return make_response(errors, api_status.HTTP_400_BAD_REQUEST)
         param_dict: dict = schema.load(args)
 
         json_data: dict = request.get_json(force=True)
         if not json_data:
-            return json.dumps({"msg": "Json Error"}), api_status.HTTP_400_BAD_REQUEST
+            return make_response({
+                'status': 'ERROR',
+                'message': 'JSON not provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
 
-        task = run_shieldhit.delay(param_dict=param_dict,
-                                   raw_input_dict=json_data)
+        task = run_simulation.delay(param_dict=param_dict, raw_input_dict=json_data)
+        return make_response({
+            'status': 'ACCEPTED',
+            'message': {
+                'task_id': task.id
+            }
+        }, api_status.HTTP_202_ACCEPTED)
 
-        return json.dumps({"task_id": task.id}), api_status.HTTP_202_ACCEPTED
 
-
-class ShieldhitDemoStatus(Resource):
+class SimulationStatus(Resource):
     """Class responsible for returning Shieldhit Demo status and result"""
 
     class _Schema(Schema):
@@ -100,38 +99,47 @@ class ShieldhitDemoStatus(Resource):
         task_id = fld.String()
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning task status and results"""
-        schema = ShieldhitDemoStatus._Schema()
-        args: MultiDict[str, str] = request.args
+        try:
+            json_data: dict = SimulationStatus._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return make_response({
+                'status': 'ERROR',
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
+        task = simulation_task_status.delay(task_id=json_data.get('task_id'))
+        result = task.wait(timeout=None, interval=0.5)
 
-        errors: dict[str, list[str]] = schema.validate(args)
-        if errors:
-            return errors
+        if result.get('status') == 'OK':
+            return make_response(result.get('message'), api_status.HTTP_200_OK)
+        return make_response(result.get('message'), api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-        task_id = schema.load(args)["task_id"]
-        task = AsyncResult(task_id, app=celery_app)
 
-        if task.state == 'PENDING':
-            response = {
-                'state': task.state,
-                'status': 'Pending...'
-            }
-        elif task.state != 'FAILURE':
-            response = {
-                'state': task.state,
-                'status': task.info.get('status', '')
-            }
-            if 'result' in task.info:
-                response['result'] = task.info['result']
-        else:
-            # something went wrong in the background job
-            response = {
-                'state': task.state,
-                'status': str(task.info),  # this is the exception raised
-            }
-        return json.dumps(response)
+class SimulationInputs(Resource):
+    """Class responsible for returning converted simulation input files"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        task_id = fld.String()
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning simulation input files"""
+        try:
+            json_data: dict = SimulationInputs._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return make_response({
+                'status': 'ERROR',
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
+        task = get_input_files.delay(task_id=json_data.get('task_id'))
+        result = task.wait(timeout=None, interval=0.5)
+
+        return make_response(result.get('message'), api_status.HTTP_200_OK)
 
 
 class UserRegister(Resource):
@@ -149,19 +157,19 @@ class UserRegister(Resource):
         try:
             json_data: dict = UserRegister._Schema().load(request.get_json(force=True))
         except ValidationError:
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'Wrong data types provided'
-            }, api_status.HTTP_400_BAD_REQUEST
+            }, api_status.HTTP_400_BAD_REQUEST)
 
         try:
             user = db.session.query(UserModel).filter_by(
                 login_name=json_data.get('login_name')).first()
         except Exception:  # skipcq: PYL-W0703
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'Internal server error'
-            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
         if not user:
             try:
@@ -173,21 +181,21 @@ class UserRegister(Resource):
                 db.session.add(user)
                 db.session.commit()
 
-                return {
+                return make_response({
                     'status': 'SUCCESS',
                     'message': 'User created'
-                }, api_status.HTTP_201_CREATED
+                }, api_status.HTTP_201_CREATED)
 
             except Exception:  # skipcq: PYL-W0703
-                return {
+                return make_response({
                     'status': 'ERROR',
                     'message': 'Internal server error'
-                }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+                }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
         else:
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'User existing'
-            }, api_status.HTTP_403_FORBIDDEN
+            }, api_status.HTTP_403_FORBIDDEN)
 
 
 class UserLogIn(Resource):
@@ -205,28 +213,27 @@ class UserLogIn(Resource):
         try:
             json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
         except ValidationError:
-            return {
+            return make_response({
                 'status': 'ERROR',
-                'message': 'Wrong data types provided'
-            }, api_status.HTTP_400_BAD_REQUEST
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
 
         try:
             user = db.session.query(UserModel).filter_by(
                 login_name=json_data.get('login_name')).first()
             if not user:
-                return {
+                return make_response({
                     'status': 'ERROR',
                     'message': 'Invalid login or password'
-                }, api_status.HTTP_401_UNAUTHORIZED
+                }, api_status.HTTP_401_UNAUTHORIZED)
             if not user.check_password(password=json_data.get('password')):
-                return {
+                return make_response({
                     'status': 'ERROR',
                     'message': 'Invalid login or password'
-                }, api_status.HTTP_401_UNAUTHORIZED
+                }, api_status.HTTP_401_UNAUTHORIZED)
 
-            access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
-            refresh_token, refresh_exp = encode_auth_token(
-                user_id=user.id, isRefresh=True)
+            access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
+            refresh_token, refresh_exp = encode_auth_token(user_id=user.id, is_refresh=True)
 
             resp = make_response({
                 'status': 'SUCCESS',
@@ -241,26 +248,25 @@ class UserLogIn(Resource):
                             expires=refresh_exp)
             return resp
         except Exception:  # skipcq: PYL-W0703
-            return {
+            return make_response({
                 'status': 'ERROR',
                 'message': 'Internal server error'
-            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR
+            }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserRefresh(Resource):
     """Class responsible for refreshing user"""
 
     @staticmethod
-    @requires_auth(isRefresh=True)
+    @requires_auth(is_refresh=True)
     def get(user: UserModel):
         """Method refreshing token"""
-        access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+        access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
         resp = make_response({
             'status': 'SUCCESS',
             'message': 'User logged in',
         }, api_status.HTTP_200_OK)
-        resp.set_cookie('token', access_token, httponly=True, samesite='Lax',
-                        expires=access_exp)
+        resp.set_cookie('token', access_token, httponly=True, samesite='Lax', expires=access_exp)
         return resp
 
 
@@ -268,7 +274,7 @@ class UserStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning user's status"""
         resp = make_response({
@@ -295,8 +301,9 @@ class UserLogOut(Resource):
 def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
 
-    api.add_resource(ShieldhitDemoRun, "/sh/run")
-    api.add_resource(ShieldhitDemoStatus, "/sh/status")
+    api.add_resource(SimulationRun, "/sh/run")
+    api.add_resource(SimulationStatus, "/sh/status")
+    api.add_resource(SimulationInputs, "/sh/inputs")
 
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")

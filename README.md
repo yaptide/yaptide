@@ -10,7 +10,7 @@ Run: ``$ pip install -r requirements.txt``
    * If not good solution would comes with help of docker:
    * * Run the following commands
    * * ``$ docker run -dp 6379:6379 redis``
-2. Run Celery with ``$ celery --app yaptide.simulation_runner.celery_app worker -P threads --loglevel=info``
+2. Run Celery with ``$ celery --app yaptide.celery.worker worker -P threads --loglevel=info``
 
    * You can reuse the same terminal, as for redis, as docker sends redis process to the background
 3. In new terminal set FLASK_APP env variable ([explanation](https://flask.palletsprojects.com/en/2.0.x/cli/)):
@@ -100,18 +100,23 @@ And for Linux:
 curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile "http://localhost:5000/sh/run"
 ```
 
+You can also add parameters after ``?`` sign like this: ``http://localhost:5000/sh/run?<param name>=<param value>``
+Possible parameters:
+* jobs - number of threads simulations should run on
+* sim_type - name of the simulator you wish to use, possible are ``shieldhit`` which is default, ``topas`` and ``dummy`` (note that they might not be working yet and for the purpose of testing just API not simulation results, use ``dummy``)
+
 The result of curl contains the task_id by which you can access the status of task started in the backend. In this case you can access the status by another curl.
 
 Example curl for Windows cmd:
 
 ```shell
-curl -i -X GET -b cookies.txt http://localhost:5000/sh/status?task_id=<task_id>
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{\"task_id\": \"<task_id>\"}" http://localhost:5000/sh/status
 ```
 
 And for Linux:
 
 ```shell
-curl -i -X GET -b cookies.txt "http://localhost:5000/sh/status?task_id=<task_id>"
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'task_id' : '<task_id>'}" "http://localhost:5000/sh/status"
 ```
 
 Although it might be inefficient way of testing so there is a prepared example ``call_api_example.py`` in yaptide/examples folder
