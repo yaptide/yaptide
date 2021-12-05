@@ -82,8 +82,7 @@ class SimulationRun(Resource):
                 'message': 'JSON not provided'
             }, api_status.HTTP_400_BAD_REQUEST)
 
-        task = run_simulation.delay(
-            param_dict=param_dict, raw_input_dict=json_data)
+        task = run_simulation.delay(param_dict=param_dict, raw_input_dict=json_data)
         return make_response({
             'status': 'ACCEPTED',
             'message': {
