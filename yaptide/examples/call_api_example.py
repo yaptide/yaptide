@@ -6,8 +6,8 @@ import os
 
 def call_api():
     """Example backend endpoint call"""
-    api_post = 'http://localhost:5000/sh/run?sim_type=dummy'
-    # api_post = 'http://localhost:5000/sh/run'
+    # api_post = 'http://localhost:5000/sh/run?sim_type=dummy'
+    api_post = 'http://localhost:5000/sh/run'
     api_status = 'http://localhost:5000/sh/status'
     api_inputs = 'http://localhost:5000/sh/inputs'
 
@@ -27,16 +27,6 @@ def call_api():
         while True:
             time.sleep(5)
             try:
-                res: requests.Response = requests.get(api_status, json={'task_id': task_id})
-                print(res.json())
-                data = res.json()
-
-                if data["state"] == "SUCCESS":
-                    print(data["result"])
-                    return
-                if data["state"] == "FAILURE":
-                    return
-
                 if is_input_saved:
                     res: requests.Response = requests.get(api_inputs, json={'task_id': task_id})
                     data = res.json()
@@ -49,6 +39,19 @@ def call_api():
                             writer.write(data[key])
                             writer.write("\n")
                     is_input_saved = False
+
+                res: requests.Response = requests.get(api_status, json={'task_id': task_id})
+                data = res.json()
+                print(data.get('state'))
+
+                if data["state"] == "SUCCESS":
+                    with open(os.path.join(example_dir, 'simulation_output.json'), 'w') as writer:
+                        data_to_write = str(data["result"])
+                        data_to_write = data_to_write.replace("'","\"")
+                        writer.write(data_to_write)
+                    return
+                if data["state"] == "FAILURE":
+                    return
 
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)

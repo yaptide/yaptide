@@ -68,11 +68,7 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
             'pages': [],
             }
 
-        page: Page   # type is still marked as Never
         for page in estimator.pages:
-            # currently we are handling for sure only 1-D results
-            # 0-D and 2-D results aren't tested yet, due to testing problems
-
             # page_dict contains:
             # 'dimensions' indicating it is 1 dim page
             # 'data' which has unit, name and list of data values
@@ -81,42 +77,29 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
                 'data': {
                     'unit': str(page.unit),
                     'name': str(page.name),
+                    'values': page.data_raw.tolist(),
                 }
             }
             # currently output is returned only when dimension == 1 due to
             # problems in efficient testing of other dimensions
-            if page.dimension == 0:
-                page_dict['data']['values'] = page.data_raw[0]
 
-            elif page.dimension == 1:
-                page_dict['data']['values'] = page.data_raw.tolist()
-
+            if page.dimension in {1, 2}:
                 axis: MeshAxis = page.plot_axis(0)
                 page_dict['first_axis'] = {
                     'unit': str(axis.unit),
                     'name': str(axis.name),
                     'values': axis.data.tolist(),
                 }
-
-            elif page.dimension == 2:
-                page_dict['data']['values'] = page.data_raw.tolist()
-
-                axis: MeshAxis = page.plot_axis(0)
-                page_dict['first_axis'] = {
-                    'unit': str(axis.unit),
-                    'name': str(axis.name),
-                    'values': axis.data.tolist(),
-                }
+            if page.dimension == 2:
                 axis: MeshAxis = page.plot_axis(1)
                 page_dict['second_axis'] = {
                     'unit': str(axis.unit),
                     'name': str(axis.name),
                     'values': axis.data.tolist(),
                 }
-
-            else:
+            if page.dimension > 2:
                 # Add info about the location of the file containging to many dimensions
-                raise ValueError(f'Invalid number of pages {page.dimensions}')
+                raise ValueError(f'Invalid number of pages {page.dimension}')
 
             est_dict['pages'].append(page_dict)
         result_dict['estimators'].append(est_dict)
