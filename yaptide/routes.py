@@ -62,15 +62,11 @@ class SimulationRun(Resource):
         sim_type = fld.String(missing="shieldhit")
 
     @staticmethod
-    # @requires_auth(isRefresh=False)
-    # def post(user: UserModel) -> Union[dict[str, list[str]],
-    #                                    tuple[str, Literal[400]],
-    #                                    tuple[str, Literal[200]],
-    #                                    tuple[str, Literal[500]]]:
-    def post() -> Union[dict[str, list[str]],
-                        tuple[str, Literal[400]],
-                        tuple[str, Literal[200]],
-                        tuple[str, Literal[500]]]:
+    @requires_auth(isRefresh=False)
+    def post(user: UserModel) -> Union[dict[str, list[str]],
+                                       tuple[str, Literal[400]],
+                                       tuple[str, Literal[200]],
+                                       tuple[str, Literal[500]]]:
         """Method handling running shieldhit with server"""
         schema = SimulationRun._Schema()
         args: MultiDict[str, str] = request.args
@@ -105,9 +101,8 @@ class SimulationStatus(Resource):
         task_id = fld.String()
 
     @staticmethod
-    # @requires_auth(isRefresh=False)
-    # def get(user: UserModel):
-    def get():
+    @requires_auth(isRefresh=False)
+    def get(user: UserModel):
         """Method returning task status and results"""
         try:
             json_data: dict = SimulationStatus._Schema().load(request.get_json(force=True))
@@ -133,7 +128,8 @@ class SimulationInputs(Resource):
         task_id = fld.String()
 
     @staticmethod
-    def get():
+    @requires_auth(isRefresh=False)
+    def get(user: UserModel):
         """Method returning simulation input files"""
         try:
             json_data: dict = SimulationInputs._Schema().load(request.get_json(force=True))
