@@ -1,4 +1,3 @@
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 from yaptide.celery.worker import celery_app
 
 import os
@@ -17,6 +16,7 @@ from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append('yaptide/converter')
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
 @celery_app.task(bind=True)
@@ -121,7 +121,7 @@ def simulation_task_status(task_id: str) -> dict:
     }
     if task.state == "PENDING":
         result['message']['status'] = 'Pending...'
-    elif task.state == "PROGRESS": 
+    elif task.state == "PROGRESS":
         result['message']['status'] = 'Calculations in progress...'
         if not task.info.get('sim_type') in {'shieldhit', 'sh_dummy'}:
             return result
