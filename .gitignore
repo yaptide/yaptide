@@ -141,4 +141,4 @@ cython_debug/
 shieldhit
 
 # database
-yaptide/*.db
+yaptide/main.db
