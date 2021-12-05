@@ -47,7 +47,7 @@ def call_api():
                 if data["state"] == "SUCCESS":
                     with open(os.path.join(example_dir, 'simulation_output.json'), 'w') as writer:
                         data_to_write = str(data["result"])
-                        data_to_write = data_to_write.replace("'","\"")
+                        data_to_write = data_to_write.replace("'", "\"")
                         writer.write(data_to_write)
                     return
                 if data["state"] == "FAILURE":
