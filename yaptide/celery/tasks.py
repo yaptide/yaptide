@@ -163,7 +163,7 @@ def get_input_files(task_id: str) -> dict:
 
 
 def sim_status_from_logfile(path_to_file: str):
-    """Extracts current simulation state from simulation logfile"""
+    """Extracts current SHIELD-HIT12A simulation state from first available logfile"""
     # This is dummy version because pymchelper currently doesn't privide any information about progress
     with open(path_to_file, 'r') as reader:
         found_line_which_starts_status_block = False
