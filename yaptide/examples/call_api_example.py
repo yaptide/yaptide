@@ -34,9 +34,9 @@ def call_api():
                 if data["state"] == "SUCCESS":
                     print(data["result"])
                     return
-                elif data["state"] == "FAILURE":
+                if data["state"] == "FAILURE":
                     return
-                
+
                 if flag:
                     flag = False
                     res: requests.Response = requests.get(api_inputs, json={'task_id': task_id})
