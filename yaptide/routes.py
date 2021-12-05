@@ -6,7 +6,7 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel
 from yaptide.utils import encode_auth_token, decode_auth_token
 
-from yaptide.celery.tasks import run_simulation, simulation_task_status
+from yaptide.celery.tasks import run_simulation, simulation_task_status, get_input_files
 
 from marshmallow import Schema, ValidationError
 from marshmallow import fields as fld
@@ -118,12 +118,34 @@ class SimulationStatus(Resource):
             }, api_status.HTTP_400_BAD_REQUEST)
         task = simulation_task_status.delay(task_id=json_data.get('task_id'))
         result = task.wait(timeout=None, interval=0.5)
-        # result = simulation_task_status(task_id=json_data.get('task_id'))
 
         if result.get('status') == 'OK':
             return make_response(result.get('message'), api_status.HTTP_200_OK)
-        # return make_response({'RESULT': str(result)}, api_status.HTTP_200_OK)
         return make_response(result.get('message'), api_status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class SimulationInputs(Resource):
+    """Class responsible for returning converted simulation input files"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        task_id = fld.String()
+
+    @staticmethod
+    def get():
+        """Method returning simulation input files"""
+        try:
+            json_data: dict = SimulationInputs._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return make_response({
+                'status': 'ERROR',
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
+        task = get_input_files.delay(task_id=json_data.get('task_id'))
+        result = task.wait(timeout=None, interval=0.5)
+
+        return make_response(result.get('message'), api_status.HTTP_200_OK)
 
 
 class UserRegister(Resource):
@@ -291,6 +313,7 @@ def initialize_routes(api):
 
     api.add_resource(SimulationRun, "/sh/run")
     api.add_resource(SimulationStatus, "/sh/status")
+    api.add_resource(SimulationInputs, "/sh/inputs")
 
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")
