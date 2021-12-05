@@ -6,7 +6,6 @@ import os
 
 def call_api():
     """Example backend endpoint call"""
-    # api_post = 'http://localhost:5000/sh/run?sim_type=dummy'
     api_post = 'http://localhost:5000/sh/run'
     api_status = 'http://localhost:5000/sh/status'
     api_inputs = 'http://localhost:5000/sh/inputs'
