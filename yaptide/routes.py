@@ -20,22 +20,22 @@ from functools import wraps
 resources = []
 
 
-def requires_auth(isRefresh: bool):
+def requires_auth(is_refresh: bool):
     """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""
         @wraps(f)
         def wrapper(*args, **kwargs):
-            token: str = request.cookies.get('refresh_token' if isRefresh else 'access_token')
+            token: str = request.cookies.get('refresh_token' if is_refresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp: Union[int, str] = decode_auth_token(token=token, isRefresh=isRefresh)
+            resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
                 user = db.session.query(UserModel).filter_by(id=resp).first()
                 if user:
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")
-            if isRefresh:
+            if is_refresh:
                 raise Forbidden(description="Log in again")
             raise Forbidden(description="Refresh access token")
         return wrapper
@@ -61,7 +61,7 @@ class SimulationRun(Resource):
         sim_type = fld.String(missing="shieldhit")
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def post(user: UserModel) -> Union[dict[str, list[str]],
                                        tuple[str, Literal[400]],
                                        tuple[str, Literal[200]],
@@ -99,7 +99,7 @@ class SimulationStatus(Resource):
         task_id = fld.String()
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning task status and results"""
         try:
@@ -126,7 +126,7 @@ class SimulationInputs(Resource):
         task_id = fld.String()
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning simulation input files"""
         try:
@@ -232,9 +232,8 @@ class UserLogIn(Resource):
                     'message': 'Invalid login or password'
                 }, api_status.HTTP_401_UNAUTHORIZED)
 
-            access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
-            refresh_token, refresh_exp = encode_auth_token(
-                user_id=user.id, isRefresh=True)
+            access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
+            refresh_token, refresh_exp = encode_auth_token(user_id=user.id, is_refresh=True)
 
             resp = make_response({
                 'status': 'SUCCESS',
@@ -259,16 +258,15 @@ class UserRefresh(Resource):
     """Class responsible for refreshing user"""
 
     @staticmethod
-    @requires_auth(isRefresh=True)
+    @requires_auth(is_refresh=True)
     def get(user: UserModel):
         """Method refreshing token"""
-        access_token, access_exp = encode_auth_token(user_id=user.id, isRefresh=False)
+        access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
         resp = make_response({
             'status': 'SUCCESS',
             'message': 'User logged in',
         }, api_status.HTTP_200_OK)
-        resp.set_cookie('token', access_token, httponly=True, samesite='Lax',
-                        expires=access_exp)
+        resp.set_cookie('token', access_token, httponly=True, samesite='Lax', expires=access_exp)
         return resp
 
 
@@ -276,7 +274,7 @@ class UserStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
-    @requires_auth(isRefresh=False)
+    @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning user's status"""
         resp = make_response({

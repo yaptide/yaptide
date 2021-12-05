@@ -10,9 +10,9 @@ _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
 
 
-def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str, Exception], datetime]:
+def encode_auth_token(user_id: int, is_refresh: bool = False) -> tuple[Union[str, Exception], datetime]:
     """Function encoding the token"""
-    if isRefresh:
+    if is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
         exp_time_minutes = _Refresh_Token_Expiration_Time
     else:
@@ -32,9 +32,9 @@ def encode_auth_token(user_id: int, isRefresh: bool = False) -> tuple[Union[str,
         return e, exp
 
 
-def decode_auth_token(token: str, isRefresh: bool = False) -> Union[int, str]:
+def decode_auth_token(token: str, is_refresh: bool = False) -> Union[int, str]:
     """Function decoding the token"""
-    if isRefresh:
+    if is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
     else:
         secret = SECRET_KEY_TOKEN

@@ -1,3 +1,4 @@
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 from yaptide.celery.worker import celery_app
 
 import os
@@ -16,7 +17,6 @@ from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append('yaptide/converter')
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
 @celery_app.task(bind=True)
@@ -28,7 +28,8 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         conv_parser = get_parser_from_str(param_dict['sim_type'])
-        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+        run_parser(parser=conv_parser, input_data=raw_input_dict,
+                   output_dir=tmp_dir_path)
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
@@ -38,7 +39,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
-        self.update_state(state="PROGRESS", meta={"path": tmp_dir_path})
+        self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": param_dict['sim_type']})
         is_run_ok = runner_obj.run(settings=settings)
         if not is_run_ok:
             self.update_state(state=states.FAILURE)
@@ -66,7 +67,7 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
         est_dict = {
             'name': estimator_key,
             'pages': [],
-            }
+        }
 
         for page in estimator.pages:
             # page_dict contains:
@@ -120,10 +121,12 @@ def simulation_task_status(task_id: str) -> dict:
     }
     if task.state == "PENDING":
         result['message']['status'] = 'Pending...'
-    elif task.state == "PROGRESS":
+    elif task.state == "PROGRESS": 
         result['message']['status'] = 'Calculations in progress...'
-        sim_info = sim_status_from_logfile(path_to_file=os.path.join(
-            task.info.get('path'), 'run_1', 'shieldhit0001.log'))
+        if not task.info.get('sim_type') in {'shieldhit', 'sh_dummy'}:
+            return result
+        sim_info = sh12a_simulation_status(path_to_file=os.path.join(task.info.get('path'),
+                                                                     'run_1', 'shieldhit0001.log'))
         result['message']['info'] = sim_info
     elif task.state != 'FAILURE':
         result['message']['status'] = task.info.get('status', '')
@@ -162,7 +165,7 @@ def get_input_files(task_id: str) -> dict:
     return result
 
 
-def sim_status_from_logfile(path_to_file: str):
+def sh12a_simulation_status(path_to_file: str):
     """Extracts current SHIELD-HIT12A simulation state from first available logfile"""
     # This is dummy version because pymchelper currently doesn't privide any information about progress
     with open(path_to_file, 'r') as reader:
