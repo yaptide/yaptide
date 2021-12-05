@@ -22,7 +22,7 @@ def call_api():
     task_id: str = ""
     data = res.json()
     task_id = data.get('message').get('task_id')
-    flag = True
+    is_input_saved = True
     if task_id != "":
         while True:
             time.sleep(5)
@@ -37,8 +37,7 @@ def call_api():
                 if data["state"] == "FAILURE":
                     return
 
-                if flag:
-                    flag = False
+                if is_input_saved:
                     res: requests.Response = requests.get(api_inputs, json={'task_id': task_id})
                     data = res.json()
                     with open(os.path.join(example_dir, 'simulation_inputs.txt'), 'w') as writer:
@@ -49,6 +48,7 @@ def call_api():
                             writer.write("\n")
                             writer.write(data[key])
                             writer.write("\n")
+                    is_input_saved = False
 
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)
