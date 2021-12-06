@@ -10,3 +10,4 @@ celery
 redis>=3.5.3
 requests
 pyjwt
+scipy  # needed by converter submodule
