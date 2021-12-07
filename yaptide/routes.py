@@ -155,7 +155,7 @@ class SimulationCancel(Resource):
     def delete(user: UserModel):
         """Method canceling simulation and returning status of this action"""
         try:
-            json_data: dict = SimulationInputs._Schema().load(request.get_json(force=True))
+            json_data: dict = SimulationCancel._Schema().load(request.get_json(force=True))
         except ValidationError:
             return make_response({
                 'status': 'ERROR',

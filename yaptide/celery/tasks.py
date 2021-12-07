@@ -197,5 +197,6 @@ def sh12a_simulation_status(path_to_file: str):
 @celery_app.task
 def cancel_simulation(task_id: str) -> dict:
     """Task responsible for canceling simulation in progress"""
-
     celery_app.control.terminate(task_id=task_id, signal='SIGTERM')
+
+    return {"message": "SUCCESS"}
