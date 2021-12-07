@@ -201,9 +201,9 @@ class SimulationCancel(Resource):
         task = cancel_simulation.delay(task_id=json_data.get('task_id'))
         result = task.wait(timeout=None, interval=0.5)
 
-        db.session.query(SimulationModel).filter_by(
-            task_id=json_data.get('task_id')).delete()
-        db.session.commit()
+        if result['status'] != 'ERROR':
+            db.session.query(SimulationModel).filter_by(task_id=json_data.get('task_id')).delete()
+            db.session.commit()
 
         return make_response(result, api_status.HTTP_200_OK)
 
