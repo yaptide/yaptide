@@ -11,7 +11,6 @@ def run_simulation_on_backend():
     http_sim_status = 'http://localhost:5000/sh/status'
     http_sim_inputs = 'http://localhost:5000/sh/inputs'
     http_list_sims = 'http://localhost:5000/sh/list_sims'
-    http_sim_cancel = 'http://localhost:5000/sh/cancel'
 
     http_auth_register = 'http://localhost:5000/auth/register'
     http_auth_login = 'http://localhost:5000/auth/login'
@@ -32,7 +31,7 @@ def run_simulation_on_backend():
 
     res: requests.Response = session.put(http_auth_register, json=auth_json)
 
-    if not res.status_code in {201, 403}:
+    if res.status_code not in {201, 403}:
         print(res.json())
         return
 

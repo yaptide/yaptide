@@ -215,7 +215,6 @@ class SimulationsList(Resource):
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning ids"""
-
         simulations = db.session.query(SimulationModel).filter_by(user_id=user.id).all()
 
         if len(simulations) > 0:
