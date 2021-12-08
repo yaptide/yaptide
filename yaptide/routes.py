@@ -3,10 +3,10 @@ from flask_api import status as api_status
 from flask_restful import Resource
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel
+from yaptide.persistence.models import UserModel, SimulationModel
 from yaptide.utils import encode_auth_token, decode_auth_token
 
-from yaptide.celery.tasks import run_simulation, simulation_task_status, get_input_files
+from yaptide.celery.tasks import run_simulation, simulation_task_status, get_input_files, cancel_simulation
 
 from marshmallow import Schema, ValidationError
 from marshmallow import fields as fld
@@ -82,12 +82,30 @@ class SimulationRun(Resource):
             }, api_status.HTTP_400_BAD_REQUEST)
 
         task = run_simulation.delay(param_dict=param_dict, raw_input_dict=json_data)
+
+        simulation = SimulationModel(task_id=task.id, user_id=user.id)
+
+        db.session.add(simulation)
+        db.session.commit()
+
         return make_response({
             'status': 'ACCEPTED',
             'message': {
                 'task_id': task.id
             }
         }, api_status.HTTP_202_ACCEPTED)
+
+
+def check_if_task_is_owned(task_id: str, user: UserModel) -> tuple[bool, dict]:
+    """Function checking if provided task is owned by user managing action"""
+    simulation = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
+
+    if simulation.user_id == user.id:
+        return True, {}
+    return False, {
+        'status': 'ERROR',
+        'message': 'Task with provided ID does not belong to the user',
+    }
 
 
 class SimulationStatus(Resource):
@@ -100,7 +118,7 @@ class SimulationStatus(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def post(user: UserModel):
         """Method returning task status and results"""
         try:
             json_data: dict = SimulationStatus._Schema().load(request.get_json(force=True))
@@ -109,10 +127,19 @@ class SimulationStatus(Resource):
                 'status': 'ERROR',
                 'message': 'Wrong data provided'
             }, api_status.HTTP_400_BAD_REQUEST)
+
+        is_owned, error_message = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        if not is_owned:
+            return make_response(error_message, api_status.HTTP_403_FORBIDDEN)
+
         task = simulation_task_status.delay(task_id=json_data.get('task_id'))
         result = task.wait(timeout=None, interval=0.5)
 
         if result.get('status') == 'OK':
+            if result.get('message').get('result'):
+                db.session.query(SimulationModel).filter_by(
+                    task_id=json_data.get('task_id')).delete()
+                db.session.commit()
             return make_response(result.get('message'), api_status.HTTP_200_OK)
         return make_response(result.get('message'), api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
@@ -127,7 +154,7 @@ class SimulationInputs(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def post(user: UserModel):
         """Method returning simulation input files"""
         try:
             json_data: dict = SimulationInputs._Schema().load(request.get_json(force=True))
@@ -136,10 +163,74 @@ class SimulationInputs(Resource):
                 'status': 'ERROR',
                 'message': 'Wrong data provided'
             }, api_status.HTTP_400_BAD_REQUEST)
+
+        is_owned, error_message = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        if not is_owned:
+            return make_response(error_message, api_status.HTTP_403_FORBIDDEN)
+
         task = get_input_files.delay(task_id=json_data.get('task_id'))
         result = task.wait(timeout=None, interval=0.5)
 
         return make_response(result.get('message'), api_status.HTTP_200_OK)
+
+
+class SimulationCancel(Resource):
+    """Class responsible for canceling simulation"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        task_id = fld.String()
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def delete(user: UserModel):
+        """Method canceling simulation and returning status of this action"""
+        try:
+            json_data: dict = SimulationCancel._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return make_response({
+                'status': 'ERROR',
+                'message': 'Wrong data provided'
+            }, api_status.HTTP_400_BAD_REQUEST)
+
+        is_owned, error_message = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        if not is_owned:
+            return make_response(error_message, api_status.HTTP_403_FORBIDDEN)
+
+        task = cancel_simulation.delay(task_id=json_data.get('task_id'))
+        result = task.wait(timeout=None, interval=0.5)
+
+        if result['status'] != 'ERROR':
+            db.session.query(SimulationModel).filter_by(task_id=json_data.get('task_id')).delete()
+            db.session.commit()
+
+        return make_response(result, api_status.HTTP_200_OK)
+
+
+class SimulationsList(Resource):
+    """Class responsible for returning ids of user's task which are running simulations"""
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning ids"""
+        simulations = db.session.query(SimulationModel).filter_by(user_id=user.id).all()
+
+        if len(simulations) > 0:
+            result = {
+                'message': {
+                    'tasks_ids': [],
+                },
+                'status': 'OK'
+            }
+            for simulation in simulations:
+                result['message']['tasks_ids'].append(simulation.task_id)
+        else:
+            result = {
+                'message': 'There are no simulations'
+            }
+        return make_response(result, api_status.HTTP_200_OK)
 
 
 class UserRegister(Resource):
@@ -304,6 +395,8 @@ def initialize_routes(api):
     api.add_resource(SimulationRun, "/sh/run")
     api.add_resource(SimulationStatus, "/sh/status")
     api.add_resource(SimulationInputs, "/sh/inputs")
+    api.add_resource(SimulationCancel, "/sh/cancel")
+    api.add_resource(SimulationsList, "/sh/list_sims")
 
     api.add_resource(UserRegister, "/auth/register")
     api.add_resource(UserLogIn, "/auth/login")

@@ -192,3 +192,13 @@ def sh12a_simulation_status(path_to_file: str):
             }
         }
         return sim_info
+
+
+@celery_app.task
+def cancel_simulation(task_id: str) -> dict:
+    """Task responsible for canceling simulation in progress"""
+    # Currently this task does nothing because to working properly it requires changes in pymchelper
+    return {
+        'status': 'ERROR',
+        'message': 'Simulation not canceled',
+    }
