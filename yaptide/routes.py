@@ -208,7 +208,7 @@ class SimulationCancel(Resource):
         return make_response(result, api_status.HTTP_200_OK)
 
 
-class SimulationsList(Resource):
+class UserSimulations(Resource):
     """Class responsible for returning ids of user's task which are running simulations"""
 
     @staticmethod
@@ -233,7 +233,7 @@ class SimulationsList(Resource):
         return make_response(result, api_status.HTTP_200_OK)
 
 
-class UserRegister(Resource):
+class AuthRegister(Resource):
     """Class responsible for user registration"""
 
     class _Schema(Schema):
@@ -246,7 +246,7 @@ class UserRegister(Resource):
     def put():
         """Method returning status of registration"""
         try:
-            json_data: dict = UserRegister._Schema().load(request.get_json(force=True))
+            json_data: dict = AuthRegister._Schema().load(request.get_json(force=True))
         except ValidationError:
             return make_response({
                 'status': 'ERROR',
@@ -289,7 +289,7 @@ class UserRegister(Resource):
             }, api_status.HTTP_403_FORBIDDEN)
 
 
-class UserLogIn(Resource):
+class AuthLogIn(Resource):
     """Class responsible for user log in"""
 
     class _Schema(Schema):
@@ -302,7 +302,7 @@ class UserLogIn(Resource):
     def post():
         """Method returning status of logging in (and token if it was successful)"""
         try:
-            json_data: dict = UserLogIn._Schema().load(request.get_json(force=True))
+            json_data: dict = AuthLogIn._Schema().load(request.get_json(force=True))
         except ValidationError:
             return make_response({
                 'status': 'ERROR',
@@ -345,7 +345,7 @@ class UserLogIn(Resource):
             }, api_status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class UserRefresh(Resource):
+class AuthRefresh(Resource):
     """Class responsible for refreshing user"""
 
     @staticmethod
@@ -361,7 +361,7 @@ class UserRefresh(Resource):
         return resp
 
 
-class UserStatus(Resource):
+class AuthStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
@@ -375,7 +375,7 @@ class UserStatus(Resource):
         return resp
 
 
-class UserLogOut(Resource):
+class AuthLogOut(Resource):
     """Class responsible for user log out"""
 
     @staticmethod
@@ -396,10 +396,11 @@ def initialize_routes(api):
     api.add_resource(SimulationStatus, "/sh/status")
     api.add_resource(SimulationInputs, "/sh/inputs")
     api.add_resource(SimulationCancel, "/sh/cancel")
-    api.add_resource(SimulationsList, "/sh/list_sims")
 
-    api.add_resource(UserRegister, "/auth/register")
-    api.add_resource(UserLogIn, "/auth/login")
-    api.add_resource(UserRefresh, "/auth/refresh")
-    api.add_resource(UserStatus, "/auth/status")
-    api.add_resource(UserLogOut, "/auth/logout")
+    api.add_resource(UserSimulations, "/user/simulations")
+
+    api.add_resource(AuthRegister, "/auth/register")
+    api.add_resource(AuthLogIn, "/auth/login")
+    api.add_resource(AuthRefresh, "/auth/refresh")
+    api.add_resource(AuthStatus, "/auth/status")
+    api.add_resource(AuthLogOut, "/auth/logout")

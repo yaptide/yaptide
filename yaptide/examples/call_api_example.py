@@ -10,7 +10,7 @@ def run_simulation_on_backend():
     http_sim_run = 'http://localhost:5000/sh/run?sim_type=sh_dummy'
     http_sim_status = 'http://localhost:5000/sh/status'
     http_sim_inputs = 'http://localhost:5000/sh/inputs'
-    http_list_sims = 'http://localhost:5000/sh/list_sims'
+    http_list_sims = 'http://localhost:5000/user/simulations'
 
     http_auth_register = 'http://localhost:5000/auth/register'
     http_auth_login = 'http://localhost:5000/auth/login'
@@ -61,7 +61,7 @@ def run_simulation_on_backend():
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post(http_auth_login, json=auth_json)
+                res: requests.Response = session.post( http_auth_login, json=auth_json)
                 if res.status_code != 202:
                     print(res.json())
                     return
