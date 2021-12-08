@@ -61,7 +61,7 @@ def run_simulation_on_backend():
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post( http_auth_login, json=auth_json)
+                res: requests.Response = session.post(http_auth_login, json=auth_json)
                 if res.status_code != 202:
                     print(res.json())
                     return
