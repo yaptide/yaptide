@@ -1,7 +1,8 @@
+from typing import Union
 from flask import make_response, Response
 
 
-def yaptide_response(message: str, code: int, content: dict = {'some': 'default'}) -> Response:
+def yaptide_response(message: str, code: int, content: Union[dict, str] = "No content") -> Response:
     """Function returning Response object"""
     return make_response({
         'message': message,
