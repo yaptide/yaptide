@@ -1,0 +1,139 @@
+from flask import request
+from flask_restful import Resource
+
+from marshmallow import Schema, ValidationError
+from marshmallow import fields
+
+from yaptide.persistence.database import db
+from yaptide.persistence.models import UserModel
+
+from yaptide.routes.utils.tokens import encode_auth_token
+from yaptide.routes.utils.decorators import requires_auth
+from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
+
+
+class AuthRegister(Resource):
+    """Class responsible for user registration"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        login_name = fields.String()
+        password = fields.String()
+
+    @staticmethod
+    def put():
+        """Method returning status of registration"""
+        try:
+            json_data: dict = AuthRegister._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return error_validation_response()
+
+        try:
+            user = db.session.query(UserModel).filter_by(
+                login_name=json_data.get('login_name')).first()
+        except Exception:  # skipcq: PYL-W0703
+            return error_internal_response()
+
+        if not user:
+            try:
+                user = UserModel(
+                    login_name=json_data.get('login_name')
+                )
+                user.set_password(json_data.get('password'))
+
+                db.session.add(user)
+                db.session.commit()
+
+                return yaptide_response(message='User created', code=201)
+
+            except Exception:  # skipcq: PYL-W0703
+                return error_internal_response()
+        else:
+            return yaptide_response(message='User existing', code=403)
+
+
+class AuthLogIn(Resource):
+    """Class responsible for user log in"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        login_name = fields.String()
+        password = fields.String()
+
+    @staticmethod
+    def post():
+        """Method returning status of logging in (and token if it was successful)"""
+        try:
+            json_data: dict = AuthLogIn._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return error_validation_response()
+
+        try:
+            user = db.session.query(UserModel).filter_by(login_name=json_data.get('login_name')).first()
+            if not user:
+                return yaptide_response(message='Invalid login or password', code=401)
+
+            if not user.check_password(password=json_data.get('password')):
+                return yaptide_response(message='Invalid login or password', code=401)
+
+            access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
+            refresh_token, refresh_exp = encode_auth_token(user_id=user.id, is_refresh=True)
+
+            resp = yaptide_response(
+                message='Successfully logged in',
+                code=202,
+                content={
+                    'access_exp': int(access_exp.timestamp()*1000),
+                    'refresh_exp': int(refresh_exp.timestamp()*1000),
+                }
+            )
+            resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
+            resp.set_cookie('refresh_token', refresh_token, httponly=True, samesite='Lax', expires=refresh_exp)
+            return resp
+        except Exception:  # skipcq: PYL-W0703
+            return error_internal_response()
+
+
+class AuthRefresh(Resource):
+    """Class responsible for refreshing user"""
+
+    @staticmethod
+    @requires_auth(is_refresh=True)
+    def get(user: UserModel):
+        """Method refreshing token"""
+        access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
+        resp = yaptide_response(
+            message='User refreshed',
+            code=200,
+            content={'access_exp': int(access_exp.timestamp()*1000)}
+        )
+        resp.set_cookie('token', access_token, httponly=True, samesite='Lax', expires=access_exp)
+        return resp
+
+
+class AuthStatus(Resource):
+    """Class responsible for returning user status"""
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning user's status"""
+        return yaptide_response(
+            message='User status',
+            code=200,
+            content={'login_name': user.login_name}
+        )
+
+
+class AuthLogOut(Resource):
+    """Class responsible for user log out"""
+
+    @staticmethod
+    def delete():
+        """Method logging the user out"""
+        resp = yaptide_response(message='User logged out', code=200)
+        resp.delete_cookie('access_token')
+        resp.delete_cookie('refresh_token')
+        return resp

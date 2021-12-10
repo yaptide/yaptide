@@ -1,7 +1,6 @@
 flask
 flask-sqlalchemy
 flask-restful
-flask_api
 flask_cors
 pytest
 environs

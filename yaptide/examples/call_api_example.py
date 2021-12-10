@@ -45,12 +45,12 @@ def run_simulation_on_backend():
     res: requests.Response = session.post(http_sim_run, json=data_to_send)
 
     task_id: str = ""
-    data = res.json()
+    data: dict = res.json()
     print(data)
-    task_id = data.get('message').get('task_id')
+    task_id = data.get('content').get('task_id')
 
     res: requests.Response = session.get(http_list_sims)
-    data = res.json()
+    data: dict = res.json()
     print(data)
 
     is_input_saved = True
@@ -69,29 +69,29 @@ def run_simulation_on_backend():
             try:
                 if is_input_saved:
                     res: requests.Response = session.post(http_sim_inputs, json={'task_id': task_id})
-                    data = res.json()
+                    content: dict = res.json()['content']
                     with open(os.path.join(example_dir, 'simulation_inputs.txt'), 'w') as writer:
-                        for key in data:
+                        for key in content:
                             if key == 'state':
                                 continue
                             writer.write(key)
                             writer.write("\n")
-                            is_input_saved = str(data[key]).startswith("No input present")
-                            writer.write(data[key])
+                            is_input_saved = str(content[key]).startswith("No input present")
+                            writer.write(content[key])
                             writer.write("\n")
 
                 res: requests.Response = session.post(http_sim_status, json={'task_id': task_id})
-                data = res.json()
-                print(data.get('state'))
+                data: dict = res.json()
+                print(data.get('message'))
 
-                if data["state"] == "SUCCESS":
+                if res.status_code == 200 and data['content'].get('result'):
                     with open(os.path.join(example_dir, 'simulation_output.json'), 'w') as writer:
-                        data_to_write = str(data["result"])
+                        data_to_write = str(data['content']['result'])
                         data_to_write = data_to_write.replace("'", "\"")
                         writer.write(data_to_write)
                     session.delete(http_auth_logout)
                     return
-                if data["state"] == "FAILURE":
+                if res.status_code == 500:
                     print(data)
                     session.delete(http_auth_logout)
                     return
