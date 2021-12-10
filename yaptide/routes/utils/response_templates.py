@@ -1,7 +1,7 @@
 from flask import make_response, Response
 
 
-def yaptide_response(message: str, code: int, content: dict = {}) -> Response:
+def yaptide_response(message: str, code: int, content: dict = {'some': 'default'}) -> Response:
     """Function returning Response object"""
     return make_response({
         'message': message,
@@ -17,4 +17,3 @@ def error_validation_response() -> Response:
 def error_internal_response() -> Response:
     """Function returning Response object when Exception occures"""
     return yaptide_response(message='Wrong data provided', code=400)
-

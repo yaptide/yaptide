@@ -6,11 +6,16 @@ from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, Aut
 
 
 class HelloWorld(Resource):
-    def get(self):
+    """Root route"""
+
+    @staticmethod
+    def get():
+        """Root route get method"""
         return {'message': 'Hello world!'}
 
 
 def initialize_routes(api):
+    """Function initializing routes"""
     api.add_resource(HelloWorld, "/")
 
     api.add_resource(SimulationRun, "/sh/run")

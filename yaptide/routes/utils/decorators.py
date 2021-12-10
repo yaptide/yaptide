@@ -9,6 +9,7 @@ from yaptide.persistence.models import UserModel
 
 from yaptide.routes.utils.tokens import decode_auth_token
 
+
 def requires_auth(is_refresh: bool):
     """Decorator for auth requirements"""
     def decorator(f):
