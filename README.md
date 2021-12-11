@@ -58,31 +58,36 @@ docker system prune
 Currently, there is a first version of authorisation. For now we need to register new user and log in.
 
 1. Register:
-Example curl for Windows cmd:
+   Example curl for Windows cmd:
+
 ```shell
 curl -i -X PUT -H "Content-Type:application/json" -d "{\"login_name\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/register
 ```
 
 2. Log in:
-Example curl for Windows cmd:
+   Example curl for Windows cmd:
+
 ```shell
 curl -i -X POST -c cookies.txt -H "Content-Type:application/json" -d "{\"login_name\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/login
 ```
 
 3. Status:
-Example curl for Windows cmd:
+   Example curl for Windows cmd:
+
 ```shell
 curl -i -X GET -b cookies.txt http://localhost:5000/auth/status
 ```
 
 4. Refresh:
-Example curl for Windows cmd:
+   Example curl for Windows cmd:
+
 ```shell
 curl -i -X GET -b cookies.txt -c cookies.txt http://localhost:5000/auth/refresh
 ```
 
 5. Logout:
-Example curl for Windows cmd:
+   Example curl for Windows cmd:
+
 ```shell
 curl -i -X DELETE http://localhost:5000/auth/logout
 ```
@@ -92,16 +97,20 @@ curl -i -X DELETE http://localhost:5000/auth/logout
 Currently converter is parsing some of the frontend input so it would be wise to pass the valid json in order to run the simulation (or you just end up with 500 API status)
 
 Example curl for Windows cmd:
+
 ```shell
 curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile http://localhost:5000/sh/run
 ```
+
 And for Linux:
+
 ```shell
 curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile "http://localhost:5000/sh/run"
 ```
 
 You can also add parameters after ``?`` sign like this: ``http://localhost:5000/sh/run?<param name>=<param value>``
 Possible parameters:
+
 * jobs - number of threads simulations should run on
 * sim_type - name of the simulator you wish to use, possible are ``shieldhit`` which is default, ``topas`` and ``dummy`` (note that they might not be working yet and for the purpose of testing just API not simulation results, use ``dummy``)
 
@@ -120,3 +129,7 @@ curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'task_id' 
 ```
 
 Although it might be inefficient way of testing so there is a prepared example ``call_api_example.py`` in yaptide/examples folder
+
+# Credits
+
+This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
