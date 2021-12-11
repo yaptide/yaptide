@@ -86,9 +86,6 @@ class SimulationStatus(Resource):
 
         content: dict = result.get('content')
         if result.get('status') == 'OK':
-            if content.get('result'):
-                db.session.query(SimulationModel).filter_by(task_id=json_data.get('task_id')).delete()
-                db.session.commit()
             return yaptide_response(
                 message='Task state: {state}'.format(state=content['state']),
                 code=200,
