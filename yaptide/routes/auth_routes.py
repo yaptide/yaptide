@@ -109,7 +109,7 @@ class AuthRefresh(Resource):
             code=200,
             content={'access_exp': int(access_exp.timestamp()*1000)}
         )
-        resp.set_cookie('token', access_token, httponly=True, samesite='Lax', expires=access_exp)
+        resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
         return resp
 
 
