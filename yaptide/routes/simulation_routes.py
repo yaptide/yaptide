@@ -95,7 +95,7 @@ class SimulationStatus(Resource):
                 content=content
             )
         return yaptide_response(
-            message='Task failed', 
+            message='Task failed',
             code=200,
             content=content
         )
