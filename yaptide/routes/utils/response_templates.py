@@ -16,9 +16,9 @@ def yaptide_response(message: str, code: int, content: Union[dict, str] = "") ->
 
 def error_validation_response() -> Response:
     """Function returning Response object when ValidationError occures"""
-    return yaptide_response(message='Internal server error', code=500)
+    return yaptide_response(message='Wrong data provided', code=400)
 
 
 def error_internal_response() -> Response:
     """Function returning Response object when Exception occures"""
-    return yaptide_response(message='Wrong data provided', code=400)
+    return yaptide_response(message='Internal server error', code=500)
