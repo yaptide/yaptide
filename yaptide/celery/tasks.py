@@ -116,24 +116,21 @@ def simulation_task_status(task_id: str) -> dict:
     result = {
         'status': 'OK',
         'content': {
-            'state': str(task.state),
+            'state': task.state,
         }
     }
-    if task.state == "PENDING":
-        result['content']['state'] = 'Pending...'
-    elif task.state == "PROGRESS":
-        result['content']['state'] = 'Calculations in progress...'
+    if task.state == 'PENDING':
+        pass
+    elif task.state == 'PROGRESS':
         if not task.info.get('sim_type') in {'shieldhit', 'sh_dummy'}:
             return result
         sim_info = sh12a_simulation_status(path_to_file=os.path.join(task.info.get('path'),
                                                                      'run_1', 'shieldhit0001.log'))
         result['content']['info'] = sim_info
     elif task.state != 'FAILURE':
-        result['content']['state'] = task.info.get('status', '')
         if 'result' in task.info:
             result['content']['result'] = task.info.get('result')
     else:
-        result['status'] = 'ERROR'
         result['content']['error'] = str(task.info)
 
     return result
