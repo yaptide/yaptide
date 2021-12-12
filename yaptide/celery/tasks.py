@@ -78,9 +78,12 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
                 'data': {
                     'unit': str(page.unit),
                     'name': str(page.name),
-                    'values': page.data_raw.tolist(),
                 }
             }
+            if page.dimension == 0:
+                page_dict['data']['values'] = [page.data_raw.tolist()]
+            else:
+                page_dict['data']['values'] = page.data_raw.tolist()
             # currently output is returned only when dimension == 1 due to
             # problems in efficient testing of other dimensions
 

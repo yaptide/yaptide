@@ -36,6 +36,17 @@ class SimulationModel(db.Model):
     name = db.Column(db.String, nullable=False)
 
 
+def add_user(login_name: str, password: str):
+    """Function adding user"""
+    user = UserModel(login_name=login_name)
+    user.set_password(password)
+
+    db.session.add(user)
+    db.session.commit()
+
+
 def create_models():
     """Function creating database's models"""
     db.create_all()
+
+    add_user(login_name='admin', password='password')

@@ -16,8 +16,8 @@ def run_simulation_on_backend():
     http_auth_logout = 'http://localhost:5000/auth/logout'
 
     auth_json = {
-        "login_name": "clientxD",
-        "password": "passwordxD",
+        "login_name": "admin",
+        "password": "password",
     }
 
     example_dir = os.path.dirname(os.path.realpath(__file__))

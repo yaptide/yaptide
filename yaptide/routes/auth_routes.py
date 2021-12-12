@@ -12,6 +12,47 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 
 
+class AuthRegister(Resource):
+    """Class responsible for user registration"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        login_name = fields.String()
+        password = fields.String()
+
+    @staticmethod
+    def put():
+        """Method returning status of registration"""
+        try:
+            json_data: dict = AuthRegister._Schema().load(request.get_json(force=True))
+        except ValidationError:
+            return error_validation_response()
+
+        try:
+            user = db.session.query(UserModel).filter_by(
+                login_name=json_data.get('login_name')).first()
+        except Exception:  # skipcq: PYL-W0703
+            return error_internal_response()
+
+        if not user:
+            try:
+                user = UserModel(
+                    login_name=json_data.get('login_name')
+                )
+                user.set_password(json_data.get('password'))
+
+                db.session.add(user)
+                db.session.commit()
+
+                return yaptide_response(message='User created', code=201)
+
+            except Exception:  # skipcq: PYL-W0703
+                return error_internal_response()
+        else:
+            return yaptide_response(message='User existing', code=403)
+
+
 class AuthLogIn(Resource):
     """Class responsible for user log in"""
 
@@ -32,11 +73,7 @@ class AuthLogIn(Resource):
         try:
             user = db.session.query(UserModel).filter_by(login_name=json_data.get('login_name')).first()
             if not user:
-                user = UserModel(login_name=json_data.get('login_name'))
-                user.set_password(json_data.get('password'))
-
-                db.session.add(user)
-                db.session.commit()
+                return yaptide_response(message='User not existing', code=401)
 
             if not user.check_password(password=json_data.get('password')):
                 return yaptide_response(message='Invalid login or password', code=401)

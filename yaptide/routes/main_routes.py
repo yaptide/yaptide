@@ -2,7 +2,7 @@ from flask_restful import Resource
 
 from yaptide.routes.simulation_routes import SimulationRun, SimulationStatus, SimulationInputs, SimulationCancel
 from yaptide.routes.user_routes import UserSimulations
-from yaptide.routes.auth_routes import AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
+from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 
 
 class HelloWorld(Resource):
@@ -25,6 +25,7 @@ def initialize_routes(api):
 
     api.add_resource(UserSimulations, "/user/simulations")
 
+    api.add_resource(AuthRegister, "/auth/register")
     api.add_resource(AuthLogIn, "/auth/login")
     api.add_resource(AuthRefresh, "/auth/refresh")
     api.add_resource(AuthStatus, "/auth/status")
