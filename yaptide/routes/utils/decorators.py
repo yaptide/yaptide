@@ -20,8 +20,7 @@ def requires_auth(is_refresh: bool):
                 'refresh_token' if is_refresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp: Union[int, str] = decode_auth_token(
-                token=token, is_refresh=is_refresh)
+            resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
                 user = db.session.query(UserModel).filter_by(id=resp).first()
                 if user:
