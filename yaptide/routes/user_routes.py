@@ -17,9 +17,10 @@ class UserSimulations(Resource):
         simulations = db.session.query(SimulationModel).filter_by(user_id=user.id).all()
 
         result = {
-            'tasks_ids': [simulation.task_id for simulation in simulations]
+            'simulations': [{
+                'name': simulation.name,
+                'task_id': simulation.task_id,
+                'creation_date': simulation.creation_date,
+            } for simulation in simulations]
         }
-        # if len(simulations) > 0:
-        #     for simulation in simulations:
-        #         result['tasks_ids'].append(simulation.task_id)
         return yaptide_response(message='User Simulations', code=200, content=result)

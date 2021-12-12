@@ -1,5 +1,6 @@
 from yaptide.persistence.database import db
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
@@ -31,6 +32,8 @@ class SimulationModel(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     task_id = db.Column(db.String, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('User.id'))
+    creation_date = db.Column(db.DateTime(timezone=True), default=func.now())
+    name = db.Column(db.String, nullable=False)
 
 
 def create_models():
