@@ -28,8 +28,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         conv_parser = get_parser_from_str(param_dict['sim_type'])
-        run_parser(parser=conv_parser, input_data=raw_input_dict,
-                   output_dir=tmp_dir_path)
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
