@@ -37,4 +37,5 @@ class SimulationModel(db.Model):
 
 
 def create_models():
+    """Function creating database's models"""
     db.create_all()
