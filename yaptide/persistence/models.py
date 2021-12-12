@@ -33,7 +33,7 @@ class SimulationModel(db.Model):
     task_id = db.Column(db.String, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('User.id'))
     creation_date = db.Column(db.DateTime(timezone=True), default=func.now())
-    name = db.Column(db.String, nullable=False)
+    name = db.Column(db.String, nullable=False, default='workspace')
 
 
 def add_user(login_name: str, password: str):

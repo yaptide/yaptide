@@ -21,7 +21,7 @@ class SimulationRun(Resource):
 
         jobs = fields.Integer(missing=1)
         sim_type = fields.String(missing="shieldhit")
-        sim_name = fields.String(missing="workspace")
+        sim_name = fields.String(missing="")
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -39,7 +39,10 @@ class SimulationRun(Resource):
 
         task = run_simulation.delay(param_dict=param_dict, raw_input_dict=json_data)
 
-        simulation = SimulationModel(task_id=task.id, user_id=user.id, name=param_dict['sim_name'])
+        if param_dict['sim_name'] == "":
+            simulation = SimulationModel(task_id=task.id, user_id=user.id)
+        else:
+            simulation = SimulationModel(task_id=task.id, user_id=user.id, name=param_dict['sim_name'])
 
         db.session.add(simulation)
         db.session.commit()
