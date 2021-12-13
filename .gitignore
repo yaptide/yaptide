@@ -142,3 +142,6 @@ shieldhit
 
 # database
 yaptide/main.db
+
+# ide settings
+.vscode/

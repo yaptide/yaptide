@@ -4,8 +4,8 @@ from yaptide.application import create_app
 from time import sleep
 import json
 
-_Login_name = "login123456"
-_Password = "password123456"
+_Login_name = "test_user"
+_Password = "test_password"
 
 
 @pytest.fixture
@@ -91,7 +91,7 @@ def test_user_status(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data.get('login_name') == _Login_name  # skipcq: BAN-B101
+    assert data['content'].get('login_name') == _Login_name  # skipcq: BAN-B101
     assert resp.status_code == 200  # skipcq: BAN-B101
 
 

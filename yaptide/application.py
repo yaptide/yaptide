@@ -1,6 +1,6 @@
 from flask import Flask
 from flask_restful import Api
-from yaptide.routes import initialize_routes
+from yaptide.routes.main_routes import initialize_routes
 from yaptide.persistence.database import db
 from yaptide.persistence import models
 from flask_cors import CORS
