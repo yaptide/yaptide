@@ -16,8 +16,7 @@ def requires_auth(is_refresh: bool):
         """Determines if the access or refresh token is valid"""
         @wraps(f)
         def wrapper(*args, **kwargs):
-            token: str = request.cookies.get(
-                'refresh_token' if is_refresh else 'access_token')
+            token: str = request.cookies.get('refresh_token' if is_refresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
             resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
