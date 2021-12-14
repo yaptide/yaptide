@@ -124,7 +124,7 @@ def simulation_logfile(path: str) -> str:
 
 
 def simulation_input_files(path: str) -> dict:
-    """Function returning input files"""
+    """Function returning a dictionary with simulation input filenames as keys and their content as values"""
     result = {}
     try:
         for p in [os.path.join(path, 'geo.dat'),
