@@ -115,7 +115,7 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
 
 
 def simulation_logfile(path: str) -> str:
-    """Proto version of returning errors -> returning shieldhit.log"""
+    """Function returning simulation logfile"""
     try:
         with open(path, 'r') as reader:
             return reader.read()
