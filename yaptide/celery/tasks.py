@@ -162,7 +162,7 @@ def simulation_task_status(task_id: str) -> dict:
             result['content']['result'] = task.info.get('result')
         elif 'logfile' in task.info:
             result['content']['state'] = 'FAILURE'
-            result['content']['error'] = 'Shieldhit error'
+            result['content']['error'] = 'Simulation error'
             result['content']['logfile'] = task.info.get('logfile')
             result['content']['input_files'] = task.info.get('input_files')
     else:
