@@ -43,7 +43,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             is_run_ok = runner_obj.run(settings=settings)
             if not is_run_ok:
                 raise Exception
-        except Exception:
+        except Exception:  # skipcq: PYL-W0703
             shieldhitlog = get_shieldhitlog(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
             input_files = get_shield_input(path=tmp_dir_path)
             return {'shieldhitlog': shieldhitlog, 'input_files': input_files}

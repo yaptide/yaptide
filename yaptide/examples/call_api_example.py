@@ -9,7 +9,6 @@ def run_simulation_on_backend():
     """Example client running simulation"""
     http_sim_run = 'http://localhost:5000/sh/run'
     http_sim_status = 'http://localhost:5000/sh/status'
-    http_sim_inputs = 'http://localhost:5000/sh/inputs'
     http_list_sims = 'http://localhost:5000/user/simulations'
 
     http_auth_login = 'http://localhost:5000/auth/login'
@@ -46,7 +45,6 @@ def run_simulation_on_backend():
     data: dict = res.json()
     print(data)
 
-    is_input_saved = True
     if task_id != "":
 
         while True:
@@ -72,7 +70,7 @@ def run_simulation_on_backend():
                             writer.write(data_to_write)
                         session.delete(http_auth_logout)
                         return
-                    elif data['content'].get('shieldhitlog'):
+                    if data['content'].get('shieldhitlog'):
                         with open(os.path.join(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
                             data_to_write = str(data['content'])
                             data_to_write = data_to_write.replace("'", "\"")
