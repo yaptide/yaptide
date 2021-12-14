@@ -1,3 +1,4 @@
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 from yaptide.celery.worker import celery_app
 
 import os
@@ -16,7 +17,6 @@ from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append('yaptide/converter')
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
 @celery_app.task(bind=True)
@@ -44,9 +44,9 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             if not is_run_ok:
                 raise Exception
         except Exception:  # skipcq: PYL-W0703
-            shieldhitlog = get_shieldhitlog(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
-            input_files = get_shield_input(path=tmp_dir_path)
-            return {'shieldhitlog': shieldhitlog, 'input_files': input_files}
+            logfile = simulation_logfile(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
+            input_files = simulation_input_files(path=tmp_dir_path)
+            return {'logfile': logfile, 'input_files': input_files}
 
         estimators_dict: dict = runner_obj.get_data()
 
@@ -114,16 +114,16 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
     return result_dict
 
 
-def get_shieldhitlog(path: str) -> str:
+def simulation_logfile(path: str) -> str:
     """Proto version of returning errors -> returning shieldhit.log"""
     try:
         with open(path, 'r') as reader:
             return reader.read()
     except FileNotFoundError:
-        return "Shieldhitlog not found"
+        return "logfile not found"
 
 
-def get_shield_input(path: str) -> dict:
+def simulation_input_files(path: str) -> dict:
     """Function returning input files"""
     result = {}
     try:
@@ -160,10 +160,10 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state != 'FAILURE':
         if 'result' in task.info:
             result['content']['result'] = task.info.get('result')
-        elif 'shieldhitlog' in task.info:
+        elif 'logfile' in task.info:
             result['content']['state'] = 'FAILURE'
             result['content']['error'] = 'Shieldhit error'
-            result['content']['shieldhitlog'] = task.info.get('shieldhitlog')
+            result['content']['logfile'] = task.info.get('logfile')
             result['content']['input_files'] = task.info.get('input_files')
     else:
         result['content']['error'] = str(task.info)

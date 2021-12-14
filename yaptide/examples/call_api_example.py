@@ -70,13 +70,13 @@ def run_simulation_on_backend():
                             writer.write(data_to_write)
                         session.delete(http_auth_logout)
                         return
-                    if data['content'].get('shieldhitlog'):
+                    if data['content'].get('logfile'):
                         with open(os.path.join(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
                             data_to_write = str(data['content'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         with open(os.path.join(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
-                            writer.write(data['content']['shieldhitlog'])
+                            writer.write(data['content']['logfile'])
                         for key in data['content']['input_files']:
                             with open(os.path.join(example_dir, 'output', key), 'w') as writer:
                                 writer.write(data['content']['input_files'][key])
