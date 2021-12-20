@@ -39,16 +39,20 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                               output_directory=tmp_dir_path)
 
         self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": param_dict['sim_type']})
-        is_run_ok = runner_obj.run(settings=settings)
-        if not is_run_ok:
-            self.update_state(state=states.FAILURE)
-            raise celery_exceptions.TaskError
+        try:
+            is_run_ok = runner_obj.run(settings=settings)
+            if not is_run_ok:
+                raise Exception
+        except Exception:  # skipcq: PYL-W0703
+            logfile = simulation_logfile(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
+            input_files = simulation_input_files(path=tmp_dir_path)
+            return {'logfile': logfile, 'input_files': input_files}
 
         estimators_dict: dict = runner_obj.get_data()
 
         result: dict = pymchelper_output_to_json(estimators_dict)
 
-        return {'status': 'COMPLETED', 'result': result}
+        return {'result': result}
 
 
 def pymchelper_output_to_json(estimators_dict: dict) -> dict:
@@ -110,6 +114,30 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
     return result_dict
 
 
+def simulation_logfile(path: str) -> str:
+    """Function returning simulation logfile"""
+    try:
+        with open(path, 'r') as reader:
+            return reader.read()
+    except FileNotFoundError:
+        return "logfile not found"
+
+
+def simulation_input_files(path: str) -> dict:
+    """Function returning a dictionary with simulation input filenames as keys and their content as values"""
+    result = {}
+    try:
+        for p in [os.path.join(path, 'geo.dat'),
+                  os.path.join(path, 'detect.dat'),
+                  os.path.join(path, 'beam.dat'),
+                  os.path.join(path, 'mat.dat')]:
+            with open(p, 'r') as reader:
+                result[p.split('/')[-1]] = reader.read()
+    except FileNotFoundError:
+        result['info'] = "No input present"
+    return result
+
+
 @celery_app.task
 def simulation_task_status(task_id: str) -> dict:
     """Task responsible for returning simulation status"""
@@ -132,6 +160,11 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state != 'FAILURE':
         if 'result' in task.info:
             result['content']['result'] = task.info.get('result')
+        elif 'logfile' in task.info:
+            result['content']['state'] = 'FAILURE'
+            result['content']['error'] = 'Simulation error'
+            result['content']['logfile'] = task.info.get('logfile')
+            result['content']['input_files'] = task.info.get('input_files')
     else:
         result['content']['error'] = str(task.info)
 

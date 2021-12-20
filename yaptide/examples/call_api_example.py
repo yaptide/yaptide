@@ -9,7 +9,6 @@ def run_simulation_on_backend():
     """Example client running simulation"""
     http_sim_run = 'http://localhost:5000/sh/run'
     http_sim_status = 'http://localhost:5000/sh/status'
-    http_sim_inputs = 'http://localhost:5000/sh/inputs'
     http_list_sims = 'http://localhost:5000/user/simulations'
 
     http_auth_login = 'http://localhost:5000/auth/login'
@@ -46,7 +45,6 @@ def run_simulation_on_backend():
     data: dict = res.json()
     print(data)
 
-    is_input_saved = True
     if task_id != "":
 
         while True:
@@ -60,34 +58,31 @@ def run_simulation_on_backend():
                     return
                 timer = timeit.default_timer()
             try:
-                if is_input_saved:
-                    res: requests.Response = session.post(http_sim_inputs, json={'task_id': task_id})
-                    content: dict = res.json()['content']
-                    with open(os.path.join(example_dir, 'simulation_inputs.txt'), 'w') as writer:
-                        for key in content:
-                            if key == 'state':
-                                continue
-                            writer.write(key)
-                            writer.write("\n")
-                            is_input_saved = str(content[key]).startswith("No input present")
-                            writer.write(content[key])
-                            writer.write("\n")
-
                 res: requests.Response = session.post(http_sim_status, json={'task_id': task_id})
                 data: dict = res.json()
                 print(data.get('message'))
 
-                if res.status_code == 200 and data['content'].get('result'):
-                    with open(os.path.join(example_dir, 'simulation_output.json'), 'w') as writer:
-                        data_to_write = str(data['content']['result'])
-                        data_to_write = data_to_write.replace("'", "\"")
-                        writer.write(data_to_write)
-                    session.delete(http_auth_logout)
-                    return
-                if res.status_code == 500:
-                    print(data)
-                    session.delete(http_auth_logout)
-                    return
+                # the request has succeeded, we can access its contents
+                if res.status_code == 200:
+                    if data['content'].get('result'):
+                        with open(os.path.join(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
+                            data_to_write = str(data['content']['result'])
+                            data_to_write = data_to_write.replace("'", "\"")
+                            writer.write(data_to_write)
+                        session.delete(http_auth_logout)
+                        return
+                    if data['content'].get('logfile'):
+                        with open(os.path.join(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
+                            data_to_write = str(data['content'])
+                            data_to_write = data_to_write.replace("'", "\"")
+                            writer.write(data_to_write)
+                        with open(os.path.join(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
+                            writer.write(data['content']['logfile'])
+                        for key in data['content']['input_files']:
+                            with open(os.path.join(example_dir, 'output', key), 'w') as writer:
+                                writer.write(data['content']['input_files'][key])
+                        session.delete(http_auth_logout)
+                        return
 
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)
