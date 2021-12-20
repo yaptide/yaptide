@@ -62,6 +62,7 @@ def run_simulation_on_backend():
                 data: dict = res.json()
                 print(data.get('message'))
 
+                # the request has succeeded, we can access its contents
                 if res.status_code == 200:
                     if data['content'].get('result'):
                         with open(os.path.join(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
