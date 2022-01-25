@@ -60,7 +60,7 @@ def run_simulation_on_backend():
             try:
                 res: requests.Response = session.post(http_sim_status, json={'task_id': task_id})
                 data: dict = res.json()
-                print(data.get('message'))
+                print(data)
 
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
@@ -83,6 +83,11 @@ def run_simulation_on_backend():
                                 writer.write(data['content']['input_files'][key])
                         session.delete(http_auth_logout)
                         return
+                    if data['content'].get('error'):
+                        print(data['content'].get('error'))
+                        session.delete(http_auth_logout)
+                        return
+
 
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)

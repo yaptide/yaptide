@@ -45,6 +45,8 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                 raise Exception
         except Exception:  # skipcq: PYL-W0703
             logfile = simulation_logfile(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
+            if logfile == "logfile not found":
+                logfile = ' '.join([str(elem) for elem in os.listdir(os.path.join(tmp_dir_path, 'run_1'))])
             input_files = simulation_input_files(path=tmp_dir_path)
             return {'logfile': logfile, 'input_files': input_files}
 
@@ -209,17 +211,18 @@ def get_input_files(task_id: str) -> dict:
         'content': {}
     }
     if task.state == "PROGRESS":
-        try:
-            for path in [os.path.join(task.info.get('path'), 'geo.dat'),
-                         os.path.join(task.info.get('path'), 'detect.dat'),
-                         os.path.join(task.info.get('path'), 'beam.dat'),
-                         os.path.join(task.info.get('path'), 'mat.dat')]:
-                with open(path, 'r') as reader:
-                    result['content'][path.split('/')[-1]] = reader.read()
-        except FileNotFoundError:
-            result['info'] = "No input present"
+        result['content'] = simulation_input_files(task.info.get('path'))
+        # try:
+        #     for path in [os.path.join(task.info.get('path'), 'geo.dat'),
+        #                  os.path.join(task.info.get('path'), 'detect.dat'),
+        #                  os.path.join(task.info.get('path'), 'beam.dat'),
+        #                  os.path.join(task.info.get('path'), 'mat.dat')]:
+        #         with open(path, 'r') as reader:
+        #             result['content'][path.split('/')[-1]] = reader.read()
+        # except FileNotFoundError:
+        #     result['info'] = "No input present"
     else:
-        result['info'] = "No input present"
+        result['content']['info'] = "No input present"
     return result
 
 
