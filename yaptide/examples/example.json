@@ -19,11 +19,33 @@
 		},
 		"geometries": [
 			{
-				"uuid": "FAC261DB-00D8-47D8-88C1-0F7F3FE5FAA4",
+				"uuid": "36EB8A61-2E9F-4DE8-B6E3-B872FE5A18E5",
+				"type": "SphereGeometry",
+				"radius": 10,
+				"widthSegments": 16,
+				"heightSegments": 8,
+				"phiStart": 0,
+				"phiLength": 6.283185307179586,
+				"thetaStart": 0,
+				"thetaLength": 3.141592653589793
+			},
+			{
+				"uuid": "C20538F5-2729-4000-8210-6D948001FE54",
+				"type": "SphereGeometry",
+				"radius": 6,
+				"widthSegments": 16,
+				"heightSegments": 8,
+				"phiStart": 0,
+				"phiLength": 6.283185307179586,
+				"thetaStart": 0,
+				"thetaLength": 3.141592653589793
+			},
+			{
+				"uuid": "DF952E7A-FD67-4AAE-9685-D23FC8CED3F5",
 				"type": "CylinderGeometry",
-				"radiusTop": 6,
-				"radiusBottom": 6,
-				"height": 2,
+				"radiusTop": 5,
+				"radiusBottom": 5,
+				"height": 1,
 				"radialSegments": 16,
 				"heightSegments": 1,
 				"openEnded": false,
@@ -31,11 +53,11 @@
 				"thetaLength": 6.283185307179586
 			},
 			{
-				"uuid": "945CFC26-DB7E-4F8B-83DA-792BA8F3BF0A",
+				"uuid": "60F6965E-8CFC-4814-82CB-798BD12EF4F6",
 				"type": "CylinderGeometry",
-				"radiusTop": 10,
-				"radiusBottom": 10,
-				"height": 2,
+				"radiusTop": 4,
+				"radiusBottom": 4,
+				"height": 6,
 				"radialSegments": 16,
 				"heightSegments": 1,
 				"openEnded": false,
@@ -43,28 +65,20 @@
 				"thetaLength": 6.283185307179586
 			},
 			{
-				"uuid": "CD8B2BC6-8DEE-4EF4-8442-9E386C99886D",
-				"type": "BoxGeometry",
-				"width": 12,
-				"height": 12,
-				"depth": 0.1,
-				"widthSegments": 1,
+				"uuid": "5963C7B1-FC7D-4438-A2CF-DC1850780B08",
+				"type": "CylinderGeometry",
+				"radiusTop": 3,
+				"radiusBottom": 3,
+				"height": 6,
+				"radialSegments": 16,
 				"heightSegments": 1,
-				"depthSegments": 1
-			},
-			{
-				"uuid": "B17140F0-410C-4F1B-B3C1-4A0998B0D4CE",
-				"type": "BoxGeometry",
-				"width": 20,
-				"height": 20,
-				"depth": 5,
-				"widthSegments": 1,
-				"heightSegments": 1,
-				"depthSegments": 1
+				"openEnded": false,
+				"thetaStart": 0,
+				"thetaLength": 6.283185307179586
 			}],
 		"materials": [
 			{
-				"uuid": "C71B0386-5CDC-4834-91CC-20D200D244BB",
+				"uuid": "59FDD25B-7350-43BD-9667-DC8564ABB28A",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -87,7 +101,7 @@
 				"wireframe": true
 			},
 			{
-				"uuid": "86C9F66E-B29F-463D-B1A1-FE8BAEF89066",
+				"uuid": "E44D3D60-0E8A-4A2C-A308-845DDE22421E",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -110,7 +124,7 @@
 				"wireframe": true
 			},
 			{
-				"uuid": "9E958B6D-C165-4AD4-B21D-873776A97A83",
+				"uuid": "F7B071A8-770B-4C88-A772-5E13246DA709",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -133,7 +147,30 @@
 				"wireframe": true
 			},
 			{
-				"uuid": "6AFF163A-840A-44B6-A957-B8DFB9BC9DE5",
+				"uuid": "5ADCABC7-E50E-4C5A-849F-1C3FC852C901",
+				"type": "MeshBasicMaterial",
+				"color": 0,
+				"reflectivity": 1,
+				"refractionRatio": 0.98,
+				"side": 2,
+				"opacity": 0.5,
+				"transparent": true,
+				"depthFunc": 3,
+				"depthTest": true,
+				"depthWrite": true,
+				"colorWrite": true,
+				"stencilWrite": false,
+				"stencilWriteMask": 255,
+				"stencilFunc": 519,
+				"stencilRef": 0,
+				"stencilFuncMask": 255,
+				"stencilFail": 7680,
+				"stencilZFail": 7680,
+				"stencilZPass": 7680,
+				"wireframe": true
+			},
+			{
+				"uuid": "17CC3146-7F60-4773-BF2D-808A02F7AB78",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -156,89 +193,105 @@
 				"wireframe": true
 			}],
 		"object": {
-			"uuid": "00B61E52-1EB5-481A-9BCF-59E687C3E53F",
+			"uuid": "9166C91E-941F-4EF2-8D26-102808FA661D",
 			"type": "Scene",
 			"name": "Figures",
+			"visible": false,
 			"layers": 1,
 			"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
 			"children": [
 				{
-					"uuid": "5B6E032F-189E-4D72-9EAC-5FF057A29190",
-					"type": "CylinderMesh",
-					"name": "InnerCylinder",
+					"uuid": "8063E2CF-B111-4A9C-993E-B17E97010029",
+					"type": "SphereMesh",
+					"name": "LowerBody",
 					"userData": {
-						"id": 853,
-						"geometryType": "CylinderGeometry",
-						"position": [0,0,0],
+						"id": 852,
+						"geometryType": "SphereGeometry",
+						"position": [0,-10,0],
 						"rotation": [0,0,0],
 						"parameters": {
-							"radiusTop": 6,
-							"height": 2
+							"radius": 10
 						}
 					},
 					"layers": 1,
-					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
-					"geometry": "FAC261DB-00D8-47D8-88C1-0F7F3FE5FAA4",
-					"material": "C71B0386-5CDC-4834-91CC-20D200D244BB"
+					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,-10,0,1],
+					"geometry": "36EB8A61-2E9F-4DE8-B6E3-B872FE5A18E5",
+					"material": "59FDD25B-7350-43BD-9667-DC8564ABB28A"
 				},
 				{
-					"uuid": "3D7E49A2-C801-4023-A9EE-9DA073857AE3",
+					"uuid": "A2F8CB12-C587-48EF-9DC8-0A92760B4AC6",
+					"type": "SphereMesh",
+					"name": "Head",
+					"userData": {
+						"id": 853,
+						"geometryType": "SphereGeometry",
+						"position": [0,3,0],
+						"rotation": [0,0,0],
+						"parameters": {
+							"radius": 6
+						}
+					},
+					"layers": 1,
+					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,3,0,1],
+					"geometry": "C20538F5-2729-4000-8210-6D948001FE54",
+					"material": "E44D3D60-0E8A-4A2C-A308-845DDE22421E"
+				},
+				{
+					"uuid": "A7F0EE4E-8A95-4582-8D61-2C4A3EF13357",
 					"type": "CylinderMesh",
-					"name": "OuterCylinder",
+					"name": "HatEdge",
+					"userData": {
+						"id": 854,
+						"geometryType": "CylinderGeometry",
+						"position": [0,8.5,0],
+						"rotation": [90,0,0],
+						"parameters": {
+							"radiusTop": 5,
+							"height": 1
+						}
+					},
+					"layers": 1,
+					"matrix": [1,0,0,0,0,2.220446049250313e-16,1,0,0,-1,2.220446049250313e-16,0,0,8.5,0,1],
+					"geometry": "DF952E7A-FD67-4AAE-9685-D23FC8CED3F5",
+					"material": "F7B071A8-770B-4C88-A772-5E13246DA709"
+				},
+				{
+					"uuid": "F8B34FC2-9A16-4F8E-83D2-310D10455F0B",
+					"type": "CylinderMesh",
+					"name": "HatOutside",
 					"userData": {
 						"id": 855,
 						"geometryType": "CylinderGeometry",
-						"position": [0,0,0],
-						"rotation": [0,0,0],
+						"position": [0,12,0],
+						"rotation": [90,0,0],
 						"parameters": {
-							"radiusTop": 10,
-							"height": 2
+							"radiusTop": 4,
+							"height": 6
 						}
 					},
 					"layers": 1,
-					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
-					"geometry": "945CFC26-DB7E-4F8B-83DA-792BA8F3BF0A",
-					"material": "86C9F66E-B29F-463D-B1A1-FE8BAEF89066"
+					"matrix": [1,0,0,0,0,2.220446049250313e-16,1,0,0,-1,2.220446049250313e-16,0,0,12,0,1],
+					"geometry": "60F6965E-8CFC-4814-82CB-798BD12EF4F6",
+					"material": "5ADCABC7-E50E-4C5A-849F-1C3FC852C901"
 				},
 				{
-					"uuid": "C6EA2383-A92A-4B3A-8821-E64A79094252",
-					"type": "BoxMesh",
-					"name": "LeadPlate",
+					"uuid": "56DD4359-6E94-4816-AC5A-F5190A264D0A",
+					"type": "CylinderMesh",
+					"name": "HatInside",
 					"userData": {
-						"id": 857,
-						"geometryType": "BoxGeometry",
-						"position": [0,0,1.1402328181499701],
-						"rotation": [0,0,0],
+						"id": 856,
+						"geometryType": "CylinderGeometry",
+						"position": [0,11,0],
+						"rotation": [90,0,0],
 						"parameters": {
-							"width": 12,
-							"height": 12,
-							"depth": 0.1
+							"radiusTop": 3,
+							"height": 6
 						}
 					},
 					"layers": 1,
-					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,1.1402328181499701,1],
-					"geometry": "CD8B2BC6-8DEE-4EF4-8442-9E386C99886D",
-					"material": "9E958B6D-C165-4AD4-B21D-873776A97A83"
-				},
-				{
-					"uuid": "748C8440-47FA-4278-9F20-16FB0E98D068",
-					"type": "BoxMesh",
-					"name": "WaterBox",
-					"userData": {
-						"id": 859,
-						"geometryType": "BoxGeometry",
-						"position": [0,0,-3.6],
-						"rotation": [0,0,0],
-						"parameters": {
-							"width": 20,
-							"height": 20,
-							"depth": 5
-						}
-					},
-					"layers": 1,
-					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,-3.6,1],
-					"geometry": "B17140F0-410C-4F1B-B3C1-4A0998B0D4CE",
-					"material": "6AFF163A-840A-44B6-A957-B8DFB9BC9DE5"
+					"matrix": [1,0,0,0,0,2.220446049250313e-16,1,0,0,-1,2.220446049250313e-16,0,0,11,0,1],
+					"geometry": "5963C7B1-FC7D-4438-A2CF-DC1850780B08",
+					"material": "17CC3146-7F60-4773-BF2D-808A02F7AB78"
 				}]
 		}
 	},
@@ -249,124 +302,135 @@
 	"zoneManager": {
 		"zones": [
 			{
-				"uuid": "63F1D121-B6CF-4B53-A59F-C6E3FE789D7D",
-				"name": "CollimatorZone",
-				"materialUuid": "67A44C5D-172F-43F3-A2F4-CA40BAE6E5C4",
+				"uuid": "2DAEF67D-DFB0-4B4F-A302-7A439E526743",
+				"name": "WaterBody",
+				"materialUuid": "07985775-F13C-4DFF-B4B2-C5F08F8174C7",
 				"unionOperations": [[
 						{
 							"mode": "union",
-							"objectUuid": "3D7E49A2-C801-4023-A9EE-9DA073857AE3"
+							"objectUuid": "8063E2CF-B111-4A9C-993E-B17E97010029"
 						},
 						{
 							"mode": "subtraction",
-							"objectUuid": "5B6E032F-189E-4D72-9EAC-5FF057A29190"
+							"objectUuid": "A2F8CB12-C587-48EF-9DC8-0A92760B4AC6"
 						}]],
 				"subscribedObjects": {
-					"5B6E032F-189E-4D72-9EAC-5FF057A29190": 1,
-					"3D7E49A2-C801-4023-A9EE-9DA073857AE3": 1
+					"8063E2CF-B111-4A9C-993E-B17E97010029": 1,
+					"A2F8CB12-C587-48EF-9DC8-0A92760B4AC6": 1
 				}
 			},
 			{
-				"uuid": "2760E5D5-0D95-42C8-949F-553E68EBF9EF",
-				"name": "PlateZone",
-				"materialUuid": "A16D0CB0-B7F9-4A02-9800-60817DCF40AA",
+				"uuid": "717F0B69-FA5C-40F4-8E18-1CBA647DDCFC",
+				"name": "WaterHead",
+				"materialUuid": "07985775-F13C-4DFF-B4B2-C5F08F8174C7",
 				"unionOperations": [[
 						{
 							"mode": "union",
-							"objectUuid": "C6EA2383-A92A-4B3A-8821-E64A79094252"
+							"objectUuid": "A2F8CB12-C587-48EF-9DC8-0A92760B4AC6"
+						},
+						{
+							"mode": "subtraction",
+							"objectUuid": "A7F0EE4E-8A95-4582-8D61-2C4A3EF13357"
 						}]],
 				"subscribedObjects": {
-					"C6EA2383-A92A-4B3A-8821-E64A79094252": 1
+					"A2F8CB12-C587-48EF-9DC8-0A92760B4AC6": 1,
+					"A7F0EE4E-8A95-4582-8D61-2C4A3EF13357": 1
 				}
 			},
 			{
-				"uuid": "5F357416-295D-4F84-B21D-3CD9BA869EDF",
-				"name": "Zone",
-				"materialUuid": "3C364E08-8CE0-44CF-B30C-3DE6DB5F31DF",
+				"uuid": "3710A66F-370D-48EC-B80B-9A5F234C0DA2",
+				"name": "LeadEdge",
+				"materialUuid": "E0986447-8AA7-4325-80D9-CEC2178494EB",
 				"unionOperations": [[
 						{
 							"mode": "union",
-							"objectUuid": "748C8440-47FA-4278-9F20-16FB0E98D068"
+							"objectUuid": "A7F0EE4E-8A95-4582-8D61-2C4A3EF13357"
+						},
+						{
+							"mode": "subtraction",
+							"objectUuid": "56DD4359-6E94-4816-AC5A-F5190A264D0A"
 						}]],
 				"subscribedObjects": {
-					"748C8440-47FA-4278-9F20-16FB0E98D068": 1
+					"A7F0EE4E-8A95-4582-8D61-2C4A3EF13357": 1,
+					"56DD4359-6E94-4816-AC5A-F5190A264D0A": 1
+				}
+			},
+			{
+				"uuid": "5CA2085B-6B32-4AC5-9427-051498DA8A9D",
+				"name": "LeadTopHat",
+				"materialUuid": "E0986447-8AA7-4325-80D9-CEC2178494EB",
+				"unionOperations": [[
+						{
+							"mode": "union",
+							"objectUuid": "F8B34FC2-9A16-4F8E-83D2-310D10455F0B"
+						},
+						{
+							"mode": "subtraction",
+							"objectUuid": "56DD4359-6E94-4816-AC5A-F5190A264D0A"
+						}]],
+				"subscribedObjects": {
+					"F8B34FC2-9A16-4F8E-83D2-310D10455F0B": 1,
+					"56DD4359-6E94-4816-AC5A-F5190A264D0A": 1
 				}
 			}],
-		"uuid": "2E6F60F0-74BE-445A-9089-8F02EC2D6EAE",
+		"uuid": "88E9C45C-3FBB-467D-A18E-69536BBA2376",
 		"name": "Zones",
 		"worldZone": {
-			"uuid": "80381299-052B-47D7-A740-E37DFDD61F24",
+			"uuid": "A65C1604-DA83-4751-89B5-3DF0ABE11E77",
 			"center": {
 				"x": 0,
-				"y": 0,
-				"z": -2.467040240764619
+				"y": 1,
+				"z": 0
 			},
 			"size": {
 				"x": 22,
-				"y": 22,
-				"z": 13.29251126
+				"y": 44,
+				"z": 22
 			},
 			"type": "WorldZone",
 			"geometryType": "Box",
 			"name": "World Zone",
 			"marginMultiplier": 1.1,
 			"autoCalculate": false,
-			"materialUuid": "9EDCEBC8-C060-49C8-8973-BA4F188B83E5",
+			"materialUuid": "F1284857-6B1C-4A1D-AC72-845CE92C6035",
 			"userData": {
 				"geometryType": "BoxGeometry",
 				"parameters": {
 					"width": 22,
-					"height": 22,
-					"depth": 13.29251126
+					"height": 44,
+					"depth": 22
 				},
-				"position": [0,0,-2.467040240764619],
+				"position": [0,1,0],
 				"rotation": [0,0,0]
 			}
 		}
 	},
 	"detectManager": {
-		"uuid": "E1899F3A-DFEE-4144-A74D-0ECA9A1CF3C3",
+		"uuid": "AC307787-A394-4E2F-ACE7-F90E2FC0C6AF",
 		"name": "DetectManager",
 		"detectGeometries": [
 			{
-				"uuid": "57460C08-0316-4F95-A878-DC78103BCFED",
+				"uuid": "6E0F0550-4464-4FAF-8213-945EEEDB3D06",
 				"data": {
 					"width": 20,
-					"height": 20,
-					"depth": 5,
-					"xSegments": 1,
-					"ySegments": 1,
-					"zSegments": 500
+					"height": 40,
+					"depth": 20,
+					"xSegments": 200,
+					"ySegments": 200,
+					"zSegments": 1
 				},
 				"type": "Mesh",
-				"position": [0,0,-3.6],
+				"position": [0,0,0],
 				"name": "Detect",
 				"colorHex": 65535
 			}],
-		"filters": [
-			{
-				"uuid": "365FB4D3-9781-4C73-92EC-84ED213E9EC4",
-				"name": "Filter",
-				"rules": [
-					{
-						"uuid": "730ABFB3-464F-4096-8E55-9B2776FACA3B",
-						"keyword": "Z",
-						"operator": "==",
-						"value": 1
-					},
-					{
-						"uuid": "0EC4F46D-2ED1-4164-ADC9-081BFD7BC45C",
-						"keyword": "A",
-						"operator": "==",
-						"value": 1
-					}]
-			}]
+		"filters": []
 	},
 	"beam": {
-		"position": [0,0,3],
-		"direction": [0,0,-1],
-		"energy": 60,
-		"energySpread": 0.6,
+		"position": [0,18.50152968002184,0],
+		"direction": [0,-1,0],
+		"energy": 150,
+		"energySpread": 1.5,
 		"divergence": {
 			"x": 0,
 			"y": 0,
@@ -382,60 +446,44 @@
 	"materialManager": {
 		"materials": [
 			{
-				"uuid": "A16D0CB0-B7F9-4A02-9800-60817DCF40AA",
+				"uuid": "E0986447-8AA7-4325-80D9-CEC2178494EB",
 				"name": "GLASS, LEAD",
 				"icru": 170,
-				"color": 6243322
+				"color": 4063060
 			},
 			{
-				"uuid": "3C364E08-8CE0-44CF-B30C-3DE6DB5F31DF",
+				"uuid": "07985775-F13C-4DFF-B4B2-C5F08F8174C7",
 				"name": "WATER, LIQUID",
-				"icru": 276,
-				"color": 4911837,
-				"transparent": true,
-				"opacity": 0.5
+				"icru": 276
 			},
 			{
-				"uuid": "67A44C5D-172F-43F3-A2F4-CA40BAE6E5C4",
-				"name": "GRAPHITE",
-				"icru": 906,
-				"color": 4268321
-			},
-			{
-				"uuid": "9EDCEBC8-C060-49C8-8973-BA4F188B83E5",
+				"uuid": "F1284857-6B1C-4A1D-AC72-845CE92C6035",
 				"name": "VACUUM",
 				"icru": 1000
 			}],
 		"selectedMaterials": {
-			"3C364E08-8CE0-44CF-B30C-3DE6DB5F31DF": 1,
-			"67A44C5D-172F-43F3-A2F4-CA40BAE6E5C4": 1,
-			"A16D0CB0-B7F9-4A02-9800-60817DCF40AA": 1,
-			"9EDCEBC8-C060-49C8-8973-BA4F188B83E5": 1
+			"07985775-F13C-4DFF-B4B2-C5F08F8174C7": 2,
+			"F1284857-6B1C-4A1D-AC72-845CE92C6035": 1,
+			"E0986447-8AA7-4325-80D9-CEC2178494EB": 2
 		}
 	},
 	"scoringManager": {
-		"uuid": "1874CC63-D9F7-42B7-9C6A-0BDA1651CCE6",
+		"uuid": "99A6DEBB-E3C9-416E-98D1-8283F5A75520",
 		"name": "Outputs",
 		"scoringOutputs": [
 			{
 				"name": "Output",
-				"uuid": "D756842A-EE46-4DA2-AA68-3C6189475C37",
+				"uuid": "8F21BE29-9BC9-4597-BF1D-7601B0C7E24E",
 				"quantities": {
 					"active": [
 						{
-							"uuid": "EEC379F2-3175-4F79-A97D-1290F9234DB8",
-							"keyword": "AvgEnergy",
-							"filter": "365FB4D3-9781-4C73-92EC-84ED213E9EC4",
-							"modifiers": []
-						},
-						{
-							"uuid": "6FCACB2C-87CA-4733-AB3E-A93EC210BB46",
+							"uuid": "E1ADA7D9-13CE-46DB-B533-47B910CA056A",
 							"keyword": "Dose",
 							"modifiers": []
 						}],
 					"disabled": []
 				},
-				"detectGeometry": "57460C08-0316-4F95-A878-DC78103BCFED",
+				"detectGeometry": "6E0F0550-4464-4FAF-8213-945EEEDB3D06",
 				"trace": false
 			}]
 	}
