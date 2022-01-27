@@ -16,6 +16,15 @@ sys.path.append('yaptide/converter')
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
+def save_input_files(input_files: dict, output_dir: str):
+    """Function used to save input files"""
+    output_dir = os.path.abspath(output_dir)
+
+    for file_name, content in input_files.items():
+        with open(os.path.join(output_dir, file_name), 'w') as conf_f:
+            conf_f.write(content)
+
+
 @celery_app.task(bind=True)
 def run_simulation(self, param_dict: dict, raw_input_dict: dict):
     """Simulation runner"""
@@ -24,8 +33,11 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        conv_parser = get_parser_from_str(param_dict['sim_type'])
-        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+        if raw_input_dict.get("input_files"):
+            save_input_files(input_data=raw_input_dict["input_files"], output_dir=tmp_dir_path)
+        else:
+            conv_parser = get_parser_from_str(param_dict['sim_type'])
+            run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
@@ -50,6 +62,20 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         result: dict = pymchelper_output_to_json(estimators_dict)
 
         return {'result': result}
+
+
+@celery_app.task
+def convert_input_files(param_dict: dict, raw_input_dict: dict):
+    """Function converting output"""
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+
+        # digest dictionary with project data (extracted from JSON file)
+        # and generate simulation input files
+        conv_parser = get_parser_from_str(param_dict['sim_type'])
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+
+        input_files = simulation_input_files(path=tmp_dir_path)
+        return {'input_files': input_files}
 
 
 def pymchelper_output_to_json(estimators_dict: dict) -> dict:

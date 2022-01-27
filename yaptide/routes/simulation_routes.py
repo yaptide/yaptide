@@ -10,7 +10,7 @@ from yaptide.persistence.models import UserModel, SimulationModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 
-from yaptide.celery.tasks import run_simulation, simulation_task_status, get_input_files, cancel_simulation
+from yaptide.celery.tasks import run_simulation, convert_input_files, simulation_task_status, get_input_files, cancel_simulation
 
 
 class SimulationRun(Resource):
@@ -51,6 +51,38 @@ class SimulationRun(Resource):
             message="Task started",
             code=202,
             content={'task_id': task.id}
+        )
+
+
+class ConvertInputFiles(Resource):
+    """Class responsible for returning input files converted from front JSON"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        sim_type = fields.String(missing="shieldhit")
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def post(user: UserModel):
+        """Method handling input files convertion"""
+        schema = SimulationRun._Schema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        json_data: dict = request.get_json(force=True)
+        if not json_data:
+            return yaptide_response(message="No JSON in body", code=400)
+
+        task = convert_input_files.delay(param_dict=param_dict, raw_input_dict=json_data)
+        result: dict = task.wait(timeout=None, interval=0.5)
+
+        return yaptide_response(
+            message="Converted Input Files",
+            code=200,
+            content=result
         )
 
 
