@@ -10,7 +10,8 @@ from yaptide.persistence.models import UserModel, SimulationModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 
-from yaptide.celery.tasks import run_simulation, convert_input_files, simulation_task_status, get_input_files, cancel_simulation
+from yaptide.celery.tasks import (run_simulation, convert_input_files, simulation_task_status,
+                                  get_input_files, cancel_simulation)
 
 
 class SimulationRun(Resource):
@@ -66,7 +67,7 @@ class ConvertInputFiles(Resource):
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
         """Method handling input files convertion"""
-        schema = SimulationRun._Schema()
+        schema = ConvertInputFiles._Schema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)

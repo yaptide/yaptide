@@ -34,7 +34,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         if raw_input_dict.get("input_files"):
-            save_input_files(input_data=raw_input_dict["input_files"], output_dir=tmp_dir_path)
+            save_input_files(input_files=raw_input_dict["input_files"], output_dir=tmp_dir_path)
         else:
             conv_parser = get_parser_from_str(param_dict['sim_type'])
             run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
