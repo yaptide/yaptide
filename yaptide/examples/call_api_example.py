@@ -60,7 +60,6 @@ def run_simulation_on_backend():
             try:
                 res: requests.Response = session.post(http_sim_status, json={'task_id': task_id})
                 data: dict = res.json()
-                print(data)
 
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
