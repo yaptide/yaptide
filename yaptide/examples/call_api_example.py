@@ -88,7 +88,6 @@ def run_simulation_on_backend():
                         session.delete(http_auth_logout)
                         return
 
-
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)
 

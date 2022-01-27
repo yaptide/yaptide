@@ -4,14 +4,11 @@ import os
 import sys
 import tempfile
 
-from celery import states
-from celery import exceptions as celery_exceptions
 from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from pymchelper.estimator import Estimator
-from pymchelper.page import Page
 from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
@@ -212,15 +209,6 @@ def get_input_files(task_id: str) -> dict:
     }
     if task.state == "PROGRESS":
         result['content'] = simulation_input_files(task.info.get('path'))
-        # try:
-        #     for path in [os.path.join(task.info.get('path'), 'geo.dat'),
-        #                  os.path.join(task.info.get('path'), 'detect.dat'),
-        #                  os.path.join(task.info.get('path'), 'beam.dat'),
-        #                  os.path.join(task.info.get('path'), 'mat.dat')]:
-        #         with open(path, 'r') as reader:
-        #             result['content'][path.split('/')[-1]] = reader.read()
-        # except FileNotFoundError:
-        #     result['info'] = "No input present"
     else:
         result['content']['info'] = "No input present"
     return result
