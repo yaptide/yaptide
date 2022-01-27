@@ -42,8 +42,6 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                 raise Exception
         except Exception:  # skipcq: PYL-W0703
             logfile = simulation_logfile(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
-            if logfile == "logfile not found":
-                logfile = ' '.join([str(elem) for elem in os.listdir(os.path.join(tmp_dir_path, 'run_1'))])
             input_files = simulation_input_files(path=tmp_dir_path)
             return {'logfile': logfile, 'input_files': input_files}
 
