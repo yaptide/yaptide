@@ -11,6 +11,45 @@
 		"toneMapping": 0,
 		"toneMappingExposure": 1
 	},
+	"camera": {
+		"metadata": {
+			"version": 4.5,
+			"type": "Object",
+			"generator": "Object3D.toJSON"
+		},
+		"object": {
+			"uuid": "0D427D0C-D35E-4E39-A89B-2DA17D024BA7",
+			"type": "PerspectiveCamera",
+			"name": "Camera",
+			"layers": 1,
+			"matrix": [
+				1,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				5,
+				10,
+				1
+			],
+			"fov": 50,
+			"zoom": 1,
+			"near": 0.01,
+			"far": 1000,
+			"focus": 10,
+			"aspect": 1,
+			"filmGauge": 35,
+			"filmOffset": 0
+		}
+	},
 	"scene": {
 		"metadata": {
 			"version": 4.5,
@@ -19,66 +58,30 @@
 		},
 		"geometries": [
 			{
-				"uuid": "36EB8A61-2E9F-4DE8-B6E3-B872FE5A18E5",
-				"type": "SphereGeometry",
-				"radius": 10,
-				"widthSegments": 16,
-				"heightSegments": 8,
-				"phiStart": 0,
-				"phiLength": 6.283185307179586,
-				"thetaStart": 0,
-				"thetaLength": 3.141592653589793
-			},
-			{
-				"uuid": "C20538F5-2729-4000-8210-6D948001FE54",
-				"type": "SphereGeometry",
-				"radius": 6,
-				"widthSegments": 16,
-				"heightSegments": 8,
-				"phiStart": 0,
-				"phiLength": 6.283185307179586,
-				"thetaStart": 0,
-				"thetaLength": 3.141592653589793
-			},
-			{
-				"uuid": "DF952E7A-FD67-4AAE-9685-D23FC8CED3F5",
-				"type": "CylinderGeometry",
-				"radiusTop": 5,
-				"radiusBottom": 5,
+				"uuid": "8D5F1D9F-204F-4A98-BD12-2479E0B2BD91",
+				"type": "BoxGeometry",
+				"width": 1,
 				"height": 1,
-				"radialSegments": 16,
+				"depth": 1,
+				"widthSegments": 1,
 				"heightSegments": 1,
-				"openEnded": false,
-				"thetaStart": 0,
-				"thetaLength": 6.283185307179586
+				"depthSegments": 1
 			},
 			{
-				"uuid": "60F6965E-8CFC-4814-82CB-798BD12EF4F6",
-				"type": "CylinderGeometry",
-				"radiusTop": 4,
-				"radiusBottom": 4,
-				"height": 6,
-				"radialSegments": 16,
-				"heightSegments": 1,
-				"openEnded": false,
+				"uuid": "F24134D6-63C8-4E44-A1A7-14420EFEE201",
+				"type": "SphereGeometry",
+				"radius": 1,
+				"widthSegments": 16,
+				"heightSegments": 8,
+				"phiStart": 0,
+				"phiLength": 6.283185307179586,
 				"thetaStart": 0,
-				"thetaLength": 6.283185307179586
-			},
-			{
-				"uuid": "5963C7B1-FC7D-4438-A2CF-DC1850780B08",
-				"type": "CylinderGeometry",
-				"radiusTop": 3,
-				"radiusBottom": 3,
-				"height": 6,
-				"radialSegments": 16,
-				"heightSegments": 1,
-				"openEnded": false,
-				"thetaStart": 0,
-				"thetaLength": 6.283185307179586
-			}],
+				"thetaLength": 3.141592653589793
+			}
+		],
 		"materials": [
 			{
-				"uuid": "59FDD25B-7350-43BD-9667-DC8564ABB28A",
+				"uuid": "EEADBF59-A957-46DB-98B5-FB4EEFBDC06D",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -101,7 +104,7 @@
 				"wireframe": true
 			},
 			{
-				"uuid": "E44D3D60-0E8A-4A2C-A308-845DDE22421E",
+				"uuid": "6E9761A0-C19E-4E20-9C8F-2A2EF32101F4",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -124,7 +127,7 @@
 				"wireframe": true
 			},
 			{
-				"uuid": "F7B071A8-770B-4C88-A772-5E13246DA709",
+				"uuid": "94DE2BFA-C365-4277-BE8E-8DB2FED9A83A",
 				"type": "MeshBasicMaterial",
 				"color": 0,
 				"reflectivity": 1,
@@ -145,156 +148,62 @@
 				"stencilZFail": 7680,
 				"stencilZPass": 7680,
 				"wireframe": true
-			},
-			{
-				"uuid": "5ADCABC7-E50E-4C5A-849F-1C3FC852C901",
-				"type": "MeshBasicMaterial",
-				"color": 0,
-				"reflectivity": 1,
-				"refractionRatio": 0.98,
-				"side": 2,
-				"opacity": 0.5,
-				"transparent": true,
-				"depthFunc": 3,
-				"depthTest": true,
-				"depthWrite": true,
-				"colorWrite": true,
-				"stencilWrite": false,
-				"stencilWriteMask": 255,
-				"stencilFunc": 519,
-				"stencilRef": 0,
-				"stencilFuncMask": 255,
-				"stencilFail": 7680,
-				"stencilZFail": 7680,
-				"stencilZPass": 7680,
-				"wireframe": true
-			},
-			{
-				"uuid": "17CC3146-7F60-4773-BF2D-808A02F7AB78",
-				"type": "MeshBasicMaterial",
-				"color": 0,
-				"reflectivity": 1,
-				"refractionRatio": 0.98,
-				"side": 2,
-				"opacity": 0.5,
-				"transparent": true,
-				"depthFunc": 3,
-				"depthTest": true,
-				"depthWrite": true,
-				"colorWrite": true,
-				"stencilWrite": false,
-				"stencilWriteMask": 255,
-				"stencilFunc": 519,
-				"stencilRef": 0,
-				"stencilFuncMask": 255,
-				"stencilFail": 7680,
-				"stencilZFail": 7680,
-				"stencilZPass": 7680,
-				"wireframe": true
-			}],
+			}
+		],
 		"object": {
-			"uuid": "9166C91E-941F-4EF2-8D26-102808FA661D",
+			"uuid": "C1BF5EE7-ACC7-4896-8451-A5B358DF9889",
 			"type": "Scene",
 			"name": "Figures",
-			"visible": false,
 			"layers": 1,
-			"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+			"matrix": [
+				1,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				0,
+				0,
+				1,
+				0,
+				0,
+				0,
+				0,
+				1
+			],
 			"children": [
 				{
-					"uuid": "8063E2CF-B111-4A9C-993E-B17E97010029",
-					"type": "SphereMesh",
-					"name": "LowerBody",
+					"uuid": "48EE4307-80C7-47AA-BF01-9132898B2B5A",
+					"type": "BoxMesh",
+					"name": "Box",
 					"userData": {
-						"id": 852,
-						"geometryType": "SphereGeometry",
-						"position": [0,-10,0],
-						"rotation": [0,0,0],
-						"parameters": {
-							"radius": 10
-						}
-					},
-					"layers": 1,
-					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,-10,0,1],
-					"geometry": "36EB8A61-2E9F-4DE8-B6E3-B872FE5A18E5",
-					"material": "59FDD25B-7350-43BD-9667-DC8564ABB28A"
-				},
-				{
-					"uuid": "A2F8CB12-C587-48EF-9DC8-0A92760B4AC6",
-					"type": "SphereMesh",
-					"name": "Head",
-					"userData": {
-						"id": 853,
-						"geometryType": "SphereGeometry",
-						"position": [0,3,0],
-						"rotation": [0,0,0],
-						"parameters": {
-							"radius": 6
-						}
-					},
-					"layers": 1,
-					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,3,0,1],
-					"geometry": "C20538F5-2729-4000-8210-6D948001FE54",
-					"material": "E44D3D60-0E8A-4A2C-A308-845DDE22421E"
-				},
-				{
-					"uuid": "A7F0EE4E-8A95-4582-8D61-2C4A3EF13357",
-					"type": "CylinderMesh",
-					"name": "HatEdge",
-					"userData": {
-						"id": 854,
+						"id": 860,
 						"geometryType": "CylinderGeometry",
-						"position": [0,8.5,0],
-						"rotation": [90,0,0],
+						"position": [
+							0,
+							0,
+							10
+						],
+						"rotation": [
+							90,
+							0,
+							0
+						],
 						"parameters": {
-							"radiusTop": 5,
-							"height": 1
+							"radiusTop": 10,
+							"height": 20
 						}
 					},
 					"layers": 1,
-					"matrix": [1,0,0,0,0,2.220446049250313e-16,1,0,0,-1,2.220446049250313e-16,0,0,8.5,0,1],
-					"geometry": "DF952E7A-FD67-4AAE-9685-D23FC8CED3F5",
-					"material": "F7B071A8-770B-4C88-A772-5E13246DA709"
-				},
-				{
-					"uuid": "F8B34FC2-9A16-4F8E-83D2-310D10455F0B",
-					"type": "CylinderMesh",
-					"name": "HatOutside",
-					"userData": {
-						"id": 855,
-						"geometryType": "CylinderGeometry",
-						"position": [0,12,0],
-						"rotation": [90,0,0],
-						"parameters": {
-							"radiusTop": 4,
-							"height": 6
-						}
-					},
-					"layers": 1,
-					"matrix": [1,0,0,0,0,2.220446049250313e-16,1,0,0,-1,2.220446049250313e-16,0,0,12,0,1],
-					"geometry": "60F6965E-8CFC-4814-82CB-798BD12EF4F6",
-					"material": "5ADCABC7-E50E-4C5A-849F-1C3FC852C901"
-				},
-				{
-					"uuid": "56DD4359-6E94-4816-AC5A-F5190A264D0A",
-					"type": "CylinderMesh",
-					"name": "HatInside",
-					"userData": {
-						"id": 856,
-						"geometryType": "CylinderGeometry",
-						"position": [0,11,0],
-						"rotation": [90,0,0],
-						"parameters": {
-							"radiusTop": 3,
-							"height": 6
-						}
-					},
-					"layers": 1,
-					"matrix": [1,0,0,0,0,2.220446049250313e-16,1,0,0,-1,2.220446049250313e-16,0,0,11,0,1],
-					"geometry": "5963C7B1-FC7D-4438-A2CF-DC1850780B08",
-					"material": "17CC3146-7F60-4773-BF2D-808A02F7AB78"
-				}]
+					"geometry": "8D5F1D9F-204F-4A98-BD12-2479E0B2BD91",
+					"material": "EEADBF59-A957-46DB-98B5-FB4EEFBDC06D"
+				}
+			]
 		}
 	},
+	"scripts": {},
 	"history": {
 		"undos": [],
 		"redos": []
@@ -302,133 +211,124 @@
 	"zoneManager": {
 		"zones": [
 			{
-				"uuid": "2DAEF67D-DFB0-4B4F-A302-7A439E526743",
-				"name": "WaterBody",
-				"materialUuid": "07985775-F13C-4DFF-B4B2-C5F08F8174C7",
-				"unionOperations": [[
+				"uuid": "7103722D-BE89-4BAC-A7E0-44F5CD3143BE",
+				"name": "Zone",
+				"materialName": "GLASS, LEAD",
+				"materialData": {
+					"id": "170",
+					"name": "GLASS, LEAD"
+				},
+				"materialUuid": "5172F301-C69D-479B-81E0-F4FB5A16A94D",
+				"unionOperations": [
+					[
 						{
 							"mode": "union",
-							"objectUuid": "8063E2CF-B111-4A9C-993E-B17E97010029"
-						},
-						{
-							"mode": "subtraction",
-							"objectUuid": "A2F8CB12-C587-48EF-9DC8-0A92760B4AC6"
-						}]],
+							"objectUuid": "48EE4307-80C7-47AA-BF01-9132898B2B5A"
+						}
+					]
+				],
 				"subscribedObjects": {
-					"8063E2CF-B111-4A9C-993E-B17E97010029": 1,
-					"A2F8CB12-C587-48EF-9DC8-0A92760B4AC6": 1
+					"48EE4307-80C7-47AA-BF01-9132898B2B5C": 1,
+					"09360EDF-E555-44D9-8561-128493CC2314": 1,
+					"E10C12F9-7C85-417D-B6B3-755FAFE54EFA": 1
 				}
-			},
-			{
-				"uuid": "717F0B69-FA5C-40F4-8E18-1CBA647DDCFC",
-				"name": "WaterHead",
-				"materialUuid": "07985775-F13C-4DFF-B4B2-C5F08F8174C7",
-				"unionOperations": [[
-						{
-							"mode": "union",
-							"objectUuid": "A2F8CB12-C587-48EF-9DC8-0A92760B4AC6"
-						},
-						{
-							"mode": "subtraction",
-							"objectUuid": "A7F0EE4E-8A95-4582-8D61-2C4A3EF13357"
-						}]],
-				"subscribedObjects": {
-					"A2F8CB12-C587-48EF-9DC8-0A92760B4AC6": 1,
-					"A7F0EE4E-8A95-4582-8D61-2C4A3EF13357": 1
-				}
-			},
-			{
-				"uuid": "3710A66F-370D-48EC-B80B-9A5F234C0DA2",
-				"name": "LeadEdge",
-				"materialUuid": "E0986447-8AA7-4325-80D9-CEC2178494EB",
-				"unionOperations": [[
-						{
-							"mode": "union",
-							"objectUuid": "A7F0EE4E-8A95-4582-8D61-2C4A3EF13357"
-						},
-						{
-							"mode": "subtraction",
-							"objectUuid": "56DD4359-6E94-4816-AC5A-F5190A264D0A"
-						}]],
-				"subscribedObjects": {
-					"A7F0EE4E-8A95-4582-8D61-2C4A3EF13357": 1,
-					"56DD4359-6E94-4816-AC5A-F5190A264D0A": 1
-				}
-			},
-			{
-				"uuid": "5CA2085B-6B32-4AC5-9427-051498DA8A9D",
-				"name": "LeadTopHat",
-				"materialUuid": "E0986447-8AA7-4325-80D9-CEC2178494EB",
-				"unionOperations": [[
-						{
-							"mode": "union",
-							"objectUuid": "F8B34FC2-9A16-4F8E-83D2-310D10455F0B"
-						},
-						{
-							"mode": "subtraction",
-							"objectUuid": "56DD4359-6E94-4816-AC5A-F5190A264D0A"
-						}]],
-				"subscribedObjects": {
-					"F8B34FC2-9A16-4F8E-83D2-310D10455F0B": 1,
-					"56DD4359-6E94-4816-AC5A-F5190A264D0A": 1
-				}
-			}],
-		"uuid": "88E9C45C-3FBB-467D-A18E-69536BBA2376",
-		"name": "Zones",
+			}
+		],
+		"uuid": "A62A2261-C346-4E04-BC62-415BC998BD3B",
+		"name": "",
 		"worldZone": {
-			"uuid": "A65C1604-DA83-4751-89B5-3DF0ABE11E77",
+			"uuid": "A62A2261-32AS-4E04-BC62-415BC998BD3B",
 			"center": {
 				"x": 0,
-				"y": 1,
+				"y": 0,
 				"z": 0
 			},
 			"size": {
-				"x": 22,
-				"y": 44,
-				"z": 22
+				"x": 3,
+				"y": 3,
+				"z": 3
 			},
 			"type": "WorldZone",
 			"geometryType": "Box",
 			"name": "World Zone",
 			"marginMultiplier": 1.1,
 			"autoCalculate": false,
-			"materialUuid": "F1284857-6B1C-4A1D-AC72-845CE92C6035",
+			"materialUuid": "37C3F777-8B67-46B2-9D7F-374B49330F5C",
 			"userData": {
 				"geometryType": "BoxGeometry",
 				"parameters": {
 					"width": 22,
-					"height": 44,
+					"height": 22,
 					"depth": 22
 				},
-				"position": [0,1,0],
-				"rotation": [0,0,0]
+				"position": [
+					0,
+					0,
+					0
+				],
+				"rotation": [
+					0,
+					0,
+					0
+				]
 			}
 		}
 	},
 	"detectManager": {
-		"uuid": "AC307787-A394-4E2F-ACE7-F90E2FC0C6AF",
+		"uuid": "E3635B58-BFC9-423A-B384-2838D32353E8",
 		"name": "DetectManager",
 		"detectGeometries": [
 			{
-				"uuid": "6E0F0550-4464-4FAF-8213-945EEEDB3D06",
+				"uuid": "563DBCFF-0B85-4511-B557-DE55AB4FA692",
 				"data": {
-					"width": 20,
-					"height": 40,
+					"radius": 10,
+					"innerRadius": 0,
 					"depth": 20,
-					"xSegments": 200,
-					"ySegments": 200,
-					"zSegments": 1
+					"radialSegments": 1,
+					"zSegments": 400
+				},
+				"type": "Cyl",
+				"position": [
+					0,
+					0,
+					10
+				],
+				"name": "CylZ_Mesh",
+				"colorHex": 65535
+			},
+			{
+				"uuid": "87D9453D-ED04-4A7C-97F0-6E6A28DFF382",
+				"data": {
+					"width": 1,
+					"height": 4,
+					"depth": 20,
+					"xSegments": 1,
+					"ySegments": 80,
+					"zSegments": 400
 				},
 				"type": "Mesh",
-				"position": [0,0,0],
-				"name": "Detect",
+				"position": [
+					0,
+					0,
+					10
+				],
+				"name": "YZ_Mesh",
 				"colorHex": 65535
-			}],
+			}
+		],
 		"filters": []
 	},
 	"beam": {
-		"position": [0,18.50152968002184,0],
-		"direction": [0,-1,0],
+		"position": [
+			0,
+			0,
+			0
+		],
+		"direction": [
+			0,
+			0,
+			1
+		],
 		"energy": 150,
 		"energySpread": 1.5,
 		"divergence": {
@@ -446,45 +346,61 @@
 	"materialManager": {
 		"materials": [
 			{
-				"uuid": "E0986447-8AA7-4325-80D9-CEC2178494EB",
-				"name": "GLASS, LEAD",
-				"icru": 170,
-				"color": 4063060
+				"uuid": "5172F301-C69D-479B-81E0-F4FB5A16A94D",
+				"name": "AMORPHOUS CARBON (density 2.0 g/cm3)",
+				"icru": 276,
+				"color": 16711680
 			},
 			{
-				"uuid": "07985775-F13C-4DFF-B4B2-C5F08F8174C7",
-				"name": "WATER, LIQUID",
-				"icru": 276
-			},
-			{
-				"uuid": "F1284857-6B1C-4A1D-AC72-845CE92C6035",
+				"uuid": "37C3F777-8B67-46B2-9D7F-374B49330F5C",
 				"name": "VACUUM",
 				"icru": 1000
-			}],
+			}
+		],
 		"selectedMaterials": {
-			"07985775-F13C-4DFF-B4B2-C5F08F8174C7": 2,
-			"F1284857-6B1C-4A1D-AC72-845CE92C6035": 1,
-			"E0986447-8AA7-4325-80D9-CEC2178494EB": 2
+			"ECE3D5A5-9B49-4A9B-B81C-BB22C825F85D": 1,
+			"8BEE5624-81C2-4B79-824A-563CF0F8163D": 1,
+			"736C07A0-06DA-41F1-A828-3425FC47152A": 1
 		}
 	},
 	"scoringManager": {
-		"uuid": "99A6DEBB-E3C9-416E-98D1-8283F5A75520",
+		"uuid": "42E44040-61AD-4483-8604-9BC02775C7D7",
 		"name": "Outputs",
 		"scoringOutputs": [
 			{
-				"name": "Output",
-				"uuid": "8F21BE29-9BC9-4597-BF1D-7601B0C7E24E",
+				"name": "cylz",
+				"uuid": "11985E99-1ABC-4EDE-839F-7EA66A48394D",
 				"quantities": {
 					"active": [
 						{
-							"uuid": "E1ADA7D9-13CE-46DB-B533-47B910CA056A",
-							"keyword": "Dose",
+							"uuid": "97BE2F24-F5FE-492E-AAA3-A3DFD190C198",
+							"keyword": "DoseGy",
+							"rescale": 2,
 							"modifiers": []
-						}],
+						}
+					],
 					"disabled": []
 				},
-				"detectGeometry": "6E0F0550-4464-4FAF-8213-945EEEDB3D06",
+				"detectGeometry": "563DBCFF-0B85-4511-B557-DE55AB4FA692",
 				"trace": false
-			}]
+			},
+			{
+				"name": "yzmsh",
+				"uuid": "11985E99-1ABC-4EDE-839F-7EA66A48394D",
+				"quantities": {
+					"active": [
+						{
+							"uuid": "97BE2F24-F5FE-492E-AAA3-A3DFD190C198",
+							"keyword": "DoseGy",
+							"rescale": 2,
+							"modifiers": []
+						}
+					],
+					"disabled": []
+				},
+				"detectGeometry": "87D9453D-ED04-4A7C-97F0-6E6A28DFF382",
+				"trace": false
+			}
+		]
 	}
 }

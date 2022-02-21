@@ -18,11 +18,9 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 def save_input_files(input_files: dict, output_dir: str):
     """Function used to save input files"""
-    output_dir = os.path.abspath(output_dir)
-
-    for file_name, content in input_files.items():
-        with open(os.path.join(output_dir, file_name), 'w') as conf_f:
-            conf_f.write(content)
+    for key in input_files:
+        with open(os.path.join(output_dir, key), 'w') as writer:
+            writer.write(input_files[key])
 
 
 @celery_app.task(bind=True)
