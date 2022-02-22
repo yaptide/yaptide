@@ -253,7 +253,7 @@
 			"name": "World Zone",
 			"marginMultiplier": 1.1,
 			"autoCalculate": false,
-			"simulationMaterialName": "AIR, DRY (NEAR SEA LEVEL)",
+			"materialUuid": "37C3F777-8B67-46B2-9D7F-374B49330F5C",
 			"userData": {
 				"geometryType": "BoxGeometry",
 				"parameters": {
@@ -350,6 +350,11 @@
 				"name": "AMORPHOUS CARBON (density 2.0 g/cm3)",
 				"icru": 276,
 				"color": 16711680
+			},
+			{
+				"uuid": "37C3F777-8B67-46B2-9D7F-374B49330F5C",
+				"name": "VACUUM",
+				"icru": 1000
 			}
 		],
 		"selectedMaterials": {
@@ -363,7 +368,7 @@
 		"name": "Outputs",
 		"scoringOutputs": [
 			{
-				"name": "cylz.bdo",
+				"name": "cylz",
 				"uuid": "11985E99-1ABC-4EDE-839F-7EA66A48394D",
 				"quantities": {
 					"active": [
@@ -380,7 +385,7 @@
 				"trace": false
 			},
 			{
-				"name": "yzmsh.bdo",
+				"name": "yzmsh",
 				"uuid": "11985E99-1ABC-4EDE-839F-7EA66A48394D",
 				"quantities": {
 					"active": [

@@ -1,6 +1,7 @@
 from flask_restful import Resource
 
-from yaptide.routes.simulation_routes import SimulationRun, SimulationStatus, SimulationInputs, SimulationCancel
+from yaptide.routes.simulation_routes import (SimulationRun, SimulationStatus, SimulationInputs,
+                                              SimulationCancel, ConvertInputFiles)
 from yaptide.routes.user_routes import UserSimulations
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 
@@ -19,6 +20,7 @@ def initialize_routes(api):
     api.add_resource(HelloWorld, "/")
 
     api.add_resource(SimulationRun, "/sh/run")
+    api.add_resource(ConvertInputFiles, "/sh/convert")
     api.add_resource(SimulationStatus, "/sh/status")
     api.add_resource(SimulationInputs, "/sh/inputs")
     api.add_resource(SimulationCancel, "/sh/cancel")

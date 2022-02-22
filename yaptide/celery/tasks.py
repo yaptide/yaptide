@@ -1,22 +1,26 @@
 from yaptide.celery.worker import celery_app
 
-import os
 import sys
 import tempfile
+from pathlib import Path
 
-from celery import states
-from celery import exceptions as celery_exceptions
 from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from pymchelper.estimator import Estimator
-from pymchelper.page import Page
 from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append('yaptide/converter')
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
+
+
+def save_input_files(input_files: dict, output_dir: str):
+    """Function used to save input files"""
+    for key in input_files:
+        with open(Path(output_dir, key), 'w') as writer:
+            writer.write(input_files[key])
 
 
 @celery_app.task(bind=True)
@@ -27,8 +31,11 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        conv_parser = get_parser_from_str(param_dict['sim_type'])
-        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+        if raw_input_dict.get("input_files"):
+            save_input_files(input_files=raw_input_dict["input_files"], output_dir=tmp_dir_path)
+        else:
+            conv_parser = get_parser_from_str(param_dict['sim_type'])
+            run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
@@ -44,7 +51,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             if not is_run_ok:
                 raise Exception
         except Exception:  # skipcq: PYL-W0703
-            logfile = simulation_logfile(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
+            logfile = simulation_logfile(path=Path(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
             input_files = simulation_input_files(path=tmp_dir_path)
             return {'logfile': logfile, 'input_files': input_files}
 
@@ -53,6 +60,20 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         result: dict = pymchelper_output_to_json(estimators_dict)
 
         return {'result': result}
+
+
+@celery_app.task
+def convert_input_files(param_dict: dict, raw_input_dict: dict):
+    """Function converting output"""
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+
+        # digest dictionary with project data (extracted from JSON file)
+        # and generate simulation input files
+        conv_parser = get_parser_from_str(param_dict['sim_type'])
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+
+        input_files = simulation_input_files(path=tmp_dir_path)
+        return {'input_files': input_files}
 
 
 def pymchelper_output_to_json(estimators_dict: dict) -> dict:
@@ -127,12 +148,10 @@ def simulation_input_files(path: str) -> dict:
     """Function returning a dictionary with simulation input filenames as keys and their content as values"""
     result = {}
     try:
-        for p in [os.path.join(path, 'geo.dat'),
-                  os.path.join(path, 'detect.dat'),
-                  os.path.join(path, 'beam.dat'),
-                  os.path.join(path, 'mat.dat')]:
-            with open(p, 'r') as reader:
-                result[p.split('/')[-1]] = reader.read()
+        for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+            file = Path(path, filename)
+            with open(file, 'r') as reader:
+                result[filename] = reader.read()
     except FileNotFoundError:
         result['info'] = "No input present"
     return result
@@ -154,8 +173,7 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state == 'PROGRESS':
         if not task.info.get('sim_type') in {'shieldhit', 'sh_dummy'}:
             return result
-        sim_info = sh12a_simulation_status(path_to_file=os.path.join(task.info.get('path'),
-                                                                     'run_1', 'shieldhit0001.log'))
+        sim_info = sh12a_simulation_status(path_to_file=Path(task.info.get('path'), 'run_1', 'shieldhit0001.log'))
         result['content']['info'] = sim_info
     elif task.state != 'FAILURE':
         if 'result' in task.info:
@@ -209,17 +227,9 @@ def get_input_files(task_id: str) -> dict:
         'content': {}
     }
     if task.state == "PROGRESS":
-        try:
-            for path in [os.path.join(task.info.get('path'), 'geo.dat'),
-                         os.path.join(task.info.get('path'), 'detect.dat'),
-                         os.path.join(task.info.get('path'), 'beam.dat'),
-                         os.path.join(task.info.get('path'), 'mat.dat')]:
-                with open(path, 'r') as reader:
-                    result['content'][path.split('/')[-1]] = reader.read()
-        except FileNotFoundError:
-            result['info'] = "No input present"
+        result['content'] = simulation_input_files(task.info.get('path'))
     else:
-        result['info'] = "No input present"
+        result['content']['info'] = "No input present"
     return result
 
 
