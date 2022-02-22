@@ -1,8 +1,8 @@
 from yaptide.celery.worker import celery_app
 
-import os
 import sys
 import tempfile
+from pathlib import Path
 
 from celery.result import AsyncResult
 
@@ -19,7 +19,7 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 def save_input_files(input_files: dict, output_dir: str):
     """Function used to save input files"""
     for key in input_files:
-        with open(os.path.join(output_dir, key), 'w') as writer:
+        with open(Path(output_dir, key), 'w') as writer:
             writer.write(input_files[key])
 
 
@@ -51,7 +51,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             if not is_run_ok:
                 raise Exception
         except Exception:  # skipcq: PYL-W0703
-            logfile = simulation_logfile(path=os.path.join(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
+            logfile = simulation_logfile(path=Path(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
             input_files = simulation_input_files(path=tmp_dir_path)
             return {'logfile': logfile, 'input_files': input_files}
 
@@ -148,12 +148,10 @@ def simulation_input_files(path: str) -> dict:
     """Function returning a dictionary with simulation input filenames as keys and their content as values"""
     result = {}
     try:
-        for p in [os.path.join(path, 'geo.dat'),
-                  os.path.join(path, 'detect.dat'),
-                  os.path.join(path, 'beam.dat'),
-                  os.path.join(path, 'mat.dat')]:
-            with open(p, 'r') as reader:
-                result[p.split('/')[-1]] = reader.read()
+        for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+            file = Path(path, filename)
+            with open(file, 'r') as reader:
+                result[filename] = reader.read()
     except FileNotFoundError:
         result['info'] = "No input present"
     return result
@@ -175,7 +173,7 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state == 'PROGRESS':
         if not task.info.get('sim_type') in {'shieldhit', 'sh_dummy'}:
             return result
-        sim_info = sh12a_simulation_status(path_to_file=os.path.join(task.info.get('path'),
+        sim_info = sh12a_simulation_status(path_to_file=Path(task.info.get('path'),
                                                                      'run_1', 'shieldhit0001.log'))
         result['content']['info'] = sim_info
     elif task.state != 'FAILURE':

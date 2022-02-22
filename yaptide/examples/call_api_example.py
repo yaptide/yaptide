@@ -3,6 +3,7 @@ import json
 import time
 import os
 import timeit
+from pathlib import Path
 
 
 http_sim_run = 'http://localhost:5000/sh/run'
@@ -21,9 +22,8 @@ auth_json = {
 
 def run_simulation_on_backend():
     """Example client running simulation"""
-
     example_dir = os.path.dirname(os.path.realpath(__file__))
-    example_json = os.path.join(example_dir, 'example.json')
+    example_json = Path(example_dir, 'example.json')
 
     with open(example_json) as json_file:
         json_to_send = json.load(json_file)
@@ -36,7 +36,7 @@ def run_simulation_on_backend():
         print(res.json())
         return
 
-    # run_simulation_with_json(session, example_dir, json_to_send)
+    run_simulation_with_json(session, example_dir, json_to_send)
 
     run_simulation_with_files(session, example_dir, json_to_send)
 
@@ -44,6 +44,7 @@ def run_simulation_on_backend():
 
 
 def run_simulation_with_json(session: requests.Session, example_dir, json_to_send):
+    """Example function running simulation with JSON"""
     timer = timeit.default_timer()
     res: requests.Response = session.post(http_sim_run, json=json_to_send)
 
@@ -73,20 +74,20 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
                     if data['content'].get('result'):
-                        with open(os.path.join(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
+                        with open(Path(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
                             data_to_write = str(data['content']['result'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         return
                     if data['content'].get('logfile'):
-                        with open(os.path.join(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
+                        with open(Path(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
                             data_to_write = str(data['content'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
-                        with open(os.path.join(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
+                        with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
                             writer.write(data['content']['logfile'])
                         for key in data['content']['input_files']:
-                            with open(os.path.join(example_dir, 'output', key), 'w') as writer:
+                            with open(Path(example_dir, 'output', key), 'w') as writer:
                                 writer.write(data['content']['input_files'][key])
                         return
                     if data['content'].get('error'):
@@ -98,21 +99,19 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
 
 
 def run_simulation_with_files(session: requests.Session, example_dir, json_to_send):
-
+    """Example function running simulation with input files"""
     res: requests.Response = session.post(http_convert, json=json_to_send)
 
-    # task_id: str = ""
     data: dict = res.json()
     for key in data['content']['input_files']:
-        with open(os.path.join(example_dir, 'output', key), 'w') as writer:
+        with open(Path(example_dir, 'output', key), 'w') as writer:
             writer.write(data['content']['input_files'][key])
-    
+
     input_files = {}
-    for filename in ['geo.dat','detect.dat','beam.dat','mat.dat']:
-        file = os.path.join(example_dir, 'output', filename)
+    for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+        file = Path(example_dir, 'output', filename)
         with open(file, 'r') as reader:
             input_files[filename] = reader.read()
-    print(input_files)
 
     timer = timeit.default_timer()
     res: requests.Response = session.post(http_sim_run, json={'input_files' : input_files})
@@ -143,20 +142,20 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
                     if data['content'].get('result'):
-                        with open(os.path.join(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
+                        with open(Path(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
                             data_to_write = str(data['content']['result'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         return
                     if data['content'].get('logfile'):
-                        with open(os.path.join(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
+                        with open(Path(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
                             data_to_write = str(data['content'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
-                        with open(os.path.join(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
+                        with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
                             writer.write(data['content']['logfile'])
                         for key in data['content']['input_files']:
-                            with open(os.path.join(example_dir, 'output', key), 'w') as writer:
+                            with open(Path(example_dir, 'output', key), 'w') as writer:
                                 writer.write(data['content']['input_files'][key])
                         return
                     if data['content'].get('error'):

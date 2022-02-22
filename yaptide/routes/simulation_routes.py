@@ -78,7 +78,7 @@ class ConvertInputFiles(Resource):
             return yaptide_response(message="No JSON in body", code=400)
 
         task = convert_input_files.delay(param_dict=param_dict, raw_input_dict=json_data)
-        result: dict = task.wait(timeout=None, interval=0.5)
+        result: dict = task.wait()
 
         return yaptide_response(
             message="Converted Input Files",
@@ -119,7 +119,7 @@ class SimulationStatus(Resource):
             return yaptide_response(message=error_message, code=403)
 
         task = simulation_task_status.delay(task_id=json_data.get('task_id'))
-        result: dict = task.wait(timeout=None, interval=0.5)
+        result: dict = task.wait()
 
         content: dict = result.get('content')
         if result.get('status') == 'OK':
@@ -157,7 +157,7 @@ class SimulationInputs(Resource):
             return yaptide_response(message=error_message, code=403)
 
         task = get_input_files.delay(task_id=json_data.get('task_id'))
-        result: dict = task.wait(timeout=None, interval=0.5)
+        result: dict = task.wait()
 
         return yaptide_response(
             message=result['info'],
@@ -188,7 +188,7 @@ class SimulationCancel(Resource):
             return yaptide_response(message=error_message, code=403)
 
         task = cancel_simulation.delay(task_id=json_data.get('task_id'))
-        result: dict = task.wait(timeout=None, interval=0.5)
+        result: dict = task.wait()
 
         if result:
             db.session.query(SimulationModel).filter_by(task_id=json_data.get('task_id')).delete()
