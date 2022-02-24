@@ -154,8 +154,7 @@ class SimulationInputs(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(
-            task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
