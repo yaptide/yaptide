@@ -47,9 +47,9 @@ Once it's running, the app will be available at [http://localhost:5000](http://l
 When you're ready to stop the containers, use the following commands:
 
 ```shell
-docker-compose stop yaptide
+docker-compose stop yaptide_flask
+docker-compose stop yaptide_worker
 docker-compose stop redis
-docker-compose stop worker
 docker system prune
 ```
 
