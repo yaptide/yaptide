@@ -23,7 +23,7 @@ auth_json = {
 def run_simulation_on_backend():
     """Example client running simulation"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
-    example_json = Path(example_dir, 'example.json')
+    example_json = Path(example_dir, 'editor_9.json')
 
     with open(example_json) as json_file:
         json_to_send = json.load(json_file)

@@ -89,12 +89,13 @@ class ConvertInputFiles(Resource):
 
 def check_if_task_is_owned(task_id: str, user: UserModel) -> tuple[bool, str]:
     """Function checking if provided task is owned by user managing action"""
-    simulation = db.session.query(
-        SimulationModel).filter_by(task_id=task_id).first()
+    simulation = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
 
+    if not simulation:
+        return False, 'Task with provided ID does not exist', 404
     if simulation.user_id == user.id:
-        return True, ""
-    return False, 'Task with provided ID does not belong to the user'
+        return True, "", 200
+    return False, 'Task with provided ID does not belong to the user', 403
 
 
 class SimulationStatus(Resource):
@@ -114,9 +115,9 @@ class SimulationStatus(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
         if not is_owned:
-            return yaptide_response(message=error_message, code=403)
+            return yaptide_response(message=error_message, code=res_code)
 
         task = simulation_task_status.delay(task_id=json_data.get('task_id'))
         result: dict = task.wait()
@@ -152,9 +153,9 @@ class SimulationInputs(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
         if not is_owned:
-            return yaptide_response(message=error_message, code=403)
+            return yaptide_response(message=error_message, code=res_code)
 
         task = get_input_files.delay(task_id=json_data.get('task_id'))
         result: dict = task.wait()
@@ -183,9 +184,9 @@ class SimulationCancel(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
         if not is_owned:
-            return yaptide_response(message=error_message, code=403)
+            return yaptide_response(message=error_message, code=res_code)
 
         task = cancel_simulation.delay(task_id=json_data.get('task_id'))
         result: dict = task.wait()
