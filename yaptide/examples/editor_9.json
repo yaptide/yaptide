@@ -1,0 +1,270 @@
+{
+	"metadata": {
+		"version": 0.2,
+		"type": "Editor",
+		"generator": "Editor.toJSON"
+	},
+	"project": {
+		"shadows": true,
+		"shadowType": 1,
+		"physicallyCorrectLights": false,
+		"toneMapping": 0,
+		"toneMappingExposure": 1
+	},
+	"scene": {
+		"metadata": {
+			"version": 4.5,
+			"type": "Object",
+			"generator": "Object3D.toJSON"
+		},
+		"geometries": [
+			{
+				"uuid": "30930049-F0E1-4846-92CE-B106A07B7390",
+				"type": "CylinderGeometry",
+				"radiusTop": 5,
+				"radiusBottom": 5,
+				"height": 20,
+				"radialSegments": 16,
+				"heightSegments": 1,
+				"openEnded": false,
+				"thetaStart": 0,
+				"thetaLength": 6.283185307179586
+			}],
+		"materials": [
+			{
+				"uuid": "D45B1E67-654D-4CE7-A4A9-9C124D7BA753",
+				"type": "MeshBasicMaterial",
+				"color": 0,
+				"reflectivity": 1,
+				"refractionRatio": 0.98,
+				"side": 2,
+				"opacity": 0.5,
+				"transparent": true,
+				"depthFunc": 3,
+				"depthTest": true,
+				"depthWrite": true,
+				"colorWrite": true,
+				"stencilWrite": false,
+				"stencilWriteMask": 255,
+				"stencilFunc": 519,
+				"stencilRef": 0,
+				"stencilFuncMask": 255,
+				"stencilFail": 7680,
+				"stencilZFail": 7680,
+				"stencilZPass": 7680,
+				"wireframe": true
+			}],
+		"object": {
+			"uuid": "EA6684DB-6B89-48D7-AACE-B5597E54CAB1",
+			"type": "Scene",
+			"name": "Figures",
+			"visible": false,
+			"layers": 1,
+			"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,0,1],
+			"children": [
+				{
+					"uuid": "F3FF61BB-2D14-4AD1-8D2C-49E44AAA2310",
+					"type": "CylinderMesh",
+					"name": "Cylinder",
+					"userData": {
+						"id": 853,
+						"geometryType": "CylinderGeometry",
+						"position": [0,0,10],
+						"rotation": [0,0,0],
+						"parameters": {
+							"radiusTop": 5,
+							"height": 20
+						}
+					},
+					"layers": 1,
+					"matrix": [1,0,0,0,0,1,0,0,0,0,1,0,0,0,10,1],
+					"geometry": "30930049-F0E1-4846-92CE-B106A07B7390",
+					"material": "D45B1E67-654D-4CE7-A4A9-9C124D7BA753"
+				}]
+		}
+	},
+	"history": {
+		"undos": [],
+		"redos": []
+	},
+	"zoneManager": {
+		"zones": [
+			{
+				"uuid": "49107AF1-04C0-40D7-A836-A172311A03BC",
+				"name": "Zone",
+				"materialUuid": "E18C4266-8FAE-4D3A-BB70-96016E153B8C",
+				"unionOperations": [[
+						{
+							"mode": "union",
+							"objectUuid": "F3FF61BB-2D14-4AD1-8D2C-49E44AAA2310"
+						}]],
+				"subscribedObjects": {
+					"F3FF61BB-2D14-4AD1-8D2C-49E44AAA2310": 1
+				}
+			}],
+		"uuid": "B6DF5A39-E928-4C7D-AF8F-8CDC545B740B",
+		"name": "Zones",
+		"worldZone": {
+			"uuid": "26EE2F80-07E8-4C1A-B0AD-D622F25BC4C1",
+			"center": {
+				"x": 0,
+				"y": 0,
+				"z": 0
+			},
+			"size": {
+				"x": 0,
+				"y": 0,
+				"z": 0
+			},
+			"type": "WorldZone",
+			"geometryType": "Box",
+			"name": "World Zone",
+			"marginMultiplier": 1.1,
+			"autoCalculate": false,
+			"materialUuid": "E18C4266-8FAE-4D3A-BB70-96016E153B8C",
+			"userData": {
+				"geometryType": "BoxGeometry",
+				"parameters": {
+					"width": 0,
+					"height": 0,
+					"depth": 0
+				},
+				"position": [0,0,0],
+				"rotation": [0,0,0]
+			}
+		}
+	},
+	"detectManager": {
+		"uuid": "7512D161-8509-4110-94EF-F7BB12699322",
+		"name": "DetectManager",
+		"detectGeometries": [
+			{
+				"uuid": "4DF9A9D2-501D-48AB-9A2C-F854E61D100C",
+				"data": {
+					"radius": 2,
+					"innerRadius": 0,
+					"depth": 15,
+					"radialSegments": 1,
+					"zSegments": 300
+				},
+				"type": "Cyl",
+				"position": [0,0,7.5],
+				"name": "Detect",
+				"colorHex": 65535
+			},
+			{
+				"uuid": "2E529657-8E92-43B7-9E7F-CB6FAD11540E",
+				"data": {
+					"radius": 3,
+					"innerRadius": 0,
+					"depth": 0.1,
+					"radialSegments": 1,
+					"zSegments": 1
+				},
+				"type": "Cyl",
+				"position": [0,0,10],
+				"name": "DiffDetec",
+				"colorHex": 65535
+			}],
+		"filters": [
+			{
+				"uuid": "184A472E-C942-4D9A-8B34-91B2A9B49C7C",
+				"name": "Protons",
+				"rules": [
+					{
+						"uuid": "65983CB0-DBAF-4BCD-AEB4-D82AA078D3B7",
+						"keyword": "Z",
+						"operator": "==",
+						"value": 1
+					}]
+			}]
+	},
+	"beam": {
+		"position": [0,0,0],
+		"direction": [0,0,1],
+		"energy": 150,
+		"energySpread": 1.5,
+		"divergence": {
+			"x": 0,
+			"y": 0,
+			"distanceToFocal": 0
+		},
+		"particle": {
+			"id": 2,
+			"a": 12,
+			"z": 6
+		},
+		"colorHex": 16776960
+	},
+	"materialManager": {
+		"materials": [
+			{
+				"uuid": "E18C4266-8FAE-4D3A-BB70-96016E153B8C",
+				"name": "WATER, LIQUID",
+				"icru": 276
+			}],
+		"selectedMaterials": {
+			"E18C4266-8FAE-4D3A-BB70-96016E153B8C": 2
+		}
+	},
+	"scoringManager": {
+		"uuid": "5B0BF47D-9F82-4CD0-9454-B6C79BE0B85A",
+		"name": "Outputs",
+		"scoringOutputs": [
+			{
+				"name": "Output",
+				"uuid": "1DB35DB8-C01A-4768-B3DC-4F8A1652FEE9",
+				"quantities": {
+					"active": [
+						{
+							"uuid": "DDAD0C69-3654-4DBC-92CD-635CB0E1F038",
+							"keyword": "DoseGy",
+							"modifiers": []
+						},
+						{
+							"uuid": "159E9FDC-CEAF-4294-BAB2-D2153233CA18",
+							"keyword": "Fluence",
+							"modifiers": []
+						},
+						{
+							"uuid": "A2CC52B2-EE27-402C-88B5-E91A10355CBE",
+							"keyword": "dLET",
+							"modifiers": []
+						},
+						{
+							"uuid": "2E6B45C5-6FC9-4490-94F8-0D3FEDF55C58",
+							"keyword": "dLET",
+							"filter": "184A472E-C942-4D9A-8B34-91B2A9B49C7C",
+							"modifiers": []
+						}],
+					"disabled": []
+				},
+				"detectGeometry": "4DF9A9D2-501D-48AB-9A2C-F854E61D100C",
+				"trace": false
+			},
+			{
+				"name": "Output",
+				"uuid": "86EF49F3-9C79-4B83-8CF4-3A768B6EFDB3",
+				"quantities": {
+					"active": [
+						{
+							"uuid": "9590D38A-8784-48B2-9C26-4D3616C0F28F",
+							"keyword": "Fluence",
+							"filter": "184A472E-C942-4D9A-8B34-91B2A9B49C7C",
+							"modifiers": [
+								{
+									"diffType": "E",
+									"lowerLimit": 0,
+									"upperLimit": 100,
+									"binsNumber": 500,
+									"isLog": false,
+									"uuid": "324CBF0E-83BC-4AB9-A990-5DC27CDFE9C5"
+								}]
+						}],
+					"disabled": []
+				},
+				"detectGeometry": "2E529657-8E92-43B7-9E7F-CB6FAD11540E",
+				"trace": false
+			}]
+	}
+}
