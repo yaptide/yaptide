@@ -49,4 +49,4 @@ def create_models():
     """Function creating database's models"""
     db.create_all()
 
-    add_user(login_name='admin', password='password')
+    # add_user(login_name='admin', password='password')
