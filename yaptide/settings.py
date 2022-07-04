@@ -8,10 +8,8 @@ File taken from https://github.com/cookiecutter-flask/cookiecutter-flask/blob/ma
 """
 from environs import Env
 import os
-from pathlib import Path
 
 file_dir = os.path.dirname(os.path.realpath(__file__))
-print(file_dir)
 env = Env()
 env.read_env()
 

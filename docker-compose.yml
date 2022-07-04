@@ -6,7 +6,7 @@ services:
     build: .
     image: yaptide_flask
     volumes:
-      - yaptide_vol:/usr/local/app/yaptide/data
+      - data:/usr/local/app/yaptide/data
     container_name: yaptide_flask
     ports:
       - 5000:5000
@@ -40,4 +40,4 @@ services:
     container_name: yaptide_redis
 
 volumes:
-  yaptide_vol:
+  data:
