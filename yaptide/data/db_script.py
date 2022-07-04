@@ -8,35 +8,29 @@ import sqlalchemy as db
 from werkzeug.security import generate_password_hash
 
 
-def select_all_users(connection):
+def select_all_users(con: db.engine.Connection):
+    """Selects all users from db"""
     metadata = db.MetaData()
     users = db.Table('User', metadata, autoload=True, autoload_with=engine)
     query = db.select([users])
-    ResultProxy = connection.execute(query)
+    ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     print(ResultSet)
 
 
-def add_user(connection, data: dict):
+def insert_user(con: db.engine.Connection, data: dict):
+    """Inserts new user to db"""
     metadata = db.MetaData()
     users = db.Table('User', metadata, autoload=True, autoload_with=engine)
     query = db.insert(users).values(
         login_name=data["LOGIN"],
         password_hash=generate_password_hash(data["PASSWORD"])
     )
-    connection.execute(query)
+    con.execute(query)
 
 
-def delete_user(connection, data: dict):
-    metadata = db.MetaData()
-    users = db.Table('User', metadata, autoload=True, autoload_with=engine)
-    query = db.delete(users).where(
-       users.c.login_name == data["LOGIN"]
-    )
-    connection.execute(query)
-
-
-def update_user(connection, data: dict):
+def update_user(con: db.engine.Connection, data: dict):
+    """Updates user with provided login in db"""
     metadata = db.MetaData()
     users = db.Table('User', metadata, autoload=True, autoload_with=engine)
     query = db.update(users).where(
@@ -44,7 +38,17 @@ def update_user(connection, data: dict):
     ).values(
         password_hash=generate_password_hash(data["PASSWORD"])
     )
-    connection.execute(query)
+    con.execute(query)
+
+
+def delete_user(con: db.engine.Connection, data: dict):
+    """Deletes user with provided login from db"""
+    metadata = db.MetaData()
+    users = db.Table('User', metadata, autoload=True, autoload_with=engine)
+    query = db.delete(users).where(
+       users.c.login_name == data["LOGIN"]
+    )
+    con.execute(query)
 
 
 if __name__ == "__main__":
@@ -55,13 +59,10 @@ if __name__ == "__main__":
     connection = engine.connect()
 
     for obj in json_data:
-        if obj["OPERATION"] == "INSERT":
-            if obj["TABLE"] == "User":
-                add_user(connection=connection, data=obj["DATA"])
-        if obj["OPERATION"] == "UPDATE":
-            if obj["TABLE"] == "User":
+        if obj["OPERATION"] == "INSERT" and obj["TABLE"] == "User":
+                insert_user(connection=connection, data=obj["DATA"])
+        if obj["OPERATION"] == "UPDATE" and obj["TABLE"] == "User":
                 update_user(connection=connection, data=obj["DATA"])
-        if obj["OPERATION"] == "DELETE":
-            if obj["TABLE"] == "User":
+        if obj["OPERATION"] == "DELETE" and obj["TABLE"] == "User":
                 delete_user(connection=connection, data=obj["DATA"])
         select_all_users(connection=connection)
