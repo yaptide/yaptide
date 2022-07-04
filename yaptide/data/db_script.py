@@ -60,9 +60,9 @@ if __name__ == "__main__":
 
     for obj in json_data:
         if obj["OPERATION"] == "INSERT" and obj["TABLE"] == "User":
-                insert_user(connection=connection, data=obj["DATA"])
+            insert_user(con=connection, data=obj["DATA"])
         if obj["OPERATION"] == "UPDATE" and obj["TABLE"] == "User":
-                update_user(connection=connection, data=obj["DATA"])
+            update_user(con=connection, data=obj["DATA"])
         if obj["OPERATION"] == "DELETE" and obj["TABLE"] == "User":
-                delete_user(connection=connection, data=obj["DATA"])
-        select_all_users(connection=connection)
+            delete_user(con=connection, data=obj["DATA"])
+        select_all_users(con=connection)
