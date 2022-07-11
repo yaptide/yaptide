@@ -92,6 +92,10 @@ curl -i -X GET -b cookies.txt -c cookies.txt http://localhost:5000/auth/refresh
 curl -i -X DELETE http://localhost:5000/auth/logout
 ```
 
+# Docker database
+
+Now registering, updating and deleting users is available with the use of ``db_script.py`` located in ``yaptide/data`` folder, which is a volume folder for ``yaptide_flask`` container. To make any changes in the database, ``script_input.json`` (the name is currently hardcoded) file should be prepared. ``example_script_input.json`` shows pattern of doing this. It is possible to either edit the file in Docker CLI (user unfriendly way) or prepare the file elsewhere and copy/move it into ``yaptide_data/_data`` folder found in docker volumes folder. After preparing the file, ``db_script.py`` can be run in the Docker CLI (from any folder) of ``yaptide_flask`` container. It is not possible to run it outside of the docker because of the database concurrency limitations. 
+
 # Testing API with command-line tools
 
 Currently converter is parsing some of the frontend input so it would be wise to pass the valid json in order to run the simulation (or you just end up with 500 API status)
