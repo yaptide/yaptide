@@ -10,16 +10,19 @@ from werkzeug.security import generate_password_hash
 
 
 class OperationTypes(Enum):
+    """Operation types"""
     INSERT = "INSERT"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
 
 
 class TableTypes(Enum):
+    """Table types"""
     USER = "User"
 
 
 class DataJsonFields(Enum):
+    """Data JSON fields"""
     LOGIN = "LOGIN"
     PASSWORD = "PASSWORD"
 
@@ -75,7 +78,7 @@ if __name__ == "__main__":
     OPERATION = "OPERATION"
     TABLE = "TABLE"
     DATA = "DATA"
-    
+
     file_dir = os.path.dirname(os.path.realpath(__file__))
     input_json_path = Path(file_dir, 'script_input.json')
     with open(input_json_path) as json_file:
@@ -90,7 +93,7 @@ if __name__ == "__main__":
             raise ValueError(f'No TABLE field in provided JSON object: {obj}')
         if DATA not in obj:
             raise ValueError(f'No DATA field in provided JSON object: {obj}')
-        
+
         if obj[OPERATION] == OperationTypes.INSERT.value and obj[TABLE] == TableTypes.USER.value:
             insert_user(con=connection, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.UPDATE.value and obj[TABLE] == TableTypes.USER.value:
