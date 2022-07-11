@@ -4,22 +4,7 @@
         "TABLE": "User",
         "DATA": {
             "LOGIN": "admin",
-            "PASSWORD": "test_password"
-        }
-    },
-    {
-        "OPERATION": "UPDATE",
-        "TABLE": "User",
-        "DATA": {
-            "LOGIN": "admin",
             "PASSWORD": "password"
-        }
-    },
-    {
-        "OPERATION": "DELETE",
-        "TABLE": "User",
-        "DATA": {
-            "LOGIN": "admin"
         }
     }
 ]
