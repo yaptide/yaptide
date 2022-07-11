@@ -11,6 +11,7 @@ from werkzeug.security import generate_password_hash
 
 class OperationTypes(Enum):
     """Operation types"""
+
     INSERT = "INSERT"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
@@ -18,11 +19,13 @@ class OperationTypes(Enum):
 
 class TableTypes(Enum):
     """Table types"""
+
     USER = "User"
 
 
 class DataJsonFields(Enum):
     """Data JSON fields"""
+
     LOGIN = "LOGIN"
     PASSWORD = "PASSWORD"
 
