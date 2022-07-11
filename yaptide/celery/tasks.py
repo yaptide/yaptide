@@ -54,6 +54,10 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             logfile = simulation_logfile(path=Path(tmp_dir_path, 'run_1', 'shieldhit0001.log'))
             input_files = simulation_input_files(path=tmp_dir_path)
             return {'logfile': logfile, 'input_files': input_files}
+        except Exception:  # skipcq: PYL-W0703
+            logfile = simulation_logfile(path=Path(tmp_dir_path, 'run_1', 'shieldhit_0001.log'))
+            input_files = simulation_input_files(path=tmp_dir_path)
+            return {'logfile': logfile, 'input_files': input_files}
 
         estimators_dict: dict = runner_obj.get_data()
 
@@ -173,7 +177,10 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state == 'PROGRESS':
         if not task.info.get('sim_type') in {'shieldhit', 'sh_dummy'}:
             return result
-        sim_info = sh12a_simulation_status(path_to_file=Path(task.info.get('path'), 'run_1', 'shieldhit0001.log'))
+        try:
+            sim_info = sh12a_simulation_status(path_to_file=Path(task.info.get('path'), 'run_1', 'shieldhit0001.log'))
+        except Exception():  # skipcq: PYL-W0703
+            sim_info = sh12a_simulation_status(path_to_file=Path(task.info.get('path'), 'run_1', 'shieldhit_0001.log'))
         result['content']['info'] = sim_info
     elif task.state != 'FAILURE':
         if 'result' in task.info:
