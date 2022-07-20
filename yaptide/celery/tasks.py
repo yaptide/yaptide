@@ -46,7 +46,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         # otherwise use given number of cores
         if param_dict['jobs'] > 0:
             jobs = param_dict['jobs']
-            
+
         runner_obj = SHRunner(jobs=jobs,
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
