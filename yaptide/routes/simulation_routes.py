@@ -20,7 +20,7 @@ class SimulationRun(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        jobs = fields.Integer(missing=1)
+        jobs = fields.Integer(missing=-1)  # use all cores by default
         sim_type = fields.String(missing="shieldhit")
         sim_name = fields.String(missing="")
 

@@ -1,8 +1,8 @@
 from yaptide.celery.worker import celery_app
 
+from pathlib import Path
 import sys
 import tempfile
-from pathlib import Path
 
 from celery.result import AsyncResult
 
@@ -41,7 +41,13 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                                       simulator_exec_path=None,
                                       cmdline_opts='')
 
-        runner_obj = SHRunner(jobs=param_dict['jobs'],
+        # use all available cores by default
+        jobs = None
+        # otherwise use given number of cores
+        if param_dict['jobs'] > 0:
+            jobs = param_dict['jobs']
+            
+        runner_obj = SHRunner(jobs=jobs,
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
@@ -135,7 +141,7 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
     return result_dict
 
 
-def simulation_logfile(path: str) -> str:
+def simulation_logfile(path: Path) -> str:
     """Function returning simulation logfile"""
     try:
         with open(path, 'r') as reader:
