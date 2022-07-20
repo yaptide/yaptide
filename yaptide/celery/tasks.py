@@ -41,7 +41,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                                       simulator_exec_path=None,
                                       cmdline_opts='')
 
-        # use all available cores by default
+        # Pymchelper uses all available cores by default
         jobs = None
         # otherwise use given number of cores
         if param_dict['jobs'] > 0:
