@@ -15,7 +15,7 @@ from yaptide.celery.tasks import (run_simulation, convert_input_files, simulatio
 
 
 class SimulationRun(Resource):
-    """Class responsible for Shieldhit Demo running"""
+    """Class responsible for SHIELD-HIT12A simulations running"""
 
     class _Schema(Schema):
         """Class specifies API parameters"""
@@ -99,7 +99,7 @@ def check_if_task_is_owned(task_id: str, user: UserModel) -> tuple[bool, str]:
 
 
 class SimulationStatus(Resource):
-    """Class responsible for returning Shieldhit Demo status and result"""
+    """Class responsible for returning SHIELD-HIT12A simulation status and result"""
 
     class _Schema(Schema):
         """Class specifies API parameters"""
@@ -125,7 +125,7 @@ class SimulationStatus(Resource):
         content: dict = result.get('content')
         if result.get('status') == 'OK':
             return yaptide_response(
-                message='Task state: {state}'.format(state=content['state']),
+                message=f"Task state: {content['state']}",
                 code=200,
                 content=content
             )
