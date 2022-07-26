@@ -63,6 +63,9 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         estimators_dict: dict = runner_obj.get_data()
 
+        import shutil
+        shutil.copy(src = Path(tmp_dir_path, 'run_4/yz_profile_0004.bdo'), dst='/workspace/yaptide/yaptide/examples')
+
         result: dict = pymchelper_output_to_json(estimators_dict)
 
         return {'result': result}
@@ -100,9 +103,11 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
             'pages': []
         }
 
+        # read metadata from estimator object
         for name, value in estimator.__dict__.items():
             # skip non-metadata fields
             if name not in {'data', 'data_raw', 'error', 'error_raw', 'counter', 'pages', 'x', 'y', 'z'}:
+                # remove \" to properly generate JSON
                 est_dict['metadata'][name] = str(value).replace("\"", "")
 
         for page in estimator.pages:
@@ -118,10 +123,13 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
                 }
             }
 
-            for name, value in estimator.__dict__.items():
+            # read metadata from page object
+            for name, value in page.__dict__.items():
                 # skip non-metadata fields
-                if name not in {'data', 'data_raw', 'error', 'error_raw', 'pages', 'x', 'y', 'z'}:
+                if name not in {'data', 'data_raw', 'error', 'error_raw', 'pages', 'diff_axis1', 'diff_axis2'}:
+                    # skip fields already read from estimator object
                     if name not in estimator.__dict__.keys():
+                        # remove \" to properly generate JSON
                         page_dict['metadata'][name] = str(value).replace("\"", "")
 
             if page.dimension == 0:
