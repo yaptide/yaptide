@@ -63,9 +63,6 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         estimators_dict: dict = runner_obj.get_data()
 
-        import shutil
-        shutil.copy(src = Path(tmp_dir_path, 'run_4/yz_profile_0004.bdo'), dst='/workspace/yaptide/yaptide/examples')
-
         result: dict = pymchelper_output_to_json(estimators_dict)
 
         return {'result': result}
