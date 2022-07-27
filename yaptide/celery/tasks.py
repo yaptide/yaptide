@@ -96,20 +96,39 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
         # est_dict contains list of pages
         est_dict = {
             'name': estimator_key,
-            'pages': [],
+            'metadata' : {},
+            'pages': []
         }
+
+        # read metadata from estimator object
+        for name, value in estimator.__dict__.items():
+            # skip non-metadata fields
+            if name not in {'data', 'data_raw', 'error', 'error_raw', 'counter', 'pages', 'x', 'y', 'z'}:
+                # remove \" to properly generate JSON
+                est_dict['metadata'][name] = str(value).replace("\"", "")
 
         for page in estimator.pages:
             # page_dict contains:
             # 'dimensions' indicating it is 1 dim page
             # 'data' which has unit, name and list of data values
             page_dict = {
+                'metadata' : {},
                 'dimensions': page.dimension,
                 'data': {
                     'unit': str(page.unit),
                     'name': str(page.name),
                 }
             }
+
+            # read metadata from page object
+            for name, value in page.__dict__.items():
+                # skip non-metadata fields and fields already read from estimator object
+                exclude = {'data_raw', 'error_raw', 'estimator', 'diff_axis1', 'diff_axis2'}
+                exclude |= set(estimator.__dict__.keys())
+                if name not in exclude:
+                    # remove \" to properly generate JSON
+                    page_dict['metadata'][name] = str(value).replace("\"", "")
+
             if page.dimension == 0:
                 page_dict['data']['values'] = [page.data_raw.tolist()]
             else:
