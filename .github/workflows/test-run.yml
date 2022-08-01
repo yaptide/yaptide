@@ -4,9 +4,9 @@ name: CI
 
 on:
   push:
-    branches: [user-management]
+    branches: [master]
   pull_request:
-    branches: [user-management]
+    branches: [master]
 
   workflow_dispatch:
 
