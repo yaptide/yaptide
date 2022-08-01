@@ -4,9 +4,9 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [user-management]
   pull_request:
-    branches: [master]
+    branches: [user-management]
 
   workflow_dispatch:
 
@@ -108,3 +108,4 @@ jobs:
             cp /home/ubuntu/usr/shieldhit/v0.9.2/bin/shieldhit .
             SHIELDHIT_PATH=shieldhit docker-compose up --detach --build
             rm shieldhit
+            docker exec yaptide_flask pwd
