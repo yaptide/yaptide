@@ -13,6 +13,7 @@ cp ${SLURM_SUBMIT_DIR}/sh_inputs/detect.dat ${SCRATCH_DIRECTORY}
 cp ${SLURM_SUBMIT_DIR}/sh_inputs/geo.dat ${SCRATCH_DIRECTORY}
 cp ${SLURM_SUBMIT_DIR}/sh_inputs/mat.dat ${SCRATCH_DIRECTORY}
 
+module load gcc/11.3.0
 export PATH=$PATH:$PLG_GROUPS_STORAGE/plggyaptide
 shieldhit
 
@@ -23,5 +24,3 @@ cd ${SLURM_SUBMIT_DIR}
 rm -rf ${SCRATCH_DIRECTORY}
 
 exit 0
-
-# module load gcc/11.3.0

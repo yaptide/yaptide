@@ -6,12 +6,25 @@ from marshmallow import fields
 
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 
-class SlurmShieldhit(Resource):
+from plgrid.rimrock_methods import submit_job, get_job, delete_job
+
+class RimrockJobs(Resource):
     """Class responsible for jobs"""
 
     @staticmethod
     def post():
         """Method submiting job"""
+        json_data: dict = request.get_json(force=True)
+        if not json_data:
+            return yaptide_response(message="No JSON in body", code=400)
+        
+        result = submit_job(json_data=json_data)
+        return yaptide_response(
+            message="Nth",
+            code=202,
+            content=result
+        )
+
 
     class _GetSchema(Schema):
         """Class specifies API parameters"""
@@ -22,11 +35,12 @@ class SlurmShieldhit(Resource):
     def get():
         """Method geting job's result"""
             
-        schema = SlurmShieldhit._GetSchema()
+        schema = RimrockJobs._GetSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        
+
+        param_dict: dict = schema.load(request.args)        
 
 
 

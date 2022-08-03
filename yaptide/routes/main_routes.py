@@ -5,6 +5,8 @@ from yaptide.routes.simulation_routes import (SimulationRun, SimulationStatus, S
 from yaptide.routes.user_routes import UserSimulations
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 
+from plgrid.rimrock_routes import RimrockJobs
+
 
 class HelloWorld(Resource):
     """Root route"""
@@ -32,3 +34,5 @@ def initialize_routes(api):
     api.add_resource(AuthRefresh, "/auth/refresh")
     api.add_resource(AuthStatus, "/auth/status")
     api.add_resource(AuthLogOut, "/auth/logout")
+
+    api.add_resource(RimrockJobs, "/plgrid/jobs")

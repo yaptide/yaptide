@@ -14,6 +14,8 @@ http_convert = 'http://localhost:5000/sh/convert'
 http_auth_login = 'http://localhost:5000/auth/login'
 http_auth_logout = 'http://localhost:5000/auth/logout'
 
+http_rimrock = 'http://localhost:5000/plgrid/jobs'
+
 auth_json = {
     "login_name": "admin",
     "password": "password",
@@ -166,5 +168,20 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
                 print(e)
 
 
+def run_simulation_with_rimrock():
+    """Example function running simulation on rimrock"""
+    grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), 'grid_proxy')
+    bash_path = Path(os.path.dirname(os.path.realpath(__file__)), 'sh_run.sh')
+    with open(grid_proxy_path) as grid_proxy_file:
+        grid_proxy = grid_proxy_file.read()
+    with open(bash_path) as bash_file:
+        bash = bash_file.read()
+
+    session = requests.Session()
+    res: requests.Response = session.post(http_rimrock, json={'grid_proxy' : grid_proxy, 'bash_file': bash})
+    print(res.json())
+
+
 if __name__ == "__main__":
-    run_simulation_on_backend()
+    run_simulation_with_rimrock()
+    # run_simulation_on_backend()
