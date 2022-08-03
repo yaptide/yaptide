@@ -6,7 +6,7 @@ from marshmallow import fields
 
 from yaptide.routes.utils.response_templates import yaptide_response
 
-from plgrid.rimrock_methods import submit_job
+from plgrid.rimrock_methods import submit_job, get_job
 
 
 class RimrockJobs(Resource):
@@ -18,7 +18,7 @@ class RimrockJobs(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
-
+        json_data["grid_proxy"] = request.headers.get("PROXY")
         result = submit_job(json_data=json_data)
         return yaptide_response(
             message="Nth",
@@ -30,6 +30,7 @@ class RimrockJobs(Resource):
         """Class specifies API parameters"""
 
         job_id = fields.Integer
+        grid_proxy = fields.String
 
     @staticmethod
     def get():

@@ -3,6 +3,7 @@ import json
 import time
 import os
 import timeit
+import base64
 from pathlib import Path
 
 
@@ -177,8 +178,12 @@ def run_simulation_with_rimrock():
     with open(bash_path) as bash_file:
         bash = bash_file.read()
 
+    headers = {
+        "PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')
+    }
+
     session = requests.Session()
-    res: requests.Response = session.post(http_rimrock, json={'grid_proxy' : grid_proxy, 'bash_file': bash})
+    res: requests.Response = session.post(http_rimrock, json={'bash_file': bash}, headers=headers)
     print(res.json())
 
 
