@@ -1,12 +1,12 @@
 from flask import request
 from flask_restful import Resource
 
-from marshmallow import Schema, ValidationError
+from marshmallow import Schema
 from marshmallow import fields
 
-from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
+from yaptide.routes.utils.response_templates import yaptide_response
 
-from plgrid.rimrock_methods import submit_job, get_job, delete_job
+from plgrid.rimrock_methods import submit_job
 
 class RimrockJobs(Resource):
     """Class responsible for jobs"""
@@ -39,10 +39,6 @@ class RimrockJobs(Resource):
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
-
-        param_dict: dict = schema.load(request.args)        
-
-
 
     @staticmethod
     def delete():

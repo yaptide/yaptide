@@ -9,10 +9,11 @@ hostname = 'ares'
 bash_path = Path(os.path.dirname(os.path.realpath(__file__)), 'sh_run.sh')
 
 def encode_proxy_grid(grid_proxy: str) -> str:
+    """Function encoding grid proxy to meet format required by rimrock"""
     return base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')
 
 def submit_job(json_data: dict) -> dict:
-
+    """Function submiting jobs to rimrock"""
     session = requests.Session()
     headers = {
         "PROXY": encode_proxy_grid(json_data["grid_proxy"])
@@ -37,7 +38,7 @@ def submit_job(json_data: dict) -> dict:
     
 
 def get_job(json_data: dict) -> dict:
-
+    """Function getting jobs' info from rimrock"""
     session = requests.Session()
     headers = {
         "PROXY": encode_proxy_grid(json_data["grid_proxy"])
@@ -49,7 +50,7 @@ def get_job(json_data: dict) -> dict:
     }
 
 def delete_job(json_data: dict) -> dict:
-
+    """Function deleting jobs from rimrock"""
     session = requests.Session()
     headers = {
         "PROXY": encode_proxy_grid(json_data["grid_proxy"])
