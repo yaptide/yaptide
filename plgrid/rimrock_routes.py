@@ -8,6 +8,7 @@ from yaptide.routes.utils.response_templates import yaptide_response
 
 from plgrid.rimrock_methods import submit_job
 
+
 class RimrockJobs(Resource):
     """Class responsible for jobs"""
 
@@ -17,14 +18,13 @@ class RimrockJobs(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
-        
+
         result = submit_job(json_data=json_data)
         return yaptide_response(
             message="Nth",
             code=202,
             content=result
         )
-
 
     class _GetSchema(Schema):
         """Class specifies API parameters"""
@@ -34,11 +34,15 @@ class RimrockJobs(Resource):
     @staticmethod
     def get():
         """Method geting job's result"""
-            
         schema = RimrockJobs._GetSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        return yaptide_response(
+            message="TODO",
+            code=200,
+            content={}
+        )
 
     @staticmethod
     def delete():

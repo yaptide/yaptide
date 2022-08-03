@@ -7,12 +7,6 @@ from pathlib import Path
 file_path = os.path.dirname(os.path.realpath(__file__))
 grid_proxy_path = Path(file_path, 'grid_proxy')
 
-
-"""
-command generating grid_proxy
-read -s p && echo $p | ssh -l plgpitrus ares.cyfronet.pl "grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`" > grid_proxy && unset p
-"""
-
 http_rimrock_jobs = 'https://rimrock.pre.plgrid.pl/api/jobs'
 http_plgdata = 'https://data.plgrid.pl'
 hostname = 'ares'

@@ -5,5 +5,7 @@
 #SBATCH -A plgccbmc11-cpu
 
 printenv
+echo ${USER}
+echo ${SLURM_JOBID}
 
 exit 0

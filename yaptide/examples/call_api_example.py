@@ -184,4 +184,3 @@ def run_simulation_with_rimrock():
 
 if __name__ == "__main__":
     run_simulation_with_rimrock()
-    # run_simulation_on_backend()
