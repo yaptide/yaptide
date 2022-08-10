@@ -68,4 +68,3 @@ class RimrockJobs(Resource):
             code=204,
             content=result
         )
-

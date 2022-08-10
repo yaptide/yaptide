@@ -205,6 +205,5 @@ def run_simulation_with_rimrock():
                 return
 
 
-
 if __name__ == "__main__":
     run_simulation_with_rimrock()

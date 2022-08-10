@@ -1,5 +1,4 @@
 import requests
-import base64
 import os
 from pathlib import Path
 
