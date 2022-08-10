@@ -184,7 +184,26 @@ def run_simulation_with_rimrock():
 
     session = requests.Session()
     res: requests.Response = session.post(http_rimrock, json={'bash_file': bash}, headers=headers)
-    print(res.json())
+    res_json = res.json()
+    print(res_json)
+
+    job_id: str = ""
+    job_id = res_json.get('content').get('job_id')
+    if job_id != "":
+        while True:
+            time.sleep(5)
+            res: requests.Response = session.get(http_rimrock, params={"job_id": job_id}, headers=headers)
+            res_json = res.json()
+            if res.status_code != 200:
+                print(res_json)
+                return
+            if res_json.get('content').get('status') != 200:
+                print(res_json.get('content'))
+                return
+            print(res_json.get('content'))
+            if res_json.get('content').get('job_status') == 'FINISHED':
+                return
+
 
 
 if __name__ == "__main__":
