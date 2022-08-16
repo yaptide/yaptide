@@ -23,10 +23,11 @@ auth_json = {
 }
 
 
-def read_input_files(dir: Path) -> dict:
+def read_input_files(example_dir: Path) -> dict:
+    """Read shieldhit input files from input_files folder"""
     input_files = {}
     for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
-        file = Path(dir, 'input_files', filename)
+        file = Path(example_dir, 'input_files', filename)
         with open(file, 'r') as reader:
             input_files[filename] = reader.read()
     return input_files
@@ -178,11 +179,8 @@ def run_simulation_with_rimrock():
     """Example function running simulation on rimrock"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
     grid_proxy_path = Path(example_dir, 'grid_proxy')
-    bash_path = Path(example_dir, 'sh_run.sh')
     with open(grid_proxy_path) as grid_proxy_file:
         grid_proxy = grid_proxy_file.read()
-    with open(bash_path) as bash_file:
-        bash = bash_file.read()
 
     headers = {
         "PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')

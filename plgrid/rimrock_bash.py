@@ -39,4 +39,4 @@ cd ${{SUBMIT_DIR}}
 rm -rf ${{SCRATCH_DIRECTORY}}
 
 exit 0
-"""
+""" # skipcq: PY-W0073, FLK-E501
