@@ -1,0 +1,23 @@
+Geometry Mesh
+    Name Detect
+    X -0.5 0.5 1
+    Y -20 20 400
+    Z -10 10 200
+
+Filter
+    Name protons
+    A == 1
+    Z == 1
+Filter
+    Name primary
+    Z == 1
+    A == 1
+    GEN == 0
+Output
+    Filename Output.bdo
+    Geo Detect
+    Quantity Dose 
+Output
+    Filename Protons.bdo
+    Geo Detect
+    Quantity AvgEnergy protons

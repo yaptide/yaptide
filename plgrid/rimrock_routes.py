@@ -18,7 +18,7 @@ class RimrockJobs(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
-        json_data["grid_proxy"] = request.headers.get("PROXY")
+        json_data['grid_proxy'] = request.headers.get("PROXY")
         result = submit_job(json_data=json_data)
         return yaptide_response(
             message="Nth",

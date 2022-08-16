@@ -23,6 +23,15 @@ auth_json = {
 }
 
 
+def read_input_files(dir: Path) -> dict:
+    input_files = {}
+    for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+        file = Path(dir, 'input_files', filename)
+        with open(file, 'r') as reader:
+            input_files[filename] = reader.read()
+    return input_files
+
+
 def run_simulation_on_backend():
     """Example client running simulation"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
@@ -110,11 +119,7 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
         with open(Path(example_dir, 'output', key), 'w') as writer:
             writer.write(data['content']['input_files'][key])
 
-    input_files = {}
-    for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
-        file = Path(example_dir, 'output', filename)
-        with open(file, 'r') as reader:
-            input_files[filename] = reader.read()
+    input_files = read_input_files(dir=example_dir)
 
     timer = timeit.default_timer()
     res: requests.Response = session.post(http_sim_run, json={'input_files' : input_files})
@@ -171,8 +176,9 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
 
 def run_simulation_with_rimrock():
     """Example function running simulation on rimrock"""
-    grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), 'grid_proxy')
-    bash_path = Path(os.path.dirname(os.path.realpath(__file__)), 'sh_run.sh')
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    grid_proxy_path = Path(example_dir, 'grid_proxy')
+    bash_path = Path(example_dir, 'sh_run.sh')
     with open(grid_proxy_path) as grid_proxy_file:
         grid_proxy = grid_proxy_file.read()
     with open(bash_path) as bash_file:
@@ -183,7 +189,8 @@ def run_simulation_with_rimrock():
     }
 
     session = requests.Session()
-    res: requests.Response = session.post(http_rimrock, json={'bash_file': bash}, headers=headers)
+    input_files = read_input_files(dir=example_dir)
+    res: requests.Response = session.post(http_rimrock, json=input_files, headers=headers)
     res_json = res.json()
     print(res_json)
 
