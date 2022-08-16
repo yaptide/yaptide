@@ -132,7 +132,6 @@ Although it might be inefficient way of testing so there is a prepared example `
 
 # PLGrid
 
-TODO: write more
 Command generating `grid_proxy` file on Linux (WSL also works fine)
 ```shell
 read -s p && echo $p | ssh -l plgpitrus ares.cyfronet.pl "grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`" > grid_proxy && unset p
