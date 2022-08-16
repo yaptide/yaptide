@@ -120,7 +120,7 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
         with open(Path(example_dir, 'output', key), 'w') as writer:
             writer.write(data['content']['input_files'][key])
 
-    input_files = read_input_files(dir=example_dir)
+    input_files = read_input_files(example_dir=example_dir)
 
     timer = timeit.default_timer()
     res: requests.Response = session.post(http_sim_run, json={'input_files' : input_files})
@@ -187,7 +187,7 @@ def run_simulation_with_rimrock():
     }
 
     session = requests.Session()
-    input_files = read_input_files(dir=example_dir)
+    input_files = read_input_files(example_dir=example_dir)
     res: requests.Response = session.post(http_rimrock, json=input_files, headers=headers)
     res_json = res.json()
     print(res_json)

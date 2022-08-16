@@ -4,7 +4,7 @@ shieldhit_bash: str = """#!/bin/bash
 #SBATCH --time=00:04:59
 #SBATCH -A plgccbmc11-cpu
 
-JOB_ID=$(printenv | grep -Po '(?<=^SLURM_JOBID=)\w*$')
+JOB_ID=$(printenv | grep -Po '(?<=^SLURM_JOBID=)\\w*$')
 SUBMIT_DIR=$(pwd)
 SCRATCH_DIRECTORY=/net/pr2/scratch/people/${{USER}}/${{JOB_ID}}
 mkdir -p ${{SCRATCH_DIRECTORY}}
@@ -39,4 +39,4 @@ cd ${{SUBMIT_DIR}}
 rm -rf ${{SCRATCH_DIRECTORY}}
 
 exit 0
-""" # skipcq: PY-W0073, FLK-E501
+"""  # skipcq: FLK-E501
