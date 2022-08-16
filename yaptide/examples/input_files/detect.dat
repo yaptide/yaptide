@@ -1,23 +1,73 @@
+Geometry Cyl
+    Name CylZ_Mesh
+    R 0 5 1
+    Z 0 20 400
+
 Geometry Mesh
-    Name Detect
-    X -0.5 0.5 1
-    Y -20 20 400
-    Z -10 10 200
+    Name YZ_Mesh
+    X -0.25 0.25 1
+    Y -2 2 80
+    Z 0 20 400
+
+Geometry Cyl
+    Name EntrySlab
+    R 0 5 1
+    Z 0 0.1 1
+
+Geometry Cyl
+    Name PeakSlab
+    R 0 5 1
+    Z 15.3 15.4 1
 
 Filter
-    Name protons
-    A == 1
+    Name Protons
     Z == 1
+    A == 1
 Filter
-    Name primary
+    Name Primaries
     Z == 1
     A == 1
     GEN == 0
+Filter
+    Name Secondary_protons
+    Z == 1
+    A == 1
+    GEN >= 1
 Output
-    Filename Output.bdo
-    Geo Detect
-    Quantity Dose 
+    Filename z_profile.bdo
+    Geo CylZ_Mesh
+    Quantity DoseGy 
+    Quantity Fluence Protons
+    Quantity Fluence Primaries
+    Quantity Fluence Secondary_protons
+
 Output
-    Filename Protons.bdo
-    Geo Detect
-    Quantity AvgEnergy protons
+    Filename yz_profile.bdo
+    Geo YZ_Mesh
+    Quantity DoseGy 
+    Quantity Fluence Protons
+    Quantity Fluence Secondary_protons
+
+Output
+    Filename entrance.bdo
+    Geo EntrySlab
+    Quantity AvgEnergy Primaries
+    Quantity AvgEnergy Protons
+    Quantity AvgEnergy Secondary_protons
+    Quantity dLET Protons
+    Quantity tLET Protons
+    Quantity Fluence Protons
+    Diff1 0 160 640 
+    Diff1Type E
+
+Output
+    Filename peak.bdo
+    Geo PeakSlab
+    Quantity AvgEnergy Primaries
+    Quantity AvgEnergy Protons
+    Quantity AvgEnergy Secondary_protons
+    Quantity dLET Protons
+    Quantity tLET Protons
+    Quantity Fluence Protons
+    Diff1 0 160 640 
+    Diff1Type E

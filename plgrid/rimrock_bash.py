@@ -6,14 +6,14 @@ shieldhit_bash: str = """#!/bin/bash
 
 JOB_ID=$(printenv | grep -Po '(?<=^SLURM_JOBID=)\\w*$')
 SUBMIT_DIR=$(pwd)
-SCRATCH_DIRECTORY=/net/pr2/scratch/people/${{USER}}/${{JOB_ID}}
-mkdir -p ${{SCRATCH_DIRECTORY}}
-cd ${{SCRATCH_DIRECTORY}}
+WORKSPACE=${{SCRATCH}}/${{JOB_ID}}
+mkdir -p ${{WORKSPACE}}
+cd ${{WORKSPACE}}
 
-BEAM_FILE=${{SCRATCH_DIRECTORY}}/beam.dat
-GEO_FILE=${{SCRATCH_DIRECTORY}}/geo.dat
-MAT_FILE=${{SCRATCH_DIRECTORY}}/mat.dat
-DETECT_FILE=${{SCRATCH_DIRECTORY}}/detect.dat
+BEAM_FILE=${{WORKSPACE}}/beam.dat
+GEO_FILE=${{WORKSPACE}}/geo.dat
+MAT_FILE=${{WORKSPACE}}/mat.dat
+DETECT_FILE=${{WORKSPACE}}/detect.dat
 
 cat << EOF > $BEAM_FILE
 {beam}
@@ -36,7 +36,7 @@ mkdir -p ${{SUBMIT_DIR}}/sh_output/${{JOB_ID}}
 cp *.bdo ${{SUBMIT_DIR}}/sh_output/${{JOB_ID}}
 
 cd ${{SUBMIT_DIR}}
-rm -rf ${{SCRATCH_DIRECTORY}}
+rm -rf ${{WORKSPACE}}
 
 exit 0
 """  # skipcq: FLK-E501
