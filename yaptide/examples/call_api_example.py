@@ -10,7 +10,7 @@ import requests
 
 
 class Endpoints:
-
+    """API endpoints"""
     def __init__(self, host: str = 'localhost', port: int = 5000) -> None:
         self.http_sim_run = f'http://{host}:{port}/sh/run'
         self.http_sim_status = f'http://{host}:{port}/sh/status'
@@ -190,9 +190,10 @@ def run_simulation_with_rimrock(port: int = 5000):
             grid_proxy = grid_proxy_file.read()
     except FileNotFoundError:
         print("Generate grid_proxy file by adjusting following command:\n")
-        print(
-            f"read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl \"grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`\" > {grid_proxy_path} && unset p\n"
-        )
+        cmd = "read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl "
+        cmd += r'"grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`"'
+        cmd += f" > {grid_proxy_path} && unset p\n"
+        print(cmd)
         return
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
