@@ -53,7 +53,7 @@ docker-compose stop redis
 docker system prune
 ```
 
-# Authorisation
+# Local Authorisation
 
 Currently, there is a first version of authorisation. For now we need to register new user and log in.
 
@@ -129,6 +129,13 @@ curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'task_id' 
 ```
 
 Although it might be inefficient way of testing so there is a prepared example ``call_api_example.py`` in yaptide/examples folder
+
+# PLGrid
+
+Command generating `grid_proxy` file on Linux (WSL also works fine)
+```shell
+read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl "grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`" > grid_proxy && unset p
+```
 
 # Credits
 

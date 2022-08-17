@@ -1,18 +1,28 @@
-import requests
+import argparse
 import json
-import time
 import os
+import time
 import timeit
+import base64
 from pathlib import Path
 
+import requests
 
-http_sim_run = 'http://localhost:5000/sh/run'
-http_sim_status = 'http://localhost:5000/sh/status'
-http_list_sims = 'http://localhost:5000/user/simulations'
-http_convert = 'http://localhost:5000/sh/convert'
 
-http_auth_login = 'http://localhost:5000/auth/login'
-http_auth_logout = 'http://localhost:5000/auth/logout'
+class Endpoints:
+    """API endpoints"""
+
+    def __init__(self, host: str = 'localhost', port: int = 5000) -> None:
+        self.http_sim_run = f'http://{host}:{port}/sh/run'
+        self.http_sim_status = f'http://{host}:{port}/sh/status'
+        self.http_list_sims = f'http://{host}:{port}/user/simulations'
+        self.http_convert = f'http://{host}:{port}/sh/convert'
+
+        self.http_auth_login = f'http://{host}:{port}/auth/login'
+        self.http_auth_logout = f'http://{host}:{port}/auth/logout'
+
+        self.http_rimrock = f'http://{host}:{port}/plgrid/jobs'
+
 
 auth_json = {
     "login_name": "admin",
@@ -20,7 +30,17 @@ auth_json = {
 }
 
 
-def run_simulation_on_backend():
+def read_input_files(example_dir: Path) -> dict:
+    """Read shieldhit input files from input_files folder"""
+    input_files = {}
+    for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+        file = Path(example_dir, 'input_files', filename)
+        with open(file, 'r') as reader:
+            input_files[filename] = reader.read()
+    return input_files
+
+
+def run_simulation_on_backend(port: int = 5000):
     """Example client running simulation"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
     example_json = Path(example_dir, 'example.json')
@@ -30,30 +50,30 @@ def run_simulation_on_backend():
 
     session = requests.Session()
 
-    res: requests.Response = session.post(http_auth_login, json=auth_json)
+    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
 
     if res.status_code != 202:
         print(res.json())
         return
 
-    run_simulation_with_json(session, example_dir, json_to_send)
+    run_simulation_with_json(session, example_dir, json_to_send, port=port)
 
-    run_simulation_with_files(session, example_dir, json_to_send)
+    run_simulation_with_files(session, example_dir, json_to_send, port=port)
 
-    session.delete(http_auth_logout)
+    session.delete(Endpoints(port=port).http_auth_logout)
 
 
-def run_simulation_with_json(session: requests.Session, example_dir, json_to_send):
+def run_simulation_with_json(session: requests.Session, example_dir, json_to_send, port: int = 5000):
     """Example function running simulation with JSON"""
     timer = timeit.default_timer()
-    res: requests.Response = session.post(http_sim_run, json=json_to_send)
+    res: requests.Response = session.post(Endpoints(port=port).http_sim_run, json=json_to_send)
 
     task_id: str = ""
     data: dict = res.json()
     print(data)
     task_id = data.get('content').get('task_id')
 
-    res: requests.Response = session.get(http_list_sims)
+    res: requests.Response = session.get(Endpoints(port=port).http_list_sims)
     data: dict = res.json()
     print(data)
     if task_id != "":
@@ -62,13 +82,13 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post(http_auth_login, json=auth_json)
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
                 if res.status_code != 202:
                     print(res.json())
                     return
                 timer = timeit.default_timer()
             try:
-                res: requests.Response = session.post(http_sim_status, json={'task_id': task_id})
+                res: requests.Response = session.post(Endpoints(port=port).http_sim_status, json={'task_id': task_id})
                 data: dict = res.json()
 
                 # the request has succeeded, we can access its contents
@@ -98,30 +118,26 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
                 print(e)
 
 
-def run_simulation_with_files(session: requests.Session, example_dir, json_to_send):
+def run_simulation_with_files(session: requests.Session, example_dir, json_to_send, port: int = 5000):
     """Example function running simulation with input files"""
-    res: requests.Response = session.post(http_convert, json=json_to_send)
+    res: requests.Response = session.post(Endpoints(port=port).http_convert, json=json_to_send)
 
     data: dict = res.json()
     for key in data['content']['input_files']:
         with open(Path(example_dir, 'output', key), 'w') as writer:
             writer.write(data['content']['input_files'][key])
 
-    input_files = {}
-    for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
-        file = Path(example_dir, 'output', filename)
-        with open(file, 'r') as reader:
-            input_files[filename] = reader.read()
+    input_files = read_input_files(example_dir=example_dir)
 
     timer = timeit.default_timer()
-    res: requests.Response = session.post(http_sim_run, json={'input_files' : input_files})
+    res: requests.Response = session.post(Endpoints(port=port).http_sim_run, json={'input_files': input_files})
     task_id: str = ""
     data: dict = res.json()
     print(data)
 
     task_id = data.get('content').get('task_id')
 
-    res: requests.Response = session.get(http_list_sims)
+    res: requests.Response = session.get(Endpoints(port=port).http_list_sims)
     data: dict = res.json()
     print(data)
     if task_id != "":
@@ -130,13 +146,13 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post(http_auth_login, json=auth_json)
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
                 if res.status_code != 202:
                     print(res.json())
                     return
                 timer = timeit.default_timer()
             try:
-                res: requests.Response = session.post(http_sim_status, json={'task_id': task_id})
+                res: requests.Response = session.post(Endpoints(port=port).http_sim_status, json={'task_id': task_id})
                 data: dict = res.json()
 
                 # the request has succeeded, we can access its contents
@@ -166,5 +182,51 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
                 print(e)
 
 
+def run_simulation_with_rimrock(port: int = 5000):
+    """Example function running simulation on rimrock"""
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    grid_proxy_path = Path(example_dir, 'grid_proxy')
+    try:
+        with open(grid_proxy_path) as grid_proxy_file:
+            grid_proxy = grid_proxy_file.read()
+    except FileNotFoundError:
+        print("Generate grid_proxy file by adjusting following command:\n")
+        cmd = "read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl "
+        cmd += r'"grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`"'
+        cmd += f" > {grid_proxy_path} && unset p\n"
+        print(cmd)
+        return
+
+    headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
+
+    session = requests.Session()
+    input_files = read_input_files(example_dir=example_dir)
+    res: requests.Response = session.post(Endpoints(port=port).http_rimrock, json=input_files, headers=headers)
+    res_json = res.json()
+    print(res_json)
+
+    job_id: str = ""
+    job_id = res_json.get('content').get('job_id')
+    if job_id != "":
+        while True:
+            time.sleep(5)
+            res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
+                                                 params={"job_id": job_id},
+                                                 headers=headers)
+            res_json = res.json()
+            if res.status_code != 200:
+                print(res_json)
+                return
+            if res_json.get('content').get('status') != 200:
+                print(res_json.get('content'))
+                return
+            print(res_json.get('content'))
+            if res_json.get('content').get('job_status') == 'FINISHED':
+                return
+
+
 if __name__ == "__main__":
-    run_simulation_on_backend()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', help='backend port', default=5000, type=int)
+    args = parser.parse_args()
+    run_simulation_with_rimrock(port=args.port)
