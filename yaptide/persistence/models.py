@@ -9,7 +9,7 @@ class UserModel(db.Model):
 
     __tablename__ = 'User'
     id = db.Column(db.Integer, primary_key=True)
-    login_name = db.Column(db.String, nullable=False)
+    login_name = db.Column(db.String, nullable=False, unique=True)
     password_hash = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
 
@@ -48,5 +48,3 @@ def add_user(login_name: str, password: str):
 def create_models():
     """Function creating database's models"""
     db.create_all()
-
-    add_user(login_name='admin', password='password')

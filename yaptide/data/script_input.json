@@ -1,0 +1,10 @@
+[
+    {
+        "OPERATION": "INSERT",
+        "TABLE": "User",
+        "DATA": {
+            "LOGIN": "admin",
+            "PASSWORD": "password"
+        }
+    }
+]
