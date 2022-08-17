@@ -65,7 +65,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         result: dict = pymchelper_output_to_json(estimators_dict)
 
-        return {'result': result}
+        return {'result': result, 'input': raw_input_dict}
 
 
 @celery_app.task
@@ -203,6 +203,7 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state != 'FAILURE':
         if 'result' in task.info:
             result['content']['result'] = task.info.get('result')
+            result['content']['input'] = task.info.get('input')
         elif 'logfile' in task.info:
             result['content']['state'] = 'FAILURE'
             result['content']['error'] = 'Simulation error'
