@@ -2,7 +2,6 @@ import argparse
 import json
 import os
 import time
-import os
 import timeit
 import base64
 from pathlib import Path
@@ -228,5 +227,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    #run_simulation_on_backend(port=args.port)
     run_simulation_with_rimrock(port=args.port)
