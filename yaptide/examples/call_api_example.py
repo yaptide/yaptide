@@ -11,7 +11,7 @@ import requests
 
 class Endpoints:
     """API endpoints"""
-    
+
     def __init__(self, host: str = 'localhost', port: int = 5000) -> None:
         self.http_sim_run = f'http://{host}:{port}/sh/run'
         self.http_sim_status = f'http://{host}:{port}/sh/status'
