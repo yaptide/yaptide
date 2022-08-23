@@ -91,7 +91,7 @@ def test_user_status(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data['content'].get('login_name') == _Login_name  # skipcq: BAN-B101
+    assert data.get('login_name') == _Login_name  # skipcq: BAN-B101
     assert resp.status_code == 200  # skipcq: BAN-B101
 
 
