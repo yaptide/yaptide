@@ -106,9 +106,9 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
                             writer.write(data_to_write)
                         with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
                             writer.write(data['logfile'])
-                        for key in data['input_files']:
+                        for key, value in data['input_files'].items():
                             with open(Path(example_dir, 'output', key), 'w') as writer:
-                                writer.write(data['input_files'][key])
+                                writer.write(value)
                         return
                     if data.get('error'):
                         print(data.get('error'))
@@ -123,9 +123,9 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
     res: requests.Response = session.post(Endpoints(port=port).http_convert, json=json_to_send)
 
     data: dict = res.json()
-    for key in data['input_files']:
+    for key, value in data['input_files'].items():
         with open(Path(example_dir, 'output', key), 'w') as writer:
-            writer.write(data['input_files'][key])
+            writer.write(value)
 
     input_files = read_input_files(example_dir=example_dir)
 
@@ -170,9 +170,9 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
                             writer.write(data_to_write)
                         with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
                             writer.write(data['logfile'])
-                        for key in data['input_files']:
+                        for key, value in data['input_files'].items():
                             with open(Path(example_dir, 'output', key), 'w') as writer:
-                                writer.write(data['input_files'][key])
+                                writer.write(value)
                         return
                     if data.get('error'):
                         print(data.get('error'))

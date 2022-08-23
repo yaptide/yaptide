@@ -18,9 +18,9 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 def save_input_files(input_files: dict, output_dir: str):
     """Function used to save input files"""
-    for key in input_files:
+    for key, value in input_files.items():
         with open(Path(output_dir, key), 'w') as writer:
-            writer.write(input_files[key])
+            writer.write(value)
 
 
 @celery_app.task(bind=True)
@@ -254,8 +254,8 @@ def get_input_files(task_id: str) -> dict:
     if task.state == "PROGRESS":
         result = {'info': 'Input files'}
         input_files = simulation_input_files(task.info.get('path'))
-        for key in input_files:
-            result[key] = input_files[key]
+        for key, value in input_files.items():
+            result[key] = value
         return result
     return {'info': 'No input present'}
 
