@@ -15,7 +15,7 @@ class OperationTypes(Enum):
     INSERT = "INSERT"
     UPDATE = "UPDATE"
     DELETE = "DELETE"
-
+    SELECT = "SELECT"
 
 class TableTypes(Enum):
     """Table types"""
@@ -103,3 +103,5 @@ if __name__ == "__main__":
             update_user(con=connection, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.DELETE.value and obj[TABLE] == TableTypes.USER.value:
             delete_user(con=connection, data=obj[DATA])
+        if obj[OPERATION] == OperationTypes.SELECT.value:
+            select_all_users(con=connection)
