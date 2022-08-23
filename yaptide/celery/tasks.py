@@ -4,8 +4,6 @@ from pathlib import Path
 import sys
 import tempfile
 
-import os
-
 from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
@@ -242,7 +240,7 @@ def sh12a_simulation_status(dir_path: str) -> dict:
                     'seconds': splited[9],
                 }
             }
-    except FileNotFoundError as e:
+    except FileNotFoundError:
         return {
             'message': 'Output not yet generated'
         }
@@ -266,4 +264,5 @@ def get_input_files(task_id: str) -> dict:
 def cancel_simulation(task_id: str) -> bool:
     """Task responsible for canceling simulation in progress"""
     # Currently this task does nothing because to working properly it requires changes in pymchelper
+    print(task_id)
     return False
