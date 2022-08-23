@@ -48,8 +48,11 @@ def insert_user(con: db.engine.Connection, data: dict):
         login_name=data[DataJsonFields.LOGIN.value],
         password_hash=generate_password_hash(data[DataJsonFields.PASSWORD.value])
     )
-    con.execute(query)
-    print(f'Successfully inserted user: {data[DataJsonFields.LOGIN.value]}')
+    try:
+        con.execute(query)
+        print(f'Successfully inserted user: {data[DataJsonFields.LOGIN.value]}')
+    except db.exc.IntegrityError:
+        print(f'Inserting user: {data[DataJsonFields.LOGIN.value]} failed, probably already exists')
 
 
 def update_user(con: db.engine.Connection, data: dict):
