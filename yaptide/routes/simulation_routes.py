@@ -65,7 +65,7 @@ class ConvertInputFiles(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    def post(user: UserModel):  # skipcq: PYL-W0613
         """Method handling input files convertion"""
         schema = ConvertInputFiles._Schema()
         errors: dict[str, list[str]] = schema.validate(request.args)

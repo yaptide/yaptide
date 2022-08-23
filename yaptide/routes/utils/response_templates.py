@@ -6,8 +6,8 @@ def yaptide_response(message: str, code: int, content: Union[dict, str] = "") ->
     """Function returning Response object"""
     response_dict = {'message': message}
     if type(content) is dict:
-        for key in content:
-            response_dict[key] = content[key]
+        for key, value in content.items():
+            response_dict[key] = value
     return make_response(response_dict, code)
 
 
