@@ -242,7 +242,7 @@ def sh12a_simulation_status(dir_path: str) -> dict:
             }
     except FileNotFoundError:
         return {
-            'message': 'Output not yet generated'
+            'message': 'Output not generated yet'
         }
 
 
