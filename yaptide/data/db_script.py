@@ -17,6 +17,7 @@ class OperationTypes(Enum):
     DELETE = "DELETE"
     SELECT = "SELECT"
 
+
 class TableTypes(Enum):
     """Table types"""
 
