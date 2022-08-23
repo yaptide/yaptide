@@ -4,14 +4,11 @@ from flask import make_response, Response
 
 def yaptide_response(message: str, code: int, content: Union[dict, str] = "") -> Response:
     """Function returning Response object"""
-    if type(content) is str:
-        return make_response({
-            'message': message,
-        }, code)
-    return make_response({
-        'message': message,
-        'content': content,
-    }, code)
+    response_dict = {'message': message}
+    if type(content) is dict:
+        for key, value in content.items():
+            response_dict[key] = value
+    return make_response(response_dict, code)
 
 
 def error_validation_response() -> Response:

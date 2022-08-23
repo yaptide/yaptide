@@ -65,7 +65,7 @@ class ConvertInputFiles(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    def post(user: UserModel):  # skipcq: PYL-W0613
         """Method handling input files convertion"""
         schema = ConvertInputFiles._Schema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -122,17 +122,10 @@ class SimulationStatus(Resource):
         task = simulation_task_status.delay(task_id=json_data.get('task_id'))
         result: dict = task.wait()
 
-        content: dict = result.get('content')
-        if result.get('status') == 'OK':
-            return yaptide_response(
-                message=f"Task state: {content['state']}",
-                code=200,
-                content=content
-            )
         return yaptide_response(
-            message='Task failed',
+            message=f"Task state: {result['state']}",
             code=200,
-            content=content
+            content=result
         )
 
 
@@ -163,7 +156,7 @@ class SimulationInputs(Resource):
         return yaptide_response(
             message=result['info'],
             code=200,
-            content=result.get('content')
+            content=result
         )
 
 

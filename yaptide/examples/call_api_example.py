@@ -71,7 +71,7 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
     task_id: str = ""
     data: dict = res.json()
     print(data)
-    task_id = data.get('content').get('task_id')
+    task_id = data.get('task_id')
 
     res: requests.Response = session.get(Endpoints(port=port).http_list_sims)
     data: dict = res.json()
@@ -93,25 +93,25 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
 
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
-                    if data['content'].get('result'):
+                    if data.get('result'):
                         with open(Path(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
-                            data_to_write = str(data['content']['result'])
+                            data_to_write = str(data['result'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         return
-                    if data['content'].get('logfile'):
+                    if data.get('logfile'):
                         with open(Path(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
-                            data_to_write = str(data['content'])
+                            data_to_write = str(data)
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
-                            writer.write(data['content']['logfile'])
-                        for key in data['content']['input_files']:
+                            writer.write(data['logfile'])
+                        for key, value in data['input_files'].items():
                             with open(Path(example_dir, 'output', key), 'w') as writer:
-                                writer.write(data['content']['input_files'][key])
+                                writer.write(value)
                         return
-                    if data['content'].get('error'):
-                        print(data['content'].get('error'))
+                    if data.get('error'):
+                        print(data.get('error'))
                         return
 
             except Exception as e:  # skipcq: PYL-W0703
@@ -123,9 +123,9 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
     res: requests.Response = session.post(Endpoints(port=port).http_convert, json=json_to_send)
 
     data: dict = res.json()
-    for key in data['content']['input_files']:
+    for key, value in data['input_files'].items():
         with open(Path(example_dir, 'output', key), 'w') as writer:
-            writer.write(data['content']['input_files'][key])
+            writer.write(value)
 
     input_files = read_input_files(example_dir=example_dir)
 
@@ -135,7 +135,7 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
     data: dict = res.json()
     print(data)
 
-    task_id = data.get('content').get('task_id')
+    task_id = data.get('task_id')
 
     res: requests.Response = session.get(Endpoints(port=port).http_list_sims)
     data: dict = res.json()
@@ -157,25 +157,25 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
 
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
-                    if data['content'].get('result'):
+                    if data.get('result'):
                         with open(Path(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
-                            data_to_write = str(data['content']['result'])
+                            data_to_write = str(data['result'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         return
-                    if data['content'].get('logfile'):
+                    if data.get('logfile'):
                         with open(Path(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
-                            data_to_write = str(data['content'])
+                            data_to_write = str(data)
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
-                            writer.write(data['content']['logfile'])
-                        for key in data['content']['input_files']:
+                            writer.write(data['logfile'])
+                        for key, value in data['input_files'].items():
                             with open(Path(example_dir, 'output', key), 'w') as writer:
-                                writer.write(data['content']['input_files'][key])
+                                writer.write(value)
                         return
-                    if data['content'].get('error'):
-                        print(data['content'].get('error'))
+                    if data.get('error'):
+                        print(data.get('error'))
                         return
 
             except Exception as e:  # skipcq: PYL-W0703
@@ -206,7 +206,7 @@ def run_simulation_with_rimrock(port: int = 5000):
     print(res_json)
 
     job_id: str = ""
-    job_id = res_json.get('content').get('job_id')
+    job_id = res_json.get('job_id')
     if job_id != "":
         while True:
             time.sleep(5)
@@ -217,11 +217,11 @@ def run_simulation_with_rimrock(port: int = 5000):
             if res.status_code != 200:
                 print(res_json)
                 return
-            if res_json.get('content').get('status') != 200:
-                print(res_json.get('content'))
+            if res_json.get('status') != 200:
+                print(res_json)
                 return
-            print(res_json.get('content'))
-            if res_json.get('content').get('job_status') == 'FINISHED':
+            print(res_json)
+            if res_json.get('job_status') == 'FINISHED':
                 return
 
 
