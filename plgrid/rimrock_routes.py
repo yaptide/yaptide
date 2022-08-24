@@ -19,10 +19,10 @@ class RimrockJobs(Resource):
         if not json_data:
             return error_validation_response()
         json_data['grid_proxy'] = request.headers.get("PROXY")
-        result = submit_job(json_data=json_data)
+        result, status_code = submit_job(json_data=json_data)
         return yaptide_response(
-            message="Not specified yet",
-            code=201,
+            message="",
+            code=status_code,
             content=result
         )
 
@@ -43,10 +43,10 @@ class RimrockJobs(Resource):
             "grid_proxy": request.headers.get("PROXY"),
             "job_id": params_dict.get("job_id")
         }
-        result = get_job(json_data=json_data)
+        result, status_code = get_job(json_data=json_data)
         return yaptide_response(
-            message="Not specified yet",
-            code=200,
+            message="",
+            code=status_code,
             content=result
         )
 
@@ -62,9 +62,9 @@ class RimrockJobs(Resource):
             "grid_proxy": request.headers.get("PROXY"),
             "job_id": params_dict.get("job_id")
         }
-        result = delete_job(json_data=json_data)
+        result, status_code = delete_job(json_data=json_data)
         return yaptide_response(
-            message="Not specified yet",
-            code=204,
+            message="",
+            code=status_code,
             content=result
         )
