@@ -5,8 +5,7 @@ from flask import make_response, Response
 def yaptide_response(message: str, code: int, content: dict = {}) -> Response:
     """Function returning Response object"""
     response_dict = {'message': message}
-    for key, value in content.items():
-        response_dict[key] = value
+    response_dict.update(content)
     return make_response(response_dict, code)
 
 
