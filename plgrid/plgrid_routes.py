@@ -83,7 +83,7 @@ class PlgData(Resource):
     @staticmethod
     def get():
         """Method geting job's result"""
-        schema = RimrockJobs._ParamsSchema()
+        schema = PlgData._ParamsSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return error_validation_response(content=errors)

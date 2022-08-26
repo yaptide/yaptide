@@ -2,10 +2,10 @@ from enum import Enum
 import requests
 
 from plgrid.string_templates import shieldhit_bash
-from plgrid.plgdata_methods import fetch_bdo_files
 
 http_rimrock_jobs = 'https://rimrock.pre.plgrid.pl/api/jobs'
 hostname = 'ares'
+
 
 class JobStatus(Enum):
     """Job status types"""

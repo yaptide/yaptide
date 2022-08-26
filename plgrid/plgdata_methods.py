@@ -13,6 +13,7 @@ from yaptide.celery.tasks import pymchelper_output_to_json
 http_plgdata = 'https://data.plgrid.pl'
 hostname = 'ares'
 
+
 def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
     """Function fetching result bdo files from cluster"""
     session = requests.Session()
@@ -46,7 +47,7 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
                     with open(local_file_path, 'wb') as writer:
                         for chunk in reader.iter_content(chunk_size=8192):
                             writer.write(chunk)
-            
+
                 estimators_dict[filename.split('.')[0]] = fromfile(local_file_path)
     result = pymchelper_output_to_json(estimators_dict=estimators_dict)
     return result, 200
