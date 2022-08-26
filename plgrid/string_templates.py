@@ -40,3 +40,7 @@ rm -rf ${{WORKSPACE}}
 
 exit 0
 """  # skipcq: FLK-E501
+
+plgdata_list_url: str = """{{http_plgdata}}/list/{{hostname}}/net/people/{{plguserlogin}}/sh_output/{{job_id}}"""
+
+plgdata_get_url: str = """{{http_plgdata}}/download/{{hostname}}/net/people/{{plguserlogin}}/sh_output/{{job_id}}/{{filename}}"""

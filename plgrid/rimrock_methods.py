@@ -1,11 +1,18 @@
+from enum import Enum
 import requests
-import os
-from pathlib import Path
 
-from plgrid.rimrock_bash import shieldhit_bash
+from plgrid.string_templates import shieldhit_bash
+from plgrid.plgdata_methods import fetch_bdo_files
 
 http_rimrock_jobs = 'https://rimrock.pre.plgrid.pl/api/jobs'
 hostname = 'ares'
+
+class JobStatus(Enum):
+    """Job status types"""
+
+    QUEUED = "QUEUED"
+    RUNNING = "RUNNING"
+    FINISHED = "FINISHED"
 
 
 def submit_job(json_data: dict) -> tuple[dict, int]:
