@@ -230,3 +230,5 @@ if __name__ == "__main__":
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
     run_simulation_with_rimrock(port=args.port)
+
+# TODO: add checking ``all`` jobs, to properly test them - send multiple jobs and then check their status

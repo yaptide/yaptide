@@ -28,7 +28,8 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
             detect=json_data["detect.dat"],
             geo=json_data["geo.dat"],
             mat=json_data["mat.dat"]
-        )
+        ),
+        "tag": "yaptide_job"
     }
     print(data)
 
@@ -38,12 +39,14 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
         return {
             "job_id": res_json["job_id"],
             "job_status": res_json["status"],
-            "message": "Job submitted"
+            "message": "Job submitted",
+            "tag": res_json["tag"]
         }, res.status_code
     return {
         "message": res_json["error_message"],
         "output": res_json["error_output"],
-        "exit_code": res_json["exit_code"]
+        "exit_code": res_json["exit_code"],
+        "tag": res_json["tag"]
     }, res.status_code
 
 
@@ -53,14 +56,23 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     headers = {
         "PROXY": json_data['grid_proxy']
     }
-    res: requests.Response = session.get(f'{http_rimrock_jobs}/{json_data["job_id"]}', headers=headers)
-    res_json = res.json()
-    if res.status_code == 200:
-        return {
-            "job_id": res_json["job_id"],
-            "job_status": res_json["status"],
-            "message": "Job status"
-        }, res.status_code
+    if "job_id" in json_data:
+        res: requests.Response = session.get(f'{http_rimrock_jobs}/{json_data["job_id"]}', headers=headers)
+        res_json = res.json()
+        if res.status_code == 200:
+            return {
+                "job_id": res_json["job_id"],
+                "job_status": res_json["status"],
+                "message": "Job status"
+            }, res.status_code
+    else:
+        res: requests.Response = session.get(f'{http_rimrock_jobs}', headers=headers, params={"tag": "yaptide_job"})
+        res_json = res.json()
+        if res.status_code == 200:
+            return {
+                "job_list": res_json,
+                "message": "Jobs status"
+            }, res.status_code
     return {
         "message": res_json["error_message"],
         "output": res_json["error_output"],
