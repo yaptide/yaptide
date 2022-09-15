@@ -182,20 +182,26 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
                 print(e)
 
 
-def run_simulation_with_rimrock(port: int = 5000):
-    """Example function running simulation on rimrock"""
-    example_dir = os.path.dirname(os.path.realpath(__file__))
-    grid_proxy_path = Path(example_dir, 'grid_proxy')
+def get_grid_proxy_file(dir_path: str) -> str:
+    """Function reading grid_proxy file"""
+    grid_proxy_path = Path(dir_path, 'grid_proxy')
     try:
         with open(grid_proxy_path) as grid_proxy_file:
             grid_proxy = grid_proxy_file.read()
+            return grid_proxy
     except FileNotFoundError:
         print("Generate grid_proxy file by adjusting following command:\n")
         cmd = "read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl "
         cmd += r'"grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`"'
         cmd += f" > {grid_proxy_path} && unset p\n"
         print(cmd)
-        return
+        exit
+
+
+def run_simulation_with_rimrock(port: int = 5000):
+    """Example function running simulation on rimrock"""
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    grid_proxy = get_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
 
@@ -208,27 +214,42 @@ def run_simulation_with_rimrock(port: int = 5000):
     job_id: str = ""
     job_id = res_json.get('job_id')
     if job_id != "":
-        while True:
-            time.sleep(5)
-            res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
-                                                 params={"job_id": job_id},
-                                                 headers=headers)
-            res_json = res.json()
-            if res.status_code != 200:
-                print(res_json)
-                return
-            if res_json.get('status') != 200:
-                print(res_json)
-                return
-            print(res_json)
-            if res_json.get('job_status') == 'FINISHED':
-                return
+        # while True:
+        time.sleep(5)
+        res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
+                                                params={"job_id": job_id},
+                                                headers=headers)
+        res_json = res.json()
+        print(f'Rescode {res.status_code}')
+        # if res.status_code != 200:
+        print(res_json)
+            # return
+            # if res_json.get('status') != 200:
+            #     print(res_json)
+            #     return
+            # print(res_json)
+            # if res_json.get('job_status') == 'FINISHED':
+            #     return
+
+
+def check_rimrock_jobs(port: int = 5000):
+    """Example function cehcking rimrock jobs' statuses"""
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    grid_proxy = get_grid_proxy_file(dir_path=example_dir)
+
+    headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
+    session = requests.Session()
+
+    res: requests.Response = session.get(Endpoints(port=port).http_rimrock, headers=headers)
+    res_json = res.json()
+    print(res_json)
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    run_simulation_with_rimrock(port=args.port)
+    # run_simulation_with_rimrock(port=args.port)
+    check_rimrock_jobs(port=args.port)
 
 # TODO: add checking ``all`` jobs, to properly test them - send multiple jobs and then check their status

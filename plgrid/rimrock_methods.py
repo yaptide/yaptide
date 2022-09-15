@@ -3,7 +3,7 @@ import requests
 
 from plgrid.string_templates import shieldhit_bash
 
-http_rimrock_jobs = 'https://rimrock.pre.plgrid.pl/api/jobs'
+http_rimrock_jobs = 'https://rimrock.plgrid.pl/api/jobs'
 hostname = 'ares'
 
 
@@ -35,19 +35,7 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
 
     res: requests.Response = session.post(http_rimrock_jobs, json=data, headers=headers)
     res_json = res.json()
-    if res.status_code == 201:
-        return {
-            "job_id": res_json["job_id"],
-            "job_status": res_json["status"],
-            "message": "Job submitted",
-            "tag": res_json["tag"]
-        }, res.status_code
-    return {
-        "message": res_json["error_message"],
-        "output": res_json["error_output"],
-        "exit_code": res_json["exit_code"],
-        "tag": res_json["tag"]
-    }, res.status_code
+    return res_json, res.status_code
 
 
 def get_job(json_data: dict) -> tuple[dict, int]:
@@ -60,24 +48,15 @@ def get_job(json_data: dict) -> tuple[dict, int]:
         res: requests.Response = session.get(f'{http_rimrock_jobs}/{json_data["job_id"]}', headers=headers)
         res_json = res.json()
         if res.status_code == 200:
-            return {
-                "job_id": res_json["job_id"],
-                "job_status": res_json["status"],
-                "message": "Job status"
-            }, res.status_code
+            return res_json, res.status_code
     else:
-        res: requests.Response = session.get(f'{http_rimrock_jobs}', headers=headers, params={"tag": "yaptide_job"})
+        res: requests.Response = session.get(http_rimrock_jobs, params={"tag": "yaptide_job"}, headers=headers)
         res_json = res.json()
         if res.status_code == 200:
             return {
-                "job_list": res_json,
-                "message": "Jobs status"
+                "job_list": res_json
             }, res.status_code
-    return {
-        "message": res_json["error_message"],
-        "output": res_json["error_output"],
-        "exit_code": res_json["exit_code"]
-    }, res.status_code
+    return res_json, res.status_code
 
 
 def delete_job(json_data: dict) -> tuple[dict, int]:
@@ -92,8 +71,4 @@ def delete_job(json_data: dict) -> tuple[dict, int]:
             "message": "Job deleted"
         }, res.status_code
     res_json = res.json()
-    return {
-        "message": res_json["error_message"],
-        "output": res_json["error_output"],
-        "exit_code": res_json["exit_code"]
-    }, res.status_code
+    return res_json, res.status_code

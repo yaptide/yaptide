@@ -30,21 +30,20 @@ class RimrockJobs(Resource):
     class _ParamsSchema(Schema):
         """Class specifies API parameters"""
 
-        job_id = fields.String()
+        job_id = fields.String(missing="None")
 
     @staticmethod
     def get():
         """Method geting job's result"""
         schema = RimrockJobs._ParamsSchema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return error_validation_response(content=errors)
-        params_dict: dict = schema.load(request.args)
         json_data = {
-            "grid_proxy": request.headers.get("PROXY"),
-            "job_id": params_dict.get("job_id")
+            "grid_proxy": request.headers.get("PROXY")
         }
+        params_dict: dict = schema.load(request.args)
+        if params_dict.get("job_id") != "None":
+            json_data["job_id"] = params_dict.get("job_id")
         result, status_code = get_job(json_data=json_data)
+        
         return yaptide_response(
             message="",
             code=status_code,
