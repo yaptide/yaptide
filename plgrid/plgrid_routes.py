@@ -43,7 +43,7 @@ class RimrockJobs(Resource):
         if params_dict.get("job_id") != "None":
             json_data["job_id"] = params_dict.get("job_id")
         result, status_code = get_job(json_data=json_data)
-        
+
         return yaptide_response(
             message="",
             code=status_code,

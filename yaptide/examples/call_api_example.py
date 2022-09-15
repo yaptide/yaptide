@@ -196,7 +196,7 @@ def get_grid_proxy_file(dir_path: str) -> str:
         cmd += r'"grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`"'
         cmd += f" > {grid_proxy_path} && unset p\n"
         print(cmd)
-        exit
+        exit(1)
 
 
 def run_simulation_with_rimrock(port: int = 5000):
@@ -218,8 +218,8 @@ def run_simulation_with_rimrock(port: int = 5000):
         # while True:
         time.sleep(5)
         res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
-                                                params={"job_id": job_id},
-                                                headers=headers)
+                                             params={"job_id": job_id},
+                                             headers=headers)
         res_json = res.json()
         print(f'Rescode {res.status_code}')
         # if res.status_code != 200:
@@ -256,8 +256,8 @@ def get_slurm_results(port: int = 5000):
     job_id = "854704.ares.cyfronet.pl"
     plguserlogin = "plgpitrus"
     res: requests.Response = session.get(Endpoints(port=port).http_plgdata,
-                                        params={"job_id": job_id, "plguserlogin": plguserlogin},
-                                        headers=headers)
+                                         params={"job_id": job_id, "plguserlogin": plguserlogin},
+                                         headers=headers)
     res_json = res.json()
     print(res_json)
 
@@ -269,5 +269,3 @@ if __name__ == "__main__":
     # run_simulation_with_rimrock(port=args.port)
     # check_rimrock_jobs(port=args.port)
     get_slurm_results(port=args.port)
-
-# TODO: add checking ``all`` jobs, to properly test them - send multiple jobs and then check their status
