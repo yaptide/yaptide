@@ -22,6 +22,7 @@ class Endpoints:
         self.http_auth_logout = f'http://{host}:{port}/auth/logout'
 
         self.http_rimrock = f'http://{host}:{port}/plgrid/jobs'
+        self.http_plgdata = f'http://{host}:{port}/plgrid/data'
 
 
 auth_json = {
@@ -245,11 +246,28 @@ def check_rimrock_jobs(port: int = 5000):
     print(res_json)
 
 
+def get_slurm_results(port: int = 5000):
+    """Example function getting slurm results"""
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    grid_proxy = get_grid_proxy_file(dir_path=example_dir)
+
+    headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
+    session = requests.Session()
+    job_id = "854704.ares.cyfronet.pl"
+    plguserlogin = "plgpitrus"
+    res: requests.Response = session.get(Endpoints(port=port).http_plgdata,
+                                        params={"job_id": job_id, "plguserlogin": plguserlogin},
+                                        headers=headers)
+    res_json = res.json()
+    print(res_json)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
     # run_simulation_with_rimrock(port=args.port)
-    check_rimrock_jobs(port=args.port)
+    # check_rimrock_jobs(port=args.port)
+    get_slurm_results(port=args.port)
 
 # TODO: add checking ``all`` jobs, to properly test them - send multiple jobs and then check their status

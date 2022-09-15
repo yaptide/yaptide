@@ -1,0 +1,9 @@
+curl -X GET https://data.plgrid.pl/list/ares/net/people/plgpitrus/ -H "PROXY:`cat grid_proxy | base64 | tr -d '\n'`"
+curl -X GET https://data.plgrid.pl/list/ares/net/people/plgpitrus/ --data-urlencode proxy="`cat grid_proxy`"
+curl -X GET https://data.plgrid.pl/list/ares/net/people/plgpitrus/sh_output/ -H "PROXY:`cat grid_proxy | base64 | tr -d '\n'`"
+curl -X GET https://data.plgrid.pl/list/ares/net/people/plgpitrus/sh_output/840641/ -H "PROXY:`cat grid_proxy | base64 | tr -d '\n'`"
+
+
+curl -X GET https://data.plgrid.pl/list/prometheus/net/people/plgpitrus/ -H "PROXY:`cat grid_proxy | base64 | tr -d '\n'`"
+
+prometheus
