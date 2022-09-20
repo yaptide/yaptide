@@ -246,16 +246,16 @@ def check_rimrock_jobs(port: int = 5000):
     print(res_json)
 
 
-def get_slurm_results(plguserlogin: str, port: int = 5000):
+def get_slurm_results(port: int = 5000):
     """Example function getting slurm results"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
     grid_proxy = get_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     session = requests.Session()
-    job_id = "854704.ares.cyfronet.pl"
+    job_id = "123432.ares.cyfronet.pl"
     res: requests.Response = session.get(Endpoints(port=port).http_plgdata,
-                                         params={"job_id": job_id, "plguserlogin": plguserlogin},
+                                         params={"job_id": job_id},
                                          headers=headers)
     res_json = res.json()
     print(res_json)

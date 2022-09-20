@@ -77,7 +77,6 @@ class PlgData(Resource):
         """Class specifies API parameters"""
 
         job_id = fields.String()
-        plguserlogin = fields.String()
 
     @staticmethod
     def get():
@@ -89,8 +88,7 @@ class PlgData(Resource):
         params_dict: dict = schema.load(request.args)
         json_data = {
             "grid_proxy": request.headers.get("PROXY"),
-            "job_id": params_dict.get("job_id"),
-            "plguserlogin": params_dict.get("plguserlogin")
+            "job_id": params_dict.get("job_id")
         }
         result, status_code = fetch_bdo_files(json_data=json_data)
         return yaptide_response(

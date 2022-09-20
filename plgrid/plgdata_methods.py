@@ -24,22 +24,19 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
     list_url = plgdata_list_url.format(
         http_plgdata=http_plgdata,
         hostname=hostname,
-        plguserlogin=json_data['plguserlogin'],
         job_id=job_id,
     )
     res: requests.Response = session.get(list_url, headers=headers)
     res_json: dict = res.json()
-    return res_json, 200
     estimators_dict = {}
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        for ls_obj in res_json.values():
+        for ls_obj in res_json:
             if not ls_obj['is_dir']:
                 filename: str = ls_obj['name']
                 local_file_path = Path(tmp_dir_path, filename)
                 get_url = plgdata_get_url.format(
                     http_plgdata=http_plgdata,
                     hostname=hostname,
-                    plguserlogin=json_data['plguserlogin'],
                     job_id=job_id,
                     filename=filename
                 )
@@ -50,5 +47,6 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
                             writer.write(chunk)
 
                 estimators_dict[filename.split('.')[0]] = fromfile(local_file_path)
+
     result = pymchelper_output_to_json(estimators_dict=estimators_dict)
     return result, 200
