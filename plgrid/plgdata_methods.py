@@ -15,7 +15,10 @@ hostname = 'ares'
 
 
 def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
-    """Function fetching result bdo files from cluster"""
+    """
+    Fetching simulation results from the cluster.
+    Return a tuple with a dictionary containing results and an integer error code.
+    """
     session = requests.Session()
     headers = {
         "PROXY": json_data['grid_proxy']
