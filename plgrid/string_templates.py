@@ -1,4 +1,4 @@
-shieldhit_bash: str = """#!/bin/bash
+SHIELDHIT_BASH: str = """#!/bin/bash
 #SBATCH --nodes 1
 #SBATCH --ntasks 1
 #SBATCH --time=00:04:59
@@ -41,6 +41,6 @@ rm -rf ${{WORKSPACE}}
 exit 0
 """  # skipcq: FLK-E501
 
-plgdata_list_url: str = """{http_plgdata}/list/{hostname}/~/sh_output/{job_id}"""
+PLGDATA_LIST_URL: str = """{http_plgdata}/list/{hostname}/~/sh_output/{slurm_job_id}"""
 
-plgdata_get_url: str = """{http_plgdata}/download/{hostname}/~/sh_output/{job_id}/{filename}"""  # skipcq: FLK-E501
+PLGDATA_GET_URL: str = """{http_plgdata}/download/{hostname}/~/sh_output/{slurm_job_id}/{filename}"""  # skipcq: FLK-E501

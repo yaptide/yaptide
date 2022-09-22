@@ -1,7 +1,7 @@
 from enum import Enum
 import requests
 
-from plgrid.string_templates import shieldhit_bash
+from plgrid.string_templates import SHIELDHIT_BASH
 
 http_rimrock_jobs = 'https://rimrock.plgrid.pl/api/jobs'
 hostname = 'ares'
@@ -23,7 +23,7 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
     }
     data = {
         "host": f'{hostname}.cyfronet.pl',
-        "script": shieldhit_bash.format(
+        "script": SHIELDHIT_BASH.format(
             beam=json_data["beam.dat"],
             detect=json_data["detect.dat"],
             geo=json_data["geo.dat"],

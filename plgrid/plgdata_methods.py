@@ -4,7 +4,7 @@ import tempfile
 
 from pathlib import Path
 
-from plgrid.string_templates import plgdata_get_url, plgdata_list_url
+from plgrid.string_templates import PLGDATA_GET_URL, PLGDATA_LIST_URL
 
 from pymchelper.input_output import fromfile
 
@@ -20,11 +20,12 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
     headers = {
         "PROXY": json_data['grid_proxy']
     }
-    job_id: str = json_data['job_id'].split('.')[0]
-    list_url = plgdata_list_url.format(
+    # job_id format: "SLURM_JOB_ID.ares.cyfronet.pl" -> folder is named with SLURM_JOB_ID only
+    slurm_job_id: str = json_data['job_id'].split('.')[0]
+    list_url = PLGDATA_LIST_URL.format(
         http_plgdata=http_plgdata,
         hostname=hostname,
-        job_id=job_id,
+        slurm_job_id=slurm_job_id,
     )
     res: requests.Response = session.get(list_url, headers=headers)
     res_json: dict = res.json()
@@ -34,10 +35,10 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
             if not ls_obj['is_dir']:
                 filename: str = ls_obj['name']
                 local_file_path = Path(tmp_dir_path, filename)
-                get_url = plgdata_get_url.format(
+                get_url = PLGDATA_GET_URL.format(
                     http_plgdata=http_plgdata,
                     hostname=hostname,
-                    job_id=job_id,
+                    slurm_job_id=slurm_job_id,
                     filename=filename
                 )
                 with session.get(get_url, headers=headers, stream=True) as reader:
