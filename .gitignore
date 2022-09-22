@@ -145,4 +145,7 @@ yaptide/main.db
 
 # ide settings
 .vscode/
-yaptide/examples/grid_proxy
+
+
+grid_proxy
+*.db

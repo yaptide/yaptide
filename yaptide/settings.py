@@ -13,6 +13,7 @@ env.read_env()
 
 ENV = env.str("FLASK_ENV", default="production")
 DEBUG = ENV == "development"
+# below use '///' for local Windows and '////' for container -> consider autoconfiguring
 SQLALCHEMY_DATABASE_URI = f'sqlite:////{file_dir}/data/main.db'
 # SECRET_KEY = env.str("SECRET_KEY") skipcq: PY-W0069
 # SEND_FILE_MAX_AGE_DEFAULT = env.int("SEND_FILE_MAX_AGE_DEFAULT") skipcq: PY-W0069
