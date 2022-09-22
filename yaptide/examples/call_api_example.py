@@ -209,28 +209,28 @@ def run_simulation_with_rimrock(port: int = 5000):
     session = requests.Session()
     input_files = read_input_files(example_dir=example_dir)
     res: requests.Response = session.post(Endpoints(port=port).http_rimrock, json=input_files, headers=headers)
+
     res_json = res.json()
     print(res_json)
+    if res.status_code != 201:
+        return
 
     job_id: str = ""
     job_id = res_json.get('job_id')
     if job_id != "":
-        # while True:
-        time.sleep(5)
-        res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
-                                             params={"job_id": job_id},
-                                             headers=headers)
-        res_json = res.json()
-        print(f'Rescode {res.status_code}')
-        # if res.status_code != 200:
-        print(res_json)
-            # return
-            # if res_json.get('status') != 200:
-            #     print(res_json)
-            #     return
-            # print(res_json)
-            # if res_json.get('job_status') == 'FINISHED':
-            #     return
+        while True:
+            time.sleep(5)
+            res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
+                                                params={"job_id": job_id},
+                                                headers=headers)
+            res_json = res.json()
+            print(f'Rescode {res.status_code}')
+            print(res_json)
+            if res.status_code != 200:
+                return
+            if res_json['status'] == 'FINISHED':
+                get_slurm_results(job_id=job_id, port=port)
+                return
 
 
 def check_rimrock_jobs(port: int = 5000):
@@ -246,14 +246,13 @@ def check_rimrock_jobs(port: int = 5000):
     print(res_json)
 
 
-def get_slurm_results(port: int = 5000):
+def get_slurm_results(job_id: str, port: int = 5000):
     """Example function getting slurm results"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
     grid_proxy = get_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     session = requests.Session()
-    job_id = "123432.ares.cyfronet.pl"
     res: requests.Response = session.get(Endpoints(port=port).http_plgdata,
                                          params={"job_id": job_id},
                                          headers=headers)
@@ -265,6 +264,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    # run_simulation_with_rimrock(port=args.port)
-    # check_rimrock_jobs(port=args.port)
-    get_slurm_results(port=args.port)
+    run_simulation_with_rimrock(port=args.port)

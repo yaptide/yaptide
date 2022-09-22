@@ -31,7 +31,6 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
         ),
         "tag": "yaptide_job"
     }
-    print(data)
 
     res: requests.Response = session.post(http_rimrock_jobs, json=data, headers=headers)
     res_json = res.json()

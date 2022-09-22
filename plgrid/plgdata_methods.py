@@ -46,7 +46,7 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
                         for chunk in reader.iter_content(chunk_size=8192):
                             writer.write(chunk)
 
-                estimators_dict[filename.split('.')[0]] = fromfile(local_file_path)
+                estimators_dict[filename.split('.')[0]] = fromfile(str(local_file_path))
 
     result = pymchelper_output_to_json(estimators_dict=estimators_dict)
     return result, 200
