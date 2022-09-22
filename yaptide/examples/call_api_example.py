@@ -221,7 +221,7 @@ def run_simulation_with_rimrock(port: int = 5000):
         while True:
             time.sleep(5)
             res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
-                                                 params={"job_id": job_id}, 
+                                                 params={"job_id": job_id},
                                                  headers=headers)
             res_json = res.json()
             print(f'Rescode {res.status_code}')
@@ -268,5 +268,4 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    # run_simulation_with_rimrock(port=args.port)
-    get_slurm_results(job_id="931864.ares.cyfronet.pl")
+    run_simulation_with_rimrock(port=args.port)
