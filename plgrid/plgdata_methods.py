@@ -25,11 +25,14 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
     }
     # job_id format: "SLURM_JOB_ID.ares.cyfronet.pl" -> folder is named with SLURM_JOB_ID only
     slurm_job_id: str = json_data['job_id'].split('.')[0]
+    # construct an URL with a path to the simulation workspace directory, based on jobid
+    # this path may contain many different files: simulation output (i.e. BDO files), logs and simulation output
     list_url = PLGDATA_LIST_URL.format(
         http_plgdata=http_plgdata,
         hostname=hostname,
         slurm_job_id=slurm_job_id,
     )
+    # get a list of all files and directories in the simulation workspace directory
     res: requests.Response = session.get(list_url, headers=headers)
     res_json: dict = res.json()
     estimators_dict = {}
