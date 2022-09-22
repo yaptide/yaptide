@@ -1,6 +1,7 @@
 import argparse
 import json
 import os
+import sys
 import time
 import timeit
 import base64
@@ -183,26 +184,26 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
                 print(e)
 
 
-def get_grid_proxy_file(dir_path: str) -> str:
+def read_grid_proxy_file(dir_path: str) -> str:
     """Function reading grid_proxy file"""
     grid_proxy_path = Path(dir_path, 'grid_proxy')
+    grid_proxy = ""
     try:
         with open(grid_proxy_path) as grid_proxy_file:
             grid_proxy = grid_proxy_file.read()
-            return grid_proxy
     except FileNotFoundError:
         print("Generate grid_proxy file by adjusting following command:\n")
         cmd = "read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl "
         cmd += r'"grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`"'
         cmd += f" > {grid_proxy_path} && unset p\n"
         print(cmd)
-        exit(1)
+    return grid_proxy
 
 
 def run_simulation_with_rimrock(port: int = 5000):
     """Example function running simulation on rimrock"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
-    grid_proxy = get_grid_proxy_file(dir_path=example_dir)
+    grid_proxy = read_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
 
@@ -220,9 +221,7 @@ def run_simulation_with_rimrock(port: int = 5000):
     if job_id != "":
         while True:
             time.sleep(5)
-            res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
-                                                params={"job_id": job_id},
-                                                headers=headers)
+            res: requests.Response = session.get(Endpoints(port=port).http_rimrock, params={"job_id": job_id}, headers=headers)
             res_json = res.json()
             print(f'Rescode {res.status_code}')
             print(res_json)
@@ -236,7 +235,7 @@ def run_simulation_with_rimrock(port: int = 5000):
 def check_rimrock_jobs(port: int = 5000):
     """Example function cehcking rimrock jobs' statuses"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
-    grid_proxy = get_grid_proxy_file(dir_path=example_dir)
+    grid_proxy = read_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     session = requests.Session()
@@ -249,7 +248,7 @@ def check_rimrock_jobs(port: int = 5000):
 def get_slurm_results(job_id: str, port: int = 5000):
     """Example function getting slurm results"""
     example_dir = os.path.dirname(os.path.realpath(__file__))
-    grid_proxy = get_grid_proxy_file(dir_path=example_dir)
+    grid_proxy = read_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     session = requests.Session()
@@ -257,7 +256,10 @@ def get_slurm_results(job_id: str, port: int = 5000):
                                          params={"job_id": job_id},
                                          headers=headers)
     res_json = res.json()
-    print(res_json)
+    with open(Path(example_dir, 'output', f'{job_id.split(".")[0]}.json'), 'w') as writer:
+        data_to_write = str(res_json['result'])
+        data_to_write = data_to_write.replace("'", "\"")
+        writer.write(data_to_write)
 
 
 if __name__ == "__main__":

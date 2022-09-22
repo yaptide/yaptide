@@ -26,18 +26,18 @@ print(res.json())
 res: requests.Response = session.post(f'{http_plgdata}/mkdir/{hostname}/~/{folder_path}', headers=headers)
 print(res.status_code)
 print(f'/~/{folder_path}')
-# data = {
-#     "host": f'{hostname}.cyfronet.pl',
-#     "script": "#!/bin/bash\n#SBATCH -A plgccbmc11\necho hello\nexit 0"
-# }
-# res: requests.Response = session.post(http_rimrock_jobs, json=data, headers=headers)
-# print(res.status_code)
-# print(res.json())
+data = {
+    "host": f'{hostname}.cyfronet.pl',
+    "script": "#!/bin/bash\n#SBATCH -A plgccbmc11\necho hello\nexit 0"
+}
+res: requests.Response = session.post(http_rimrock_jobs, json=data, headers=headers)
+print(res.status_code)
+print(res.json())
 
-# time.sleep(4)
-# res: requests.Response = session.get(http_rimrock_jobs, headers=headers)
-# print(res.status_code)
-# print(res.json())
+time.sleep(4)
+res: requests.Response = session.get(http_rimrock_jobs, headers=headers)
+print(res.status_code)
+print(res.json())
 
 res: requests.Response = session.get(f'{http_plgdata}/list/{hostname}/~/{folder_path}', headers=headers)
 print(res.status_code)
