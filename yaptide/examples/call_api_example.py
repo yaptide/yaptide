@@ -1,7 +1,6 @@
 import argparse
 import json
 import os
-import sys
 import time
 import timeit
 import base64
@@ -221,7 +220,9 @@ def run_simulation_with_rimrock(port: int = 5000):
     if job_id != "":
         while True:
             time.sleep(5)
-            res: requests.Response = session.get(Endpoints(port=port).http_rimrock, params={"job_id": job_id}, headers=headers)
+            res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
+                                                 params={"job_id": job_id}, 
+                                                 headers=headers)
             res_json = res.json()
             print(f'Rescode {res.status_code}')
             print(res_json)
@@ -256,7 +257,8 @@ def get_slurm_results(job_id: str, port: int = 5000):
                                          params={"job_id": job_id},
                                          headers=headers)
     res_json = res.json()
-    with open(Path(example_dir, 'output', f'{job_id.split(".")[0]}.json'), 'w') as writer:
+    path = Path(example_dir, 'output', f'{job_id.split(".")[0]}.json')
+    with open(path, 'w') as writer:
         data_to_write = str(res_json['result'])
         data_to_write = data_to_write.replace("'", "\"")
         writer.write(data_to_write)
@@ -266,4 +268,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    run_simulation_with_rimrock(port=args.port)
+    # run_simulation_with_rimrock(port=args.port)
+    get_slurm_results(job_id="931864.ares.cyfronet.pl")
