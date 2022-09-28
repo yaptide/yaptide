@@ -1,6 +1,8 @@
 from flask import request
 from flask_restful import Resource
 
+from sqlalchemy import null
+
 from marshmallow import Schema, ValidationError
 from marshmallow import fields
 
@@ -115,14 +117,22 @@ class SimulationStatus(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data['task_id'], user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = simulation_task_status.delay(task_id=json_data.get('task_id'))
+        task = simulation_task_status.delay(task_id=json_data['task_id'])
         result: dict = task.wait()
 
-        return yaptide_response(
+        if "end_time" in result:
+            simulation: SimulationModel = db.session.query(SimulationModel).filter_by(
+                task_id=json_data['task_id']).first()
+            if simulation.end_time == null():
+                simulation.set_end_time(end_time=result['end_time'])
+                db.session.commit()
+            result.pop('end_time')
+
+        return yaptide_response( 
             message=f"Task state: {result['state']}",
             code=200,
             content=result

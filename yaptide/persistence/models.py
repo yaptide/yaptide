@@ -29,11 +29,16 @@ class SimulationModel(db.Model):
     """Simulation model - initial version"""
 
     __tablename__ = 'Simulation'
-    id = db.Column(db.Integer, primary_key=True)
-    task_id = db.Column(db.String, nullable=False)
+    id: int = db.Column(db.Integer, primary_key=True)
+    task_id: str = db.Column(db.String, nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('User.id'))
-    creation_date = db.Column(db.DateTime(timezone=True), default=func.now())
+    start_time = db.Column(db.DateTime(timezone=True), default=func.now())
+    end_time = db.Column(db.DateTime(timezone=True), nullable=True)
     name = db.Column(db.String, nullable=False, default='workspace')
+
+    def set_end_time(self, end_time):
+        """Updates simulation end time"""
+        self.end_time = end_time
 
 
 def add_user(login_name: str, password: str):

@@ -1,5 +1,7 @@
 from yaptide.celery.worker import celery_app
 
+from sqlalchemy.sql import func
+
 from pathlib import Path
 import sys
 import tempfile
@@ -65,7 +67,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         result: dict = pymchelper_output_to_json(estimators_dict)
 
-        return {'result': result, 'input': raw_input_dict}
+        return {'result': result, 'input': raw_input_dict, 'end_time': func.now()}
 
 
 @celery_app.task
@@ -201,6 +203,7 @@ def simulation_task_status(task_id: str) -> dict:
         if 'result' in task.info:
             result['result'] = task.info.get('result')
             result['input'] = task.info.get('input')
+            result['end_time'] = task.info.get('end_time')
         elif 'logfile' in task.info:
             result['state'] = 'FAILURE'
             result['error'] = 'Simulation error'
