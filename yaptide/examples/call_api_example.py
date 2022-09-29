@@ -281,5 +281,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    session = requests.Session()
-    run_simulation_on_backend(session=session, port=args.port, do_monitor_job=False)
+    main_session = requests.Session()
+    run_simulation_on_backend(session=main_session, port=args.port, do_monitor_job=False)
