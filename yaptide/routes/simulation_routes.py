@@ -117,20 +117,26 @@ class SimulationStatus(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data['task_id'], user=user)
+        task_id = json_data['task_id']
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=task_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = simulation_task_status.delay(task_id=json_data['task_id'])
+        task = simulation_task_status.delay(task_id=task_id)
         result: dict = task.wait()
 
-        if "end_time" in result:
+        if "end_time" in result and "cores" in result:
+            print(f'End time for task {task_id}: {result["end_time"]}')
+            print(f'Cores for task {task_id}: {result["cores"]}')
             simulation: SimulationModel = db.session.query(SimulationModel).filter_by(
-                task_id=json_data['task_id']).first()
-            if simulation.end_time == null():
-                simulation.set_end_time(end_time=result['end_time'])
+                task_id=task_id).first()
+            if simulation.end_time == null() and simulation.cores == null():
+                print(f'End time for task {task_id}: {result["end_time"]} - was NULL')
+                print(f'Cores for task {task_id}: {result["cores"]} - was NULL')
+                simulation.set_params_after_finish(end_time=result['end_time'], cores=result['cores'])
+                db.session.query(SimulationModel).filter_by(task_id=task_id).\
+                    update({"end_time": result['end_time'], "cores": result['cores']})
                 db.session.commit()
-            result.pop('end_time')
 
         return yaptide_response(
             message=f"Task state: {result['state']}",

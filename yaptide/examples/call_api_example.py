@@ -61,10 +61,10 @@ def run_simulation_on_backend(session: requests.Session, port: int = 5000, do_mo
 
         run_simulation_with_files(session, port=port)
     else:
-        for _ in range(4):
-            run_simulation_with_files(session, port=port, do_monitor_job=False)
-            print("Submitted job")
-            time.sleep(5)
+        # for _ in range(4):
+        #     run_simulation_with_files(session, port=port, do_monitor_job=False)
+        #     print("Submitted job")
+        #     time.sleep(5)
         check_backend_jobs(session, port)
 
     session.delete(Endpoints(port=port).http_auth_logout)
@@ -183,22 +183,35 @@ def check_backend_jobs(session: requests.Session, port: int = 5000):
     if res.status_code != 202:
         return
     timer = timeit.default_timer()
-    for i in range(3):
-        time.sleep(5)
-        if timeit.default_timer() - timer > 500:
-            res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
-            if res.status_code != 202:
-                print(res.json())
-                return
-            timer = timeit.default_timer()
-        res: requests.Response = session.get(Endpoints(port=port).http_list_sims, params={
-            "page_size": 2,
-            "page_idx": i,
-            "order_by": "start_time",
-            "order_type": "descend",
-        })
-        res_json: dict = res.json()
-        print(res_json)
+    are_all_finished = False
+    one_last_run = True
+    while not are_all_finished and one_last_run:
+        some_still_running = False
+        for i in range(3):
+            time.sleep(5)
+            if timeit.default_timer() - timer > 500:
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+                if res.status_code != 202:
+                    print(res.json())
+                    return
+                timer = timeit.default_timer()
+            res: requests.Response = session.get(Endpoints(port=port).http_list_sims, params={
+                "page_size": 2,
+                "page_idx": i,
+                "order_by": "start_time",
+                "order_type": "descend",
+            })
+            res_json: dict = res.json()
+            print(res_json['simulations_count'])
+            for sim in res_json['simulations']:
+                print(sim)
+                task_id = sim['task_id']
+                res: requests.Response = session.post(Endpoints(port=port).http_sim_status, json={'task_id': task_id})
+                res_json: dict = res.json()
+                if not "result" in res_json:
+                    some_still_running = True
+        one_last_run = not are_all_finished
+        are_all_finished = not some_still_running
 
 
 def read_grid_proxy_file(dir_path: str) -> str:

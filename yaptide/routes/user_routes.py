@@ -55,18 +55,18 @@ class UserSimulations(Resource):
 
         if params_dict['order_by'] == OrderBy.END_TIME.value:
             if params_dict['order_type'] == OrderType.DESCEND.value:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
-                    user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+                    filter_by(user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
             else:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
-                    user_id=user.id).order_by(SimulationModel.end_time).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+                    filter_by(user_id=user.id).order_by(SimulationModel.end_time).all()
         else:
             if params_dict['order_type'] == OrderType.DESCEND.value:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
-                    user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+                    filter_by(user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
             else:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
-                    user_id=user.id).order_by(SimulationModel.start_time).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+                    filter_by(user_id=user.id).order_by(SimulationModel.start_time).all()
 
         sim_count = len(simulations)
         page_size = (
@@ -87,8 +87,10 @@ class UserSimulations(Resource):
                 'name': simulation.name,
                 'task_id': simulation.task_id,
                 'start_time': simulation.start_time,
-                'end_time': simulation.end_time
+                'end_time': simulation.end_time,
+                'cores': simulation.cores
             } for simulation in simulations],
-            'page_count': page_count
+            'page_count': page_count,
+            'simulations_count': sim_count,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)

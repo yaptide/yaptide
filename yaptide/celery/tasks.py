@@ -5,6 +5,7 @@ from sqlalchemy.sql import func
 from pathlib import Path
 import sys
 import tempfile
+from datetime import datetime
 
 from celery.result import AsyncResult
 
@@ -67,7 +68,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         result: dict = pymchelper_output_to_json(estimators_dict)
 
-        return {'result': result, 'input': raw_input_dict, 'end_time': func.now()}
+        return {'result': result, 'input': raw_input_dict, 'end_time': datetime.utcnow(), 'cores': runner_obj.jobs}
 
 
 @celery_app.task

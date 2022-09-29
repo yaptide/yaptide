@@ -35,10 +35,12 @@ class SimulationModel(db.Model):
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
     name: str = db.Column(db.String, nullable=False, default='workspace')
+    cores: int = db.Column(db.Integer, nullable=True)
 
-    def set_end_time(self, end_time):
+    def set_params_after_finish(self, end_time, cores: int):
         """Updates simulation end time"""
         self.end_time = end_time
+        self.cores = cores
 
 
 def add_user(login_name: str, password: str):
