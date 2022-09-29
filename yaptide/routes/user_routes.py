@@ -20,18 +20,17 @@ from yaptide.routes.utils.response_templates import yaptide_response
 class UserSimulations(Resource):
     """Class responsible for returning ids of user's task which are running simulations"""
 
-
     class OrderType(Enum):
         """Order type"""
+
         ASCEND = "ascend"
         DESCEND = "descend"
 
-
     class OrderBy(Enum):
         """Order by column"""
+
         START_TIME = "start_time"
         END_TIME = "end_time"
-
 
     class _ParamsSchema(Schema):
         """Class specifies API parameters"""
@@ -40,7 +39,6 @@ class UserSimulations(Resource):
         page_idx = fields.Integer(missing=0)
         order_by = fields.String(missing="start_time")
         order_type = fields.String(missing="ascend")
-
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -51,20 +49,24 @@ class UserSimulations(Resource):
 
         if params_dict['order_by'] == UserSimulations.OrderBy.END_TIME.value:
             if params_dict['order_type'] == UserSimulations.OrderType.DESCEND.value:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
+                    user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
             else:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(user_id=user.id).order_by(SimulationModel.end_time).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
+                    user_id=user.id).order_by(SimulationModel.end_time).all()
         else:
             if params_dict['order_type'] == UserSimulations.OrderType.DESCEND.value:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
+                    user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
             else:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(user_id=user.id).order_by(SimulationModel.start_time).all()
+                simulations: list[SimulationModel] = db.session.query(SimulationModel).filter_by(
+                    user_id=user.id).order_by(SimulationModel.start_time).all()
 
         sim_count = len(simulations)
         page_size = params_dict['page_size']
         page_idx = params_dict['page_idx']
         page_count = int(math.ceil(sim_count/page_size))
-        simulations = simulations[page_size*page_idx:min(page_size*(page_idx+1),sim_count)]
+        simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1),sim_count)]
 
         result = {
             'simulations': [{

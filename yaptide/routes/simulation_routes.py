@@ -132,7 +132,7 @@ class SimulationStatus(Resource):
                 db.session.commit()
             result.pop('end_time')
 
-        return yaptide_response( 
+        return yaptide_response(
             message=f"Task state: {result['state']}",
             code=200,
             content=result

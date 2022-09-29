@@ -176,7 +176,7 @@ def run_simulation_with_files(session: requests.Session, example_dir, port: int 
 
 
 def check_backend_jobs(session: requests.Session, port: int = 5000):
-    """"""
+    """Example checking backend jobs with pagination"""
     res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
     print(res.json())
     if res.status_code != 202:
@@ -245,13 +245,12 @@ def run_simulation_with_rimrock(session: requests.Session, example_dir, port: in
             if res.status_code != 200:
                 return
             if res_json['status'] == 'FINISHED':
-                get_slurm_results(job_id=job_id, port=port)
+                get_slurm_results(example_dir, job_id=job_id, port=port)
                 return
 
 
-def check_rimrock_jobs(port: int = 5000):
+def check_rimrock_jobs(example_dir, port: int = 5000):
     """Example function cehcking rimrock jobs' statuses"""
-    example_dir = os.path.dirname(os.path.realpath(__file__))
     grid_proxy = read_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
@@ -262,9 +261,8 @@ def check_rimrock_jobs(port: int = 5000):
     print(res_json)
 
 
-def get_slurm_results(job_id: str, port: int = 5000):
+def get_slurm_results(example_dir, job_id: str, port: int = 5000):
     """Example function getting slurm results"""
-    example_dir = os.path.dirname(os.path.realpath(__file__))
     grid_proxy = read_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
