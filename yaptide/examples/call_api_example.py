@@ -246,28 +246,26 @@ def run_simulation_with_rimrock(session: requests.Session, port: int = 5000, do_
             if res.status_code != 200:
                 return
             if res_json['status'] == 'FINISHED':
-                get_slurm_results(job_id=job_id, port=port)
+                get_slurm_results(session=session, job_id=job_id, port=port)
                 return
 
 
-def check_rimrock_jobs(port: int = 5000):
+def check_rimrock_jobs(session: requests.Session, port: int = 5000):
     """Example function cehcking rimrock jobs' statuses"""
     grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
-    session = requests.Session()
 
     res: requests.Response = session.get(Endpoints(port=port).http_rimrock, headers=headers)
     res_json = res.json()
     print(res_json)
 
 
-def get_slurm_results(job_id: str, port: int = 5000):
+def get_slurm_results(session: requests.Session, job_id: str, port: int = 5000):
     """Example function getting slurm results"""
     grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
-    session = requests.Session()
     res: requests.Response = session.get(Endpoints(port=port).http_plgdata,
                                          params={"job_id": job_id},
                                          headers=headers)
