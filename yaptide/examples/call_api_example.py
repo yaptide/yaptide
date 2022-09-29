@@ -30,21 +30,22 @@ auth_json = {
     "login_name": "admin",
     "password": "password",
 }
+EXAMPLE_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-def read_input_files(example_dir: Path) -> dict:
+def read_input_files() -> dict:
     """Read shieldhit input files from input_files folder"""
     input_files = {}
     for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
-        file = Path(example_dir, 'input_files', filename)
+        file = Path(EXAMPLE_DIR, 'input_files', filename)
         with open(file, 'r') as reader:
             input_files[filename] = reader.read()
     return input_files
 
 
-def run_simulation_on_backend(session: requests.Session, example_dir, port: int = 5000, do_monitor_job: bool = True):
+def run_simulation_on_backend(session: requests.Session, port: int = 5000, do_monitor_job: bool = True):
     """Example client running simulation"""
-    example_json = Path(example_dir, 'example.json')
+    example_json = Path(EXAMPLE_DIR, 'example.json')
 
     with open(example_json) as json_file:
         json_to_send = json.load(json_file)
@@ -56,12 +57,12 @@ def run_simulation_on_backend(session: requests.Session, example_dir, port: int 
         return
 
     if do_monitor_job:
-        run_simulation_with_json(session, example_dir, json_to_send, port=port)
+        run_simulation_with_json(session, json_to_send, port=port)
 
-        run_simulation_with_files(session, example_dir, port=port)
+        run_simulation_with_files(session, port=port)
     else:
         for _ in range(4):
-            run_simulation_with_files(session, example_dir, port=port, do_monitor_job=False)
+            run_simulation_with_files(session, port=port, do_monitor_job=False)
             print("Submitted job")
             time.sleep(5)
         check_backend_jobs(session, port)
@@ -69,7 +70,7 @@ def run_simulation_on_backend(session: requests.Session, example_dir, port: int 
     session.delete(Endpoints(port=port).http_auth_logout)
 
 
-def run_simulation_with_json(session: requests.Session, example_dir, json_to_send, port: int = 5000, do_monitor_job: bool = True):
+def run_simulation_with_json(session: requests.Session, json_to_send, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation with JSON"""
     timer = timeit.default_timer()
     res: requests.Response = session.post(Endpoints(port=port).http_sim_run, json=json_to_send)
@@ -97,20 +98,20 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
                     if data.get('result'):
-                        with open(Path(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
+                        with open(Path(EXAMPLE_DIR, 'output', 'simulation_output.json'), 'w') as writer:
                             data_to_write = str(data['result'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         return
                     if data.get('logfile'):
-                        with open(Path(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
+                        with open(Path(EXAMPLE_DIR, 'output', 'error_full_output.json'), 'w') as writer:
                             data_to_write = str(data)
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
-                        with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
+                        with open(Path(EXAMPLE_DIR, 'output', 'shieldlog.log'), 'w') as writer:
                             writer.write(data['logfile'])
                         for key, value in data['input_files'].items():
-                            with open(Path(example_dir, 'output', key), 'w') as writer:
+                            with open(Path(EXAMPLE_DIR, 'output', key), 'w') as writer:
                                 writer.write(value)
                         return
                     if data.get('error'):
@@ -121,9 +122,9 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
                 print(e)
 
 
-def run_simulation_with_files(session: requests.Session, example_dir, port: int = 5000, do_monitor_job: bool = True):
+def run_simulation_with_files(session: requests.Session, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation with input files"""
-    input_files = read_input_files(example_dir=example_dir)
+    input_files = read_input_files()
 
     timer = timeit.default_timer()
     res: requests.Response = session.post(Endpoints(port=port).http_sim_run, json={'input_files': input_files})
@@ -151,20 +152,20 @@ def run_simulation_with_files(session: requests.Session, example_dir, port: int 
                 # the request has succeeded, we can access its contents
                 if res.status_code == 200:
                     if data.get('result'):
-                        with open(Path(example_dir, 'output', 'simulation_output.json'), 'w') as writer:
+                        with open(Path(EXAMPLE_DIR, 'output', 'simulation_output.json'), 'w') as writer:
                             data_to_write = str(data['result'])
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
                         return
                     if data.get('logfile'):
-                        with open(Path(example_dir, 'output', 'error_full_output.json'), 'w') as writer:
+                        with open(Path(EXAMPLE_DIR, 'output', 'error_full_output.json'), 'w') as writer:
                             data_to_write = str(data)
                             data_to_write = data_to_write.replace("'", "\"")
                             writer.write(data_to_write)
-                        with open(Path(example_dir, 'output', 'shieldlog.log'), 'w') as writer:
+                        with open(Path(EXAMPLE_DIR, 'output', 'shieldlog.log'), 'w') as writer:
                             writer.write(data['logfile'])
                         for key, value in data['input_files'].items():
-                            with open(Path(example_dir, 'output', key), 'w') as writer:
+                            with open(Path(EXAMPLE_DIR, 'output', key), 'w') as writer:
                                 writer.write(value)
                         return
                     if data.get('error'):
@@ -216,14 +217,14 @@ def read_grid_proxy_file(dir_path: str) -> str:
     return grid_proxy
 
 
-def run_simulation_with_rimrock(session: requests.Session, example_dir, port: int = 5000, do_monitor_job: bool = True):
+def run_simulation_with_rimrock(session: requests.Session, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation on rimrock"""
-    grid_proxy = read_grid_proxy_file(dir_path=example_dir)
+    grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
 
     session = requests.Session()
-    input_files = read_input_files(example_dir=example_dir)
+    input_files = read_input_files()
     res: requests.Response = session.post(Endpoints(port=port).http_rimrock, json=input_files, headers=headers)
 
     res_json = res.json()
@@ -245,13 +246,13 @@ def run_simulation_with_rimrock(session: requests.Session, example_dir, port: in
             if res.status_code != 200:
                 return
             if res_json['status'] == 'FINISHED':
-                get_slurm_results(example_dir, job_id=job_id, port=port)
+                get_slurm_results(job_id=job_id, port=port)
                 return
 
 
-def check_rimrock_jobs(example_dir, port: int = 5000):
+def check_rimrock_jobs(port: int = 5000):
     """Example function cehcking rimrock jobs' statuses"""
-    grid_proxy = read_grid_proxy_file(dir_path=example_dir)
+    grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     session = requests.Session()
@@ -261,9 +262,9 @@ def check_rimrock_jobs(example_dir, port: int = 5000):
     print(res_json)
 
 
-def get_slurm_results(example_dir, job_id: str, port: int = 5000):
+def get_slurm_results(job_id: str, port: int = 5000):
     """Example function getting slurm results"""
-    grid_proxy = read_grid_proxy_file(dir_path=example_dir)
+    grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     session = requests.Session()
@@ -271,7 +272,7 @@ def get_slurm_results(example_dir, job_id: str, port: int = 5000):
                                          params={"job_id": job_id},
                                          headers=headers)
     res_json = res.json()
-    path = Path(example_dir, 'output', f'{job_id.split(".")[0]}.json')
+    path = Path(EXAMPLE_DIR, 'output', f'{job_id.split(".")[0]}.json')
     with open(path, 'w') as writer:
         data_to_write = str(res_json['result'])
         data_to_write = data_to_write.replace("'", "\"")
@@ -283,5 +284,4 @@ if __name__ == "__main__":
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
     session = requests.Session()
-    example_dir = os.path.dirname(os.path.realpath(__file__))
-    run_simulation_on_backend(session=session, example_dir=example_dir, port=args.port, do_monitor_job=False)
+    run_simulation_on_backend(session=session, port=args.port, do_monitor_job=False)

@@ -66,7 +66,7 @@ class UserSimulations(Resource):
         page_size = params_dict['page_size']
         page_idx = params_dict['page_idx']
         page_count = int(math.ceil(sim_count/page_size))
-        simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1),sim_count)]
+        simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1), sim_count)]
 
         result = {
             'simulations': [{
