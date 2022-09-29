@@ -8,9 +8,9 @@ class UserModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
-    id = db.Column(db.Integer, primary_key=True)
-    login_name = db.Column(db.String, nullable=False, unique=True)
-    password_hash = db.Column(db.String, nullable=False)
+    id: int = db.Column(db.Integer, primary_key=True)
+    login_name: str = db.Column(db.String, nullable=False, unique=True)
+    password_hash: str = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
 
     def set_password(self, password: str):
@@ -31,10 +31,10 @@ class SimulationModel(db.Model):
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)
     task_id: str = db.Column(db.String, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('User.id'))
+    user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
-    name = db.Column(db.String, nullable=False, default='workspace')
+    name: str = db.Column(db.String, nullable=False, default='workspace')
 
     def set_end_time(self, end_time):
         """Updates simulation end time"""
