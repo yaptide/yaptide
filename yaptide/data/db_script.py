@@ -22,6 +22,7 @@ class TableTypes(Enum):
     """Table types"""
 
     USER = "User"
+    SIMULATION = "Simulation"
 
 
 class DataJsonFields(Enum):
@@ -29,6 +30,16 @@ class DataJsonFields(Enum):
 
     LOGIN = "LOGIN"
     PASSWORD = "PASSWORD"
+
+
+def select_all_simulations(con: db.engine.Connection):
+    """Selects all users from db"""
+    metadata = db.MetaData()
+    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
+    query = db.select([simulations])
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    print(ResultSet)
 
 
 def select_all_users(con: db.engine.Connection):
@@ -108,4 +119,7 @@ if __name__ == "__main__":
         if obj[OPERATION] == OperationTypes.DELETE.value and obj[TABLE] == TableTypes.USER.value:
             delete_user(con=connection, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.SELECT.value:
-            select_all_users(con=connection)
+            if obj[TABLE] == TableTypes.USER.value:
+                select_all_users(con=connection)
+            else:
+                select_all_simulations(con=connection)

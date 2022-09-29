@@ -15,8 +15,9 @@ class Endpoints:
     def __init__(self, host: str = 'localhost', port: int = 5000) -> None:
         self.http_sim_run = f'http://{host}:{port}/sh/run'
         self.http_sim_status = f'http://{host}:{port}/sh/status'
-        self.http_list_sims = f'http://{host}:{port}/user/simulations'
         self.http_convert = f'http://{host}:{port}/sh/convert'
+
+        self.http_list_sims = f'http://{host}:{port}/user/simulations'
 
         self.http_auth_login = f'http://{host}:{port}/auth/login'
         self.http_auth_logout = f'http://{host}:{port}/auth/logout'
@@ -41,15 +42,12 @@ def read_input_files(example_dir: Path) -> dict:
     return input_files
 
 
-def run_simulation_on_backend(port: int = 5000):
+def run_simulation_on_backend(session: requests.Session, example_dir, port: int = 5000, do_monitor_job: bool = True):
     """Example client running simulation"""
-    example_dir = os.path.dirname(os.path.realpath(__file__))
     example_json = Path(example_dir, 'example.json')
 
     with open(example_json) as json_file:
         json_to_send = json.load(json_file)
-
-    session = requests.Session()
 
     res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
 
@@ -57,14 +55,21 @@ def run_simulation_on_backend(port: int = 5000):
         print(res.json())
         return
 
-    run_simulation_with_json(session, example_dir, json_to_send, port=port)
+    if do_monitor_job:
+        run_simulation_with_json(session, example_dir, json_to_send, port=port)
 
-    run_simulation_with_files(session, example_dir, json_to_send, port=port)
+        run_simulation_with_files(session, example_dir, port=port)
+    else:
+        for _ in range(4):
+            run_simulation_with_files(session, example_dir, port=port, do_monitor_job=False)
+            print("Submitted job")
+            time.sleep(5)
+        check_backend_jobs(session, port)
 
     session.delete(Endpoints(port=port).http_auth_logout)
 
 
-def run_simulation_with_json(session: requests.Session, example_dir, json_to_send, port: int = 5000):
+def run_simulation_with_json(session: requests.Session, example_dir, json_to_send, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation with JSON"""
     timer = timeit.default_timer()
     res: requests.Response = session.post(Endpoints(port=port).http_sim_run, json=json_to_send)
@@ -74,11 +79,8 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
     print(data)
     task_id = data.get('task_id')
 
-    res: requests.Response = session.get(Endpoints(port=port).http_list_sims)
-    data: dict = res.json()
-    print(data)
     if task_id != "":
-        while True:
+        while do_monitor_job:
             time.sleep(5)
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
@@ -119,15 +121,8 @@ def run_simulation_with_json(session: requests.Session, example_dir, json_to_sen
                 print(e)
 
 
-def run_simulation_with_files(session: requests.Session, example_dir, json_to_send, port: int = 5000):
+def run_simulation_with_files(session: requests.Session, example_dir, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation with input files"""
-    res: requests.Response = session.post(Endpoints(port=port).http_convert, json=json_to_send)
-
-    data: dict = res.json()
-    for key, value in data['input_files'].items():
-        with open(Path(example_dir, 'output', key), 'w') as writer:
-            writer.write(value)
-
     input_files = read_input_files(example_dir=example_dir)
 
     timer = timeit.default_timer()
@@ -138,11 +133,8 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
 
     task_id = data.get('task_id')
 
-    res: requests.Response = session.get(Endpoints(port=port).http_list_sims)
-    data: dict = res.json()
-    print(data)
     if task_id != "":
-        while True:
+        while do_monitor_job:
             time.sleep(5)
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
@@ -181,6 +173,31 @@ def run_simulation_with_files(session: requests.Session, example_dir, json_to_se
 
             except Exception as e:  # skipcq: PYL-W0703
                 print(e)
+
+
+def check_backend_jobs(session: requests.Session, port: int = 5000):
+    """"""
+    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+    print(res.json())
+    if res.status_code != 202:
+        return
+    timer = timeit.default_timer()
+    for i in range(3):
+        time.sleep(5)
+        if timeit.default_timer() - timer > 500:
+            res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+            if res.status_code != 202:
+                print(res.json())
+                return
+            timer = timeit.default_timer()
+        res: requests.Response = session.get(Endpoints(port=port).http_list_sims, params={
+            "page_size": 2,
+            "page_idx": i,
+            "order_by": "start_time",
+            "order_type": "descend",
+        })
+        res_json: dict = res.json()
+        print(res_json)
 
 
 def read_grid_proxy_file(dir_path: str) -> str:
@@ -199,9 +216,8 @@ def read_grid_proxy_file(dir_path: str) -> str:
     return grid_proxy
 
 
-def run_simulation_with_rimrock(port: int = 5000):
+def run_simulation_with_rimrock(session: requests.Session, example_dir, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation on rimrock"""
-    example_dir = os.path.dirname(os.path.realpath(__file__))
     grid_proxy = read_grid_proxy_file(dir_path=example_dir)
 
     headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
@@ -218,7 +234,7 @@ def run_simulation_with_rimrock(port: int = 5000):
     job_id: str = ""
     job_id = res_json.get('job_id')
     if job_id != "":
-        while True:
+        while do_monitor_job:
             time.sleep(5)
             res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
                                                  params={"job_id": job_id},
@@ -268,4 +284,6 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
-    run_simulation_with_rimrock(port=args.port)
+    session = requests.Session()
+    example_dir = os.path.dirname(os.path.realpath(__file__))
+    run_simulation_on_backend(session=session, example_dir=example_dir, port=args.port, do_monitor_job=False)
