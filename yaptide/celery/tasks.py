@@ -1,7 +1,5 @@
 from yaptide.celery.worker import celery_app
 
-from sqlalchemy.sql import func
-
 from pathlib import Path
 import sys
 import tempfile
