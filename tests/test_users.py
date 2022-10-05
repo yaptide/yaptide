@@ -5,6 +5,7 @@ from time import sleep
 import json
 
 _Login_name = "test_user"
+_Login_name_2 = "not_existing_user"
 _Password = "test_password"
 
 
@@ -67,7 +68,7 @@ def test_log_in(client):
 def test_log_in_not_existing(client):
     """Test if user can log in"""
     resp = client.post("/auth/login", data=json.dumps(dict(
-        login_name=_Login_name,
+        login_name=_Login_name_2,
         password=_Password)),
         content_type='application/json')
 
