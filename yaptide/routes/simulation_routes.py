@@ -4,6 +4,8 @@ from flask_restful import Resource
 from marshmallow import Schema, ValidationError
 from marshmallow import fields
 
+from datetime import datetime
+
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel
 
@@ -20,9 +22,9 @@ class SimulationRun(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        jobs = fields.Integer(missing=-1)  # use all cores by default
-        sim_type = fields.String(missing="shieldhit")
-        sim_name = fields.String(missing="")
+        jobs = fields.Integer(load_default=-1)  # use all cores by default
+        sim_type = fields.String(load_default="shieldhit")
+        sim_name = fields.String(load_default="")
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -61,7 +63,7 @@ class ConvertInputFiles(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        sim_type = fields.String(missing="shieldhit")
+        sim_type = fields.String(load_default="shieldhit")
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -115,12 +117,21 @@ class SimulationStatus(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        task_id = json_data['task_id']
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=task_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = simulation_task_status.delay(task_id=json_data.get('task_id'))
+        task = simulation_task_status.delay(task_id=task_id)
         result: dict = task.wait()
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
+
+        if "end_time" in result and "cores" in result and simulation.end_time is None and simulation.cores is None:
+            simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
+            simulation.cores = result['cores']
+            db.session.commit()
+            result.pop("end_time")
+            result.pop("cores")
 
         return yaptide_response(
             message=f"Task state: {result['state']}",

@@ -8,9 +8,9 @@ class UserModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
-    id = db.Column(db.Integer, primary_key=True)
-    login_name = db.Column(db.String, nullable=False, unique=True)
-    password_hash = db.Column(db.String, nullable=False)
+    id: int = db.Column(db.Integer, primary_key=True)
+    login_name: str = db.Column(db.String, nullable=False, unique=True)
+    password_hash: str = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
 
     def set_password(self, password: str):
@@ -29,20 +29,13 @@ class SimulationModel(db.Model):
     """Simulation model - initial version"""
 
     __tablename__ = 'Simulation'
-    id = db.Column(db.Integer, primary_key=True)
-    task_id = db.Column(db.String, nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey('User.id'))
-    creation_date = db.Column(db.DateTime(timezone=True), default=func.now())
-    name = db.Column(db.String, nullable=False, default='workspace')
-
-
-def add_user(login_name: str, password: str):
-    """Function adding user"""
-    user = UserModel(login_name=login_name)
-    user.set_password(password)
-
-    db.session.add(user)
-    db.session.commit()
+    id: int = db.Column(db.Integer, primary_key=True)
+    task_id: str = db.Column(db.String, nullable=False, unique=True)
+    user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
+    start_time = db.Column(db.DateTime(timezone=True), default=func.now())
+    end_time = db.Column(db.DateTime(timezone=True), nullable=True)
+    name: str = db.Column(db.String, nullable=False, default='workspace')
+    cores: int = db.Column(db.Integer, nullable=True)
 
 
 def create_models():
