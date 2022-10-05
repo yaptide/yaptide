@@ -127,11 +127,11 @@ class SimulationStatus(Resource):
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
 
         if "end_time" in result and "cores" in result and simulation.end_time is None and simulation.cores is None:
-                simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
-                simulation.cores = result['cores']
-                db.session.commit()
-                result.pop("end_time")
-                result.pop("cores")
+            simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
+            simulation.cores = result['cores']
+            db.session.commit()
+            result.pop("end_time")
+            result.pop("cores")
 
         return yaptide_response(
             message=f"Task state: {result['state']}",
