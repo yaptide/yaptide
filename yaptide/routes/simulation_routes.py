@@ -1,10 +1,10 @@
 from flask import request
 from flask_restful import Resource
 
-from sqlalchemy import null
-
 from marshmallow import Schema, ValidationError
 from marshmallow import fields
+
+from datetime import datetime
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel
@@ -124,19 +124,15 @@ class SimulationStatus(Resource):
 
         task = simulation_task_status.delay(task_id=task_id)
         result: dict = task.wait()
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
 
         if "end_time" in result and "cores" in result:
-            print(f'End time for task {task_id}: {result["end_time"]}')
-            print(f'Cores for task {task_id}: {result["cores"]}')
-            simulation: SimulationModel = db.session.query(SimulationModel).filter_by(
-                task_id=task_id).first()
-            if simulation.end_time == null() and simulation.cores == null():
-                print(f'End time for task {task_id}: {result["end_time"]} - was NULL')
-                print(f'Cores for task {task_id}: {result["cores"]} - was NULL')
-                simulation.set_params_after_finish(end_time=result['end_time'], cores=result['cores'])
-                db.session.query(SimulationModel).filter_by(task_id=task_id).\
-                    update({"end_time": result['end_time'], "cores": result['cores']})
+            if simulation.end_time == None and simulation.cores == None:
+                simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
+                simulation.cores = result['cores']
                 db.session.commit()
+                result.pop("end_time")
+                result.pop("cores")
 
         return yaptide_response(
             message=f"Task state: {result['state']}",

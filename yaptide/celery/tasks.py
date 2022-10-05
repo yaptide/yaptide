@@ -205,6 +205,7 @@ def simulation_task_status(task_id: str) -> dict:
             result['result'] = task.info.get('result')
             result['input'] = task.info.get('input')
             result['end_time'] = task.info.get('end_time')
+            result['cores'] = task.info.get('cores')
         elif 'logfile' in task.info:
             result['state'] = 'FAILURE'
             result['error'] = 'Simulation error'

@@ -30,26 +30,12 @@ class SimulationModel(db.Model):
 
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)
-    task_id: str = db.Column(db.String, nullable=False)
+    task_id: str = db.Column(db.String, nullable=False, unique=True)
     user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
     name: str = db.Column(db.String, nullable=False, default='workspace')
     cores: int = db.Column(db.Integer, nullable=True)
-
-    def set_params_after_finish(self, end_time, cores: int):
-        """Updates simulation end time"""
-        self.end_time = end_time
-        self.cores = cores
-
-
-def add_user(login_name: str, password: str):
-    """Function adding user"""
-    user = UserModel(login_name=login_name)
-    user.set_password(password)
-
-    db.session.add(user)
-    db.session.commit()
 
 
 def create_models():
