@@ -22,9 +22,9 @@ class SimulationRun(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        jobs = fields.Integer(missing=-1)  # use all cores by default
-        sim_type = fields.String(missing="shieldhit")
-        sim_name = fields.String(missing="")
+        jobs = fields.Integer(load_default=-1)  # use all cores by default
+        sim_type = fields.String(load_default="shieldhit")
+        sim_name = fields.String(load_default="")
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -63,7 +63,7 @@ class ConvertInputFiles(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        sim_type = fields.String(missing="shieldhit")
+        sim_type = fields.String(load_default="shieldhit")
 
     @staticmethod
     @requires_auth(is_refresh=False)

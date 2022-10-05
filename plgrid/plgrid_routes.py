@@ -30,7 +30,7 @@ class RimrockJobs(Resource):
     class _ParamsSchema(Schema):
         """Class specifies API parameters"""
 
-        job_id = fields.String(missing="None")
+        job_id = fields.String(load_default="None")
 
     @staticmethod
     def get():

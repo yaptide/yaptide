@@ -41,10 +41,10 @@ class UserSimulations(Resource):
     class _ParamsSchema(Schema):
         """Class specifies API parameters"""
 
-        page_size = fields.Integer(missing=DEFAULT_PAGE_SIZE)
-        page_idx = fields.Integer(missing=DEFAULT_PAGE_IDX)
-        order_by = fields.String(missing=OrderBy.START_TIME.value)
-        order_type = fields.String(missing=OrderType.DESCEND.value)
+        page_size = fields.Integer(load_default=DEFAULT_PAGE_SIZE)
+        page_idx = fields.Integer(load_default=DEFAULT_PAGE_IDX)
+        order_by = fields.String(load_default=OrderBy.START_TIME.value)
+        order_type = fields.String(load_default=OrderType.DESCEND.value)
 
     @staticmethod
     @requires_auth(is_refresh=False)
