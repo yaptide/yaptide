@@ -126,8 +126,7 @@ class SimulationStatus(Resource):
         result: dict = task.wait()
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
 
-        if "end_time" in result and "cores" in result:
-            if simulation.end_time == None and simulation.cores == None:
+        if "end_time" in result and "cores" in result and simulation.end_time is None and simulation.cores is None:
                 simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
                 simulation.cores = result['cores']
                 db.session.commit()

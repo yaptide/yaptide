@@ -15,7 +15,7 @@ def app():  # skipcq: PY-D0003
     with _app.app_context():
         db.create_all()
     yield _app
-    # db.session.remove()
+
     with _app.app_context():
         db.drop_all()
 

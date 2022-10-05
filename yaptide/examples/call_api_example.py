@@ -209,8 +209,7 @@ def check_backend_jobs(session: requests.Session, sim_n: int, page_size: int, po
                 task_id = sim['task_id']
                 res: requests.Response = session.post(Endpoints(port=port).http_sim_status, json={'task_id': task_id})
                 res_json: dict = res.json()
-                if not "result" in res_json:
-                    if not some_still_running:
+                if "result" not in res_json and not some_still_running:
                         some_still_running = True
                         print("Some still running")
         one_last_run = not are_all_finished
