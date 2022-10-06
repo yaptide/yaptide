@@ -1,6 +1,5 @@
 FROM python:3.9-slim
-ARG SHIELDHIT_PATH
-COPY $SHIELDHIT_PATH /usr/local/bin/
+COPY /plgrid /usr/local/bin/plgrid
 WORKDIR /usr/local/app
 
 RUN apt-get -qq update && \
