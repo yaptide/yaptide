@@ -1,6 +1,6 @@
 FROM python:3.9-slim
 ARG SHIELDHIT_PATH
-COPY $SHIELDHIT_PATH /usr/local/bin/
+COPY $SHIELDHIT_PATH /usr/local/bin/shieldhit
 WORKDIR /usr/local/app
 
 RUN apt-get -qq update && \
