@@ -1,43 +1,45 @@
-version: '3.3'
+version: "3.3"
 
 services:
+    yaptide_flask:
+        build:
+            context: .
+            dockerfile: Dockerfile-flask
+        image: yaptide_flask
+        volumes:
+            - data:/usr/local/app/yaptide/data
+        container_name: yaptide_flask
+        ports:
+            - 5000:5000
+        command: flask run --host=0.0.0.0
+        environment:
+            - FLASK_APP=yaptide.application
+            - APP_SETTINGS=yaptide.settings
+            - CELERY_BROKER_URL=redis://redis:6379/0
+            - CELERY_RESULT_BACKEND=redis://redis:6379/0
+        depends_on:
+            - redis
 
-  yaptide_flask:
-    build: .
-    image: yaptide_flask
-    volumes:
-      - data:/usr/local/app/yaptide/data
-    container_name: yaptide_flask
-    ports:
-      - 5000:5000
-    command: flask run --host=0.0.0.0
-    environment:
-      - FLASK_APP=yaptide.application
-      - APP_SETTINGS=yaptide.settings
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      - redis
+    yaptide_worker:
+        build:
+            context: .
+            args:
+                SHIELDHIT_PATH: ${SHIELDHIT_PATH-/shieldhit}
+            dockerfile: Dockerfile-worker
+        image: yaptide_worker
+        container_name: yaptide_worker
+        command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
+        environment:
+            - FLASK_DEBUG=1
+            - CELERY_BROKER_URL=redis://redis:6379/0
+            - CELERY_RESULT_BACKEND=redis://redis:6379/0
+        depends_on:
+            - redis
+            - yaptide_flask
 
-  yaptide_worker:
-    build: 
-      context: .
-      args:
-        SHIELDHIT_PATH: ${SHIELDHIT_PATH-/shieldhit}
-    image: yaptide_worker
-    container_name: yaptide_worker
-    command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
-    environment:
-      - FLASK_DEBUG=1
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
-    depends_on:
-      - redis
-      - yaptide_flask
-
-  redis:
-    image: redis:6-alpine
-    container_name: yaptide_redis
+    redis:
+        image: redis:6-alpine
+        container_name: yaptide_redis
 
 volumes:
-  data:
+    data:
