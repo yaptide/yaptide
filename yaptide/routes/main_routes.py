@@ -5,7 +5,7 @@ from yaptide.routes.simulation_routes import (SimulationRun, SimulationStatus, S
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 
-from plgrid.plgrid_routes import RimrockJobs, PlgData
+from yaptide.plgrid.plgrid_routes import RimrockJobs, PlgData
 
 
 class HelloWorld(Resource):
