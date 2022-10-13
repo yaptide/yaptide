@@ -70,7 +70,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         return {
             'result': result, 
             'metadata': {
-                'source': 'YAPTIIDE' if 'metadata' in raw_input_dict else 'Input files',
+                'source': 'YAPTIDE' if 'metadata' in raw_input_dict else 'Input files',
                 'simulator': param_dict['sim_type'],
                 'type': 'results',
             },
