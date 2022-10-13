@@ -4,10 +4,9 @@ import tempfile
 
 from pathlib import Path
 
-from yaptide.plgrid.string_templates import PLGDATA_GET_URL, PLGDATA_LIST_URL
-
 from pymchelper.input_output import fromfile
 
+from plgrid.string_templates import PLGDATA_GET_URL, PLGDATA_LIST_URL
 from yaptide.celery.tasks import pymchelper_output_to_json
 
 HTTP_PLGDATA = 'https://data.plgrid.pl'

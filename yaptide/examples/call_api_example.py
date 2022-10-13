@@ -19,6 +19,7 @@ class Endpoints:
         self.http_convert = f'http://{host}:{port}/sh/convert'
 
         self.http_list_sims = f'http://{host}:{port}/user/simulations'
+        self.http_update_user = f'http://{host}:{port}/user/update'
 
         self.http_auth_login = f'http://{host}:{port}/auth/login'
         self.http_auth_logout = f'http://{host}:{port}/auth/logout'
@@ -27,7 +28,7 @@ class Endpoints:
         self.http_plgdata = f'http://{host}:{port}/plgrid/data'
 
 
-auth_json = {
+AUTH_JSON = {
     "login_name": "admin",
     "password": "password",
 }
@@ -51,7 +52,7 @@ def run_simulation_on_backend(session: requests.Session, port: int = 5000, do_mo
     with open(example_json) as json_file:
         json_to_send = json.load(json_file)
 
-    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
 
     if res.status_code != 202:
         print(res.json())
@@ -87,7 +88,7 @@ def run_simulation_with_json(session: requests.Session, json_to_send, port: int 
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
                 if res.status_code != 202:
                     print(res.json())
                     return
@@ -129,19 +130,18 @@ def run_simulation_with_files(session: requests.Session, port: int = 5000, do_mo
 
     timer = timeit.default_timer()
     res: requests.Response = session.post(Endpoints(port=port).http_sim_run, json={'input_files': input_files})
-    task_id: str = ""
     data: dict = res.json()
     print(data)
 
-    task_id = data.get('task_id')
+    task_id: str = data.get('task_id')
 
-    if task_id != "":
+    if task_id != None:
         while do_monitor_job:
             time.sleep(5)
             # we need to relog in every 2 hours or refresh every 10 minutes
             # for just simplicity of the code we are just relogging in
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
                 if res.status_code != 202:
                     print(res.json())
                     return
@@ -179,7 +179,7 @@ def run_simulation_with_files(session: requests.Session, port: int = 5000, do_mo
 
 def check_backend_jobs(session: requests.Session, sim_n: int, page_size: int, port: int = 5000):
     """Example checking backend jobs with pagination"""
-    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
     print(res.json())
     if res.status_code != 202:
         return
@@ -191,7 +191,7 @@ def check_backend_jobs(session: requests.Session, sim_n: int, page_size: int, po
         for i in range(math.ceil(sim_n/page_size)):
             time.sleep(5)
             if timeit.default_timer() - timer > 500:
-                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=auth_json)
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
                 if res.status_code != 202:
                     print(res.json())
                     return
@@ -236,25 +236,39 @@ def run_simulation_with_rimrock(session: requests.Session, port: int = 5000, do_
     """Example function running simulation on rimrock"""
     grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
 
-    headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
-
     session = requests.Session()
     input_files = read_input_files()
-    res: requests.Response = session.post(Endpoints(port=port).http_rimrock, json=input_files, headers=headers)
-
+    timer = timeit.default_timer()
+    res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
+    res_json = res.json()
+    print(res_json)
+    if res.status_code != 202:
+        return
+    res: requests.Response = session.post(Endpoints(port=port).http_update_user, json={'grid_proxy': grid_proxy})
+    res_json = res.json()
+    print(res_json)
+    if res.status_code != 202:
+        return
+    res: requests.Response = session.post(Endpoints(port=port).http_rimrock, json=input_files)
     res_json = res.json()
     print(res_json)
     if res.status_code != 201:
         return
 
-    job_id: str = ""
-    job_id = res_json.get('job_id')
-    if job_id != "":
+    job_id: str = res_json.get('job_id')
+    if job_id != None:
         while do_monitor_job:
             time.sleep(5)
+            # we need to relog in every 2 hours or refresh every 10 minutes
+            # for just simplicity of the code we are just relogging in
+            if timeit.default_timer() - timer > 500:
+                res: requests.Response = session.post(Endpoints(port=port).http_auth_login, json=AUTH_JSON)
+                if res.status_code != 202:
+                    print(res.json())
+                    return
+                timer = timeit.default_timer()
             res: requests.Response = session.get(Endpoints(port=port).http_rimrock,
-                                                 params={"job_id": job_id},
-                                                 headers=headers)
+                                                 params={"job_id": job_id})
             res_json = res.json()
             print(f'Rescode {res.status_code}')
             print(res_json)
@@ -267,23 +281,15 @@ def run_simulation_with_rimrock(session: requests.Session, port: int = 5000, do_
 
 def check_rimrock_jobs(session: requests.Session, port: int = 5000):
     """Example function cehcking rimrock jobs' statuses"""
-    grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
-
-    headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
-
-    res: requests.Response = session.get(Endpoints(port=port).http_rimrock, headers=headers)
+    res: requests.Response = session.get(Endpoints(port=port).http_rimrock)
     res_json = res.json()
     print(res_json)
 
 
 def get_slurm_results(session: requests.Session, job_id: str, port: int = 5000):
     """Example function getting slurm results"""
-    grid_proxy = read_grid_proxy_file(dir_path=EXAMPLE_DIR)
-
-    headers = {"PROXY": base64.b64encode(grid_proxy.encode('utf-8')).decode('utf-8')}
     res: requests.Response = session.get(Endpoints(port=port).http_plgdata,
-                                         params={"job_id": job_id},
-                                         headers=headers)
+                                         params={"job_id": job_id})
     res_json = res.json()
     path = Path(EXAMPLE_DIR, 'output', f'{job_id.split(".")[0]}.json')
     with open(path, 'w') as writer:
@@ -297,4 +303,4 @@ if __name__ == "__main__":
     parser.add_argument('--port', help='backend port', default=5000, type=int)
     args = parser.parse_args()
     main_session = requests.Session()
-    run_simulation_on_backend(session=main_session, port=args.port, do_monitor_job=False)
+    run_simulation_with_rimrock(session=main_session, port=args.port, do_monitor_job=True)

@@ -1,7 +1,7 @@
 from enum import Enum
 import requests
 
-from yaptide.plgrid.string_templates import SHIELDHIT_BASH
+from plgrid.string_templates import SHIELDHIT_BASH
 
 HTTP_RIMROCK_JOBS = 'https://rimrock.plgrid.pl/api/jobs'
 HOSTNAME = 'ares'
