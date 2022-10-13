@@ -2,10 +2,10 @@ from flask_restful import Resource
 
 from yaptide.routes.simulation_routes import (SimulationRun, SimulationStatus, SimulationInputs,
                                               SimulationCancel, ConvertInputFiles)
-from yaptide.routes.user_routes import UserSimulations
+from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 
-from plgrid.plgrid_routes import RimrockJobs, PlgData
+from yaptide.plgrid.plgrid_routes import RimrockJobs, PlgData
 
 
 class HelloWorld(Resource):
@@ -28,6 +28,7 @@ def initialize_routes(api):
     api.add_resource(SimulationCancel, "/sh/cancel")
 
     api.add_resource(UserSimulations, "/user/simulations")
+    api.add_resource(UserUpdate, "/user/update")
 
     api.add_resource(AuthRegister, "/auth/register")
     api.add_resource(AuthLogIn, "/auth/login")

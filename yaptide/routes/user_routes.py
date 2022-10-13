@@ -14,7 +14,7 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel
 
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import yaptide_response
+from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 
 MAX_PAGE_SIZE = 100
 DEFAULT_PAGE_SIZE = 10
@@ -94,3 +94,19 @@ class UserSimulations(Resource):
             'simulations_count': sim_count,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)
+
+
+class UserUpdate(Resource):
+    """Class responsible for updating the user"""
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def post(user: UserModel):
+        """Updates user with provided parameters"""
+        json_data: dict = request.get_json(force=True)
+        if not json_data:
+            return error_validation_response()
+        if 'grid_proxy' in json_data:
+            user.grid_proxy = json_data['grid_proxy']
+        db.session.commit()
+        return yaptide_response(message='User updated', code=202)

@@ -4,14 +4,14 @@ import tempfile
 
 from pathlib import Path
 
-from plgrid.string_templates import PLGDATA_GET_URL, PLGDATA_LIST_URL
+from yaptide.plgrid.string_templates import PLGDATA_GET_URL, PLGDATA_LIST_URL
 
 from pymchelper.input_output import fromfile
 
 from yaptide.celery.tasks import pymchelper_output_to_json
 
-http_plgdata = 'https://data.plgrid.pl'
-hostname = 'ares'
+HTTP_PLGDATA = 'https://data.plgrid.pl'
+HOSTNAME = 'ares'
 
 
 def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
@@ -28,8 +28,8 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
     # construct an URL with a path to the simulation workspace directory, based on jobid
     # this path may contain many different files: simulation output (i.e. BDO files), logs and simulation output
     list_url = PLGDATA_LIST_URL.format(
-        http_plgdata=http_plgdata,
-        hostname=hostname,
+        http_plgdata=HTTP_PLGDATA,
+        hostname=HOSTNAME,
         slurm_job_id=slurm_job_id,
     )
     # get a list of all files and directories in the simulation workspace directory
@@ -42,8 +42,8 @@ def fetch_bdo_files(json_data: dict) -> tuple[dict, int]:
                 filename: str = ls_obj['name']
                 local_file_path = Path(tmp_dir_path, filename)
                 get_url = PLGDATA_GET_URL.format(
-                    http_plgdata=http_plgdata,
-                    hostname=hostname,
+                    http_plgdata=HTTP_PLGDATA,
+                    hostname=HOSTNAME,
                     slurm_job_id=slurm_job_id,
                     filename=filename
                 )

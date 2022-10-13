@@ -1,10 +1,10 @@
 from enum import Enum
 import requests
 
-from plgrid.string_templates import SHIELDHIT_BASH
+from yaptide.plgrid.string_templates import SHIELDHIT_BASH
 
-http_rimrock_jobs = 'https://rimrock.plgrid.pl/api/jobs'
-hostname = 'ares'
+HTTP_RIMROCK_JOBS = 'https://rimrock.plgrid.pl/api/jobs'
+HOSTNAME = 'ares'
 
 
 class JobStatus(Enum):
@@ -22,7 +22,7 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
         "PROXY": json_data['grid_proxy']
     }
     data = {
-        "host": f'{hostname}.cyfronet.pl',
+        "host": f'{HOSTNAME}.cyfronet.pl',
         "script": SHIELDHIT_BASH.format(
             beam=json_data["beam.dat"],
             detect=json_data["detect.dat"],
@@ -32,7 +32,7 @@ def submit_job(json_data: dict) -> tuple[dict, int]:
         "tag": "yaptide_job"
     }
 
-    res: requests.Response = session.post(http_rimrock_jobs, json=data, headers=headers)
+    res: requests.Response = session.post(HTTP_RIMROCK_JOBS, json=data, headers=headers)
     res_json = res.json()
     return res_json, res.status_code
 
@@ -44,12 +44,12 @@ def get_job(json_data: dict) -> tuple[dict, int]:
         "PROXY": json_data['grid_proxy']
     }
     if "job_id" in json_data:
-        res: requests.Response = session.get(f'{http_rimrock_jobs}/{json_data["job_id"]}', headers=headers)
+        res: requests.Response = session.get(f'{HTTP_RIMROCK_JOBS}/{json_data["job_id"]}', headers=headers)
         res_json = res.json()
         if res.status_code == 200:
             return res_json, res.status_code
     else:
-        res: requests.Response = session.get(http_rimrock_jobs, params={"tag": "yaptide_job"}, headers=headers)
+        res: requests.Response = session.get(HTTP_RIMROCK_JOBS, params={"tag": "yaptide_job"}, headers=headers)
         res_json = res.json()
         if res.status_code == 200:
             return {
@@ -64,7 +64,7 @@ def delete_job(json_data: dict) -> tuple[dict, int]:
     headers = {
         "PROXY": json_data['grid_proxy']
     }
-    res: requests.Response = session.delete(f'{http_rimrock_jobs}/{json_data["job_id"]}', headers=headers)
+    res: requests.Response = session.delete(f'{HTTP_RIMROCK_JOBS}/{json_data["job_id"]}', headers=headers)
     if res.status_code == 204:
         return {
             "message": "Job deleted"
