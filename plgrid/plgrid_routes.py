@@ -6,11 +6,10 @@ from marshmallow import fields
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
+from yaptide.persistence.models import UserModel
 
 from plgrid.rimrock_methods import submit_job, get_job, delete_job
 from plgrid.plgdata_methods import fetch_bdo_files
-
-from yaptide.persistence.models import UserModel
 
 
 class RimrockJobs(Resource):

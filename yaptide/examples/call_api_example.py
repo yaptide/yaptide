@@ -4,7 +4,7 @@ import math
 import os
 import time
 import timeit
-import base64
+
 from pathlib import Path
 
 import requests
@@ -135,7 +135,7 @@ def run_simulation_with_files(session: requests.Session, port: int = 5000, do_mo
 
     task_id: str = data.get('task_id')
 
-    if task_id != None:
+    if task_id is not None:
         while do_monitor_job:
             time.sleep(5)
             # we need to relog in every 2 hours or refresh every 10 minutes
@@ -256,7 +256,7 @@ def run_simulation_with_rimrock(session: requests.Session, port: int = 5000, do_
         return
 
     job_id: str = res_json.get('job_id')
-    if job_id != None:
+    if job_id is not None:
         while do_monitor_job:
             time.sleep(5)
             # we need to relog in every 2 hours or refresh every 10 minutes
