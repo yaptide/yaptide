@@ -1,4 +1,4 @@
-from yaptide.celery.worker import celery_app
+'from yaptide.celery.worker import celery_app
 
 from pathlib import Path
 import sys
@@ -18,11 +18,14 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 
 def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: str):
-    """Function used to write input files to output directory. Returns dictionary with filenames as keys and their content as values"""
-    if not "input_files" in raw_input_dict:
+    """
+    Function used to write input files to output directory. 
+    Returns dictionary with filenames as keys and their content as values
+    """
+    if "input_files" not in raw_input_dict:
         conv_parser = get_parser_from_str(param_dict['sim_type'])
         return run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=output_dir)
-    
+
     for key, file in raw_input_dict["input_files"].items():
         with open(Path(output_dir, key), 'w') as writer:
             writer.write(file)
@@ -68,7 +71,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         result: dict = pymchelper_output_to_json(estimators_dict)
 
         return {
-            'result': result, 
+            'result': result,
             'metadata': {
                 'source': 'YAPTIIDE' if 'metadata' in raw_input_dict else 'Input files',
                 'simulator': param_dict['sim_type'],
@@ -76,7 +79,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             },
             'input_json': raw_input_dict if 'metadata' in raw_input_dict else None,
             'input_files': input_files,
-            'end_time': datetime.utcnow(), 
+            'end_time': datetime.utcnow(),
             'cores': runner_obj.jobs
         }
 
@@ -283,3 +286,4 @@ def cancel_simulation(task_id: str) -> bool:
     # Currently this task does nothing because to working properly it requires changes in pymchelper
     print(task_id)
     return False
+'
