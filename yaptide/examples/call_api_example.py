@@ -234,7 +234,6 @@ def read_grid_proxy_file(dir_path: str) -> str:
 
 def run_simulation_with_rimrock(session: requests.Session, port: int = 5000, do_monitor_job: bool = True):
     """Example function running simulation on rimrock"""
-
     session = requests.Session()
     input_files = read_input_files()
     timer = timeit.default_timer()
