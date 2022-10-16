@@ -6,5 +6,13 @@
             "LOGIN": "admin",
             "PASSWORD": "password"
         }
+    },
+    {
+        "OPERATION": "UPDATE",
+        "TABLE": "User",
+        "DATA": {
+            "LOGIN": "admin",
+            "GRID_PROXY_NAME": "grid_proxy"
+        }
     }
 ]

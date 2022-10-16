@@ -28,6 +28,8 @@ class UserModel(db.Model):
 
     def get_encoded_grid_proxy(self) -> str:
         """Returns encoded grid proxy required for SLURM authentication"""
+        if self.grid_proxy is None:
+            return "Literally any string which is intended not to work -> this one does not"
         return base64.b64encode(self.grid_proxy.encode('utf-8')).decode('utf-8')
 
     def __repr__(self) -> str:

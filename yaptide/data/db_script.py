@@ -25,11 +25,12 @@ class TableTypes(Enum):
     SIMULATION = "Simulation"
 
 
-class DataJsonFields(Enum):
+class DataUserFields(Enum):
     """Data JSON fields"""
 
     LOGIN = "LOGIN"
     PASSWORD = "PASSWORD"
+    GRID_PROXY_NAME = "GRID_PROXY_NAME"
 
 
 def select_all_simulations(con: db.engine.Connection):
@@ -57,27 +58,40 @@ def insert_user(con: db.engine.Connection, data: dict):
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     query = db.insert(users).values(
-        login_name=data[DataJsonFields.LOGIN.value],
-        password_hash=generate_password_hash(data[DataJsonFields.PASSWORD.value])
+        login_name=data[DataUserFields.LOGIN.value],
+        password_hash=generate_password_hash(data[DataUserFields.PASSWORD.value])
     )
     try:
         con.execute(query)
-        print(f'Successfully inserted user: {data[DataJsonFields.LOGIN.value]}')
+        print(f'Successfully inserted user: {data[DataUserFields.LOGIN.value]}')
     except db.exc.IntegrityError:
-        print(f'Inserting user: {data[DataJsonFields.LOGIN.value]} failed, probably already exists')
+        print(f'Inserting user: {data[DataUserFields.LOGIN.value]} failed, probably already exists')
 
 
 def update_user(con: db.engine.Connection, data: dict):
     """Updates user with provided login in db"""
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    query = db.update(users).where(
-       users.c.login_name == data[DataJsonFields.LOGIN.value]
-    ).values(
-        password_hash=generate_password_hash(data[DataJsonFields.PASSWORD.value])
-    )
-    con.execute(query)
-    print(f'Successfully updated user: {data[DataJsonFields.LOGIN.value]}')
+    if DataUserFields.LOGIN.value not in data:
+        print(f'{DataUserFields.LOGIN.value} not provided in UPDATE function')
+        return
+    if DataUserFields.PASSWORD.value in data:
+        query = db.update(users).where(
+        users.c.login_name == data[DataUserFields.LOGIN.value]
+        ).values(
+            password_hash=generate_password_hash(data[DataUserFields.PASSWORD.value])
+        )
+        con.execute(query)
+    if DataUserFields.GRID_PROXY_NAME.value in data:
+        grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), data[DataUserFields.GRID_PROXY_NAME.value])
+        with open(grid_proxy_path) as grid_proxy_file:
+            query = db.update(users).where(
+            users.c.login_name == data[DataUserFields.LOGIN.value]
+            ).values(
+                grid_proxy=grid_proxy_file.read()
+            )
+            con.execute(query)
+    print(f'Successfully updated user: {data[DataUserFields.LOGIN.value]}')
 
 
 def delete_user(con: db.engine.Connection, data: dict):
@@ -85,10 +99,10 @@ def delete_user(con: db.engine.Connection, data: dict):
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     query = db.delete(users).where(
-       users.c.login_name == data[DataJsonFields.LOGIN.value]
+       users.c.login_name == data[DataUserFields.LOGIN.value]
     )
     con.execute(query)
-    print(f'Successfully deleted user: {data[DataJsonFields.LOGIN.value]}')
+    print(f'Successfully deleted user: {data[DataUserFields.LOGIN.value]}')
 
 
 if __name__ == "__main__":
