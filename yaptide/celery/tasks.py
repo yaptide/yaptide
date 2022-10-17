@@ -19,7 +19,7 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: str):
     """
-    Function used to write input files to output directory. 
+    Function used to write input files to output directory.
     Returns dictionary with filenames as keys and their content as values
     """
     if "input_files" not in raw_input_dict:
