@@ -286,4 +286,3 @@ def cancel_simulation(task_id: str) -> bool:
     # Currently this task does nothing because to working properly it requires changes in pymchelper
     print(task_id)
     return False
-'
