@@ -17,11 +17,19 @@ sys.path.append('yaptide/converter')
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
-def save_input_files(input_files: dict, output_dir: str):
-    """Function used to save input files"""
-    for key, value in input_files.items():
+def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: str):
+    """
+    Function used to write input files to output directory.
+    Returns dictionary with filenames as keys and their content as values
+    """
+    if "input_files" not in raw_input_dict:
+        conv_parser = get_parser_from_str(param_dict['sim_type'])
+        return run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=output_dir)
+
+    for key, file in raw_input_dict["input_files"].items():
         with open(Path(output_dir, key), 'w') as writer:
-            writer.write(value)
+            writer.write(file)
+    return raw_input_dict["input_files"]
 
 
 @celery_app.task(bind=True)
@@ -32,11 +40,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        if raw_input_dict.get("input_files"):
-            save_input_files(input_files=raw_input_dict["input_files"], output_dir=tmp_dir_path)
-        else:
-            conv_parser = get_parser_from_str(param_dict['sim_type'])
-            run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+        input_files = write_input_files(param_dict, raw_input_dict, tmp_dir_path)
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
@@ -66,7 +70,18 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         result: dict = pymchelper_output_to_json(estimators_dict)
 
-        return {'result': result, 'input': raw_input_dict, 'end_time': datetime.utcnow(), 'cores': runner_obj.jobs}
+        return {
+            'result': result,
+            'metadata': {
+                'source': 'YAPTIDE' if 'metadata' in raw_input_dict else 'Input files',
+                'simulator': param_dict['sim_type'],
+                'type': 'results',
+            },
+            'input_json': raw_input_dict if 'metadata' in raw_input_dict else None,
+            'input_files': input_files,
+            'end_time': datetime.utcnow(),
+            'cores': runner_obj.jobs
+        }
 
 
 @celery_app.task
@@ -174,7 +189,7 @@ def simulation_input_files(path: str) -> dict:
     """Function returning a dictionary with simulation input filenames as keys and their content as values"""
     result = {}
     try:
-        for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+        for filename in ['info.json', 'geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
             file = Path(path, filename)
             with open(file, 'r') as reader:
                 result[filename] = reader.read()
@@ -201,7 +216,9 @@ def simulation_task_status(task_id: str) -> dict:
     elif task.state != 'FAILURE':
         if 'result' in task.info:
             result['result'] = task.info.get('result')
-            result['input'] = task.info.get('input')
+            result['metadata'] = task.info.get('metadata')
+            result['input_files'] = task.info.get('input_files')
+            result['input_json'] = task.info.get('input_json')
             result['end_time'] = task.info.get('end_time')
             result['cores'] = task.info.get('cores')
         elif 'logfile' in task.info:
