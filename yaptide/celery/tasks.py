@@ -1,4 +1,4 @@
-'from yaptide.celery.worker import celery_app
+from yaptide.celery.worker import celery_app
 
 from pathlib import Path
 import sys
