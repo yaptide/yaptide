@@ -130,8 +130,6 @@ class SimulationStatus(Resource):
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
             simulation.cores = result['cores']
             db.session.commit()
-            result.pop("end_time")
-            result.pop("cores")
 
         return yaptide_response(
             message=f"Task state: {result['state']}",
