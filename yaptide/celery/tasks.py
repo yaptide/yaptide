@@ -261,8 +261,7 @@ def sh12a_simulation_status(dir_path: str) -> dict:
                         'hours': splitted[5],
                         'minutes': splitted[7],
                         'seconds': splitted[9],
-                    },
-                    'line': last_result_line
+                    }
                 }
             return {'simulated_primaries': 0}
     except FileNotFoundError:
