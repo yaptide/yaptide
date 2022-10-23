@@ -107,8 +107,8 @@ if __name__ == "__main__":
     input_json_path = Path(file_dir, 'script_input.json')
     with open(input_json_path) as json_file:
         json_data = json.load(json_file)
-    engine = db.create_engine(f'sqlite:////{file_dir}/main.db')
-    connection = engine.connect()
+    db_engine = db.create_engine(f'sqlite:////{file_dir}/main.db')
+    connection = db_engine.connect()
 
     for obj in json_data:
         if OPERATION not in obj:
@@ -119,13 +119,13 @@ if __name__ == "__main__":
             raise ValueError(f'No DATA field in provided JSON object: {obj}')
 
         if obj[OPERATION] == OperationTypes.INSERT.value and obj[TABLE] == TableTypes.USER.value:
-            insert_user(con=connection, engine=engine, data=obj[DATA])
+            insert_user(con=connection, engine=db_engine, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.UPDATE.value and obj[TABLE] == TableTypes.USER.value:
-            update_user(con=connection, engine=engine, data=obj[DATA])
+            update_user(con=connection, engine=db_engine, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.DELETE.value and obj[TABLE] == TableTypes.USER.value:
-            delete_user(con=connection, engine=engine, data=obj[DATA])
+            delete_user(con=connection, engine=db_engine, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.SELECT.value:
             if obj[TABLE] == TableTypes.USER.value:
-                select_all_users(con=connection, engine=engine)
+                select_all_users(con=connection, engine=db_engine)
             else:
-                select_all_simulations(con=connection, engine=engine)
+                select_all_simulations(con=connection, engine=db_engine)
