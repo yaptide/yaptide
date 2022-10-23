@@ -81,9 +81,9 @@ class YaptideTester:
         Path(ROOT_DIR, "output").mkdir(parents=True, exist_ok=True)
         self.session.login(inital_login=True)
 
-        print("Running simulation on rimrock")
+        print("\n\nRunning simulation on rimrock\n\n")
         self.run_simulation_with_rimrock(True)
-        print("Running simulation on backend")
+        print("\n\nRunning simulation on backend\n\n")
         self.run_simulation_on_backend(True)
 
         self.session.logout()
@@ -122,9 +122,9 @@ class YaptideTester:
         res: requests.Response = self.session.post(self.endpoints.http_sim_run, json=json_to_send)
 
         task_id: str = ""
-        data: dict = res.json()
-        print(data)
-        task_id = data.get('task_id')
+        res_json: dict = res.json()
+        print(res_json)
+        task_id = res_json.get('task_id')
 
         if task_id != "":
             while do_monitor_job:
@@ -132,29 +132,30 @@ class YaptideTester:
                 try:
                     res: requests.Response = self.session.\
                         post(self.endpoints.http_sim_status, json={'task_id': task_id})
-                    data: dict = res.json()
+                    res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
-                        if data.get('result'):
+                        if res_json.get('result'):
                             with open(Path(ROOT_DIR, 'output', 'simulation_output.json'), 'w') as writer:
-                                data_to_write = str(data['result'])
+                                data_to_write = str(res_json['result'])
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
                             return
-                        if data.get('logfile'):
+                        print(res_json)
+                        if res_json.get('logfile'):
                             with open(Path(ROOT_DIR, 'output', 'error_full_output.json'), 'w') as writer:
-                                data_to_write = str(data)
+                                data_to_write = str(res_json)
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
                             with open(Path(ROOT_DIR, 'output', 'shieldlog.log'), 'w') as writer:
-                                writer.write(data['logfile'])
-                            for key, value in data['input_files'].items():
+                                writer.write(res_json['logfile'])
+                            for key, value in res_json['input_files'].items():
                                 with open(Path(ROOT_DIR, 'output', key), 'w') as writer:
                                     writer.write(value)
                             return
-                        if data.get('error'):
-                            print(data.get('error'))
+                        if res_json.get('error'):
+                            print(res_json.get('error'))
                             return
 
                 except Exception as e:  # skipcq: PYL-W0703
@@ -165,10 +166,10 @@ class YaptideTester:
         input_files = self.read_input_files()
 
         res: requests.Response = self.session.post(self.endpoints.http_sim_run, json={'input_files': input_files})
-        data: dict = res.json()
-        print(data)
+        res_json: dict = res.json()
+        print(res_json)
 
-        task_id: str = data.get('task_id')
+        task_id: str = res_json.get('task_id')
 
         if task_id is not None:
             while do_monitor_job:
@@ -176,29 +177,30 @@ class YaptideTester:
                 try:
                     res: requests.Response = self.session.\
                         post(self.endpoints.http_sim_status, json={'task_id': task_id})
-                    data: dict = res.json()
+                    res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
-                        if data.get('result'):
+                        if res_json.get('result'):
                             with open(Path(ROOT_DIR, 'output', 'simulation_output.json'), 'w') as writer:
-                                data_to_write = str(data['result'])
+                                data_to_write = str(res_json['result'])
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
                             return
-                        if data.get('logfile'):
+                        print(res_json)
+                        if res_json.get('logfile'):
                             with open(Path(ROOT_DIR, 'output', 'error_full_output.json'), 'w') as writer:
-                                data_to_write = str(data)
+                                data_to_write = str(res_json)
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
                             with open(Path(ROOT_DIR, 'output', 'shieldlog.log'), 'w') as writer:
-                                writer.write(data['logfile'])
-                            for key, value in data['input_files'].items():
+                                writer.write(res_json['logfile'])
+                            for key, value in res_json['input_files'].items():
                                 with open(Path(ROOT_DIR, 'output', key), 'w') as writer:
                                     writer.write(value)
                             return
-                        if data.get('error'):
-                            print(data.get('error'))
+                        if res_json.get('error'):
+                            print(res_json.get('error'))
                             return
 
                 except Exception as e:  # skipcq: PYL-W0703
