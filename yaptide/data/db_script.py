@@ -33,7 +33,7 @@ class DataUserFields(Enum):
     GRID_PROXY_NAME = "GRID_PROXY_NAME"
 
 
-def select_all_simulations(con: db.engine.Connection):
+def select_all_simulations(con: db.engine.Connection, engine):
     """Selects all users from db"""
     metadata = db.MetaData()
     simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
@@ -43,7 +43,7 @@ def select_all_simulations(con: db.engine.Connection):
     print(ResultSet)
 
 
-def select_all_users(con: db.engine.Connection):
+def select_all_users(con: db.engine.Connection, engine):
     """Selects all users from db"""
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
@@ -53,7 +53,7 @@ def select_all_users(con: db.engine.Connection):
     print(ResultSet)
 
 
-def insert_user(con: db.engine.Connection, data: dict):
+def insert_user(con: db.engine.Connection, engine, data: dict):
     """Inserts new user to db"""
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
@@ -68,7 +68,7 @@ def insert_user(con: db.engine.Connection, data: dict):
         print(f'Inserting user: {data[DataUserFields.LOGIN.value]} failed, probably already exists')
 
 
-def update_user(con: db.engine.Connection, data: dict):
+def update_user(con: db.engine.Connection, engine, data: dict):
     """Updates user with provided login in db"""
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
@@ -88,7 +88,7 @@ def update_user(con: db.engine.Connection, data: dict):
     print(f'Successfully updated user: {data[DataUserFields.LOGIN.value]}')
 
 
-def delete_user(con: db.engine.Connection, data: dict):
+def delete_user(con: db.engine.Connection, engine, data: dict):
     """Deletes user with provided login from db"""
     metadata = db.MetaData()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
@@ -119,13 +119,13 @@ if __name__ == "__main__":
             raise ValueError(f'No DATA field in provided JSON object: {obj}')
 
         if obj[OPERATION] == OperationTypes.INSERT.value and obj[TABLE] == TableTypes.USER.value:
-            insert_user(con=connection, data=obj[DATA])
+            insert_user(con=connection, engine=engine, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.UPDATE.value and obj[TABLE] == TableTypes.USER.value:
-            update_user(con=connection, data=obj[DATA])
+            update_user(con=connection, engine=engine, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.DELETE.value and obj[TABLE] == TableTypes.USER.value:
-            delete_user(con=connection, data=obj[DATA])
+            delete_user(con=connection, engine=engine, data=obj[DATA])
         if obj[OPERATION] == OperationTypes.SELECT.value:
             if obj[TABLE] == TableTypes.USER.value:
-                select_all_users(con=connection)
+                select_all_users(con=connection, engine=engine)
             else:
-                select_all_simulations(con=connection)
+                select_all_simulations(con=connection, engine=engine)
