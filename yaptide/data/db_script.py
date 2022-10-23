@@ -81,10 +81,14 @@ def update_user(con: db.engine.Connection, engine, data: dict):
         con.execute(query)
     if DataUserFields.GRID_PROXY_NAME.value in data:
         grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), data[DataUserFields.GRID_PROXY_NAME.value])
-        with open(grid_proxy_path) as grid_proxy_file:
-            query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
-                values(grid_proxy=grid_proxy_file.read())
-            con.execute(query)
+        try:
+            with open(grid_proxy_path) as grid_proxy_file:
+                query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
+                    values(grid_proxy=grid_proxy_file.read())
+                con.execute(query)
+        except FileNotFoundError:
+            print(f'Proxy file: {grid_proxy_path} does not exist - aborting update')
+            return
     print(f'Successfully updated user: {data[DataUserFields.LOGIN.value]}')
 
 
