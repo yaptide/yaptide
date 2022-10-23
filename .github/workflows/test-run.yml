@@ -54,7 +54,7 @@ jobs:
 
       # add keys to the SSH agent
       - uses: webfactory/ssh-agent@v0.5.3
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
         with:
           ssh-private-key: |
             ${{ secrets.DEPLOY_C3_TEST }}
@@ -69,7 +69,7 @@ jobs:
       # kill docker containers, then remove them
       - name: Kill our docker containers
         continue-on-error: true
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.BACKEND_HOST }}
@@ -89,12 +89,12 @@ jobs:
     
       # copy the new files form the github agent onto the openstack machine via proxy (inspired by: https://stackoverflow.com/questions/16654751/rsync-through-ssh-tunnel)
       - name: Copy files to the machine
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
         run: rsync -e "ssh -A ${{ env.FRONTEND_USER }}@${{ env.FRONTEND_HOST }} ssh" . ${{ env.BACKEND_USER }}@${{ env.BACKEND_HOST }}:~/yaptide --delete --recursive
 
       # No need to run these processes using screen, as docker-compose with --detach option sends the process to the background
       - name: Compose docker images and run them
-        if: github.ref == 'refs/heads/master'
+        # if: github.ref == 'refs/heads/master'
         uses: appleboy/ssh-action@master
         with:
           host: ${{ env.BACKEND_HOST }}
