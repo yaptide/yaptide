@@ -157,6 +157,8 @@ class YaptideTester:
                         if res_json.get('error'):
                             print(res_json.get('error'))
                             return
+                    else:
+                        print(res_json)
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
@@ -202,6 +204,8 @@ class YaptideTester:
                         if res_json.get('error'):
                             print(res_json.get('error'))
                             return
+                    else:
+                        print(res_json)
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)

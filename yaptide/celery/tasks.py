@@ -5,6 +5,8 @@ import sys
 import tempfile
 from datetime import datetime
 
+import re
+
 from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
@@ -249,17 +251,20 @@ def sh12a_simulation_status(dir_path: str) -> dict:
                     # Searching for latest line
                     if line.lstrip().startswith("Primary particle"):
                         last_result_line = line
-            if last_result_line == "":
-                return {'simulated_primaries': 0}
-            splited = last_result_line.split()
-            return {
-                'simulated_primaries': splited[3],
-                'estimated': {
-                    'hours': splited[5],
-                    'minutes': splited[7],
-                    'seconds': splited[9],
+
+            regex_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hours\s*\d*\s*minutes\s*\d*\s*seconds\b"
+            if re.search(regex_match, last_result_line):
+                splitted = last_result_line.split()
+                return {
+                    'simulated_primaries': splitted[3],
+                    'estimated': {
+                        'hours': splitted[5],
+                        'minutes': splitted[7],
+                        'seconds': splitted[9],
+                    },
+                    'line': last_result_line
                 }
-            }
+            return {'simulated_primaries': 0}
     except FileNotFoundError:
         return {
             'message': 'Output not generated yet'
