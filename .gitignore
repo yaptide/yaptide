@@ -149,3 +149,5 @@ yaptide/main.db
 
 grid_proxy
 *.db
+
+yaptide_local_tester/output/
