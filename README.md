@@ -132,7 +132,16 @@ And for Linux:
 curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'task_id' : '<task_id>'}" "http://localhost:5000/sh/status"
 ```
 
-Although it might be inefficient way of testing so there is a prepared example ``call_api_example.py`` in yaptide/examples folder
+# Windows running script
+
+There are 3 scripts prepared for Windows. Example calls: ```shell
+.\scripts\run_yaptide.bat <shieldhit_binary_file_path>
+.\scripts\kill_yaptide.bat
+.\scripts\run_dev_testing.bat <shieldhit_binary_file_path>
+```
+First script setups the YAPTIDE environment
+Second allows to delete YAPTIDE environment
+Third one setups the environment, runs tests and deletes environment
 
 # PLGrid
 
