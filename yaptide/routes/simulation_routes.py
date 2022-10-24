@@ -1,3 +1,4 @@
+from platform import platform
 from flask import request
 from flask_restful import Resource
 
@@ -43,9 +44,12 @@ class SimulationRun(Resource):
         task = run_simulation.delay(param_dict=param_dict, raw_input_dict=json_data)
 
         if param_dict['sim_name'] == "":
-            simulation = SimulationModel(task_id=task.id, user_id=user.id)
+            simulation = SimulationModel(
+                task_id=task.id, user_id=user.id, platform=SimulationModel.Platform.CELERY.value)
         else:
-            simulation = SimulationModel(task_id=task.id, user_id=user.id, name=param_dict['sim_name'])
+            simulation = SimulationModel(
+                task_id=task.id, user_id=user.id, name=param_dict['sim_name'],
+                platform=SimulationModel.Platform.CELERY.value)
 
         db.session.add(simulation)
         db.session.commit()

@@ -6,7 +6,9 @@ from marshmallow import fields
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
-from yaptide.persistence.models import UserModel
+
+from yaptide.persistence.database import db
+from yaptide.persistence.models import UserModel, SimulationModel
 
 from plgrid.rimrock_methods import submit_job, get_job, delete_job
 from plgrid.plgdata_methods import fetch_bdo_files
@@ -24,6 +26,13 @@ class RimrockJobs(Resource):
             return error_validation_response()
         json_data['grid_proxy'] = user.get_encoded_grid_proxy()
         result, status_code = submit_job(json_data=json_data)
+
+        if "job_id" in result:
+            simulation = SimulationModel(
+                task_id=result["job_id"], user_id=user.id, platform=SimulationModel.Platform.RIMROCK.value)
+            db.session.add(simulation)
+            db.session.commit()
+
         return yaptide_response(
             message="",
             code=status_code,
