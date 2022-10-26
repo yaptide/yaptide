@@ -90,7 +90,7 @@ class YaptideTester:
         print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} on rimrock\n\n')
         for _ in range(sim_n):
             self.run_simulation_on_rimrock(do_monitor)
-        print(f'\n\nRunning simulations pagination check\n\n')
+        print("\n\nRunning simulations pagination check\n\n")
         self.check_backend_jobs()
 
         self.session.logout()
