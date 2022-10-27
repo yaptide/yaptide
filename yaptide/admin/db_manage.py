@@ -37,6 +37,7 @@ def run():
 
 @run.command
 def list_users():
+    """List all users"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -87,6 +88,7 @@ def add_user(**kwargs):
     con.execute(query)
     return None
 
+
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
@@ -121,6 +123,7 @@ def update_user(**kwargs):
     print(f'Successfully updated user: {username}')
     return None
 
+
 @run.command
 @click.argument('name')
 def remove_user(**kwargs):
@@ -145,6 +148,7 @@ def remove_user(**kwargs):
     print(f'Successfully deleted user: {username}')
     return None
 
+
 @run.command
 def list_simulations(**kwargs):
     """List all simulations in db"""
@@ -160,6 +164,6 @@ def list_simulations(**kwargs):
         print(f"Id {row['id']} ; Name {row['name']} ; Status {row['status']} ; User {row['user_id']}")
     return None
 
+
 if __name__ == "__main__":
-    """Run the CLI"""
     run()
