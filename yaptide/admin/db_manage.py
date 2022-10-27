@@ -1,18 +1,10 @@
 from enum import Enum
 from pathlib import Path
+import hashlib
 
 import click
 import sqlalchemy as db
 from werkzeug.security import generate_password_hash
-
-
-class OperationTypes(Enum):
-    """Operation types"""
-
-    INSERT = "INSERT"
-    UPDATE = "UPDATE"
-    DELETE = "DELETE"
-    SELECT = "SELECT"
 
 
 class TableTypes(Enum):
@@ -20,29 +12,6 @@ class TableTypes(Enum):
 
     USER = "User"
     SIMULATION = "Simulation"
-
-
-# def update_user(con: db.engine.Connection, metadata: db.MetaData, engine, data: dict):
-#     """Updates user with provided login in db"""
-#     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-#     if DataUserFields.LOGIN.value not in data:
-#         print(f'{DataUserFields.LOGIN.value} not provided in UPDATE function')
-#         return
-#     if DataUserFields.PASSWORD.value in data:
-#         query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
-#             values(password_hash=generate_password_hash(data[DataUserFields.PASSWORD.value]))
-#         con.execute(query)
-#     if DataUserFields.GRID_PROXY_NAME.value in data:
-#         grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), data[DataUserFields.GRID_PROXY_NAME.value])
-#         try:
-#             with open(grid_proxy_path) as grid_proxy_file:
-#                 query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
-#                     values(grid_proxy=grid_proxy_file.read())
-#                 con.execute(query)
-#         except FileNotFoundError:
-#             print(f'Proxy file: {grid_proxy_path} does not exist - aborting update')
-#             return
-#     print(f'Successfully updated user: {data[DataUserFields.LOGIN.value]}')
 
 
 def connect_to_db():
@@ -77,18 +46,28 @@ def list_users():
     ResultSet = ResultProxy.fetchall()
     print(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        print(f"Login {row['login_name']} ; Password hash {row['password_hash']} ; Proxy {row['grid_proxy']}")
+        last_part_of_hash = 'None'
+        if row.grid_proxy is not None:
+            h = hashlib.sha256()
+            h.update(row.grid_proxy.encode('utf-8'))
+            last_part_of_hash = '...' + h.hexdigest()[-10:]
+        print(f"Login {row.login_name} ; Password hash ...{row.password_hash[-10:]} ; Proxy {last_part_of_hash}")
 
 
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
+@click.option('proxy', '--proxy', type=click.File(mode='r'))
 def add_user(**kwargs):
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
     username = kwargs['name']
     password = kwargs['password']
+    proxy_file_handle = kwargs['proxy']
+    proxy_content = None
+    if proxy_file_handle is not None:
+        proxy_content = proxy_file_handle.read()
     print(f'Adding user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
@@ -100,19 +79,21 @@ def add_user(**kwargs):
         print(f'User: {username} already exists')
         return None
 
-    query = db.insert(users).values(login_name=username, password_hash=generate_password_hash(password))
+    query = db.insert(users).values(login_name=username,
+                                    password_hash=generate_password_hash(password),
+                                    grid_proxy=proxy_content)
     con.execute(query)
 
 
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
+@click.option('proxy', '--proxy', type=click.File(mode='r'))
 def update_user(**kwargs):
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
     username = kwargs['name']
-    password = kwargs['password']
     print(f'Updating user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
@@ -124,9 +105,15 @@ def update_user(**kwargs):
         print(f'User: {username} does not exist - aborting update')
         return
 
-    # update password if provided:
+    password = kwargs['password']
+    proxy_file_handle = kwargs['proxy']
+    proxy_content = None
+    if proxy_file_handle is not None:
+        proxy_content = proxy_file_handle.read()
+
+    # update password and proxy if provided:
     query = db.update(users).where(users.c.login_name == username).\
-        values(password_hash=generate_password_hash(password))
+        values(password_hash=generate_password_hash(password), grid_proxy=proxy_content)
     con.execute(query)
     print(f'Successfully updated user: {username}')
 

@@ -98,6 +98,13 @@ Now registering, updating and deleting users is available with the use of ``db_m
 Once docker compose is running, you can use the following command:
  ``docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py --help``.
 
+To add an user with grid_proxy type:
+
+```bash
+docker cp grid_proxy yaptide_flask:/usr/local/app
+docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword --proxy grid_proxy
+```
+
 # Testing API with command-line tools
 
 Currently converter is parsing some of the frontend input so it would be wise to pass the valid json in order to run the simulation (or you just end up with 500 API status)
