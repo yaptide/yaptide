@@ -60,9 +60,11 @@ def connect_to_db():
         return None, None, None
     return con, metadata, engine
 
+
 @click.group()
 def run():
     pass
+
 
 @run.command
 def list_users():
@@ -76,6 +78,7 @@ def list_users():
     print(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
         print(f"Login {row['login_name']} ; Password hash {row['password_hash']} ; Proxy {row['grid_proxy']}")
+
 
 @run.command
 @click.argument('name')
@@ -97,11 +100,9 @@ def add_user(**kwargs):
         print(f'User: {username} already exists')
         return None
 
-    query = db.insert(users).values(
-        login_name=username,
-        password_hash=generate_password_hash(password)
-    )
+    query = db.insert(users).values(login_name=username, password_hash=generate_password_hash(password))
     con.execute(query)
+
 
 @run.command
 @click.argument('name')
@@ -129,6 +130,7 @@ def update_user(**kwargs):
     con.execute(query)
     print(f'Successfully updated user: {username}')
 
+
 @run.command
 @click.argument('name')
 def remove_user(**kwargs):
@@ -152,6 +154,7 @@ def remove_user(**kwargs):
     con.execute(query)
     print(f'Successfully deleted user: {username}')
 
+
 @run.command
 def list_simulations(**kwargs):
     con, metadata, engine = connect_to_db()
@@ -164,6 +167,7 @@ def list_simulations(**kwargs):
     print(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
         print(f"Id {row['id']} ; Name {row['name']} ; Status {row['status']} ; User {row['user_id']}")
+
 
 if __name__ == "__main__":
     run()
