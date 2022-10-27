@@ -232,7 +232,9 @@ if __name__ == "__main__":
     parser.add_argument('--password', help='user password to use for tests', default="password", type=str)
     parser.add_argument('--sim_n', help='number of simulations to run for each type', default=1, type=int)
     parser.add_argument('--do_monitor', help='orders tester to wait for simulations\' results', action='store_true')
-    parser.add_argument('--no-do_monitor', dest='orders tester not to wait for simulations\' results', action='store_false')
+    parser.add_argument(
+        '--no-do_monitor',  dest='do_monitor', action='store_false',
+        help='orders tester not to wait for simulations\' results')
     parser.set_defaults(do_monitor=False)
     args = parser.parse_args()
 
