@@ -1,10 +1,7 @@
-import os
-
-import json
-
-from pathlib import Path
 from enum import Enum
+from pathlib import Path
 
+import click
 import sqlalchemy as db
 from werkzeug.security import generate_password_hash
 
@@ -25,107 +22,148 @@ class TableTypes(Enum):
     SIMULATION = "Simulation"
 
 
-class DataUserFields(Enum):
-    """Data JSON fields"""
+# def update_user(con: db.engine.Connection, metadata: db.MetaData, engine, data: dict):
+#     """Updates user with provided login in db"""
+#     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+#     if DataUserFields.LOGIN.value not in data:
+#         print(f'{DataUserFields.LOGIN.value} not provided in UPDATE function')
+#         return
+#     if DataUserFields.PASSWORD.value in data:
+#         query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
+#             values(password_hash=generate_password_hash(data[DataUserFields.PASSWORD.value]))
+#         con.execute(query)
+#     if DataUserFields.GRID_PROXY_NAME.value in data:
+#         grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), data[DataUserFields.GRID_PROXY_NAME.value])
+#         try:
+#             with open(grid_proxy_path) as grid_proxy_file:
+#                 query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
+#                     values(grid_proxy=grid_proxy_file.read())
+#                 con.execute(query)
+#         except FileNotFoundError:
+#             print(f'Proxy file: {grid_proxy_path} does not exist - aborting update')
+#             return
+#     print(f'Successfully updated user: {data[DataUserFields.LOGIN.value]}')
 
-    LOGIN = "LOGIN"
-    PASSWORD = "PASSWORD"
-    GRID_PROXY_NAME = "GRID_PROXY_NAME"
 
+def connect_to_db():
+    """Connects to db"""
+    sqlite_file_path = Path(Path(__file__).resolve().parent.parent, 'data', 'main.db')
+    if not sqlite_file_path.exists():
+        print(f'Database file: {sqlite_file_path} does not exist - aborting')
+        return None, None, None
+    engine = db.create_engine(f'sqlite:////{sqlite_file_path}')
+    try:
+        con = engine.connect()
+        metadata = db.MetaData()
+    except db.exc.OperationalError:
+        print(f'Connection to db {sqlite_file_path} failed')
+        return None, None, None
+    return con, metadata, engine
 
-def select_all_simulations(con: db.engine.Connection, metadata: db.MetaData, engine):
-    """Selects all users from db"""
-    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([simulations])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    print(ResultSet)
+@click.group()
+def run():
+    pass
 
-
-def select_all_users(con: db.engine.Connection, metadata: db.MetaData, engine):
-    """Selects all users from db"""
+@run.command
+def list_users():
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     query = db.select([users])
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
-    print(ResultSet)
+    print(f"{len(ResultSet)} users in DB:")
+    for row in ResultSet:
+        print(f"Login {row['login_name']} ; Password hash {row['password_hash']} ; Proxy {row['grid_proxy']}")
 
-
-def insert_user(con: db.engine.Connection, metadata: db.MetaData, engine, data: dict):
-    """Inserts new user to db"""
+@run.command
+@click.argument('name')
+@click.option('password', '--password', default='')
+def add_user(**kwargs):
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    username = kwargs['name']
+    password = kwargs['password']
+    print(f'Adding user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+
+    # check if user already exists
+    query = db.select([users]).where(users.c.login_name == username)
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    if len(ResultSet) > 0:
+        print(f'User: {username} already exists')
+        return None
+
     query = db.insert(users).values(
-        login_name=data[DataUserFields.LOGIN.value],
-        password_hash=generate_password_hash(data[DataUserFields.PASSWORD.value])
+        login_name=username,
+        password_hash=generate_password_hash(password)
     )
-    try:
-        con.execute(query)
-        print(f'Successfully inserted user: {data[DataUserFields.LOGIN.value]}')
-    except db.exc.IntegrityError:
-        print(f'Inserting user: {data[DataUserFields.LOGIN.value]} failed, probably already exists')
-
-
-def update_user(con: db.engine.Connection, metadata: db.MetaData, engine, data: dict):
-    """Updates user with provided login in db"""
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    if DataUserFields.LOGIN.value not in data:
-        print(f'{DataUserFields.LOGIN.value} not provided in UPDATE function')
-        return
-    if DataUserFields.PASSWORD.value in data:
-        query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
-            values(password_hash=generate_password_hash(data[DataUserFields.PASSWORD.value]))
-        con.execute(query)
-    if DataUserFields.GRID_PROXY_NAME.value in data:
-        grid_proxy_path = Path(os.path.dirname(os.path.realpath(__file__)), data[DataUserFields.GRID_PROXY_NAME.value])
-        try:
-            with open(grid_proxy_path) as grid_proxy_file:
-                query = db.update(users).where(users.c.login_name == data[DataUserFields.LOGIN.value]).\
-                    values(grid_proxy=grid_proxy_file.read())
-                con.execute(query)
-        except FileNotFoundError:
-            print(f'Proxy file: {grid_proxy_path} does not exist - aborting update')
-            return
-    print(f'Successfully updated user: {data[DataUserFields.LOGIN.value]}')
-
-
-def delete_user(con: db.engine.Connection, metadata: db.MetaData, engine, data: dict):
-    """Deletes user with provided login from db"""
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    query = db.delete(users).where(users.c.login_name == data[DataUserFields.LOGIN.value])
     con.execute(query)
-    print(f'Successfully deleted user: {data[DataUserFields.LOGIN.value]}')
 
+@run.command
+@click.argument('name')
+@click.option('password', '--password', default='')
+def update_user(**kwargs):
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    username = kwargs['name']
+    password = kwargs['password']
+    print(f'Updating user: {username}')
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+
+    # check if user exists:
+    query = db.select([users]).where(users.c.login_name == username)
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    if len(ResultSet) == 0:
+        print(f'User: {username} does not exist - aborting update')
+        return
+
+    # update password if provided:
+    query = db.update(users).where(users.c.login_name == username).\
+        values(password_hash=generate_password_hash(password))
+    con.execute(query)
+    print(f'Successfully updated user: {username}')
+
+@run.command
+@click.argument('name')
+def remove_user(**kwargs):
+    """Deletes user with provided login from db"""
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    username = kwargs['name']
+    print(f'Deleting user: {username}')
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+
+    # check if user exists:
+    query = db.select([users]).where(users.c.login_name == username)
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    if len(ResultSet) == 0:
+        print(f'User: {username} does not exist - aborting delete')
+        return
+
+    query = db.delete(users).where(users.c.login_name == username)
+    con.execute(query)
+    print(f'Successfully deleted user: {username}')
+
+@run.command
+def list_simulations(**kwargs):
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
+    query = db.select([simulations])
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    print(f"{len(ResultSet)} simulations in DB:")
+    for row in ResultSet:
+        print(f"Id {row['id']} ; Name {row['name']} ; Status {row['status']} ; User {row['user_id']}")
 
 if __name__ == "__main__":
-
-    OPERATION = "OPERATION"
-    TABLE = "TABLE"
-    DATA = "DATA"
-
-    file_dir = os.path.dirname(os.path.realpath(__file__))
-    input_json_path = Path(file_dir, 'script_input.json')
-    with open(input_json_path) as json_file:
-        json_data = json.load(json_file)
-    db_engine = db.create_engine(f'sqlite:////{file_dir}/main.db')
-    connection = db_engine.connect()
-    db_metadata = db.MetaData()
-
-    for obj in json_data:
-        if OPERATION not in obj:
-            raise ValueError(f'No OPERATION field in provided JSON object: {obj}')
-        if TABLE not in obj:
-            raise ValueError(f'No TABLE field in provided JSON object: {obj}')
-        if DATA not in obj:
-            raise ValueError(f'No DATA field in provided JSON object: {obj}')
-
-        if obj[OPERATION] == OperationTypes.INSERT.value and obj[TABLE] == TableTypes.USER.value:
-            insert_user(con=connection, metadata=db_metadata, engine=db_engine, data=obj[DATA])
-        if obj[OPERATION] == OperationTypes.UPDATE.value and obj[TABLE] == TableTypes.USER.value:
-            update_user(con=connection, metadata=db_metadata, engine=db_engine, data=obj[DATA])
-        if obj[OPERATION] == OperationTypes.DELETE.value and obj[TABLE] == TableTypes.USER.value:
-            delete_user(con=connection, metadata=db_metadata, engine=db_engine, data=obj[DATA])
-        if obj[OPERATION] == OperationTypes.SELECT.value:
-            if obj[TABLE] == TableTypes.USER.value:
-                select_all_users(con=connection, metadata=db_metadata, engine=db_engine)
-            else:
-                select_all_simulations(con=connection, metadata=db_metadata, engine=db_engine)
+    run()
