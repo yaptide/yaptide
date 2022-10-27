@@ -151,4 +151,4 @@ grid_proxy
 *.db
 
 yaptide_tester/output/
-#yaptide/data/
+yaptide/data/
