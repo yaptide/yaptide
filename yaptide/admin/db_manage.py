@@ -32,7 +32,7 @@ def connect_to_db():
 
 @click.group()
 def run():
-    pass
+    """Manage database"""
 
 
 @run.command
@@ -52,6 +52,7 @@ def list_users():
             h.update(row.grid_proxy.encode('utf-8'))
             last_part_of_hash = '...' + h.hexdigest()[-10:]
         print(f"Login {row.login_name} ; Password hash ...{row.password_hash[-10:]} ; Proxy {last_part_of_hash}")
+    return None
 
 
 @run.command
@@ -59,6 +60,7 @@ def list_users():
 @click.option('password', '--password', default='')
 @click.option('proxy', '--proxy', type=click.File(mode='r'))
 def add_user(**kwargs):
+    """Add user to database"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -83,13 +85,14 @@ def add_user(**kwargs):
                                     password_hash=generate_password_hash(password),
                                     grid_proxy=proxy_content)
     con.execute(query)
-
+    return None
 
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
 @click.option('proxy', '--proxy', type=click.File(mode='r'))
 def update_user(**kwargs):
+    """Update user in database"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -103,7 +106,7 @@ def update_user(**kwargs):
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) == 0:
         print(f'User: {username} does not exist - aborting update')
-        return
+        return None
 
     password = kwargs['password']
     proxy_file_handle = kwargs['proxy']
@@ -116,7 +119,7 @@ def update_user(**kwargs):
         values(password_hash=generate_password_hash(password), grid_proxy=proxy_content)
     con.execute(query)
     print(f'Successfully updated user: {username}')
-
+    return None
 
 @run.command
 @click.argument('name')
@@ -135,15 +138,16 @@ def remove_user(**kwargs):
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) == 0:
         print(f'User: {username} does not exist - aborting delete')
-        return
+        return None
 
     query = db.delete(users).where(users.c.login_name == username)
     con.execute(query)
     print(f'Successfully deleted user: {username}')
-
+    return None
 
 @run.command
 def list_simulations(**kwargs):
+    """List all simulations in db"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -154,7 +158,8 @@ def list_simulations(**kwargs):
     print(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
         print(f"Id {row['id']} ; Name {row['name']} ; Status {row['status']} ; User {row['user_id']}")
-
+    return None
 
 if __name__ == "__main__":
+    """Run the CLI"""
     run()
