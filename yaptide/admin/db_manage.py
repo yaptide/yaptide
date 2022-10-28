@@ -30,6 +30,16 @@ def connect_to_db():
     return con, metadata, engine
 
 
+def user_exists(name: str, users: db.Table, con ) -> bool:
+    # check if user already exists
+    query = db.select([users]).where(users.c.login_name == name)
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    if len(ResultSet) > 0:
+        print(f'User: {name} already exists')
+        return True
+    return False
+
 @click.group()
 def run():
     """Manage database"""
@@ -74,12 +84,7 @@ def add_user(**kwargs):
     print(f'Adding user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
-    # check if user already exists
-    query = db.select([users]).where(users.c.login_name == username)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) > 0:
-        print(f'User: {username} already exists')
+    if user_exists(username, users, con):
         return None
 
     query = db.insert(users).values(login_name=username,
@@ -102,12 +107,7 @@ def update_user(**kwargs):
     print(f'Updating user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
-    # check if user exists:
-    query = db.select([users]).where(users.c.login_name == username)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) == 0:
-        print(f'User: {username} does not exist - aborting update')
+    if user_exists(username, users, con):
         return None
 
     password = kwargs['password']
@@ -135,12 +135,9 @@ def remove_user(**kwargs):
     print(f'Deleting user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
-    # check if user exists:
-    query = db.select([users]).where(users.c.login_name == username)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) == 0:
-        print(f'User: {username} does not exist - aborting delete')
+    # abort if user does not exist
+    if not user_exists(username, users, con):
+        print("Aborting, user does not exist")
         return None
 
     query = db.delete(users).where(users.c.login_name == username)
@@ -161,7 +158,7 @@ def list_simulations(**kwargs):
     ResultSet = ResultProxy.fetchall()
     print(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
-        print(f"Id {row['id']} ; Name {row['name']} ; Status {row['status']} ; User {row['user_id']}")
+        print(f"id {row.id} ; task id {row.task_id} ; user_id {row.user_id} ; start_time {row.start_time}; end_time {row.end_time}; cores {row.cores}; platform {row.platform}")
     return None
 
 
