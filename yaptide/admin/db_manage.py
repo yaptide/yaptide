@@ -30,8 +30,8 @@ def connect_to_db():
     return con, metadata, engine
 
 
-def user_exists(name: str, users: db.Table, con ) -> bool:
-    # check if user already exists
+def user_exists(name: str, users: db.Table, con) -> bool:
+    """Check if user already exists"""
     query = db.select([users]).where(users.c.login_name == name)
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
@@ -39,6 +39,7 @@ def user_exists(name: str, users: db.Table, con ) -> bool:
         print(f'User: {name} already exists')
         return True
     return False
+
 
 @click.group()
 def run():
@@ -158,7 +159,7 @@ def list_simulations(**kwargs):
     ResultSet = ResultProxy.fetchall()
     print(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
-        print(f"id {row.id} ; task id {row.task_id} ; user_id {row.user_id} ; start_time {row.start_time}; end_time {row.end_time}; cores {row.cores}; platform {row.platform}")
+        print(f"id {row.id} ; task id {row.task_id} ; start_time {row.start_time}; end_time {row.end_time};")
     return None
 
 
