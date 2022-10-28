@@ -94,7 +94,16 @@ curl -i -X DELETE http://localhost:5000/auth/logout
 
 # Docker database
 
-Now registering, updating and deleting users is available with the use of ``db_script.py`` located in ``yaptide/data`` folder, which is a volume folder for ``yaptide_flask`` container. To make any changes in the database, ``script_input.json`` (the name is currently hardcoded) file should be prepared. ``example_script_input.json`` shows pattern of doing this. It is possible to either edit the file in Docker CLI (user unfriendly way) or prepare the file elsewhere and copy/move it into ``yaptide_data/_data`` folder found in docker volumes folder. In order to get access to PLGrid resources it is required to generate ``grid_proxy`` file (instruction describing generating it are provided in ``PLGrid`` section). After preparing ``grid_proxy`` file it should be copied/moved into ``yaptide_data/_data`` folder and in ``script_input.json`` its name should be added in User update option following the pattern showed in ``example_script_input.json``. In next step, ``db_script.py`` can be run in the Docker CLI (from any folder) of ``yaptide_flask`` container with ``python3 /path/to/file/db_script.py`` command or in terminal (for example in which docker-compose was run) with ``docker exec -w /usr/local/app/yaptide/data yaptide_flask python3 db_script.py`` command.
+Now registering, updating and deleting users is available with the use of ``db_manage.py`` located in ``yaptide/admin`` folder.
+Once docker compose is running, you can use the following command:
+ ``docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py --help``.
+
+To add an user with grid_proxy type:
+
+```bash
+docker cp grid_proxy yaptide_flask:/usr/local/app
+docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword --proxy grid_proxy
+```
 
 # Testing API with command-line tools
 
