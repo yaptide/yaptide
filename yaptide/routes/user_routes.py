@@ -83,13 +83,23 @@ class UserSimulations(Resource):
         simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1), sim_count)]
 
         result = {
-            'simulations': [{
-                'name': simulation.name,
-                'task_id': simulation.task_id,
-                'start_time': simulation.start_time,
-                'end_time': simulation.end_time,
-                'cores': simulation.cores
-            } for simulation in simulations],
+            'simulations': [
+                {
+                    'name': simulation.name,
+                    'task_id': simulation.task_id,
+                    'start_time': simulation.start_time,
+                    'end_time': simulation.end_time,
+                    'cores': simulation.cores,
+                    'platform': simulation.platform
+                } if simulation.platform == SimulationModel.Platform.CELERY.value else {
+                    'name': simulation.name,
+                    'job_id': simulation.task_id,
+                    'start_time': simulation.start_time,
+                    'end_time': simulation.end_time,
+                    'nodes': simulation.cores,
+                    'platform': simulation.platform
+                }
+                for simulation in simulations],
             'page_count': page_count,
             'simulations_count': sim_count,
         }
