@@ -98,10 +98,15 @@ Now registering, updating and deleting users is available with the use of ``db_m
 Once docker compose is running, you can use the following command:
  ``docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py --help``.
 
-To add an user with grid_proxy type:
+To add an user with grid_proxy copy grid_proxy:
 
 ```bash
 docker cp grid_proxy yaptide_flask:/usr/local/app
+```
+
+and run:
+
+```bash
 docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword --proxy grid_proxy
 ```
 
