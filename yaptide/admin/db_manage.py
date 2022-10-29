@@ -89,9 +89,9 @@ def add_user(**kwargs):
     if proxy_file_handle is not None:
         proxy_content = proxy_file_handle.read()
     click.echo(f'Adding user: {username}')
-    if kwargs['verbose'] > 1:
-        click.echo(f'Password: {password}')
     if kwargs['verbose'] > 2:
+        click.echo(f'Password: {password}')
+    if kwargs['verbose'] > 1:
         click.echo(f'Proxy: {proxy_hash(proxy_content)}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
@@ -135,11 +135,11 @@ def update_user(**kwargs):
 
     # update password
     password = kwargs['password']
-    if password is not None:
+    if password:
         pwd_hash = generate_password_hash(password)
         query = db.update(users).where(users.c.login_name == username).values(password_hash=pwd_hash)
         con.execute(query)
-        if kwargs['verbose'] > 1:
+        if kwargs['verbose'] > 2:
             click.echo(f'Updating password: {password}')
     click.echo(f'Successfully updated user: {username}')
     return None
