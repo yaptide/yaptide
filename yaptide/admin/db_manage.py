@@ -41,6 +41,16 @@ def user_exists(name: str, users: db.Table, con) -> bool:
     return False
 
 
+def proxy_hash(proxy_content: str) -> str:
+    """User friendly proxy hash"""
+    last_part_of_hash = 'None'
+    if proxy_content is not None:
+        h = hashlib.sha256()
+        h.update(proxy_content.encode('utf-8'))
+        last_part_of_hash = '...' + h.hexdigest()[-10:]
+    return last_part_of_hash
+
+
 @click.group()
 def run():
     """Manage database"""
@@ -58,12 +68,7 @@ def list_users(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        last_part_of_hash = 'None'
-        if row.grid_proxy is not None:
-            h = hashlib.sha256()
-            h.update(row.grid_proxy.encode('utf-8'))
-            last_part_of_hash = '...' + h.hexdigest()[-10:]
-        click.echo(f"Login {row.login_name} ; Password hash ...{row.password_hash[-10:]} ; Proxy {last_part_of_hash}")
+        click.echo(f"Login {row.login_name} ; Passw ...{row.password_hash[-10:]} ; Proxy {proxy_hash(row.grid_proxy)}")
     return None
 
 
@@ -86,8 +91,8 @@ def add_user(**kwargs):
     click.echo(f'Adding user: {username}')
     if kwargs['verbose'] > 1:
         click.echo(f'Password: {password}')
-    if kwargs['verbose'] > 2:        
-        click.echo(f'Proxy: {proxy_content}')
+    if kwargs['verbose'] > 2:
+        click.echo(f'Proxy: {proxy_hash(proxy_content)}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
     if user_exists(username, users, con):
@@ -114,26 +119,28 @@ def update_user(**kwargs):
     click.echo(f'Updating user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
-    if user_exists(username, users, con):
+    if not user_exists(username, users, con):
+        click.echo(f'User: {username} does not exist, aborting update')
         return None
 
-    password = kwargs['password']
+    # update proxy
     proxy_file_handle = kwargs['proxy']
     proxy_content = None
     if proxy_file_handle is not None:
         proxy_content = proxy_file_handle.read()
-
-    # update password and proxy if provided:
-    if password is not None:
-        query = db.update(users).where(users.c.login_name == username).\
-            values(password_hash=generate_password_hash(password), grid_proxy=proxy_content)
-        if kwargs['verbose'] > 1:
-            click.echo(f'Updating password: {password}')
-    else:
         query = db.update(users).where(users.c.login_name == username).values(grid_proxy=proxy_content)
         if kwargs['verbose'] > 1:
-            click.echo(f'Updating password: {password} and proxy')
-    con.execute(query)
+            click.echo(f'Updating proxy: {proxy_hash(proxy_content)}')
+        con.execute(query)
+
+    # update password
+    password = kwargs['password']
+    if password is not None:
+        pwd_hash = generate_password_hash(password)
+        query = db.update(users).where(users.c.login_name == username).values(password_hash=pwd_hash)
+        con.execute(query)
+        if kwargs['verbose'] > 1:
+            click.echo(f'Updating password: {password}')
     click.echo(f'Successfully updated user: {username}')
     return None
 
