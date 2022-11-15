@@ -2,11 +2,6 @@ FROM python:3.10-slim
 ARG SHIELDHIT_PATH
 COPY $SHIELDHIT_PATH /usr/local/bin/shieldhit
 
-# gfortran is needed by shieldhit binary to execute properly
-RUN apt-get -qq update && \
-    apt-get install -qq -y --no-install-recommends gfortran && \
-    rm -rf /var/lib/apt/lists/*
-
 # install dependencies
 WORKDIR /usr/local/app
 COPY ./requirements.txt ./
