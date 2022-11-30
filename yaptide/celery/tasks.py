@@ -19,7 +19,7 @@ sys.path.append('yaptide/converter')
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
-def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: str):
+def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: Path):
     """
     Function used to write input files to output directory.
     Returns dictionary with filenames as keys and their content as values
@@ -42,7 +42,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        input_files = write_input_files(param_dict, raw_input_dict, tmp_dir_path)
+        input_files = write_input_files(param_dict, raw_input_dict, Path(tmp_dir_path))
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
