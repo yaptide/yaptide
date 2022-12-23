@@ -23,7 +23,6 @@ class SimulationRun(Resource):
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
         """Method handling running shieldhit with server"""
-
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
@@ -149,7 +148,7 @@ class SimulationInputs(Resource):
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning simulation input files"""
-        schema = SimulationStatus._Schema()
+        schema = SimulationInputs._Schema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
