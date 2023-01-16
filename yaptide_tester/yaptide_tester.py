@@ -113,14 +113,16 @@ class YaptideTester:
         """Example client running simulation"""
         if with_files:
             input_files = self.read_input_files()
-            json_to_send = {'input_files': input_files}
+            sim_data = {'input_files': input_files}
         else:
             example_json = Path(ROOT_DIR, 'example.json')
 
             with open(example_json) as json_file:
-                json_to_send = json_lib.load(json_file)
+                sim_data = json_lib.load(json_file)
 
-        res: requests.Response = self.session.post(self.endpoints.http_sim_run, json=json_to_send)
+        res: requests.Response = self.session.post(self.endpoints.http_sim_run, json={
+            "sim_data": sim_data
+        })
         res_json: dict = res.json()
         print(res_json)
 
@@ -131,7 +133,7 @@ class YaptideTester:
                 time.sleep(5)
                 try:
                     res: requests.Response = self.session.\
-                        post(self.endpoints.http_sim_status, json={'task_id': task_id})
+                        get(self.endpoints.http_sim_status, params={'task_id': task_id})
                     res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents
@@ -212,7 +214,7 @@ class YaptideTester:
                 print(sim)
                 id_type = 'task_id' if sim['platform'] == 'CELERY' else 'job_id'
                 res: requests.Response = self.session.\
-                    post(self.endpoints.http_sim_status, json={id_type: sim[id_type]})
+                    get(self.endpoints.http_sim_status, params={id_type: sim[id_type]})
                 res_json: dict = res.json()
 
     def get_slurm_results(self, job_id: str):
