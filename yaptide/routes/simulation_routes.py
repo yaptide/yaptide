@@ -19,36 +19,30 @@ from yaptide.celery.tasks import (run_simulation, convert_input_files, simulatio
 class SimulationRun(Resource):
     """Class responsible for SHIELD-HIT12A simulations running"""
 
-    class _Schema(Schema):
-        """Class specifies API parameters"""
-
-        jobs = fields.Integer(load_default=-1)  # use all cores by default
-        sim_type = fields.String(load_default="shieldhit")
-        sim_name = fields.String(load_default="")
-
     @staticmethod
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
         """Method handling running shieldhit with server"""
-        schema = SimulationRun._Schema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        param_dict: dict = schema.load(request.args)
-
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
 
-        task = run_simulation.delay(param_dict=param_dict, raw_input_dict=json_data)
+        if "sim_data" not in json_data:
+            return error_validation_response()
 
-        if param_dict['sim_name'] == "":
+        task = run_simulation.delay(param_dict={
+            "jobs": json_data["jobs"] if "jobs" in json_data else -1,
+            "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit",
+            "sim_name": json_data["sim_name"] if "sim_name" in json_data else ""
+        }, raw_input_dict=json_data["sim_data"])
+
+        if json_data.get('sim_name'):
             simulation = SimulationModel(
-                task_id=task.id, user_id=user.id, platform=SimulationModel.Platform.CELERY.value)
+                task_id=task.id, user_id=user.id, name=json_data['sim_name'],
+                platform=SimulationModel.Platform.CELERY.value)
         else:
             simulation = SimulationModel(
-                task_id=task.id, user_id=user.id, name=param_dict['sim_name'],
-                platform=SimulationModel.Platform.CELERY.value)
+                task_id=task.id, user_id=user.id, platform=SimulationModel.Platform.CELERY.value)
 
         db.session.add(simulation)
         db.session.commit()
@@ -113,14 +107,15 @@ class SimulationStatus(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    def get(user: UserModel):
         """Method returning task status and results"""
-        try:
-            json_data: dict = SimulationStatus._Schema().load(request.get_json(force=True))
-        except ValidationError:
-            return error_validation_response()
+        schema = SimulationStatus._Schema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
 
-        task_id = json_data['task_id']
+        task_id = param_dict['task_id']
         is_owned, error_message, res_code = check_if_task_is_owned(task_id=task_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
@@ -151,18 +146,20 @@ class SimulationInputs(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    def get(user: UserModel):
         """Method returning simulation input files"""
-        try:
-            json_data: dict = SimulationInputs._Schema().load(request.get_json(force=True))
-        except ValidationError:
-            return error_validation_response()
+        schema = SimulationInputs._Schema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+        task_id = param_dict['task_id']
 
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(task_id=task_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = get_input_files.delay(task_id=json_data.get('task_id'))
+        task = get_input_files.delay(task_id=task_id)
         result: dict = task.wait()
 
         return yaptide_response(
