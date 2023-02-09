@@ -4,7 +4,6 @@ import hashlib
 
 import click
 import sqlalchemy as db
-from sqlalchemy.orm import sessionmaker
 from werkzeug.security import generate_password_hash
 
 
@@ -23,20 +22,18 @@ def connect_to_db():
         return None, None, None
     engine = db.create_engine(f'sqlite:////{sqlite_file_path}')
     try:
-        # con = engine.connect()
-        session = sessionmaker(engine)()
+        con = engine.connect()
         metadata = db.MetaData()
     except db.exc.OperationalError:
         click.echo(f'Connection to db {sqlite_file_path} failed', err=True)
         return None, None, None
-    return session, metadata, engine
+    return con, metadata, engine
 
 
-def user_exists(name: str, users: db.Table, session) -> bool:
+def user_exists(name: str, users: db.Table, con) -> bool:
     """Check if user already exists"""
-    query = db.select(users).where(users.c.login_name == name)
-    print("\n\nSelect matching users query:\n", query)
-    ResultProxy = session.execute(query)
+    query = db.select([users]).where(users.c.login_name == name)
+    ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
         click.echo(f'User: {name} already exists')
@@ -62,13 +59,12 @@ def run():
 @run.command
 def list_users(**kwargs):
     """List all users"""
-    session, metadata, engine = connect_to_db()
-    if session is None or metadata is None or engine is None:
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
         return None
-    users = db.Table(TableTypes.USER.value, metadata, autoload_with=engine)
-    query = db.select(users)
-    print("\n\nSelect all users query:\n", query)
-    ResultProxy = session.execute(query)
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    query = db.select([users])
+    ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
@@ -83,8 +79,8 @@ def list_users(**kwargs):
 @click.option('-v', '--verbose', count=True)
 def add_user(**kwargs):
     """Add user to database"""
-    session, metadata, engine = connect_to_db()
-    if session is None or metadata is None or engine is None:
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
         return None
     username = kwargs['name']
     password = kwargs['password']
@@ -97,16 +93,15 @@ def add_user(**kwargs):
         click.echo(f'Password: {password}')
     if kwargs['verbose'] > 1:
         click.echo(f'Proxy: {proxy_hash(proxy_content)}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload_with=engine)
-    print("\n\nTable:\n", users)
-    if user_exists(username, users, session):
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+
+    if user_exists(username, users, con):
         return None
 
     query = db.insert(users).values(login_name=username,
                                     password_hash=generate_password_hash(password),
                                     grid_proxy=proxy_content)
-    print("\n\nInsert user query:\n", query)
-    session.execute(query)
+    con.execute(query)
     return None
 
 
@@ -117,14 +112,14 @@ def add_user(**kwargs):
 @click.option('-v', '--verbose', count=True)
 def update_user(**kwargs):
     """Update user in database"""
-    session, metadata, engine = connect_to_db()
-    if session is None or metadata is None or engine is None:
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
         return None
     username = kwargs['name']
     click.echo(f'Updating user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload_with=engine)
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
-    if not user_exists(username, users, session):
+    if not user_exists(username, users, con):
         click.echo(f'User: {username} does not exist, aborting update')
         return None
 
@@ -136,14 +131,14 @@ def update_user(**kwargs):
         query = db.update(users).where(users.c.login_name == username).values(grid_proxy=proxy_content)
         if kwargs['verbose'] > 1:
             click.echo(f'Updating proxy: {proxy_hash(proxy_content)}')
-        session.execute(query)
+        con.execute(query)
 
     # update password
     password = kwargs['password']
     if password:
         pwd_hash = generate_password_hash(password)
         query = db.update(users).where(users.c.login_name == username).values(password_hash=pwd_hash)
-        session.execute(query)
+        con.execute(query)
         if kwargs['verbose'] > 2:
             click.echo(f'Updating password: {password}')
     click.echo(f'Successfully updated user: {username}')
@@ -154,20 +149,20 @@ def update_user(**kwargs):
 @click.argument('name')
 def remove_user(**kwargs):
     """Deletes user with provided login from db"""
-    session, metadata, engine = connect_to_db()
-    if session is None or metadata is None or engine is None:
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
         return None
     username = kwargs['name']
     click.echo(f'Deleting user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload_with=engine)
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
     # abort if user does not exist
-    if not user_exists(username, users, session):
+    if not user_exists(username, users, con):
         click.echo("Aborting, user does not exist")
         return None
 
     query = db.delete(users).where(users.c.login_name == username)
-    session.execute(query)
+    con.execute(query)
     click.echo(f'Successfully deleted user: {username}')
     return None
 
@@ -175,12 +170,12 @@ def remove_user(**kwargs):
 @run.command
 def list_simulations(**kwargs):
     """List all simulations in db"""
-    session, metadata, engine = connect_to_db()
-    if session is None or metadata is None or engine is None:
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
         return None
-    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload_with=engine)
-    query = db.select(simulations)
-    ResultProxy = session.execute(query)
+    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
+    query = db.select([simulations])
+    ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
