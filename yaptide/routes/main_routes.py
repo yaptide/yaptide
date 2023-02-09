@@ -7,6 +7,8 @@ from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, Aut
 
 from plgrid.plgrid_routes import RimrockJobs, PlgData
 
+from slurm.slurm_routes import SlurmJobs, SlurmData
+
 
 class HelloWorld(Resource):
     """Root route"""
@@ -38,3 +40,6 @@ def initialize_routes(api):
 
     api.add_resource(RimrockJobs, "/plgrid/jobs")
     api.add_resource(PlgData, "/plgrid/data")
+
+    api.add_resource(SlurmJobs, "/slurm/jobs")
+    api.add_resource(SlurmData, "/slurm/data")

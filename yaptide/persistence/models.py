@@ -46,6 +46,7 @@ class SimulationModel(db.Model):
 
         CELERY = "CELERY"
         RIMROCK = "RIMROCK"
+        SLURM = "SLURM"
 
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)
