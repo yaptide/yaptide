@@ -44,9 +44,9 @@ class SimulationModel(db.Model):
     class Platform(Enum):
         """Platform specification"""
 
-        CELERY = "CELERY"
+        DIRECT = "DIRECT"
         RIMROCK = "RIMROCK"
-        SLURM = "SLURM"
+        BATCH = "BATCH"
 
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)

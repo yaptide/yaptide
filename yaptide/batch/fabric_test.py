@@ -14,7 +14,7 @@ echo Hello World!
 connection.run('rm new_script.sh')
 connection.run(f'echo \'{script}\' >> new_script.sh')
 connection.run('chmod 777 new_script.sh')
-result: Result = connection.run('sbatch new_script.sh')
+result: Result = connection.run('batch new_script.sh')
 stdout = result.stdout.split()
 
 job_id = int(stdout[3])

@@ -17,8 +17,9 @@ class Endpoints:
     """API endpoints"""
 
     def __init__(self, host: str, port: int) -> None:
-        self.http_sim_run = f'http://{host}:{port}/sh/run'
-        self.http_sim_status = f'http://{host}:{port}/sh/status'
+        self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
+        self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
+
         self.http_convert = f'http://{host}:{port}/sh/convert'
 
         self.http_list_sims = f'http://{host}:{port}/user/simulations'
@@ -84,15 +85,26 @@ class YaptideTester:
         Path(ROOT_DIR, "output").mkdir(parents=True, exist_ok=True)
         self.session.login(inital_login=True)
 
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} on backend with files\n\n')
+        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} directly with files\n\n')
         for _ in range(sim_n):
-            self.run_simulation_on_backend(True, do_monitor)
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} on backend with json\n\n')
+            self.run_simulation_on_backend(True, do_monitor, True)
+
+        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} directly with json\n\n')
         for _ in range(sim_n):
-            self.run_simulation_on_backend(False, do_monitor)
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} on rimrock\n\n')
+            self.run_simulation_on_backend(False, do_monitor, True)
+
+        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} via batch with files\n\n')
         for _ in range(sim_n):
-            self.run_simulation_on_rimrock(do_monitor)
+            self.run_simulation_on_backend(True, do_monitor, False)
+
+        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} via batch with json\n\n')
+        for _ in range(sim_n):
+            self.run_simulation_on_backend(False, do_monitor, False)
+
+        # print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} on rimrock\n\n')
+        # for _ in range(sim_n):
+        #     self.run_simulation_on_rimrock(do_monitor)
+
         print("\n\nRunning simulations pagination check\n\n")
         self.check_backend_jobs()
 
@@ -109,7 +121,7 @@ class YaptideTester:
                 input_files[filename] = reader.read()
         return input_files
 
-    def run_simulation_on_backend(self, with_files: bool, do_monitor_job: bool):
+    def run_simulation_on_backend(self, with_files: bool, do_monitor_job: bool, direct: bool):
         """Example client running simulation"""
         if with_files:
             input_files = self.read_input_files()
@@ -120,7 +132,9 @@ class YaptideTester:
             with open(example_json) as json_file:
                 sim_data = json_lib.load(json_file)
 
-        res: requests.Response = self.session.post(self.endpoints.http_sim_run, json={
+        jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
+
+        res: requests.Response = self.session.post(jobs_url, json={
             "sim_data": sim_data
         })
         res_json: dict = res.json()
@@ -132,14 +146,13 @@ class YaptideTester:
             while do_monitor_job:
                 time.sleep(5)
                 try:
-                    res: requests.Response = self.session.\
-                        get(self.endpoints.http_sim_status, params={'task_id': task_id})
+                    res: requests.Response = self.session.get(jobs_url, params={'task_id': task_id})
                     res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
                         if res_json.get('result'):
-                            with open(Path(ROOT_DIR, 'output', 'simulation_output.json'), 'w') as writer:
+                            with open(Path(ROOT_DIR, 'output', f'sim_output_{task_id}.json'), 'w') as writer:
                                 data_to_write = str(res_json['result'])
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
@@ -212,9 +225,13 @@ class YaptideTester:
             res_json: dict = res.json()
             for sim in res_json['simulations']:
                 print(sim)
-                id_type = 'task_id' if sim['platform'] == 'CELERY' else 'job_id'
+                is_direct = sim['platform'] == 'DIRECT'
+                id_type = 'task_id' if is_direct else 'job_id'
                 res: requests.Response = self.session.\
-                    get(self.endpoints.http_sim_status, params={id_type: sim[id_type]})
+                    get(
+                        self.endpoints.http_jobs_direct if is_direct else self.endpoints.http_jobs_batch,
+                        params={id_type: sim[id_type]}
+                    )
                 res_json: dict = res.json()
 
     def get_slurm_results(self, job_id: str):
