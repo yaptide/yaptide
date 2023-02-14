@@ -101,10 +101,6 @@ class YaptideTester:
         for _ in range(sim_n):
             self.run_simulation_on_backend(False, do_monitor, False)
 
-        # print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} on rimrock\n\n')
-        # for _ in range(sim_n):
-        #     self.run_simulation_on_rimrock(do_monitor)
-
         print("\n\nRunning simulations pagination check\n\n")
         self.check_backend_jobs()
 

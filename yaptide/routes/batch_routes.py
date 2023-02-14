@@ -4,8 +4,6 @@ from flask_restful import Resource
 from marshmallow import Schema
 from marshmallow import fields
 
-from datetime import datetime
-
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 
@@ -47,7 +45,6 @@ class JobsBatch(Resource):
         if "sim_data" not in json_data:
             return error_validation_response()
 
-        # TODO: pass credentials from db to json_data
         result, status_code = submit_job(json_data=json_data)
 
         if "job_id" in result:
@@ -73,14 +70,14 @@ class JobsBatch(Resource):
         """Method geting job's result
         parametry:
             job_id
-        
+
         result ok:
             job_status
 
         when job done and result ok:
             job_status
             output
-        
+
         result not ok:
             job_status
             error messages
@@ -88,8 +85,6 @@ class JobsBatch(Resource):
         when job done and result ok: (scenario for storaging in slurm)
             job_status
             error messages
-        
-
         """
         schema = JobsBatch._ParamsSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -103,7 +98,7 @@ class JobsBatch(Resource):
 
         json_data = {
             "job_id": params_dict["job_id"]
-        } # TODO: pass credentials from db to json_data
+        }
 
         result, status_code = get_job(json_data=json_data)
 
