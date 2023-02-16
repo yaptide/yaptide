@@ -60,14 +60,16 @@ class JobsBatch(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
+        simulation: SimulationModel = db.session.query(SimulationModel).\
+            filter_by(task_id=params_dict["job_id"]).first()
+
         json_data = {
-            "job_id": params_dict["job_id"]
+            "job_id": params_dict["job_id"],
+            "start_time_for_dummy": simulation.start_time,
+            "end_time_for_dummy": simulation.end_time
         }
 
         result, status_code = get_job(json_data=json_data)
-
-        simulation: SimulationModel = db.session.query(SimulationModel).\
-            filter_by(task_id=params_dict["job_id"]).first()
 
         if "end_time" in result and "cores" in result and simulation.end_time is None and simulation.cores is None:
             simulation.end_time = result['end_time']

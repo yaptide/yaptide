@@ -7,6 +7,7 @@ from flask_cors import CORS
 
 
 def create_app(config_object="yaptide.settings"):
+    """Function starting Flask Server"""
     app = Flask(__name__.split('.')[0])
     app.config.from_object(config_object)
     db.init_app(app)
@@ -24,4 +25,5 @@ def create_app(config_object="yaptide.settings"):
 
 
 if __name__ == "__main__":
+    """Main"""
     create_app()
