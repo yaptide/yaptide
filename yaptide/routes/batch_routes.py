@@ -19,25 +19,7 @@ class JobsBatch(Resource):
     @staticmethod
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
-        """
-        parametry:
-            sim_name: <string> (default - "")
-            sim_type: <string> (default - "shieldhit")
-            sim_data:
-                input_files: <list>
-                json projektu ui
-            slurm_params: (optional) - wyślij wiadomość, jeśli nie użyto
-                header: <string> (all parameters text block)
-                cmd_line_args: <słownik> | <None> (ma wygenerować stringa)
-
-        result not ok:
-            "Error message" (scenariusze):
-                error message od połączenia
-                error message batcha
-
-        result ok:
-            job_id
-        """
+        """Method handling running shieldhit with batch"""
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return error_validation_response()
@@ -67,25 +49,7 @@ class JobsBatch(Resource):
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
-        """Method geting job's result
-        parametry:
-            job_id
-
-        result ok:
-            job_status
-
-        when job done and result ok:
-            job_status
-            output
-
-        result not ok:
-            job_status
-            error messages
-
-        when job done and result ok: (scenario for storaging in slurm)
-            job_status
-            error messages
-        """
+        """Method geting job's result"""
         schema = JobsBatch._ParamsSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
