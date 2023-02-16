@@ -17,7 +17,7 @@ from yaptide.celery.tasks import (run_simulation, convert_input_files, simulatio
 
 
 class JobsDirect(Resource):
-    """Class responsible for SHIELD-HIT12A simulations running"""
+    """Class responsible for simulations run directly with celery"""
 
     @staticmethod
     @requires_auth(is_refresh=False)
