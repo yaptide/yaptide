@@ -178,10 +178,10 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
     return result_dict
 
 
-def simulation_logfile(path: Path) -> str:
+def simulation_logfile(filepath: Path) -> str:
     """Function returning simulation logfile"""
     try:
-        with open(path, 'r') as reader:
+        with open(filepath, 'r') as reader:
             return reader.read()
     except FileNotFoundError:
         return "logfile not found"
