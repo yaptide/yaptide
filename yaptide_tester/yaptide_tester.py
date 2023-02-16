@@ -129,6 +129,7 @@ class YaptideTester:
                 sim_data = json_lib.load(json_file)
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
+        job_key = "task_id" if direct else "job_id"
 
         res: requests.Response = self.session.post(jobs_url, json={
             "sim_data": sim_data
@@ -136,13 +137,13 @@ class YaptideTester:
         res_json: dict = res.json()
         print(res_json)
 
-        task_id: str = res_json.get('task_id')
+        task_id: str = res_json.get(job_key)
 
         if task_id is not None:
             while do_monitor_job:
                 time.sleep(5)
                 try:
-                    res: requests.Response = self.session.get(jobs_url, params={'task_id': task_id})
+                    res: requests.Response = self.session.get(jobs_url, params={job_key: task_id})
                     res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents

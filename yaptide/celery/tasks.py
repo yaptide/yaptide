@@ -217,12 +217,8 @@ def simulation_task_status(task_id: str) -> dict:
         result['info'] = sim_info
     elif task.state != 'FAILURE':
         if 'result' in task.info:
-            result['result'] = task.info.get('result')
-            result['metadata'] = task.info.get('metadata')
-            result['input_files'] = task.info.get('input_files')
-            result['input_json'] = task.info.get('input_json')
-            result['end_time'] = task.info.get('end_time')
-            result['cores'] = task.info.get('cores')
+            for key in ['result', 'metadata', 'input_files', 'input_json', 'end_time', 'cores']:
+                result[key] = task.info.get(key)
         elif 'logfile' in task.info:
             result['state'] = 'FAILURE'
             result['error'] = 'Simulation error'
