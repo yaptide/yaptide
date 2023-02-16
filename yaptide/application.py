@@ -25,5 +25,4 @@ def create_app(config_object="yaptide.settings"):
 
 
 if __name__ == "__main__":
-    """Main"""
     create_app()
