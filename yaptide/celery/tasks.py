@@ -252,13 +252,13 @@ def sh12a_simulation_status(dir_path: str) -> list:
     # This is dummy version because pymchelper currently doesn't privide any information about progress
     # file_path = Path(dir_path, "run_1", "shieldhit_0001.log")
     result_list = []
-    for work_dir in os.listdir(dir_path):
-        if not re.search(r"run_", work_dir): continue
-        workdir = Path(dir_path, work_dir)
-        task_id = int(work_dir.split("_")[1])
-        for filename in os.listdir(workdir):
-            if not re.search(r"shieldhit.*log", filename): continue
-            file_path = Path(workdir, filename)
+    for workdir in os.listdir(dir_path):
+        if not re.search(r"run_", workdir): continue  # skipcq: FLK-E701
+        task_id = int(workdir.split("_")[1])
+        workdir_path = Path(dir_path, workdir)
+        for filename in os.listdir(workdir_path):
+            if not re.search(r"shieldhit.*log", filename): continue  # skipcq: FLK-E701
+            file_path = Path(workdir_path, filename)
             try:
                 with open(file_path, "r") as reader:
                     found_line_which_starts_status_block = False
