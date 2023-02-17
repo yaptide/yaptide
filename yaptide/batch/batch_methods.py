@@ -6,17 +6,9 @@ from datetime import datetime
 
 from pathlib import Path
 
-from enum import Enum
+from yaptide.persistence.models import SimulationModel
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
-
-
-class JobStatus(Enum):
-    """Job status types - move it to more utils like place in future"""
-
-    PENDING = "PENDING"
-    RUNNING = "RUNNING"
-    COMPLETED = "COMPLETED"
 
 
 def submit_job(json_data: dict) -> tuple[dict, int]:  # skipcq: PYL-W0613
@@ -35,16 +27,18 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     print(json_data)
     if time_diff.seconds < 30 and json_data["end_time_for_dummy"] is None:
         return {
+            "job_state": SimulationModel.JobStatus.RUNNING.value,
             "job_tasks_status": [
                 {
-                    "state": JobStatus.RUNNING.value,
-                    "info": {
-                        'simulated_primaries': 1000,
-                        'primaries_to_simulate': 2000,
-                        'estimated': {
-                            'hours': 0,
-                            'minutes': 0,
-                            'seconds': 15,
+                    "task_id": 1,
+                    "task_state": SimulationModel.JobStatus.RUNNING.value,
+                    "task_info": {
+                        "simulated_primaries": 1000,
+                        "primaries_to_simulate": 2000,
+                        "estimated": {
+                            "hours": 0,
+                            "minutes": 0,
+                            "seconds": 15,
                         }
                     }
                 }
@@ -56,7 +50,12 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     return {
         "result": result,
         "end_time": now,
-        "cores": 1
+        "cores": 1,
+        "metadata": {
+            "source": "YAPTIDE",
+            "simulator": "shieldhit",
+            "type": "results",
+        }
     }, 200
 
 

@@ -48,6 +48,14 @@ class SimulationModel(db.Model):
         RIMROCK = "RIMROCK"
         BATCH = "BATCH"
 
+    class JobStatus(Enum):
+        """Job status types - move it to more utils like place in future"""
+
+        PENDING = "PENDING"
+        RUNNING = "RUNNING"
+        COMPLETED = "COMPLETED"
+        FAILED = "FAILED"
+
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)
     task_id: str = db.Column(db.String, nullable=False, unique=True)

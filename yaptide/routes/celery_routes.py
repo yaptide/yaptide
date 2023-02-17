@@ -83,7 +83,7 @@ class JobsDirect(Resource):
             db.session.commit()
 
         return yaptide_response(
-            message=f"Task state: {result['state']}",
+            message=f"Job state: {result['job_state']}",
             code=200,
             content=result
         )
