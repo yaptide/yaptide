@@ -12,3 +12,4 @@ requests
 pyjwt
 scipy  # needed by converter submodule
 click==8.1.3
+fabric
