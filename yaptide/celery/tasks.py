@@ -204,6 +204,7 @@ def simulation_input_files(path: str) -> dict:
 
 
 def translate_celery_state_naming(job_state: str) -> str:
+    """Function translating celery states' names to ones used in YAPTIDE"""
     if job_state in ["RECEIVED", "RETRY"]:
         return SimulationModel.JobStatus.PENDING.value
     if job_state in ["PROGRESS", "STARTED"]:
@@ -252,13 +253,11 @@ def sh12a_simulation_status(dir_path: str) -> list:
     # file_path = Path(dir_path, "run_1", "shieldhit_0001.log")
     result_list = []
     for work_dir in os.listdir(dir_path):
-        regex_match = r"run_"
-        if not re.search(regex_match, work_dir): continue
+        if not re.search(r"run_", work_dir): continue
         workdir = Path(dir_path, work_dir)
         task_id = int(work_dir.split("_")[1])
         for filename in os.listdir(workdir):
-            regex_match = r"shieldhit.*log"
-            if not re.search(regex_match, filename): continue
+            if not re.search(r"shieldhit.*log", filename): continue
             file_path = Path(workdir, filename)
             try:
                 with open(file_path, "r") as reader:
