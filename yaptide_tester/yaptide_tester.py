@@ -129,7 +129,6 @@ class YaptideTester:
                 sim_data = json_lib.load(json_file)
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
-        job_key = "task_id" if direct else "job_id"
 
         res: requests.Response = self.session.post(jobs_url, json={
             "sim_data": sim_data
@@ -137,19 +136,19 @@ class YaptideTester:
         res_json: dict = res.json()
         print(res_json)
 
-        task_id: str = res_json.get(job_key)
+        job_id: str = res_json.get("job_id")
 
-        if task_id is not None:
+        if job_id is not None:
             while do_monitor_job:
                 time.sleep(5)
                 try:
-                    res: requests.Response = self.session.get(jobs_url, params={job_key: task_id})
+                    res: requests.Response = self.session.get(jobs_url, params={"job_id": job_id})
                     res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
                         if res_json.get('result'):
-                            with open(Path(ROOT_DIR, 'output', f'sim_output_{task_id}.json'), 'w') as writer:
+                            with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
                                 data_to_write = str(res_json['result'])
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
@@ -223,7 +222,7 @@ class YaptideTester:
             for sim in res_json['simulations']:
                 print(sim)
                 is_direct = sim['platform'] == 'DIRECT'
-                id_type = 'task_id' if is_direct else 'job_id'
+                id_type = 'job_id' if is_direct else 'job_id'
                 res: requests.Response = self.session.\
                     get(
                         self.endpoints.http_jobs_direct if is_direct else self.endpoints.http_jobs_batch,

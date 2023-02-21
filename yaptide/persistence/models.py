@@ -58,12 +58,12 @@ class SimulationModel(db.Model):
 
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)
-    task_id: str = db.Column(db.String, nullable=False, unique=True)
+    job_id: str = db.Column(db.String, nullable=False, unique=True)
     user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
     name: str = db.Column(db.String, nullable=False, default='workspace')
-    cores: int = db.Column(db.Integer, nullable=True)
+    ntasks: int = db.Column(db.Integer, nullable=True)
     platform: str = db.Column(db.String, nullable=False)
 
 

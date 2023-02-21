@@ -50,7 +50,7 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     return {
         "result": result,
         "end_time": now,
-        "cores": 1,
+        "ntasks": 1,
         "metadata": {
             "source": "YAPTIDE",
             "simulator": "shieldhit",

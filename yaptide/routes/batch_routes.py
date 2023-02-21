@@ -31,7 +31,7 @@ class JobsBatch(Resource):
 
         if "job_id" in result:
             simulation = SimulationModel(
-                task_id=result["job_id"], user_id=user.id, platform=SimulationModel.Platform.BATCH.value)
+                job_id=result["job_id"], user_id=user.id, platform=SimulationModel.Platform.BATCH.value)
             db.session.add(simulation)
             db.session.commit()
 
@@ -61,7 +61,7 @@ class JobsBatch(Resource):
             return yaptide_response(message=error_message, code=res_code)
 
         simulation: SimulationModel = db.session.query(SimulationModel).\
-            filter_by(task_id=params_dict["job_id"]).first()
+            filter_by(job_id=params_dict["job_id"]).first()
 
         json_data = {
             "job_id": params_dict["job_id"],
@@ -71,9 +71,9 @@ class JobsBatch(Resource):
 
         result, status_code = get_job(json_data=json_data)
 
-        if "end_time" in result and "cores" in result and simulation.end_time is None and simulation.cores is None:
+        if "end_time" in result and "ntasks" in result and simulation.end_time is None and simulation.ntasks is None:
             simulation.end_time = result['end_time']
-            simulation.cores = result['cores']
+            simulation.ntasks = result['ntasks']
             db.session.commit()
 
         return yaptide_response(
@@ -109,7 +109,7 @@ class JobsBatch(Resource):
 
 def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str]:
     """Function checking if provided task is owned by user managing action"""
-    simulation = db.session.query(SimulationModel).filter_by(task_id=job_id).first()
+    simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
     if not simulation:
         return False, 'Task with provided ID does not exist', 404

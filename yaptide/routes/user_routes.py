@@ -86,17 +86,10 @@ class UserSimulations(Resource):
             'simulations': [
                 {
                     'name': simulation.name,
-                    'task_id': simulation.task_id,
+                    'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
                     'end_time': simulation.end_time,
-                    'cores': simulation.cores,
-                    'platform': simulation.platform
-                } if simulation.platform == SimulationModel.Platform.DIRECT.value else {
-                    'name': simulation.name,
-                    'job_id': simulation.task_id,
-                    'start_time': simulation.start_time,
-                    'end_time': simulation.end_time,
-                    'nodes': simulation.cores,
+                    'ntasks': simulation.ntasks,
                     'platform': simulation.platform
                 }
                 for simulation in simulations],

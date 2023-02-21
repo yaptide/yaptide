@@ -132,18 +132,18 @@ Possible parameters:
 * jobs - number of threads simulations should run on
 * sim_type - name of the simulator you wish to use, possible are ``shieldhit`` which is default, ``topas`` and ``dummy`` (note that they might not be working yet and for the purpose of testing just API not simulation results, use ``dummy``)
 
-The result of curl contains the task_id by which you can access the status of task started in the backend. In this case you can access the status by another curl.
+The result of curl contains the job_id by which you can access the status of task started in the backend. In this case you can access the status by another curl.
 
 Example curl for Windows cmd:
 
 ```shell
-curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{\"task_id\": \"<task_id>\"}" http://localhost:5000/sh/status
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{\"job_id\": \"<job_id>\"}" http://localhost:5000/sh/status
 ```
 
 And for Linux:
 
 ```shell
-curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'task_id' : '<task_id>'}" "http://localhost:5000/sh/status"
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'job_id' : '<job_id>'}" "http://localhost:5000/sh/status"
 ```
 
 # Windows running script

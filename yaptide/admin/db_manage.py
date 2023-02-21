@@ -179,7 +179,7 @@ def list_simulations(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
-        click.echo(f"id {row.id} ; task id {row.task_id} ; start_time {row.start_time}; end_time {row.end_time};")
+        click.echo(f"id {row.id} ; job id {row.job_id} ; start_time {row.start_time}; end_time {row.end_time};")
     return None
 
 
