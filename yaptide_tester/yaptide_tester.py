@@ -222,11 +222,10 @@ class YaptideTester:
             for sim in res_json['simulations']:
                 print(sim)
                 is_direct = sim['platform'] == 'DIRECT'
-                id_type = 'job_id' if is_direct else 'job_id'
                 res: requests.Response = self.session.\
                     get(
                         self.endpoints.http_jobs_direct if is_direct else self.endpoints.http_jobs_batch,
-                        params={id_type: sim[id_type]}
+                        params={"job_id": sim["job_id"]}
                     )
                 res_json: dict = res.json()
 
