@@ -85,7 +85,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
             "input_json": raw_input_dict if "metadata" in raw_input_dict else None,
             "input_files": input_files,
             "end_time": datetime.utcnow(),
-            "ntasks": runner_obj.jobs
+            "job_tasks_status": sh12a_simulation_status(dir_path=tmp_dir_path, sim_ended=True)
         }
 
 
@@ -234,7 +234,7 @@ def simulation_task_status(job_id: str) -> dict:
         result["job_tasks_status"] = sim_info
     elif job_state != "FAILURE":
         if "result" in job.info:
-            for key in ["result", "metadata", "input_files", "input_json", "end_time", "ntasks"]:
+            for key in ["result", "metadata", "input_files", "input_json", "end_time", "job_tasks_status"]:
                 result[key] = job.info[key]
         elif "logfile" in job.info:
             result["job_state"] = translate_celery_state_naming("FAILURE")
@@ -247,10 +247,9 @@ def simulation_task_status(job_id: str) -> dict:
     return result
 
 
-def sh12a_simulation_status(dir_path: str) -> list:
+def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
     """Extracts current SHIELD-HIT12A simulation state from first available logfile"""
     # This is dummy version because pymchelper currently doesn't privide any information about progress
-    # file_path = Path(dir_path, "run_1", "shieldhit_0001.log")
     result_list = []
     for workdir in os.listdir(dir_path):
         if not re.search(r"run_", workdir): continue  # skipcq: FLK-E701
@@ -275,10 +274,11 @@ def sh12a_simulation_status(dir_path: str) -> list:
                                 requested_particles = int(line.split(": ")[1])
                         else:
                             # Searching for latest line
-                            if line.lstrip().startswith("Primary particle"):
+                            if line.lstrip().startswith("Primary particle") or line.lstrip().startswith("Run time"):
                                 last_result_line = line
 
-                    regex_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hours\s*\d*\s*minutes\s*\d*\s*seconds\b"
+                    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hours\s*\d*\s*minutes\s*\d*\s*seconds\b"
+                    complete_match = r"\bRun time:\s*\d*\s*hours\s*\d*\s*minutes\s*\d*\s*seconds\b"
                     task_status = {
                         "task_id": task_id,
                         "task_state": SimulationModel.JobStatus.RUNNING.value,
@@ -287,19 +287,29 @@ def sh12a_simulation_status(dir_path: str) -> list:
                             "simulated_primaries": 0
                         }
                     }
-                    if re.search(regex_match, last_result_line):
-                        splitted = last_result_line.split()
+                    splitted = last_result_line.split()
+                    if re.search(run_match, last_result_line):
                         task_status["task_info"]["simulated_primaries"] = splitted[3]
                         task_status["estimated"] = {
                                 "hours": splitted[5],
                                 "minutes": splitted[7],
                                 "seconds": splitted[9],
                             }
+                    elif re.search(complete_match, last_result_line):
+                        task_status["task_info"]["simulated_primaries"] = requested_particles
+                        task_status["task_state"] = SimulationModel.JobStatus.COMPLETED.value
+                        task_status["run_time"] = {
+                                "hours": splitted[2],
+                                "minutes": splitted[4],
+                                "seconds": splitted[6],
+                        }
                     result_list.append(task_status)
             except FileNotFoundError:
+                task_state = SimulationModel.JobStatus.FAILED.value if sim_ended\
+                    else SimulationModel.JobStatus.PENDING.value
                 result_list.append({
                     "task_id": task_id,
-                    "task_state": SimulationModel.JobStatus.PENDING.value
+                    "task_state": task_state
                 })
     return result_list
 

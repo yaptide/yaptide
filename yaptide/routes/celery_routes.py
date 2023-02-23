@@ -77,9 +77,8 @@ class JobsDirect(Resource):
         result: dict = job.wait()
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        if "end_time" in result and "ntasks" in result and simulation.end_time is None and simulation.ntasks is None:
+        if "end_time" in result and simulation.end_time is None:
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
-            simulation.ntasks = result['ntasks']
             db.session.commit()
 
         return yaptide_response(

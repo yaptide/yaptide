@@ -63,7 +63,6 @@ class SimulationModel(db.Model):
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
     name: str = db.Column(db.String, nullable=False, default='workspace')
-    ntasks: int = db.Column(db.Integer, nullable=True)
     platform: str = db.Column(db.String, nullable=False)
 
 

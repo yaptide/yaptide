@@ -48,14 +48,29 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     with open(Path(ROOT_DIR, "dummy_output.json")) as json_file:
         result = json_lib.load(json_file)
     return {
+        "job_state": SimulationModel.JobStatus.COMPLETED.value,
         "result": result,
         "end_time": now,
-        "ntasks": 1,
         "metadata": {
             "source": "YAPTIDE",
             "simulator": "shieldhit",
             "type": "results",
-        }
+        },
+        "job_tasks_status": [
+            {
+                "task_id": 1,
+                "task_state": SimulationModel.JobStatus.COMPLETED.value,
+                "task_info": {
+                    "simulated_primaries": 2000,
+                    "primaries_to_simulate": 2000,
+                    "run_time": {
+                        "hours": 0,
+                        "minutes": 0,
+                        "seconds": 30,
+                    }
+                }
+            }
+        ]
     }, 200
 
 

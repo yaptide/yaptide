@@ -89,7 +89,6 @@ class UserSimulations(Resource):
                     'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
                     'end_time': simulation.end_time,
-                    'ntasks': simulation.ntasks,
                     'platform': simulation.platform
                 }
                 for simulation in simulations],

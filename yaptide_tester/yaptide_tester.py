@@ -152,6 +152,7 @@ class YaptideTester:
                                 data_to_write = str(res_json['result'])
                                 data_to_write = data_to_write.replace("'", "\"")
                                 writer.write(data_to_write)
+                                print(res_json['job_tasks_status'])
                             return
                         print(res_json)
                         if res_json.get('logfile'):

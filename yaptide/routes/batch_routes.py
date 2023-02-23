@@ -71,9 +71,8 @@ class JobsBatch(Resource):
 
         result, status_code = get_job(json_data=json_data)
 
-        if "end_time" in result and "ntasks" in result and simulation.end_time is None and simulation.ntasks is None:
+        if "end_time" in result and simulation.end_time is None:
             simulation.end_time = result['end_time']
-            simulation.ntasks = result['ntasks']
             db.session.commit()
 
         return yaptide_response(
