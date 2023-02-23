@@ -35,7 +35,7 @@ def get_job(json_data: dict) -> tuple[dict, int]:
                     "task_info": {
                         "simulated_primaries": 1000,
                         "primaries_to_simulate": 2000,
-                        "estimated": {
+                        "estimated_time": {
                             "hours": 0,
                             "minutes": 0,
                             "seconds": 15,

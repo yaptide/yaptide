@@ -290,7 +290,7 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                     splitted = last_result_line.split()
                     if re.search(run_match, last_result_line):
                         task_status["task_info"]["simulated_primaries"] = splitted[3]
-                        task_status["estimated"] = {
+                        task_status["estimated_time"] = {
                                 "hours": splitted[5],
                                 "minutes": splitted[7],
                                 "seconds": splitted[9],
