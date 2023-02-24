@@ -52,7 +52,7 @@ def get_job(json_data: dict) -> tuple[dict, int]:
         "result": result,
         "end_time": now,
         "metadata": {
-            "source": "YAPTIDE",
+            "input": "YAPTIDE project",
             "simulator": "shieldhit",
             "type": "results",
         },

@@ -1,3 +1,4 @@
+from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 from yaptide.celery.worker import celery_app
 
 from yaptide.persistence.models import SimulationModel
@@ -19,7 +20,6 @@ from pymchelper.axis import MeshAxis
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
 def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: Path):
@@ -78,7 +78,7 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
         return {
             "result": result,
             "metadata": {
-                "source": "YAPTIDE" if "metadata" in raw_input_dict else "Input files",
+                "input": "YAPTIDE project" if "metadata" in raw_input_dict else "Input files",
                 "simulator": param_dict["sim_type"],
                 "type": "results",
             },
@@ -117,7 +117,7 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
         # est_dict contains list of pages
         est_dict = {
             "name": estimator_key,
-            "metadata" : {},
+            "metadata": {},
             "pages": []
         }
 
@@ -133,7 +133,7 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
             # "dimensions" indicating it is 1 dim page
             # "data" which has unit, name and list of data values
             page_dict = {
-                "metadata" : {},
+                "metadata": {},
                 "dimensions": page.dimension,
                 "data": {
                     "unit": str(page.unit),
@@ -252,11 +252,13 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
     # This is dummy version because pymchelper currently doesn't privide any information about progress
     result_list = []
     for workdir in os.listdir(dir_path):
-        if not re.search(r"run_", workdir): continue  # skipcq: FLK-E701
+        if not re.search(r"run_", workdir):
+            continue  # skipcq: FLK-E701
         task_id = int(workdir.split("_")[1])
         workdir_path = Path(dir_path, workdir)
         for filename in os.listdir(workdir_path):
-            if not re.search(r"shieldhit.*log", filename): continue  # skipcq: FLK-E701
+            if not re.search(r"shieldhit.*log", filename):
+                continue  # skipcq: FLK-E701
             file_path = Path(workdir_path, filename)
             try:
                 with open(file_path, "r") as reader:
@@ -291,17 +293,17 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                     if re.search(run_match, last_result_line):
                         task_status["task_info"]["simulated_primaries"] = splitted[3]
                         task_status["estimated_time"] = {
-                                "hours": splitted[5],
-                                "minutes": splitted[7],
-                                "seconds": splitted[9],
-                            }
+                            "hours": splitted[5],
+                            "minutes": splitted[7],
+                            "seconds": splitted[9],
+                        }
                     elif re.search(complete_match, last_result_line):
                         task_status["task_info"]["simulated_primaries"] = requested_particles
                         task_status["task_state"] = SimulationModel.JobStatus.COMPLETED.value
                         task_status["run_time"] = {
-                                "hours": splitted[2],
-                                "minutes": splitted[4],
-                                "seconds": splitted[6],
+                            "hours": splitted[2],
+                            "minutes": splitted[4],
+                            "seconds": splitted[6],
                         }
                     result_list.append(task_status)
             except FileNotFoundError:
