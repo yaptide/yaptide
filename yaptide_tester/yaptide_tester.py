@@ -35,21 +35,21 @@ class Endpoints:
 class YaptideTesterSession:
     """Class supposed to wrap request.Session class with yaptide auth features"""
 
-    def __init__(self, login_endpoint: str, logout_endpoint: str, login_name: str, password: str):
+    def __init__(self, login_endpoint: str, logout_endpoint: str, username: str, password: str):
         """Init of a class"""
         self.session = requests.Session()
         self.timer = timeit.default_timer()
         self.login_interval = 500
         self.login_endpoint = login_endpoint
         self.logout_endpoint = logout_endpoint
-        self.login_name = login_name
+        self.username = username
         self.password = password
 
     def login(self, inital_login: bool = False):
         """Function allowing to login"""
         if timeit.default_timer() - self.timer > self.login_interval or inital_login:
             res: requests.Response = self.session.\
-                post(self.login_endpoint, json={"login_name": self.login_name, "password": self.password})
+                post(self.login_endpoint, json={"username": self.username, "password": self.password})
             if res.status_code != 202:
                 res_json = res.json()
                 print(res_json)
@@ -75,10 +75,10 @@ class YaptideTesterSession:
 class YaptideTester:
     """Class responsible for testing YAPTIDE backend locally by developer"""
 
-    def __init__(self, host: str, port: int, login_name: str, password: str):
+    def __init__(self, host: str, port: int, username: str, password: str):
         self.endpoints = Endpoints(host, port)
         self.session = YaptideTesterSession(
-            self.endpoints.http_auth_login, self.endpoints.http_auth_logout, login_name, password)
+            self.endpoints.http_auth_login, self.endpoints.http_auth_logout, username, password)
 
     def run_all(self, sim_n: int, do_monitor: bool):
         """Function running all important tests - might be extended in future"""
@@ -202,9 +202,9 @@ class YaptideTester:
         order_by = "start_time"
         order_type = "descend"
         res: requests.Response = self.session.get(self.endpoints.http_list_sims, params={
-                "order_by": order_by,
-                "order_type": order_type,
-            })
+            "order_by": order_by,
+            "order_type": order_type,
+        })
         res_json: dict = res.json()
         if res.status_code != 200:
             print(res_json)
@@ -245,7 +245,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--host', help='backend host', default="localhost", type=str)
     parser.add_argument('--port', help='backend port', default=5000, type=int)
-    parser.add_argument('--login_name', help='user login to use for tests', default="admin", type=str)
+    parser.add_argument('--username', help='user login to use for tests', default="admin", type=str)
     parser.add_argument('--password', help='user password to use for tests', default="password", type=str)
     parser.add_argument('--sim_n', help='number of simulations to run for each type', default=1, type=int)
     parser.add_argument('--do_monitor', help='orders tester to wait for simulations\' results', action='store_true')
@@ -255,5 +255,5 @@ if __name__ == "__main__":
     parser.set_defaults(do_monitor=False)
     args = parser.parse_args()
 
-    tester = YaptideTester(host=args.host, port=args.port, login_name=args.login_name, password=args.password)
+    tester = YaptideTester(host=args.host, port=args.port, username=args.username, password=args.password)
     tester.run_all(sim_n=args.sim_n, do_monitor=args.do_monitor)
