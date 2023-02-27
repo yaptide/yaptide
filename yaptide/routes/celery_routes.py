@@ -32,13 +32,12 @@ class JobsDirect(Resource):
 
         job = run_simulation.delay(param_dict={
             "jobs": json_data["jobs"] if "jobs" in json_data else -1,
-            "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit",
-            "sim_name": json_data["sim_name"] if "sim_name" in json_data else ""
+            "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit"
         }, raw_input_dict=json_data["sim_data"])
 
-        if json_data.get('sim_name'):
+        if json_data.get('title'):
             simulation = SimulationModel(
-                job_id=job.id, user_id=user.id, name=json_data['sim_name'],
+                job_id=job.id, user_id=user.id, title=json_data['title'],
                 platform=SimulationModel.Platform.DIRECT.value)
         else:
             simulation = SimulationModel(

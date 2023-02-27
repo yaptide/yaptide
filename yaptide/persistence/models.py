@@ -15,7 +15,7 @@ class UserModel(db.Model):
 
     __tablename__ = 'User'
     id: int = db.Column(db.Integer, primary_key=True)
-    login_name: str = db.Column(db.String, nullable=False, unique=True)
+    username: str = db.Column(db.String, nullable=False, unique=True)
     password_hash: str = db.Column(db.String, nullable=False)
     grid_proxy: str = db.Column(db.String)
     simulations = relationship("SimulationModel")
@@ -35,7 +35,7 @@ class UserModel(db.Model):
         return base64.b64encode(self.grid_proxy.encode('utf-8')).decode('utf-8')
 
     def __repr__(self) -> str:
-        return f'User #{self.id} {self.login_name}'
+        return f'User #{self.id} {self.username}'
 
 
 class SimulationModel(db.Model):
@@ -62,7 +62,7 @@ class SimulationModel(db.Model):
     user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
-    name: str = db.Column(db.String, nullable=False, default='workspace')
+    title: str = db.Column(db.String, nullable=False, default='workspace')
     platform: str = db.Column(db.String, nullable=False)
 
 

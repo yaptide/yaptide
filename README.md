@@ -61,14 +61,14 @@ Currently, there is a first version of authorisation. For now we need to registe
    Example curl for Windows cmd:
 
 ```shell
-curl -i -X PUT -H "Content-Type:application/json" -d "{\"login_name\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/register
+curl -i -X PUT -H "Content-Type:application/json" -d "{\"username\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/register
 ```
 
 2. Log in:
    Example curl for Windows cmd:
 
 ```shell
-curl -i -X POST -c cookies.txt -H "Content-Type:application/json" -d "{\"login_name\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/login
+curl -i -X POST -c cookies.txt -H "Content-Type:application/json" -d "{\"username\": \"login\", \"password\": \"password\" }" http://localhost:5000/auth/login
 ```
 
 3. Status:
