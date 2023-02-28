@@ -89,7 +89,10 @@ class UserSimulations(Resource):
                     'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
                     'end_time': simulation.end_time,
-                    'platform': simulation.platform
+                    'metadata': {
+                        'platform': simulation.platform,
+                        'server': 'Yaptide'
+                    }
                 }
                 for simulation in simulations],
             'page_count': page_count,
