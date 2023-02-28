@@ -85,7 +85,7 @@ class UserSimulations(Resource):
         result = {
             'simulations': [
                 {
-                    'name': simulation.name,
+                    'title': simulation.title,
                     'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
                     'end_time': simulation.end_time,

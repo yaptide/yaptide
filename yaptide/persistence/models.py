@@ -62,7 +62,7 @@ class SimulationModel(db.Model):
     user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
     start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
-    name: str = db.Column(db.String, nullable=False, default='workspace')
+    title: str = db.Column(db.String, nullable=False, default='workspace')
     platform: str = db.Column(db.String, nullable=False)
 
 

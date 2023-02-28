@@ -264,7 +264,7 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                 with open(file_path, "r") as reader:
                     found_line_which_starts_status_block = False
                     last_result_line = ""
-                    requested_particles = 0
+                    requested_primaries = 0
                     for line in reader:
                         if not found_line_which_starts_status_block:
                             # We are searching for lines containing progress info
@@ -272,8 +272,8 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                             found_line_which_starts_status_block = line.lstrip().startswith("Starting transport")
 
                             # We are also searching for requested particles number
-                            if requested_particles == 0 and re.search(r"Requested number of primaries NSTAT", line):
-                                requested_particles = int(line.split(": ")[1])
+                            if requested_primaries == 0 and re.search(r"Requested number of primaries NSTAT", line):
+                                requested_primaries = int(line.split(": ")[1])
                         else:
                             # Searching for latest line
                             if line.lstrip().startswith("Primary particle") or line.lstrip().startswith("Run time"):
@@ -284,21 +284,19 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                     task_status = {
                         "task_id": task_id,
                         "task_state": SimulationModel.JobStatus.RUNNING.value,
-                        "task_info": {
-                            "requested_particles": requested_particles,
-                            "simulated_primaries": 0
-                        }
+                        "requested_primaries": requested_primaries,
+                        "simulated_primaries": 0
                     }
                     splitted = last_result_line.split()
                     if re.search(run_match, last_result_line):
-                        task_status["task_info"]["simulated_primaries"] = splitted[3]
+                        task_status["simulated_primaries"] = splitted[3]
                         task_status["estimated_time"] = {
                             "hours": splitted[5],
                             "minutes": splitted[7],
                             "seconds": splitted[9],
                         }
                     elif re.search(complete_match, last_result_line):
-                        task_status["task_info"]["simulated_primaries"] = requested_particles
+                        task_status["simulated_primaries"] = requested_primaries
                         task_status["task_state"] = SimulationModel.JobStatus.COMPLETED.value
                         task_status["run_time"] = {
                             "hours": splitted[2],

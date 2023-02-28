@@ -32,14 +32,12 @@ def get_job(json_data: dict) -> tuple[dict, int]:
                 {
                     "task_id": 1,
                     "task_state": SimulationModel.JobStatus.RUNNING.value,
-                    "task_info": {
-                        "simulated_primaries": 1000,
-                        "primaries_to_simulate": 2000,
-                        "estimated_time": {
-                            "hours": 0,
-                            "minutes": 0,
-                            "seconds": 15,
-                        }
+                    "simulated_primaries": 1000,
+                    "requested_primaries": 2000,
+                    "estimated_time": {
+                        "hours": 0,
+                        "minutes": 0,
+                        "seconds": 15,
                     }
                 }
             ]
@@ -60,14 +58,12 @@ def get_job(json_data: dict) -> tuple[dict, int]:
             {
                 "task_id": 1,
                 "task_state": SimulationModel.JobStatus.COMPLETED.value,
-                "task_info": {
-                    "simulated_primaries": 2000,
-                    "primaries_to_simulate": 2000,
-                    "run_time": {
-                        "hours": 0,
-                        "minutes": 0,
-                        "seconds": 30,
-                    }
+                "simulated_primaries": 2000,
+                "requested_primaries": 2000,
+                "run_time": {
+                    "hours": 0,
+                    "minutes": 0,
+                    "seconds": 30,
                 }
             }
         ]
