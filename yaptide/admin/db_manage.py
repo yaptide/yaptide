@@ -32,7 +32,7 @@ def connect_to_db():
 
 def user_exists(name: str, users: db.Table, con) -> bool:
     """Check if user already exists"""
-    query = db.select([users]).where(users.c.login_name == name)
+    query = db.select([users]).where(users.c.username == name)
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
@@ -68,7 +68,7 @@ def list_users(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        click.echo(f"Login {row.login_name} ; Passw ...{row.password_hash[-10:]} ; Proxy {proxy_hash(row.grid_proxy)}")
+        click.echo(f"Login {row.username} ; Passw ...{row.password_hash[-10:]} ; Proxy {proxy_hash(row.grid_proxy)}")
     return None
 
 
@@ -98,7 +98,7 @@ def add_user(**kwargs):
     if user_exists(username, users, con):
         return None
 
-    query = db.insert(users).values(login_name=username,
+    query = db.insert(users).values(username=username,
                                     password_hash=generate_password_hash(password),
                                     grid_proxy=proxy_content)
     con.execute(query)
@@ -128,7 +128,7 @@ def update_user(**kwargs):
     proxy_content = None
     if proxy_file_handle is not None:
         proxy_content = proxy_file_handle.read()
-        query = db.update(users).where(users.c.login_name == username).values(grid_proxy=proxy_content)
+        query = db.update(users).where(users.c.username == username).values(grid_proxy=proxy_content)
         if kwargs['verbose'] > 1:
             click.echo(f'Updating proxy: {proxy_hash(proxy_content)}')
         con.execute(query)
@@ -137,7 +137,7 @@ def update_user(**kwargs):
     password = kwargs['password']
     if password:
         pwd_hash = generate_password_hash(password)
-        query = db.update(users).where(users.c.login_name == username).values(password_hash=pwd_hash)
+        query = db.update(users).where(users.c.username == username).values(password_hash=pwd_hash)
         con.execute(query)
         if kwargs['verbose'] > 2:
             click.echo(f'Updating password: {password}')
@@ -161,7 +161,7 @@ def remove_user(**kwargs):
         click.echo("Aborting, user does not exist")
         return None
 
-    query = db.delete(users).where(users.c.login_name == username)
+    query = db.delete(users).where(users.c.username == username)
     con.execute(query)
     click.echo(f'Successfully deleted user: {username}')
     return None
@@ -179,7 +179,7 @@ def list_simulations(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
-        click.echo(f"id {row.id} ; task id {row.task_id} ; start_time {row.start_time}; end_time {row.end_time};")
+        click.echo(f"id {row.id} ; job id {row.job_id} ; start_time {row.start_time}; end_time {row.end_time};")
     return None
 
 

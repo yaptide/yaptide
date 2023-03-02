@@ -30,19 +30,18 @@ class JobsDirect(Resource):
         if "sim_data" not in json_data:
             return error_validation_response()
 
-        task = run_simulation.delay(param_dict={
-            "jobs": json_data["jobs"] if "jobs" in json_data else -1,
-            "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit",
-            "sim_name": json_data["sim_name"] if "sim_name" in json_data else ""
+        job = run_simulation.delay(param_dict={
+            "ntasks": json_data["ntasks"] if "ntasks" in json_data else -1,
+            "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit"
         }, raw_input_dict=json_data["sim_data"])
 
-        if json_data.get('sim_name'):
+        if json_data.get('title'):
             simulation = SimulationModel(
-                task_id=task.id, user_id=user.id, name=json_data['sim_name'],
+                job_id=job.id, user_id=user.id, title=json_data['title'],
                 platform=SimulationModel.Platform.DIRECT.value)
         else:
             simulation = SimulationModel(
-                task_id=task.id, user_id=user.id, platform=SimulationModel.Platform.DIRECT.value)
+                job_id=job.id, user_id=user.id, platform=SimulationModel.Platform.DIRECT.value)
 
         db.session.add(simulation)
         db.session.commit()
@@ -50,40 +49,41 @@ class JobsDirect(Resource):
         return yaptide_response(
             message="Task started",
             code=202,
-            content={'task_id': task.id}
+            content={'job_id': job.id}
         )
 
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        task_id = fields.String()
+        job_id = fields.String()
 
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
-        """Method returning task status and results"""
+        """Method returning job status and results"""
         schema = JobsDirect._Schema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
 
-        task_id = param_dict['task_id']
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=task_id, user=user)
+        job_id = param_dict['job_id']
+        is_owned, error_message, res_code = check_if_task_is_owned(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = simulation_task_status.delay(task_id=task_id)
-        result: dict = task.wait()
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
+        job = simulation_task_status.delay(job_id=job_id)
+        result: dict = job.wait()
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        if "end_time" in result and "cores" in result and simulation.end_time is None and simulation.cores is None:
+        if "end_time" in result and simulation.end_time is None:
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
-            simulation.cores = result['cores']
             db.session.commit()
 
+        result.pop("end_time", None)
+
         return yaptide_response(
-            message=f"Task state: {result['state']}",
+            message=f"Job state: {result['job_state']}",
             code=200,
             content=result
         )
@@ -97,15 +97,15 @@ class JobsDirect(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=json_data.get('task_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(job_id=json_data.get('job_id'), user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = cancel_simulation.delay(task_id=json_data.get('task_id'))
-        result: dict = task.wait()
+        job = cancel_simulation.delay(job_id=json_data.get('job_id'))
+        result: dict = job.wait()
 
         if result:
-            db.session.query(SimulationModel).filter_by(task_id=json_data.get('task_id')).delete()
+            db.session.query(SimulationModel).filter_by(job_id=json_data.get('job_id')).delete()
             db.session.commit()
 
         return error_internal_response()
@@ -133,8 +133,8 @@ class ConvertInputFiles(Resource):
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
 
-        task = convert_input_files.delay(param_dict=param_dict, raw_input_dict=json_data)
-        result: dict = task.wait()
+        job = convert_input_files.delay(param_dict=param_dict, raw_input_dict=json_data)
+        result: dict = job.wait()
 
         return yaptide_response(
             message="Converted Input Files",
@@ -143,9 +143,9 @@ class ConvertInputFiles(Resource):
         )
 
 
-def check_if_task_is_owned(task_id: str, user: UserModel) -> tuple[bool, str]:
-    """Function checking if provided task is owned by user managing action"""
-    simulation = db.session.query(SimulationModel).filter_by(task_id=task_id).first()
+def check_if_task_is_owned(job_id: str, user: UserModel) -> tuple[bool, str]:
+    """Function checking if provided job is owned by user managing action"""
+    simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
     if not simulation:
         return False, 'Task with provided ID does not exist', 404
@@ -160,7 +160,7 @@ class SimulationInputs(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        task_id = fields.String()
+        job_id = fields.String()
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -171,14 +171,14 @@ class SimulationInputs(Resource):
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
-        task_id = param_dict['task_id']
+        job_id = param_dict['job_id']
 
-        is_owned, error_message, res_code = check_if_task_is_owned(task_id=task_id, user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        task = get_input_files.delay(task_id=task_id)
-        result: dict = task.wait()
+        job = get_input_files.delay(job_id=job_id)
+        result: dict = job.wait()
 
         return yaptide_response(
             message=result['info'],
