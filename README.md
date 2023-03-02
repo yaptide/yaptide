@@ -120,16 +120,16 @@ Currently converter is parsing some of the frontend input so it would be wise to
 Example curl for Windows cmd:
 
 ```shell
-curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile http://localhost:5000/sh/run
+curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile http://localhost:5000/jobs/direct
 ```
 
 And for Linux:
 
 ```shell
-curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile "http://localhost:5000/sh/run"
+curl -i -X POST -b cookies.txt -H "Content-Type:application/json" -d @path/to/jsonfile "http://localhost:5000/jobs/direct"
 ```
 
-You can also add parameters after `?` sign like this: `http://localhost:5000/sh/run?<param name>=<param value>`
+You can also add parameters after `?` sign like this: `http://localhost:5000/jobs/direct?<param name>=<param value>`
 Possible parameters:
 
 -   jobs - number of threads simulations should run on
@@ -140,13 +140,13 @@ The result of curl contains the job_id by which you can access the status of tas
 Example curl for Windows cmd:
 
 ```shell
-curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{\"job_id\": \"<job_id>\"}" http://localhost:5000/sh/status
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{\"job_id\": \"<job_id>\"}" http://localhost:5000/jobs/direct
 ```
 
 And for Linux:
 
 ```shell
-curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'job_id' : '<job_id>'}" "http://localhost:5000/sh/status"
+curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'job_id' : '<job_id>'}" "http://localhost:5000/jobs/direct"
 ```
 
 # Windows running script
