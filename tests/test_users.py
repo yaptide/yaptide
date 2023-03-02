@@ -4,8 +4,8 @@ from yaptide.application import create_app
 from time import sleep
 import json
 
-_Login_name = "test_user"
-_Login_name_2 = "not_existing_user"
+_Username = "test_user"
+_Username_2 = "not_existing_user"
 _Password = "test_password"
 
 
@@ -29,7 +29,7 @@ def client(app):  # skipcq: PY-D0003
 def test_register(client):
     """Test if user can register"""
     resp = client.put("/auth/register", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
 
@@ -39,11 +39,11 @@ def test_register(client):
 def test_register_existing(client):
     """Test if user can register"""
     client.put("/auth/register", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
     resp = client.put("/auth/register", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
 
@@ -53,11 +53,11 @@ def test_register_existing(client):
 def test_log_in(client):
     """Test if user can log in"""
     client.put("/auth/register", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
     resp = client.post("/auth/login", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
 
@@ -68,7 +68,7 @@ def test_log_in(client):
 def test_log_in_not_existing(client):
     """Test if user can log in"""
     resp = client.post("/auth/login", data=json.dumps(dict(
-        login_name=_Login_name_2,
+        username=_Username_2,
         password=_Password)),
         content_type='application/json')
 
@@ -78,11 +78,11 @@ def test_log_in_not_existing(client):
 def test_user_status(client):
     """Test checking user's status"""
     resp = client.put("/auth/register", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
     resp = client.post("/auth/login", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
 
@@ -92,7 +92,7 @@ def test_user_status(client):
 
     data = json.loads(resp.data.decode())
 
-    assert data.get('login_name') == _Login_name  # skipcq: BAN-B101
+    assert data.get('username') == _Username  # skipcq: BAN-B101
     assert resp.status_code == 200  # skipcq: BAN-B101
 
 
@@ -106,11 +106,11 @@ def test_user_status_unauthorized(client):
 def test_user_status_after_logout(client):
     """Test checking user's status"""
     client.put("/auth/register", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
     client.post("/auth/login", data=json.dumps(dict(
-        login_name=_Login_name,
+        username=_Username,
         password=_Password)),
         content_type='application/json')
 

@@ -29,7 +29,7 @@ class RimrockJobs(Resource):
 
         if "job_id" in result:
             simulation = SimulationModel(
-                task_id=result["job_id"], user_id=user.id, platform=SimulationModel.Platform.RIMROCK.value)
+                job_id=result["job_id"], user_id=user.id, platform=SimulationModel.Platform.RIMROCK.value)
             db.session.add(simulation)
             db.session.commit()
 

@@ -18,7 +18,7 @@ class AuthRegister(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        login_name = fields.String()
+        username = fields.String()
         password = fields.String()
 
     @staticmethod
@@ -31,14 +31,14 @@ class AuthRegister(Resource):
 
         try:
             user = db.session.query(UserModel).filter_by(
-                login_name=json_data.get('login_name')).first()
+                username=json_data.get('username')).first()
         except Exception:  # skipcq: PYL-W0703
             return error_internal_response()
 
         if not user:
             try:
                 user = UserModel(
-                    login_name=json_data.get('login_name')
+                    username=json_data.get('username')
                 )
                 user.set_password(json_data.get('password'))
 
@@ -59,7 +59,7 @@ class AuthLogIn(Resource):
     class _Schema(Schema):
         """Class specifies API parameters"""
 
-        login_name = fields.String()
+        username = fields.String()
         password = fields.String()
 
     @staticmethod
@@ -71,7 +71,7 @@ class AuthLogIn(Resource):
             return error_validation_response()
 
         try:
-            user = db.session.query(UserModel).filter_by(login_name=json_data.get('login_name')).first()
+            user = db.session.query(UserModel).filter_by(username=json_data.get('username')).first()
             if not user:
                 return yaptide_response(message='User not existing', code=401)
 
@@ -123,7 +123,7 @@ class AuthStatus(Resource):
         return yaptide_response(
             message='User status',
             code=200,
-            content={'login_name': user.login_name}
+            content={'username': user.username}
         )
 
 

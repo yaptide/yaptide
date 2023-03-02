@@ -85,19 +85,14 @@ class UserSimulations(Resource):
         result = {
             'simulations': [
                 {
-                    'name': simulation.name,
-                    'task_id': simulation.task_id,
+                    'title': simulation.title,
+                    'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
                     'end_time': simulation.end_time,
-                    'cores': simulation.cores,
-                    'platform': simulation.platform
-                } if simulation.platform == SimulationModel.Platform.DIRECT.value else {
-                    'name': simulation.name,
-                    'job_id': simulation.task_id,
-                    'start_time': simulation.start_time,
-                    'end_time': simulation.end_time,
-                    'nodes': simulation.cores,
-                    'platform': simulation.platform
+                    'metadata': {
+                        'platform': simulation.platform,
+                        'server': 'Yaptide'
+                    }
                 }
                 for simulation in simulations],
             'page_count': page_count,

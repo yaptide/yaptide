@@ -4,7 +4,6 @@ login = "---------------"
 host = "ares"
 connection = Connection(host=f'{login}@{host}.cyfronet.pl', connect_kwargs={"password": "---------------"})
 script = """#!/bin/bash
-#SBATCH --nodes 1
 #SBATCH --ntasks 1
 #SBATCH --time=00:00:19
 #SBATCH -A plgccbmc11-cpu
