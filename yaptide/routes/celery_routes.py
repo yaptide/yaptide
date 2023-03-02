@@ -80,6 +80,8 @@ class JobsDirect(Resource):
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
             db.session.commit()
 
+        result.pop("end_time", None)
+
         return yaptide_response(
             message=f"Job state: {result['job_state']}",
             code=200,

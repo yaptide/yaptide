@@ -279,8 +279,8 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                             if line.lstrip().startswith("Primary particle") or line.lstrip().startswith("Run time"):
                                 last_result_line = line
 
-                    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hours\s*\d*\s*minutes\s*\d*\s*seconds\b"
-                    complete_match = r"\bRun time:\s*\d*\s*hours\s*\d*\s*minutes\s*\d*\s*seconds\b"
+                    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+                    complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
                     task_status = {
                         "task_id": task_id,
                         "task_state": SimulationModel.JobStatus.RUNNING.value,

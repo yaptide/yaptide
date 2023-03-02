@@ -75,6 +75,8 @@ class JobsBatch(Resource):
             simulation.end_time = result['end_time']
             db.session.commit()
 
+        result.pop("end_time", None)
+
         return yaptide_response(
             message="",
             code=status_code,
