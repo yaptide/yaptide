@@ -31,7 +31,7 @@ class JobsDirect(Resource):
             return error_validation_response()
 
         job = run_simulation.delay(param_dict={
-            "jobs": json_data["jobs"] if "jobs" in json_data else -1,
+            "ntasks": json_data["ntasks"] if "ntasks" in json_data else -1,
             "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit"
         }, raw_input_dict=json_data["sim_data"])
 

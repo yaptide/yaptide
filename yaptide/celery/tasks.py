@@ -52,12 +52,9 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
                                       cmdline_opts="")
 
         # Pymchelper uses all available cores by default
-        jobs = None
-        # otherwise use given number of cores
-        if param_dict["jobs"] > 0:
-            jobs = param_dict["jobs"]
+        ntasks = param_dict["ntasks"] if param_dict["ntasks"] > 0 else None
 
-        runner_obj = SHRunner(jobs=jobs,
+        runner_obj = SHRunner(jobs=ntasks,
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
