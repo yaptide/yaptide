@@ -19,6 +19,7 @@ class UserModel(db.Model):
     password_hash: str = db.Column(db.String, nullable=False)
     grid_proxy: str = db.Column(db.String)
     simulations = relationship("SimulationModel")
+    clusters = relationship("ClusterModel")
 
     def set_password(self, password: str):
         """Sets hashed password"""
@@ -36,6 +37,17 @@ class UserModel(db.Model):
 
     def __repr__(self) -> str:
         return f'User #{self.id} {self.username}'
+
+
+class ClusterModel(db.Model):
+    """Cluster info for specific user"""
+
+    __tablename__ = 'ClusterModel'
+    id: int = db.Column(db.Integer, primary_key=True)
+    user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
+    cluster_name: str = db.Column(db.String, nullable=False)
+    cluster_username: str = db.Column(db.String, nullable=False)
+    cluster_ssh_key: str = db.Column(db.String, nullable=False)
 
 
 class SimulationModel(db.Model):
