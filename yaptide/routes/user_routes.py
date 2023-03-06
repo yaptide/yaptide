@@ -114,7 +114,7 @@ class UserClusters(Resource):
             'clusters': [
                 {
                     'cluster_name': cluster.cluster_name
-                } 
+                }
                 for cluster in clusters
             ]
         }
