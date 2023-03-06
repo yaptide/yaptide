@@ -23,8 +23,6 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     """Dummy version of get_job"""
     now = datetime.utcnow()
     time_diff = now - json_data["start_time_for_dummy"]
-    print(time_diff)
-    print(json_data)
     if time_diff.seconds < 30 and json_data["end_time_for_dummy"] is None:
         return {
             "job_state": SimulationModel.JobStatus.RUNNING.value,
@@ -37,7 +35,7 @@ def get_job(json_data: dict) -> tuple[dict, int]:
                     "estimated_time": {
                         "hours": 0,
                         "minutes": 0,
-                        "seconds": 15,
+                        "seconds": 30 - time_diff.seconds,
                     }
                 }
             ]
@@ -49,11 +47,6 @@ def get_job(json_data: dict) -> tuple[dict, int]:
         "job_state": SimulationModel.JobStatus.COMPLETED.value,
         "result": result,
         "end_time": now,
-        "metadata": {
-            "input": "YAPTIDE project",
-            "simulator": "shieldhit",
-            "type": "results",
-        },
         "job_tasks_status": [
             {
                 "task_id": 1,

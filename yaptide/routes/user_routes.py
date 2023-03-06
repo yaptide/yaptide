@@ -91,7 +91,9 @@ class UserSimulations(Resource):
                     'end_time': simulation.end_time,
                     'metadata': {
                         'platform': simulation.platform,
-                        'server': 'Yaptide'
+                        'server': 'Yaptide',
+                        'input_type': simulation.input_type,
+                        'sim_type': simulation.sim_type
                     }
                 }
                 for simulation in simulations],

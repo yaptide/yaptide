@@ -121,7 +121,7 @@ class YaptideTester:
         """Example client running simulation"""
         if with_files:
             input_files = self.read_input_files()
-            sim_data = {'input_files': input_files}
+            sim_data = input_files
         else:
             example_json = Path(ROOT_DIR, 'example.json')
 

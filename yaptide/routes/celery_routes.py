@@ -30,18 +30,36 @@ class JobsDirect(Resource):
         if "sim_data" not in json_data:
             return error_validation_response()
 
+        sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
+            json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
+            SimulationModel.SimType.DUMMY.value
+
+        input_type = SimulationModel.InputType.YAPTIDE_PROJECT.value if\
+            "metadata" in json_data["sim_data"] else\
+            SimulationModel.InputType.INPUT_FILES.value
+
         job = run_simulation.delay(param_dict={
             "ntasks": json_data["ntasks"] if "ntasks" in json_data else -1,
-            "sim_type": json_data["sim_type"] if "sim_type" in json_data else "shieldhit"
+            "sim_type": sim_type.lower()
         }, raw_input_dict=json_data["sim_data"])
 
-        if json_data.get('title'):
+        if "title" in json_data:
             simulation = SimulationModel(
-                job_id=job.id, user_id=user.id, title=json_data['title'],
-                platform=SimulationModel.Platform.DIRECT.value)
+                job_id=job.id,
+                user_id=user.id,
+                title=json_data['title'],
+                platform=SimulationModel.Platform.DIRECT.value,
+                sim_type=sim_type,
+                input_type=input_type
+            )
         else:
             simulation = SimulationModel(
-                job_id=job.id, user_id=user.id, platform=SimulationModel.Platform.DIRECT.value)
+                job_id=job.id,
+                user_id=user.id,
+                platform=SimulationModel.Platform.DIRECT.value,
+                sim_type=sim_type,
+                input_type=input_type
+            )
 
         db.session.add(simulation)
         db.session.commit()
