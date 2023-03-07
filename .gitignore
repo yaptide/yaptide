@@ -147,6 +147,7 @@ yaptide/main.db
 .vscode/
 
 
+id_ed25519
 grid_proxy
 *.db
 

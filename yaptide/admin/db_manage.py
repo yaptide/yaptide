@@ -69,7 +69,7 @@ def list_users(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        click.echo(f"Login {row.username} ; Passw ...{row.password_hash[-10:]} ; Proxy {proxy_hash(row.grid_proxy)}")
+        click.echo(f"Login {row.username}; Passw ...{row.password_hash[-10:]}; Proxy {proxy_hash(row.grid_proxy)}")
     return None
 
 
@@ -129,7 +129,9 @@ def update_user(**kwargs):
     proxy_content = None
     if proxy_file_handle is not None:
         proxy_content = proxy_file_handle.read()
-        query = db.update(users).where(users.c.username == username).values(grid_proxy=proxy_content)
+        query = db.update(users).\
+            where(users.c.username == username).\
+            values(grid_proxy=proxy_content)
         if kwargs['verbose'] > 1:
             click.echo(f'Updating proxy: {proxy_hash(proxy_content)}')
         con.execute(query)
@@ -138,7 +140,9 @@ def update_user(**kwargs):
     password = kwargs['password']
     if password:
         pwd_hash = generate_password_hash(password)
-        query = db.update(users).where(users.c.username == username).values(password_hash=pwd_hash)
+        query = db.update(users).\
+            where(users.c.username == username).\
+            values(password_hash=pwd_hash)
         con.execute(query)
         if kwargs['verbose'] > 2:
             click.echo(f'Updating password: {password}')
@@ -160,15 +164,36 @@ def add_ssh_key(**kwargs):
     username = kwargs['username']
     cluster_name = kwargs['cluster_name']
     cluster_username = kwargs['cluster_username']
-    click.echo(f'Adding key for user: {username}, to connect to cluster: {cluster_name}')
+    ssh_key = kwargs['ssh_key']
+    ssh_key_content = ssh_key.read()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
 
-    if not user_exists(username, users, con):
+    query = db.select([users]).where(users.c.username == username)
+    ResultProxy = con.execute(query)
+    user = ResultProxy.first()
+
+    if not user:
         click.echo(f'User: {username} does not exist, aborting adding ssh key')
         return None
-    
-    query = db.insert() # TODO: Finish
 
+    query = db.select([clusters]).\
+        where(clusters.c.user_id == user.id and clusters.c.cluster_name == cluster_name)
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    if len(ResultSet) > 0:
+        click.echo(f'User: {username} already has key and username for cluster: {cluster_name} - updating old one')
+        query = db.update(clusters).\
+            where(clusters.c.user_id == user.id and clusters.c.cluster_name == cluster_name).\
+            values(cluster_username=cluster_username, cluster_ssh_key=ssh_key_content)
+    else:
+        click.echo(f'Adding key and username for user: {username}, for cluster: {cluster_name}')
+        query = db.insert(clusters).values(user_id=user.id,
+                                           cluster_name=cluster_name,
+                                           cluster_username=cluster_username,
+                                           cluster_ssh_key=ssh_key_content)
+    con.execute(query)
+    return None
 
 
 @run.command
@@ -205,7 +230,23 @@ def list_simulations(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
-        click.echo(f"id {row.id} ; job id {row.job_id} ; start_time {row.start_time}; end_time {row.end_time};")
+        click.echo(f"id {row.id}; job id {row.job_id}; start_time {row.start_time}; end_time {row.end_time};")
+    return None
+
+
+@run.command
+def list_clusters(**kwargs):
+    """List all simulations in db"""
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
+    query = db.select([clusters])
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    click.echo(f"{len(ResultSet)} simulations in DB:")
+    for row in ResultSet:
+        click.echo(f"id {row.id}; user id {row.user_id}; cluster name {row.cluster_name};")
     return None
 
 
