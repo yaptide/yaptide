@@ -146,13 +146,13 @@ def add_ssh_key(**kwargs):
         return None
 
     query = db.select([clusters]).\
-        where((clusters.c.user_id == user.id) and (clusters.c.cluster_name == cluster_name))
+        where((clusters.c.user_id == user.id) & (clusters.c.cluster_name == cluster_name))
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
         click.echo(f'User: {username} already has key and username for cluster: {cluster_name} - updating old one')
         query = db.update(clusters).\
-            where((clusters.c.user_id == user.id) and (clusters.c.cluster_name == cluster_name)).\
+            where((clusters.c.user_id == user.id) & (clusters.c.cluster_name == cluster_name)).\
             values(cluster_username=cluster_username, cluster_ssh_key=ssh_key_content)
     else:
         click.echo(f'Adding key and username for user: {username}, for cluster: {cluster_name}')
