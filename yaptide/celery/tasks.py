@@ -27,14 +27,14 @@ def write_input_files(param_dict: dict, raw_input_dict: dict, output_dir: Path):
     Function used to write input files to output directory.
     Returns dictionary with filenames as keys and their content as values
     """
-    if "input_files" not in raw_input_dict:
+    if "beam.dat" not in raw_input_dict:
         conv_parser = get_parser_from_str(param_dict["sim_type"])
         return run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=output_dir)
 
-    for key, file in raw_input_dict["input_files"].items():
+    for key, file in raw_input_dict.items():
         with open(Path(output_dir, key), "w") as writer:
             writer.write(file)
-    return raw_input_dict["input_files"]
+    return raw_input_dict
 
 
 @celery_app.task(bind=True)
@@ -74,11 +74,6 @@ def run_simulation(self, param_dict: dict, raw_input_dict: dict):
 
         return {
             "result": result,
-            "metadata": {
-                "input": "YAPTIDE project" if "metadata" in raw_input_dict else "Input files",
-                "simulator": param_dict["sim_type"],
-                "type": "results",
-            },
             "input_json": raw_input_dict if "metadata" in raw_input_dict else None,
             "input_files": input_files,
             "end_time": datetime.utcnow(),
@@ -231,7 +226,7 @@ def simulation_task_status(job_id: str) -> dict:
         result["job_tasks_status"] = sim_info
     elif job_state != "FAILURE":
         if "result" in job.info:
-            for key in ["result", "metadata", "input_files", "input_json", "end_time", "job_tasks_status"]:
+            for key in ["result", "input_files", "input_json", "end_time", "job_tasks_status"]:
                 result[key] = job.info[key]
         elif "logfile" in job.info:
             result["job_state"] = translate_celery_state_naming("FAILURE")
