@@ -42,7 +42,7 @@ class UserModel(db.Model):
 class ClusterModel(db.Model):
     """Cluster info for specific user"""
 
-    __tablename__ = 'ClusterModel'
+    __tablename__ = 'Cluster'
     id: int = db.Column(db.Integer, primary_key=True)
     user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
     cluster_name: str = db.Column(db.String, nullable=False)

@@ -12,6 +12,7 @@ class TableTypes(Enum):
 
     USER = "User"
     SIMULATION = "Simulation"
+    CLUSTER = "Cluster"
 
 
 def connect_to_db():
@@ -143,6 +144,31 @@ def update_user(**kwargs):
             click.echo(f'Updating password: {password}')
     click.echo(f'Successfully updated user: {username}')
     return None
+
+
+@run.command
+@click.argument('username')
+@click.argument('cluster_name')
+@click.argument('cluster_username')
+@click.argument('ssh_key', type=click.File(mode='r'))
+@click.option('-v', '--verbose', count=True)
+def add_ssh_key(**kwargs):
+    """Adds ssh key to allow the user to connect to cluster"""
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    username = kwargs['username']
+    cluster_name = kwargs['cluster_name']
+    cluster_username = kwargs['cluster_username']
+    click.echo(f'Adding key for user: {username}, to connect to cluster: {cluster_name}')
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+
+    if not user_exists(username, users, con):
+        click.echo(f'User: {username} does not exist, aborting adding ssh key')
+        return None
+    
+    query = db.insert() # TODO: Finish
+
 
 
 @run.command
