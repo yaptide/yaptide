@@ -7,8 +7,6 @@ from sqlalchemy.sql import func
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
-import base64
-
 
 class UserModel(db.Model):
     """User model"""

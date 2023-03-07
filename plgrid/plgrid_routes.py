@@ -45,7 +45,7 @@ class RimrockJobs(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(_: UserModel):
         """Method geting job's result"""
         schema = RimrockJobs._ParamsSchema()
         json_data = {}
@@ -62,7 +62,7 @@ class RimrockJobs(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def delete(user: UserModel):
+    def delete(_: UserModel):
         """Method canceling job"""
         schema = RimrockJobs._ParamsSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -90,7 +90,7 @@ class PlgData(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(_: UserModel):
         """Method geting job's result"""
         schema = PlgData._ParamsSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)

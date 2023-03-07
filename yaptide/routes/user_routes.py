@@ -133,4 +133,4 @@ class UserUpdate(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return error_validation_response()
-        return yaptide_response(message='User updated', code=202)
+        return yaptide_response(message=f'User {user.username} updated', code=202)

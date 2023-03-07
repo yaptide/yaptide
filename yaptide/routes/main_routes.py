@@ -5,8 +5,6 @@ from yaptide.routes.user_routes import UserSimulations, UserClusters, UserUpdate
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 from yaptide.routes.batch_routes import JobsBatch
 
-from plgrid.plgrid_routes import RimrockJobs, PlgData
-
 
 class HelloWorld(Resource):
     """Root route"""
