@@ -24,7 +24,6 @@ class RimrockJobs(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return error_validation_response()
-        json_data['grid_proxy'] = user.get_encoded_grid_proxy()
         result, status_code = submit_job(json_data=json_data)
 
         if "job_id" in result:
@@ -49,9 +48,7 @@ class RimrockJobs(Resource):
     def get(user: UserModel):
         """Method geting job's result"""
         schema = RimrockJobs._ParamsSchema()
-        json_data = {
-            "grid_proxy": user.get_encoded_grid_proxy()
-        }
+        json_data = {}
         params_dict: dict = schema.load(request.args)
         if params_dict.get("job_id") != "None":
             json_data["job_id"] = params_dict.get("job_id")
@@ -73,7 +70,6 @@ class RimrockJobs(Resource):
             return error_validation_response(content=errors)
         params_dict: dict = schema.load(request.args)
         json_data = {
-            "grid_proxy": user.get_encoded_grid_proxy(),
             "job_id": params_dict.get("job_id")
         }
         result, status_code = delete_job(json_data=json_data)
@@ -102,7 +98,6 @@ class PlgData(Resource):
             return error_validation_response(content=errors)
         params_dict: dict = schema.load(request.args)
         json_data = {
-            "grid_proxy": user.get_encoded_grid_proxy(),
             "job_id": params_dict.get("job_id")
         }
         result, status_code = fetch_bdo_files(json_data=json_data)

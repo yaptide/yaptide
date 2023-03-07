@@ -101,16 +101,10 @@ Now registering, updating and deleting users is available with the use of `db_ma
 Once docker compose is running, you can use the following command:
 `docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py --help`.
 
-To add an user with grid_proxy copy grid_proxy:
+To add an user run:
 
 ```bash
-docker cp grid_proxy yaptide_flask:/usr/local/app
-```
-
-and run:
-
-```bash
-docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword --proxy grid_proxy
+docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword
 ```
 
 # Testing API with command-line tools
@@ -160,13 +154,6 @@ There are 3 scripts prepared for Windows. Example calls: ```shell
 First script setups the YAPTIDE environment
 Second allows to delete YAPTIDE environment
 Third one setups the environment, runs tests and deletes environment
-
-# PLGrid
-
-Command generating `grid_proxy` file on Linux (WSL also works fine)
-```shell
-read -s p && echo $p | ssh -l <plgusername> ares.cyfronet.pl "grid-proxy-init -q -pwstdin && cat /tmp/x509up_u\`id -u\`" > grid_proxy && unset p
-````
 
 # Credits
 

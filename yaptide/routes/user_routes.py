@@ -131,7 +131,4 @@ class UserUpdate(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return error_validation_response()
-        if 'grid_proxy' in json_data:
-            user.grid_proxy = json_data['grid_proxy']
-        db.session.commit()
         return yaptide_response(message='User updated', code=202)

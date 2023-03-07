@@ -148,7 +148,6 @@ yaptide/main.db
 
 
 id_ed25519
-grid_proxy
 *.db
 
 yaptide_tester/output/

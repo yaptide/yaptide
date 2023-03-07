@@ -17,7 +17,6 @@ class UserModel(db.Model):
     id: int = db.Column(db.Integer, primary_key=True)
     username: str = db.Column(db.String, nullable=False, unique=True)
     password_hash: str = db.Column(db.String, nullable=False)
-    grid_proxy: str = db.Column(db.String)
     simulations = relationship("SimulationModel")
     clusters = relationship("ClusterModel")
 
@@ -28,12 +27,6 @@ class UserModel(db.Model):
     def check_password(self, password: str) -> bool:
         """Checks password correctness"""
         return check_password_hash(self.password_hash, password)
-
-    def get_encoded_grid_proxy(self) -> str:
-        """Returns encoded grid proxy required for SLURM authentication"""
-        if self.grid_proxy is None:
-            return "Literally any string which is intended not to work -> this one does not"
-        return base64.b64encode(self.grid_proxy.encode('utf-8')).decode('utf-8')
 
     def __repr__(self) -> str:
         return f'User #{self.id} {self.username}'

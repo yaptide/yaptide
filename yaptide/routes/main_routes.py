@@ -36,6 +36,3 @@ def initialize_routes(api):
     api.add_resource(AuthRefresh, "/auth/refresh")
     api.add_resource(AuthStatus, "/auth/status")
     api.add_resource(AuthLogOut, "/auth/logout")
-
-    api.add_resource(RimrockJobs, "/plgrid/jobs")
-    api.add_resource(PlgData, "/plgrid/data")

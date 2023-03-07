@@ -42,16 +42,6 @@ def user_exists(name: str, users: db.Table, con) -> bool:
     return False
 
 
-def proxy_hash(proxy_content: str) -> str:
-    """User friendly proxy hash"""
-    last_part_of_hash = 'None'
-    if proxy_content is not None:
-        h = hashlib.sha256()
-        h.update(proxy_content.encode('utf-8'))
-        last_part_of_hash = '...' + h.hexdigest()[-10:]
-    return last_part_of_hash
-
-
 @click.group()
 def run():
     """Manage database"""
@@ -69,14 +59,13 @@ def list_users(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        click.echo(f"Login {row.username}; Passw ...{row.password_hash[-10:]}; Proxy {proxy_hash(row.grid_proxy)}")
+        click.echo(f"Login {row.username}; Passw ...{row.password_hash[-10:]}")
     return None
 
 
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
-@click.option('proxy', '--proxy', type=click.File(mode='r'))
 @click.option('-v', '--verbose', count=True)
 def add_user(**kwargs):
     """Add user to database"""
@@ -85,23 +74,16 @@ def add_user(**kwargs):
         return None
     username = kwargs['name']
     password = kwargs['password']
-    proxy_file_handle = kwargs['proxy']
-    proxy_content = None
-    if proxy_file_handle is not None:
-        proxy_content = proxy_file_handle.read()
     click.echo(f'Adding user: {username}')
     if kwargs['verbose'] > 2:
         click.echo(f'Password: {password}')
-    if kwargs['verbose'] > 1:
-        click.echo(f'Proxy: {proxy_hash(proxy_content)}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
     if user_exists(username, users, con):
         return None
 
     query = db.insert(users).values(username=username,
-                                    password_hash=generate_password_hash(password),
-                                    grid_proxy=proxy_content)
+                                    password_hash=generate_password_hash(password))
     con.execute(query)
     return None
 
@@ -109,7 +91,6 @@ def add_user(**kwargs):
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
-@click.option('proxy', '--proxy', type=click.File(mode='r'))
 @click.option('-v', '--verbose', count=True)
 def update_user(**kwargs):
     """Update user in database"""
@@ -123,18 +104,6 @@ def update_user(**kwargs):
     if not user_exists(username, users, con):
         click.echo(f'User: {username} does not exist, aborting update')
         return None
-
-    # update proxy
-    proxy_file_handle = kwargs['proxy']
-    proxy_content = None
-    if proxy_file_handle is not None:
-        proxy_content = proxy_file_handle.read()
-        query = db.update(users).\
-            where(users.c.username == username).\
-            values(grid_proxy=proxy_content)
-        if kwargs['verbose'] > 1:
-            click.echo(f'Updating proxy: {proxy_hash(proxy_content)}')
-        con.execute(query)
 
     # update password
     password = kwargs['password']
