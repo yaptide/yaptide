@@ -22,16 +22,39 @@ class JobsBatch(Resource):
         """Method handling running shieldhit with batch"""
         json_data: dict = request.get_json(force=True)
         if not json_data:
-            return error_validation_response()
+            return yaptide_response(message="No JSON in body", code=400)
 
         if "sim_data" not in json_data:
             return error_validation_response()
 
+        sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
+            json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
+            SimulationModel.SimType.DUMMY.value
+
+        input_type = SimulationModel.InputType.YAPTIDE_PROJECT.value if\
+            "metadata" in json_data["sim_data"] else\
+            SimulationModel.InputType.INPUT_FILES.value
+
         result, status_code = submit_job(json_data=json_data)
 
         if "job_id" in result:
-            simulation = SimulationModel(
-                job_id=result["job_id"], user_id=user.id, platform=SimulationModel.Platform.BATCH.value)
+            if "title" in json_data:
+                simulation = SimulationModel(
+                    job_id=result["job_id"],
+                    user_id=user.id,
+                    title=json_data['title'],
+                    platform=SimulationModel.Platform.BATCH.value,
+                    sim_type=sim_type,
+                    input_type=input_type
+                    )
+            else:
+                simulation = SimulationModel(
+                    job_id=result["job_id"],
+                    user_id=user.id,
+                    platform=SimulationModel.Platform.BATCH.value,
+                    sim_type=sim_type,
+                    input_type=input_type
+                    )
             db.session.add(simulation)
             db.session.commit()
 

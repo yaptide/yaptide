@@ -56,6 +56,18 @@ class SimulationModel(db.Model):
         COMPLETED = "COMPLETED"
         FAILED = "FAILED"
 
+    class InputType(Enum):
+        """Input type specification"""
+
+        YAPTIDE_PROJECT = "YAPTIDE_PROJECT"
+        INPUT_FILES = "INPUT_FILES"
+
+    class SimType(Enum):
+        """Simulation type specification"""
+
+        SHIELDHIT = "SHIELDHIT"
+        DUMMY = "DUMMY"
+
     __tablename__ = 'Simulation'
     id: int = db.Column(db.Integer, primary_key=True)
     job_id: str = db.Column(db.String, nullable=False, unique=True)
@@ -64,6 +76,8 @@ class SimulationModel(db.Model):
     end_time = db.Column(db.DateTime(timezone=True), nullable=True)
     title: str = db.Column(db.String, nullable=False, default='workspace')
     platform: str = db.Column(db.String, nullable=False)
+    input_type: str = db.Column(db.String, nullable=False)
+    sim_type: str = db.Column(db.String, nullable=False)
 
 
 def create_models():
