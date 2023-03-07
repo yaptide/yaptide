@@ -243,6 +243,8 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
     """Extracts current SHIELD-HIT12A simulation state from first available logfile"""
     # This is dummy version because pymchelper currently doesn't privide any information about progress
     result_list = []
+    if not os.path.exists(dir_path):
+        return result_list
     for workdir in os.listdir(dir_path):
         if not re.search(r"run_", workdir):
             continue  # skipcq: FLK-E701
