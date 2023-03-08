@@ -7,8 +7,6 @@ from sqlalchemy.sql import func
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
-import base64
-
 
 class UserModel(db.Model):
     """User model"""
@@ -17,8 +15,8 @@ class UserModel(db.Model):
     id: int = db.Column(db.Integer, primary_key=True)
     username: str = db.Column(db.String, nullable=False, unique=True)
     password_hash: str = db.Column(db.String, nullable=False)
-    grid_proxy: str = db.Column(db.String)
     simulations = relationship("SimulationModel")
+    clusters = relationship("ClusterModel")
 
     def set_password(self, password: str):
         """Sets hashed password"""
@@ -28,14 +26,19 @@ class UserModel(db.Model):
         """Checks password correctness"""
         return check_password_hash(self.password_hash, password)
 
-    def get_encoded_grid_proxy(self) -> str:
-        """Returns encoded grid proxy required for SLURM authentication"""
-        if self.grid_proxy is None:
-            return "Literally any string which is intended not to work -> this one does not"
-        return base64.b64encode(self.grid_proxy.encode('utf-8')).decode('utf-8')
-
     def __repr__(self) -> str:
         return f'User #{self.id} {self.username}'
+
+
+class ClusterModel(db.Model):
+    """Cluster info for specific user"""
+
+    __tablename__ = 'Cluster'
+    id: int = db.Column(db.Integer, primary_key=True)
+    user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
+    cluster_name: str = db.Column(db.String, nullable=False)
+    cluster_username: str = db.Column(db.String, nullable=False)
+    cluster_ssh_key: str = db.Column(db.String, nullable=False)
 
 
 class SimulationModel(db.Model):
