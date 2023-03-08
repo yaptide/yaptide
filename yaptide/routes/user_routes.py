@@ -11,7 +11,7 @@ import math
 from sqlalchemy import desc
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel
+from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
@@ -36,7 +36,7 @@ class OrderBy(Enum):
 
 
 class UserSimulations(Resource):
-    """Class responsible for returning ids of user's task which are running simulations"""
+    """Class responsible for returning user's simulations' basic infos"""
 
     class _ParamsSchema(Schema):
         """Class specifies API parameters"""
@@ -49,7 +49,7 @@ class UserSimulations(Resource):
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
-        """Method returning ids"""
+        """Method returning simulations"""
         schema = UserSimulations._ParamsSchema()
         params_dict: dict = schema.load(request.args)
 
@@ -103,6 +103,26 @@ class UserSimulations(Resource):
         return yaptide_response(message='User Simulations', code=200, content=result)
 
 
+class UserClusters(Resource):
+    """Class responsible for returning user's available clusters"""
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning clusters"""
+        clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
+
+        result = {
+            'clusters': [
+                {
+                    'cluster_name': cluster.cluster_name
+                }
+                for cluster in clusters
+            ]
+        }
+        return yaptide_response(message='User clusters', code=200, content=result)
+
+
 class UserUpdate(Resource):
     """Class responsible for updating the user"""
 
@@ -113,7 +133,4 @@ class UserUpdate(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return error_validation_response()
-        if 'grid_proxy' in json_data:
-            user.grid_proxy = json_data['grid_proxy']
-        db.session.commit()
-        return yaptide_response(message='User updated', code=202)
+        return yaptide_response(message=f'User {user.username} updated', code=202)
