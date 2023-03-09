@@ -243,17 +243,18 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
     """Extracts current SHIELD-HIT12A simulation state from first available logfile"""
     # This is dummy version because pymchelper currently doesn't privide any information about progress
     result_list = []
-    for workdir in os.listdir(dir_path):
-        if not re.search(r"run_", workdir):
+    dir_path: Path = Path(dir_path)
+    if not dir_path.exists():
+        return result_list
+    for workdir in dir_path.iterdir():
+        if not re.search(r"run_", str(workdir)) or not workdir.is_dir():
             continue  # skipcq: FLK-E701
-        task_id = int(workdir.split("_")[1])
-        workdir_path = Path(dir_path, workdir)
-        for filename in os.listdir(workdir_path):
-            if not re.search(r"shieldhit.*log", filename):
+        task_id = int(str(workdir).split("_")[-1])
+        for filename in workdir.iterdir():
+            if not re.search(r"shieldhit.*log", str(filename)) or not filename.is_file():
                 continue  # skipcq: FLK-E701
-            file_path = Path(workdir_path, filename)
             try:
-                with open(file_path, "r") as reader:
+                with open(filename, "r") as reader:
                     found_line_which_starts_status_block = False
                     last_result_line = ""
                     requested_primaries = 0
@@ -296,6 +297,7 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
                             "seconds": splitted[6],
                         }
                     result_list.append(task_status)
+                    break
             except FileNotFoundError:
                 task_state = SimulationModel.JobStatus.FAILED.value if sim_ended\
                     else SimulationModel.JobStatus.PENDING.value
