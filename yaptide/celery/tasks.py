@@ -89,7 +89,7 @@ def convert_input_files(param_dict: dict, raw_input_dict: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         conv_parser = get_parser_from_str(param_dict["sim_type"])
-        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=tmp_dir_path)
+        run_parser(parser=conv_parser, input_data=raw_input_dict, output_dir=Path(tmp_dir_path))
 
         input_files = simulation_input_files(path=tmp_dir_path)
         return {"input_files": input_files}
