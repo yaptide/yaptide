@@ -27,6 +27,10 @@ services:
                 SHIELDHIT_PATH: ${SHIELDHIT_PATH-/shieldhit}
             dockerfile: Dockerfile-worker
         image: yaptide_worker
+        deploy:
+            resources:
+                limits:
+                    cpus: ${MAX_CORES-/1}
         container_name: yaptide_worker
         command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
         environment:
