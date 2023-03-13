@@ -4,7 +4,6 @@ from yaptide.persistence.models import SimulationModel
 
 from pathlib import Path
 import sys
-import os
 import tempfile
 import re
 
