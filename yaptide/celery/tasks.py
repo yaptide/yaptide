@@ -246,65 +246,59 @@ def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
     dir_path: Path = Path(dir_path)
     if not dir_path.exists():
         return result_list
-    for workdir in dir_path.iterdir():
-        if not re.search(r"run_", str(workdir)) or not workdir.is_dir():
-            continue  # skipcq: FLK-E701
-        task_id = int(str(workdir).split("_")[-1])
-        for filename in workdir.iterdir():
-            if not re.search(r"shieldhit.*log", str(filename)) or not filename.is_file():
-                continue  # skipcq: FLK-E701
-            try:
-                with open(filename, "r") as reader:
-                    found_line_which_starts_status_block = False
-                    last_result_line = ""
-                    requested_primaries = 0
-                    for line in reader:
-                        if not found_line_which_starts_status_block:
-                            # We are searching for lines containing progress info
-                            # They are preceded by line starting with "Starting transport"
-                            found_line_which_starts_status_block = line.lstrip().startswith("Starting transport")
+    for shieldhit_log in dir_path.glob('**/shieldhit*.log'):
+        task_id = int(str(shieldhit_log).split("run_")[1].split("/")[0])
+        try:
+            with open(shieldhit_log, "r") as reader:
+                found_line_which_starts_status_block = False
+                last_result_line = ""
+                requested_primaries = 0
+                for line in reader:
+                    if not found_line_which_starts_status_block:
+                        # We are searching for lines containing progress info
+                        # They are preceded by line starting with "Starting transport"
+                        found_line_which_starts_status_block = line.lstrip().startswith("Starting transport")
 
-                            # We are also searching for requested particles number
-                            if requested_primaries == 0 and re.search(r"Requested number of primaries NSTAT", line):
-                                requested_primaries = int(line.split(": ")[1])
-                        else:
-                            # Searching for latest line
-                            if line.lstrip().startswith("Primary particle") or line.lstrip().startswith("Run time"):
-                                last_result_line = line
+                        # We are also searching for requested particles number
+                        if requested_primaries == 0 and re.search(r"Requested number of primaries NSTAT", line):
+                            requested_primaries = int(line.split(": ")[1])
+                    else:
+                        # Searching for latest line
+                        if line.lstrip().startswith("Primary particle") or line.lstrip().startswith("Run time"):
+                            last_result_line = line
 
-                    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-                    complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-                    task_status = {
-                        "task_id": task_id,
-                        "task_state": SimulationModel.JobStatus.RUNNING.value,
-                        "requested_primaries": requested_primaries,
-                        "simulated_primaries": 0
-                    }
-                    splitted = last_result_line.split()
-                    if re.search(run_match, last_result_line):
-                        task_status["simulated_primaries"] = splitted[3]
-                        task_status["estimated_time"] = {
-                            "hours": splitted[5],
-                            "minutes": splitted[7],
-                            "seconds": splitted[9],
-                        }
-                    elif re.search(complete_match, last_result_line):
-                        task_status["simulated_primaries"] = requested_primaries
-                        task_status["task_state"] = SimulationModel.JobStatus.COMPLETED.value
-                        task_status["run_time"] = {
-                            "hours": splitted[2],
-                            "minutes": splitted[4],
-                            "seconds": splitted[6],
-                        }
-                    result_list.append(task_status)
-                    break
-            except FileNotFoundError:
-                task_state = SimulationModel.JobStatus.FAILED.value if sim_ended\
-                    else SimulationModel.JobStatus.PENDING.value
-                result_list.append({
+                run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+                complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+                task_status = {
                     "task_id": task_id,
-                    "task_state": task_state
-                })
+                    "task_state": SimulationModel.JobStatus.RUNNING.value,
+                    "requested_primaries": requested_primaries,
+                    "simulated_primaries": 0
+                }
+                splitted = last_result_line.split()
+                if re.search(run_match, last_result_line):
+                    task_status["simulated_primaries"] = splitted[3]
+                    task_status["estimated_time"] = {
+                        "hours": splitted[5],
+                        "minutes": splitted[7],
+                        "seconds": splitted[9],
+                    }
+                elif re.search(complete_match, last_result_line):
+                    task_status["simulated_primaries"] = requested_primaries
+                    task_status["task_state"] = SimulationModel.JobStatus.COMPLETED.value
+                    task_status["run_time"] = {
+                        "hours": splitted[2],
+                        "minutes": splitted[4],
+                        "seconds": splitted[6],
+                    }
+                result_list.append(task_status)
+        except FileNotFoundError:
+            task_state = SimulationModel.JobStatus.FAILED.value if sim_ended\
+                else SimulationModel.JobStatus.PENDING.value
+            result_list.append({
+                "task_id": task_id,
+                "task_state": task_state
+            })
     return result_list
 
 
