@@ -31,8 +31,8 @@ module load gcc/11.3.0
 export PATH=$PATH:$PLG_GROUPS_STORAGE/plggyaptide
 shieldhit
 
-mkdir -p ${{SUBMIT_DIR}}/sh_output/${{JOB_ID}}
-cp *.bdo ${{SUBMIT_DIR}}/sh_output/${{JOB_ID}}
+mkdir -p ${{SUBMIT_DIR}}/yaptide_output/${{JOB_ID}}
+cp *.bdo ${{SUBMIT_DIR}}/yaptide_output/${{JOB_ID}}
 
 cd ${{SUBMIT_DIR}}
 rm -rf ${{WORKSPACE}}
