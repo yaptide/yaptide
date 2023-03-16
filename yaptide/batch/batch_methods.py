@@ -6,7 +6,6 @@ import os
 import sys
 import tempfile
 
-import time
 from datetime import datetime
 
 from pathlib import Path
@@ -21,6 +20,7 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+
 
 def write_input_files(json_data: dict, output_dir: Path):
     """
@@ -63,13 +63,23 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     job_id = int(result.stdout.split()[3])
 
     return {
-        "message": "Dummy submit",
+        "message": "Job submitted",
         "job_id": f"{job_id}:{cluster.cluster_name}"
     }, 202
 
 
-def get_job(json_data: dict) -> tuple[dict, int]:
+def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     """Dummy version of get_job"""
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        ssh_key_path = Path(tmp_dir_path, "id_ed25519")
+        with open(ssh_key_path, "w") as writer:
+            writer.write(cluster.cluster_ssh_key)
+        pkey = Ed25519Key(filename=ssh_key_path)
+    con = Connection(
+        host=f"{cluster.cluster_username}@{cluster.cluster_name}",
+        connect_kwargs={"pkey": pkey}
+    )
+    # get results: "scp plgpitrus@ares.cyfronet.pl:yaptide_output/{job_id}/*.png ."
     now = datetime.utcnow()
     time_diff = now - json_data["start_time_for_dummy"]
     if time_diff.seconds < 30 and json_data["end_time_for_dummy"] is None:
@@ -112,7 +122,7 @@ def get_job(json_data: dict) -> tuple[dict, int]:
     }, 200
 
 
-def delete_job(json_data: dict) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def delete_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
     return {"message": "Not implemented yet"}, 404
 

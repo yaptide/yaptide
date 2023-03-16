@@ -26,7 +26,7 @@ class JobsBatch(Resource):
 
         if "sim_data" not in json_data:
             return error_validation_response()
-        
+
         clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
         if len(clusters) < 1:
             return error_validation_response({"message": "User has no clusters available"})
@@ -88,14 +88,17 @@ class JobsBatch(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).\
             filter_by(job_id=params_dict["job_id"]).first()
-
+        splitted_job_id: list[str] = params_dict["job_id"].split(":")
+        job_id, cluster_name = splitted_job_id[0], splitted_job_id[1]
+        cluster: ClusterModel = db.session.query(ClusterModel).\
+            filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
-            "job_id": params_dict["job_id"],
+            "job_id": job_id,
             "start_time_for_dummy": simulation.start_time,
             "end_time_for_dummy": simulation.end_time
         }
 
-        result, status_code = get_job(json_data=json_data)
+        result, status_code = get_job(json_data=json_data, cluster=cluster)
 
         if "end_time" in result and simulation.end_time is None:
             simulation.end_time = result['end_time']
@@ -123,10 +126,14 @@ class JobsBatch(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
+        splitted_job_id: list[str] = params_dict["job_id"].split(":")
+        job_id, cluster_name = splitted_job_id[0], splitted_job_id[1]
+        cluster: ClusterModel = db.session.query(ClusterModel).\
+            filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
             "job_id": params_dict["job_id"]
         }
-        result, status_code = delete_job(json_data=json_data)
+        result, status_code = delete_job(json_data=json_data, cluster=cluster)
         return yaptide_response(
             message="",
             code=status_code,

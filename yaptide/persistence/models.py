@@ -83,6 +83,7 @@ class SimulationModel(db.Model):
     sim_type: str = db.Column(db.String, nullable=False)
 
     def set_title(self, title: str) -> None:
+        """Title variable setter"""
         self.title = title
 
 
