@@ -6,12 +6,12 @@ from datetime import datetime
 
 from pathlib import Path
 
-from yaptide.persistence.models import SimulationModel
+from yaptide.persistence.models import SimulationModel, ClusterModel
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
-def submit_job(json_data: dict) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of submit_job"""
     return {
         "message": "Dummy submit",

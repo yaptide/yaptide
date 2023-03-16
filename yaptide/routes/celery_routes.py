@@ -43,23 +43,15 @@ class JobsDirect(Resource):
             "sim_type": sim_type.lower()
         }, raw_input_dict=json_data["sim_data"])
 
+        simulation = SimulationModel(
+            job_id=job.id,
+            user_id=user.id,
+            platform=SimulationModel.Platform.DIRECT.value,
+            sim_type=sim_type,
+            input_type=input_type
+        )
         if "title" in json_data:
-            simulation = SimulationModel(
-                job_id=job.id,
-                user_id=user.id,
-                title=json_data['title'],
-                platform=SimulationModel.Platform.DIRECT.value,
-                sim_type=sim_type,
-                input_type=input_type
-            )
-        else:
-            simulation = SimulationModel(
-                job_id=job.id,
-                user_id=user.id,
-                platform=SimulationModel.Platform.DIRECT.value,
-                sim_type=sim_type,
-                input_type=input_type
-            )
+            simulation.set_title(json_data["title"])
 
         db.session.add(simulation)
         db.session.commit()

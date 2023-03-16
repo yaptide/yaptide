@@ -82,6 +82,9 @@ class SimulationModel(db.Model):
     input_type: str = db.Column(db.String, nullable=False)
     sim_type: str = db.Column(db.String, nullable=False)
 
+    def set_title(self, title: str) -> None:
+        self.title = title
+
 
 def create_models():
     """Function creating database's models"""
