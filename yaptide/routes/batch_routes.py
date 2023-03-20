@@ -131,7 +131,7 @@ class JobsBatch(Resource):
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
-            "job_id": params_dict["job_id"]
+            "job_id": job_id
         }
         result, status_code = delete_job(json_data=json_data, cluster=cluster)
         return yaptide_response(
