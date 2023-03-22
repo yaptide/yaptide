@@ -28,13 +28,15 @@ cat << EOF > $DETECT_FILE
 {detect}
 EOF
 
-SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:04:59 -A plgccbmc11-cpu --partition=plgrid-testing --parsable $ARRAY_SCRIPT > $OUT"
+SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:04:59\\
+    -A plgccbmc11-cpu --partition=plgrid-testing --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
 
 if [ -n "$JOB_ID" ] ; then
-    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID --time=00:00:59 -A plgccbmc11-cpu --partition=plgrid-testing --parsable $COLLECT_SCRIPT > $OUT"
+    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID\\
+        --time=00:00:59 -A plgccbmc11-cpu --partition=plgrid-testing --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
@@ -83,5 +85,6 @@ sig_handler()
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun shieldhit --beamfile=$BEAM_FILE --geofile=$GEO_FILE --matfile=$MAT_FILE --detectfile=$DETECT_FILE -n {particle_no} -N $RNG_SEED  $WORK_DIR
+srun shieldhit --beamfile=$BEAM_FILE --geofile=$GEO_FILE --matfile=$MAT_FILE --detectfile=$DETECT_FILE\\
+    -n {particle_no} -N $RNG_SEED  $WORK_DIR
 """  # skipcq: FLK-E501

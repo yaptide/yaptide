@@ -33,7 +33,7 @@ con = Connection(host=f'{login}@{host}', connect_kwargs={"pkey": pkey})
 result: Result = con.run("echo $SCRATCH", hide=True)
 scratch = result.stdout.split()[0]
 
-job_dir=f"{scratch}/yaptide_runs/{utc_time}"
+job_dir = f"{scratch}/yaptide_runs/{utc_time}"
 
 con.run(f"mkdir -p {job_dir}")
 
@@ -83,44 +83,30 @@ while True:
     result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
     collect_state = result.stdout.split()[-1].split()[0]
     if collect_state == "FAILED":
-        print(f'Job state: FAILED')
-        exit(0)
+        print('Job state: FAILED')
+        break
     if collect_state == "RUNNING":
-        print(f'Job state: RUNNING')
+        print('Job state: RUNNING')
         continue
     if collect_state == "COMPLETED":
-        print(f'Job state: COMPLETED')
-        result: Result = con.run(f'ls -f {job_dir}/output | grep .bdo', hide = True)
+        print('Job state: COMPLETED')
+        result: Result = con.run(f'ls -f {job_dir}/output | grep .bdo', hide=True)
         for filename in result.stdout.split():
             file_path = Path(ROOT_DIR, "output", filename)
             with open(file_path, "wb") as writer:
                 try:
                     con.get(f'{job_dir}/output/{filename}', writer)
-                except:
+                except FileNotFoundError:
                     print(filename)
-        exit(0)
+        break
     result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
     job_state = result.stdout.split()[-1].split()[0]
     if job_state == "PENDING":
-        print(f'Job state: PENDING')
+        print('Job state: PENDING')
         continue
     if job_state == "RUNNING":
-        print(f'Job state: RUNNING')
+        print('Job state: RUNNING')
         continue
     if collect_state == "PENDING":
-        print(f'Job state: RUNNING')
+        print('Job state: RUNNING')
         continue
-
-# result: Result = con.run("ls /net/ascratch/people/plgpitrus/yaptide_runs/1679337629456366/output", hide=True)
-# for file in result.stdout.split(): /net/ascratch/people/plgpitrus/yaptide_runs/1679338814640918/output
-#     print(f"-{file}-")
-# job_id = int(stdout[3])      sacct -n -X -j 2049932 -o state%20 | sort | uniq -c
-# print(job_id)                 sacct -j 2050106 --format State
-
-# con.run(f'scancel {job_id}')
-# con.put(f"{ROOT_DIR}/input_files/beam.dat", "") # WORKS
-# path_new = str(Path(ROOT_DIR, "main_run.sh"))
-# con.get("main_run.sh", f"{path_new}")
-
-# result: Result = con.run("sacct -j 2016070 --format JobID,State,Start,JobName", hide=True)
-# print(result.stdout.split("\n"))
