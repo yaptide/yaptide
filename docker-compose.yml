@@ -30,7 +30,7 @@ services:
         deploy:
             resources:
                 limits:
-                    cpus: ${MAX_CORES-/1}
+                    cpus: ${MAX_CORES-1.0}
         container_name: yaptide_worker
         command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
         environment:
