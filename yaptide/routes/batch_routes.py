@@ -40,6 +40,7 @@ class JobsBatch(Resource):
         sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
             json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
             SimulationModel.SimType.DUMMY.value
+        json_data["sim_type"] = sim_type.lower()
 
         input_type = SimulationModel.InputType.YAPTIDE_PROJECT.value if\
             "metadata" in json_data["sim_data"] else\
@@ -89,7 +90,7 @@ class JobsBatch(Resource):
         simulation: SimulationModel = db.session.query(SimulationModel).\
             filter_by(job_id=params_dict["job_id"]).first()
         splitted_job_id: list[str] = params_dict["job_id"].split(":")
-        utc_time, job_id, collect_id, cluster_name = splitted_job_id[0], splitted_job_id[1]
+        utc_time, job_id, collect_id, cluster_name = splitted_job_id
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
@@ -129,11 +130,13 @@ class JobsBatch(Resource):
             return yaptide_response(message=error_message, code=res_code)
 
         splitted_job_id: list[str] = params_dict["job_id"].split(":")
-        job_id, cluster_name = splitted_job_id[0], splitted_job_id[1]
+        utc_time, job_id, collect_id, cluster_name = splitted_job_id
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
-            "job_id": job_id
+            "utc_time": utc_time,
+            "job_id": job_id,
+            "collect_id": collect_id
         }
         result, status_code = delete_job(json_data=json_data, cluster=cluster)
         return yaptide_response(

@@ -120,7 +120,10 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     if job_state == "PENDING":  # PENDING
         pass
     if collect_state == "FAILED":  # FAILED
-        pass
+        return {
+            "job_state": SimulationModel.JobStatus.FAILED.value,
+            "message": "Simulation FAILED"
+        }
     if collect_state == "COMPLETED":  # COMPLETED
         pass
         result: Result = con.run(f'ls -f {job_dir}/output | grep .bdo', hide = True)
@@ -133,7 +136,6 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
                 estimators_dict[filename.split('.')[0]] = fromfile(str(file_path))
         result = pymchelper_output_to_json(estimators_dict=estimators_dict)
         now = datetime.utcnow()
-        timediff = now - datetime.fromtimestamp(utc_time)
         return {
             "job_state": SimulationModel.JobStatus.COMPLETED.value,
             "result": result,
