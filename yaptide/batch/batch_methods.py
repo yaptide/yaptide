@@ -82,7 +82,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     )
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
-    con.run(f'chmod 777 {array_file}')
+    con.run(f'chmod +x {array_file}')
     con.run(f'echo \'{submit_script}\' >> {submit_file}')
     con.run(f'chmod +x {submit_file}')
     con.run(f'echo \'{collect_script}\' >> {collect_file}')
