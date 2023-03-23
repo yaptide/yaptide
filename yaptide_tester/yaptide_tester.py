@@ -28,9 +28,6 @@ class Endpoints:
         self.http_auth_login = f'http://{host}:{port}/auth/login'
         self.http_auth_logout = f'http://{host}:{port}/auth/logout'
 
-        self.http_rimrock = f'http://{host}:{port}/plgrid/jobs'
-        self.http_plgdata = f'http://{host}:{port}/plgrid/data'
-
 
 class YaptideTesterSession:
     """Class supposed to wrap request.Session class with yaptide auth features"""

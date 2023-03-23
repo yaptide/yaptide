@@ -1,5 +1,4 @@
 FROM python:3.10-slim
-COPY /plgrid /usr/local/bin/plgrid
 WORKDIR /usr/local/app
 
 # install dependencies
