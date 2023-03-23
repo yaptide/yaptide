@@ -8,7 +8,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel
+from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
 
 from yaptide.batch.batch_methods import submit_job, get_job, delete_job
 
@@ -27,34 +27,38 @@ class JobsBatch(Resource):
         if "sim_data" not in json_data:
             return error_validation_response()
 
+        clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
+        if len(clusters) < 1:
+            return error_validation_response({"message": "User has no clusters available"})
+
+        filtered_clusters: list[ClusterModel] = []
+        if "batch_options" in json_data and "cluster_name" in json_data["batch_options"]:
+            cluster_name = json_data["batch_options"]["cluster_name"]
+            filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
+        cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
+
         sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
             json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
             SimulationModel.SimType.DUMMY.value
+        json_data["sim_type"] = sim_type.lower()
 
         input_type = SimulationModel.InputType.YAPTIDE_PROJECT.value if\
             "metadata" in json_data["sim_data"] else\
             SimulationModel.InputType.INPUT_FILES.value
 
-        result, status_code = submit_job(json_data=json_data)
+        result, status_code = submit_job(json_data=json_data, cluster=cluster)
 
         if "job_id" in result:
+            simulation = SimulationModel(
+                job_id=result["job_id"],
+                user_id=user.id,
+                platform=SimulationModel.Platform.BATCH.value,
+                sim_type=sim_type,
+                input_type=input_type
+            )
             if "title" in json_data:
-                simulation = SimulationModel(
-                    job_id=result["job_id"],
-                    user_id=user.id,
-                    title=json_data['title'],
-                    platform=SimulationModel.Platform.BATCH.value,
-                    sim_type=sim_type,
-                    input_type=input_type
-                    )
-            else:
-                simulation = SimulationModel(
-                    job_id=result["job_id"],
-                    user_id=user.id,
-                    platform=SimulationModel.Platform.BATCH.value,
-                    sim_type=sim_type,
-                    input_type=input_type
-                    )
+                simulation.set_title(json_data["title"])
+
             db.session.add(simulation)
             db.session.commit()
 
@@ -85,14 +89,19 @@ class JobsBatch(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).\
             filter_by(job_id=params_dict["job_id"]).first()
-
+        splitted_job_id: list[str] = params_dict["job_id"].split(":")
+        utc_time, job_id, collect_id, cluster_name = splitted_job_id
+        cluster: ClusterModel = db.session.query(ClusterModel).\
+            filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
-            "job_id": params_dict["job_id"],
+            "utc_time": utc_time,
+            "job_id": job_id,
+            "collect_id": collect_id,
             "start_time_for_dummy": simulation.start_time,
             "end_time_for_dummy": simulation.end_time
         }
 
-        result, status_code = get_job(json_data=json_data)
+        result, status_code = get_job(json_data=json_data, cluster=cluster)
 
         if "end_time" in result and simulation.end_time is None:
             simulation.end_time = result['end_time']
@@ -120,10 +129,16 @@ class JobsBatch(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
+        splitted_job_id: list[str] = params_dict["job_id"].split(":")
+        utc_time, job_id, collect_id, cluster_name = splitted_job_id
+        cluster: ClusterModel = db.session.query(ClusterModel).\
+            filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
-            "job_id": params_dict["job_id"]
+            "utc_time": utc_time,
+            "job_id": job_id,
+            "collect_id": collect_id
         }
-        result, status_code = delete_job(json_data=json_data)
+        result, status_code = delete_job(json_data=json_data, cluster=cluster)
         return yaptide_response(
             message="",
             code=status_code,
