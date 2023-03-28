@@ -3,7 +3,6 @@ from paramiko import Ed25519Key
 
 import io
 import os
-import sys
 import tempfile
 
 from datetime import datetime
@@ -16,29 +15,10 @@ from yaptide.persistence.models import SimulationModel, ClusterModel
 
 from yaptide.batch.string_templates import SUBMIT_SHIELDHIT, ARRAY_SHIELDHIT_BASH, COLLECT_BASH
 
-from yaptide.celery.tasks import pymchelper_output_to_json
-
-# dirty hack needed to properly handle relative imports in the converter submodule
-sys.path.append("yaptide/converter")
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
+from yaptide.utils.sim_utils import pymchelper_output_to_json, write_input_files
 
 
 ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
-
-
-def write_input_files(json_data: dict, output_dir: Path):
-    """
-    Function used to write input files to output directory.
-    Returns dictionary with filenames as keys and their content as values
-    """
-    if "beam.dat" not in json_data["sim_data"]:
-        conv_parser = get_parser_from_str(json_data["sim_type"])
-        return run_parser(parser=conv_parser, input_data=json_data["sim_data"], output_dir=output_dir)
-
-    for key, file in json_data["sim_data"].items():
-        with open(Path(output_dir, key), "w") as writer:
-            writer.write(file)
-    return json_data["sim_data"]
 
 
 def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
