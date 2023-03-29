@@ -102,21 +102,24 @@ def write_input_files(json_data: dict, output_dir: Path):
     return json_data["sim_data"]
 
 
-def simulation_logfile(path: Path) -> str:
+def simulation_logfiles(path: Path) -> dict:
     """Function returning simulation logfile"""
-    try:
-        with open(path, "r") as reader:  # skipcq: PTC-W6004
-            return reader.read()
-    except FileNotFoundError:
-        return "logfile not found"
+    result = {}
+    for log in path.glob("run_*/shieldhit_*log"):
+        try:
+            with open(log, "r") as reader:  # skipcq: PTC-W6004
+                result[log.name] = reader.read()
+        except FileNotFoundError:
+            result[log.name] = "No file"
+    return result
 
 
-def simulation_input_files(path: str) -> dict:
+def simulation_input_files(path: Path) -> dict:
     """Function returning a dictionary with simulation input filenames as keys and their content as values"""
     result = {}
     try:
         for filename in ["info.json", "geo.dat", "detect.dat", "beam.dat", "mat.dat"]:
-            file = Path(path, filename)
+            file = path / filename
             with open(file, "r") as reader:
                 result[filename] = reader.read()
     except FileNotFoundError:

@@ -5,7 +5,7 @@ from yaptide.persistence.models import SimulationModel
 from yaptide.utils.sim_utils import (
     pymchelper_output_to_json,
     write_input_files,
-    simulation_logfile,
+    simulation_logfiles,
     simulation_input_files
 )
 
@@ -84,12 +84,19 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
     complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
     requested_match = r"\bRequested number of primaries NSTAT"
 
-    while True:
+    logfile = None
+    for _ in range(30):  # 30 stands for maximum attempts
         try:
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
             time.sleep(1)
+
+    if logfile is None:
+        up_dict = {
+            "task_state": SimulationModel.JobStatus.FAILED.value
+        }
+        stats.update(str(task_id), up_dict)
 
     loglines = log_generator(logfile)
     for line in loglines:
@@ -165,9 +172,9 @@ def run_simulation(self, json_data: dict):
                 if not is_run_ok:
                     raise Exception
             except Exception:  # skipcq: PYL-W0703
-                logfile = simulation_logfile(path=Path(tmp_dir_path, "run_1", "shieldhit_0001.log"))
-                input_files = simulation_input_files(path=tmp_dir_path)
-                return {"logfile": logfile, "input_files": input_files}
+                logfiles = simulation_logfiles(path=Path(tmp_dir_path))
+                input_files = simulation_input_files(path=Path(tmp_dir_path))
+                return {"logfiles": logfiles, "input_files": input_files}
 
             for process in monitoring_processes:
                 process.join()
@@ -216,7 +223,7 @@ def simulation_task_status(job_id: str) -> dict:
         elif "logfile" in job.info:
             result["job_state"] = translate_celery_state_naming("FAILURE")
             result["error"] = "Simulation error"
-            result["logfile"] = job.info.get("logfile")
+            result["logfiles"] = job.info.get("logfiles")
             result["input_files"] = job.info.get("input_files")
     else:
         result["error"] = str(job.info)
