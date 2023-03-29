@@ -108,7 +108,7 @@ def write_input_files(json_data: dict, output_dir: Path):
 def simulation_logfile(path: Path) -> str:
     """Function returning simulation logfile"""
     try:
-        with open(path, "r") as reader:
+        with open(path, "r") as reader:  # skipcq: PYL-W6004
             return reader.read()
     except FileNotFoundError:
         return "logfile not found"
@@ -125,66 +125,3 @@ def simulation_input_files(path: str) -> dict:
     except FileNotFoundError:
         result["info"] = "No input present"
     return result
-
-
-def sh12a_simulation_status(dir_path: str, sim_ended: bool = False) -> list:
-    """Extracts current SHIELD-HIT12A simulation state from first available logfile"""
-    # This is dummy version because pymchelper currently doesn't privide any information about progress
-    result_list = []
-    dir_path: Path = Path(dir_path)
-    if not dir_path.exists():
-        return result_list
-    for shieldhit_log in dir_path.glob('**/shieldhit*.log'):
-        task_id = int(str(shieldhit_log).split("run_")[1].split("/")[0])
-        try:
-            with open(shieldhit_log, "r") as reader:
-                found_line_which_starts_status_block = False
-                last_result_line = ""
-                requested_primaries = 0
-                for line in reader:
-                    if not found_line_which_starts_status_block:
-                        # We are searching for lines containing progress info
-                        # They are preceded by line starting with "Starting transport"
-                        found_line_which_starts_status_block = line.lstrip().startswith("Starting transport")
-
-                        # We are also searching for requested particles number
-                        if requested_primaries == 0 and re.search(r"Requested number of primaries NSTAT", line):
-                            requested_primaries = int(line.split(": ")[1])
-                    else:
-                        # Searching for latest line
-                        if line.lstrip().startswith("Primary particle") or line.lstrip().startswith("Run time"):
-                            last_result_line = line
-
-                run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-                complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-                task_status = {
-                    "task_id": task_id,
-                    "task_state": SimulationModel.JobStatus.RUNNING.value,
-                    "requested_primaries": requested_primaries,
-                    "simulated_primaries": 0
-                }
-                splitted = last_result_line.split()
-                if re.search(run_match, last_result_line):
-                    task_status["simulated_primaries"] = splitted[3]
-                    task_status["estimated_time"] = {
-                        "hours": splitted[5],
-                        "minutes": splitted[7],
-                        "seconds": splitted[9],
-                    }
-                elif re.search(complete_match, last_result_line):
-                    task_status["simulated_primaries"] = requested_primaries
-                    task_status["task_state"] = SimulationModel.JobStatus.COMPLETED.value
-                    task_status["run_time"] = {
-                        "hours": splitted[2],
-                        "minutes": splitted[4],
-                        "seconds": splitted[6],
-                    }
-                result_list.append(task_status)
-        except FileNotFoundError:
-            task_state = SimulationModel.JobStatus.FAILED.value if sim_ended\
-                else SimulationModel.JobStatus.PENDING.value
-            result_list.append({
-                "task_id": task_id,
-                "task_state": task_state
-            })
-    return result_list

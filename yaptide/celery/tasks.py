@@ -27,6 +27,8 @@ from pymchelper.executor.runner import Runner as SHRunner
 
 
 class SimulationStats():
+    """Class holding simulation statistics"""
+
     def __init__(self, ntasks: int, parent, parent_id: str):
         self.lock = Lock()
         self.tasks_status = {}
@@ -39,10 +41,11 @@ class SimulationStats():
             }
         parent_state = AsyncResult(parent_id).state
         parent_meta = AsyncResult(parent_id).info
-        parent_meta["job_tasks_status"] = self.get()
+        parent_meta["job_tasks_status"] = self.to_list()
         self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
 
     def update(self, task_id: str, up_dict: dict, final: bool = False):
+        """Method updating simulation statistics"""
         self.lock.acquire()
         try:
             for key, value in up_dict.items():
@@ -52,12 +55,13 @@ class SimulationStats():
                 self.tasks_status[task_id].pop("estimated_time", None)
             parent_state = AsyncResult(self.parent_id).state
             parent_meta = AsyncResult(self.parent_id).info
-            parent_meta["job_tasks_status"] = self.get()
+            parent_meta["job_tasks_status"] = self.to_list()
             self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
         finally:
             self.lock.release()
 
-    def get(self) -> list:
+    def to_list(self) -> list:
+        """To list"""
         return [value for _, value in self.tasks_status.items()]
 
 
@@ -65,7 +69,7 @@ class SharedResourcesManager(BaseManager):
     """Shared objects manager for multiprocessing"""
 
 
-def follow(thefile):
+def log_generator(thefile):
     """Generator function for monitoring purpose"""
     while True:
         line = thefile.readline()
@@ -83,12 +87,12 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
 
     while True:
         try:
-            logfile = open(filepath)
+            logfile = open(filepath)  # skipcq: PYL-W6004
             break
         except FileNotFoundError:
             time.sleep(1)
 
-    loglines = follow(logfile)
+    loglines = log_generator(logfile)
     for line in loglines:
         if re.search(run_match, line):
             splitted = line.split()
@@ -169,7 +173,7 @@ def run_simulation(self, json_data: dict):
             for process in monitoring_processes:
                 process.join()
 
-            final_stats = stats.get()
+            final_stats = stats.to_list()
 
             estimators_dict: dict = runner_obj.get_data()
 
@@ -219,28 +223,6 @@ def simulation_task_status(job_id: str) -> dict:
         result["error"] = str(job.info)
 
     return result
-
-
-def xD():
-    ROOT_DIR = Path(__file__).parent.resolve()
-    FILENAME = "shieldhit.log"
-
-    FILE = ROOT_DIR / FILENAME
-
-    def follow(thefile):
-        thefile.seek(0, os.SEEK_END) # End-of-file
-        while True:
-            line = thefile.readline()
-            if not line:
-                time.sleep(1) # Sleep briefly
-                continue
-            yield line
-
-    logfile = open(FILE)
-    loglines = follow(logfile)
-    print(f"Following file: {FILE}")
-    for line in loglines:
-        print(line, end='')
 
 
 @celery_app.task
