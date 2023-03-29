@@ -6,20 +6,123 @@ from yaptide.utils.sim_utils import (
     pymchelper_output_to_json,
     write_input_files,
     simulation_logfile,
-    simulation_input_files,
-    sh12a_simulation_status
+    simulation_input_files
 )
 
 from pathlib import Path
 import tempfile
 import os
+import re
+import time
 
 from datetime import datetime
+
+from multiprocessing import Lock, Process
+from multiprocessing.managers import BaseManager
 
 from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
+
+
+class SimulationStats():
+    def __init__(self, ntasks: int, parent, parent_id: str):
+        self.lock = Lock()
+        self.tasks_status = {}
+        self.parent = parent
+        self.parent_id = parent_id
+        for i in range(ntasks):
+            self.tasks_status[str(i+1)] = {
+                "task_id": i+1,
+                "task_state": SimulationModel.JobStatus.PENDING.value
+            }
+        parent_state = AsyncResult(parent_id).state
+        parent_meta = AsyncResult(parent_id).info
+        parent_meta["job_tasks_status"] = self.get()
+        self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
+
+    def update(self, task_id: str, up_dict: dict, final: bool = False):
+        self.lock.acquire()
+        try:
+            for key, value in up_dict.items():
+                self.tasks_status[task_id][key] = value
+            if final:
+                self.tasks_status[task_id]["simulated_primaries"] = self.tasks_status[task_id]["requested_primaries"]
+                parent_state = AsyncResult(self.parent_id).state
+                parent_meta = AsyncResult(self.parent_id).info
+                parent_meta["job_tasks_status"] = self.get()
+                self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
+        finally:
+            self.lock.release()
+
+    def get(self) -> list:
+        return [value for _, value in self.tasks_status.items()]
+
+
+class CustomManager(BaseManager):
+    """Multiprocessing manager"""
+
+
+def follow(thefile):
+    """Generator function for monitoring purpose"""
+    thefile.seek(0, os.SEEK_END) # End-of-file
+    while True:
+        line = thefile.readline()
+        if not line:
+            time.sleep(1) # Sleep briefly
+            continue
+        yield line
+
+
+def read_file(stats: SimulationStats, filepath: Path, task_id: int):
+    """Monitoring function"""
+    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+    complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+    requested_match = r"\bRequested number of primaries NSTAT"
+
+    while True:
+        try:
+            logfile = open(filepath)
+            break
+        except FileNotFoundError:
+            time.sleep(2)
+
+    loglines = follow(logfile)
+    for line in loglines:
+        if re.search(run_match, line):
+            splitted = line.split()
+            up_dict = {
+                "simulated_primaries": int(splitted[3]),
+                "estimated_time": {
+                    "hours": int(splitted[5]),
+                    "minutes": int(splitted[7]),
+                    "seconds": int(splitted[9]),
+                }
+            }
+            stats.update(str(task_id), up_dict)
+
+        elif re.search(requested_match, line):
+            splitted = line.split(": ")
+            up_dict = {
+                "simulated_primaries": 0,
+                "requested_primaries": int(splitted[1]),
+                "task_state": SimulationModel.JobStatus.RUNNING.value
+            }
+            stats.update(str(task_id), up_dict)
+
+        elif re.search(complete_match, line):
+            splitted = line.split()
+            up_dict = {
+                "run_time": {
+                    "hours": int(splitted[2]),
+                    "minutes": int(splitted[4]),
+                    "seconds": int(splitted[6]),
+                },
+                "task_state": SimulationModel.JobStatus.COMPLETED.value
+            }
+            stats.update(str(task_id), up_dict)
+            return
 
 
 @celery_app.task(bind=True)
@@ -36,34 +139,49 @@ def run_simulation(self, json_data: dict):
                                       simulator_exec_path=None,
                                       cmdline_opts="")
 
-        # Pymchelper uses all available cores by default
         ntasks = json_data["ntasks"] if json_data["ntasks"] > 0 else None
 
         runner_obj = SHRunner(jobs=ntasks,
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
+        ntasks = runner_obj.jobs
+
+        logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
 
         self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": json_data["sim_type"]})
-        try:
-            is_run_ok = runner_obj.run(settings=settings)
-            if not is_run_ok:
-                raise Exception
-        except Exception:  # skipcq: PYL-W0703
-            logfile = simulation_logfile(path=Path(tmp_dir_path, "run_1", "shieldhit_0001.log"))
-            input_files = simulation_input_files(path=tmp_dir_path)
-            return {"logfile": logfile, "input_files": input_files}
 
-        estimators_dict: dict = runner_obj.get_data()
+        CustomManager.register('SimulationStats', SimulationStats)
+        with CustomManager() as manager:
+            stats: SimulationStats = manager.SimulationStats(ntasks, self, self.request.id)
+            monitoring_processes = [Process(target=read_file, args=(stats, logs_list[i], i+1)) for i in range(ntasks)]
+            for process in monitoring_processes:
+                process.start()
 
-        result: dict = pymchelper_output_to_json(estimators_dict)
+            try:
+                is_run_ok = runner_obj.run(settings=settings)
+                if not is_run_ok:
+                    raise Exception
+            except Exception:  # skipcq: PYL-W0703
+                logfile = simulation_logfile(path=Path(tmp_dir_path, "run_1", "shieldhit_0001.log"))
+                input_files = simulation_input_files(path=tmp_dir_path)
+                return {"logfile": logfile, "input_files": input_files}
 
-        return {
-            "result": result,
-            "input_json": json_data["sim_data"] if "metadata" in json_data["sim_data"] else None,
-            "input_files": input_files,
-            "end_time": datetime.utcnow(),
-            "job_tasks_status": sh12a_simulation_status(dir_path=tmp_dir_path, sim_ended=True)
-        }
+            for process in monitoring_processes:
+                process.join()
+
+            final_stats = stats.get()
+
+            estimators_dict: dict = runner_obj.get_data()
+
+            result: dict = pymchelper_output_to_json(estimators_dict)
+
+            return {
+                "result": result,
+                "input_json": json_data["sim_data"] if "metadata" in json_data["sim_data"] else None,
+                "input_files": input_files,
+                "end_time": datetime.utcnow(),
+                "job_tasks_status": final_stats
+            }
 
 
 @celery_app.task
@@ -87,8 +205,7 @@ def simulation_task_status(job_id: str) -> dict:
     elif job_state == "PROGRESS":
         if not job.info.get("sim_type") in {"shieldhit", "sh_dummy"}:
             return result
-        sim_info = sh12a_simulation_status(dir_path=job.info.get("path"))
-        result["job_tasks_status"] = sim_info
+        result["job_tasks_status"] = job.info.get("job_tasks_status")
     elif job_state != "FAILURE":
         if "result" in job.info:
             for key in ["result", "input_files", "input_json", "end_time", "job_tasks_status"]:

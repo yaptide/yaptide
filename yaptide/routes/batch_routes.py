@@ -90,7 +90,11 @@ class JobsBatch(Resource):
         simulation: SimulationModel = db.session.query(SimulationModel).\
             filter_by(job_id=params_dict["job_id"]).first()
         splitted_job_id: list[str] = params_dict["job_id"].split(":")
-        utc_time, job_id, collect_id, cluster_name = splitted_job_id
+        try:
+            utc_time, job_id, collect_id, cluster_name = splitted_job_id
+        except ValueError:
+            return error_validation_response(content={"message": "Job ID is incorrect"})
+
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
         json_data = {
