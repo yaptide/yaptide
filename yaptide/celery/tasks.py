@@ -49,10 +49,11 @@ class SimulationStats():
                 self.tasks_status[task_id][key] = value
             if final:
                 self.tasks_status[task_id]["simulated_primaries"] = self.tasks_status[task_id]["requested_primaries"]
-                parent_state = AsyncResult(self.parent_id).state
-                parent_meta = AsyncResult(self.parent_id).info
-                parent_meta["job_tasks_status"] = self.get()
-                self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
+                self.tasks_status[task_id].pop("estimated_time", None)
+            parent_state = AsyncResult(self.parent_id).state
+            parent_meta = AsyncResult(self.parent_id).info
+            parent_meta["job_tasks_status"] = self.get()
+            self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
         finally:
             self.lock.release()
 
@@ -60,17 +61,16 @@ class SimulationStats():
         return [value for _, value in self.tasks_status.items()]
 
 
-class CustomManager(BaseManager):
-    """Multiprocessing manager"""
+class SharedResourcesManager(BaseManager):
+    """Shared objects manager for multiprocessing"""
 
 
 def follow(thefile):
     """Generator function for monitoring purpose"""
-    thefile.seek(0, os.SEEK_END) # End-of-file
     while True:
         line = thefile.readline()
         if not line:
-            time.sleep(1) # Sleep briefly
+            time.sleep(1)
             continue
         yield line
 
@@ -86,7 +86,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
             logfile = open(filepath)
             break
         except FileNotFoundError:
-            time.sleep(2)
+            time.sleep(1)
 
     loglines = follow(logfile)
     for line in loglines:
@@ -121,7 +121,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
                 },
                 "task_state": SimulationModel.JobStatus.COMPLETED.value
             }
-            stats.update(str(task_id), up_dict)
+            stats.update(str(task_id), up_dict, True)
             return
 
 
@@ -150,8 +150,8 @@ def run_simulation(self, json_data: dict):
 
         self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": json_data["sim_type"]})
 
-        CustomManager.register('SimulationStats', SimulationStats)
-        with CustomManager() as manager:
+        SharedResourcesManager.register('SimulationStats', SimulationStats)
+        with SharedResourcesManager() as manager:
             stats: SimulationStats = manager.SimulationStats(ntasks, self, self.request.id)
             monitoring_processes = [Process(target=read_file, args=(stats, logs_list[i], i+1)) for i in range(ntasks)]
             for process in monitoring_processes:
