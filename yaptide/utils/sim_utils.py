@@ -1,8 +1,5 @@
 from pathlib import Path
 import sys
-import re
-
-from yaptide.persistence.models import SimulationModel
 
 from pymchelper.estimator import Estimator
 from pymchelper.axis import MeshAxis
@@ -108,7 +105,7 @@ def write_input_files(json_data: dict, output_dir: Path):
 def simulation_logfile(path: Path) -> str:
     """Function returning simulation logfile"""
     try:
-        with open(path, "r") as reader:  # skipcq: PYL-W6004
+        with open(path, "r") as reader:  # skipcq: PTC-W6004
             return reader.read()
     except FileNotFoundError:
         return "logfile not found"

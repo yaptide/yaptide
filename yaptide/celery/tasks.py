@@ -11,7 +11,6 @@ from yaptide.utils.sim_utils import (
 
 from pathlib import Path
 import tempfile
-import os
 import re
 import time
 
@@ -87,7 +86,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
 
     while True:
         try:
-            logfile = open(filepath)  # skipcq: PYL-W6004
+            logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
             time.sleep(1)
