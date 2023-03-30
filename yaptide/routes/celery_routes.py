@@ -134,9 +134,10 @@ class ConvertInputFiles(Resource):
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
 
-        sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
-            json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
-            SimulationModel.SimType.DUMMY.value
+        sim_type = (SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in json_data
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    else SimulationModel.SimType.DUMMY.value)
 
         # Rework in later PRs to match pattern from jobs endpoint
         job = convert_input_files.delay(json_data={
