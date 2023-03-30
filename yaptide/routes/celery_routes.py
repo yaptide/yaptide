@@ -30,13 +30,14 @@ class JobsDirect(Resource):
         if "sim_data" not in json_data:
             return error_validation_response()
 
-        sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
-            json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
-            SimulationModel.SimType.DUMMY.value
+        sim_type = (SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in json_data
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    else SimulationModel.SimType.DUMMY.value)
 
-        input_type = SimulationModel.InputType.YAPTIDE_PROJECT.value if\
-            "metadata" in json_data["sim_data"] else\
-            SimulationModel.InputType.INPUT_FILES.value
+        input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
+                      if "metadata" in json_data["sim_data"]
+                      else SimulationModel.InputType.INPUT_FILES.value)
 
         job = run_simulation.delay(json_data={
             "ntasks": json_data["ntasks"] if "ntasks" in json_data else -1,
