@@ -32,7 +32,7 @@ class JobsDirect(Resource):
 
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
                     if "sim_type" not in json_data
-                        or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
                     else SimulationModel.SimType.DUMMY.value)
 
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
@@ -136,7 +136,7 @@ class ConvertInputFiles(Resource):
 
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
                     if "sim_type" not in json_data
-                        or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
                     else SimulationModel.SimType.DUMMY.value)
 
         # Rework in later PRs to match pattern from jobs endpoint

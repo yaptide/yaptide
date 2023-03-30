@@ -39,7 +39,7 @@ class JobsBatch(Resource):
 
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
                     if "sim_type" not in json_data
-                        or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
                     else SimulationModel.SimType.DUMMY.value)
         json_data["sim_type"] = sim_type.lower()
 
