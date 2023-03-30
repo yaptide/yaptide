@@ -30,18 +30,20 @@ class JobsDirect(Resource):
         if "sim_data" not in json_data:
             return error_validation_response()
 
-        sim_type = SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in json_data or\
-            json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else\
-            SimulationModel.SimType.DUMMY.value
+        sim_type = (SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in json_data
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    else SimulationModel.SimType.DUMMY.value)
 
-        input_type = SimulationModel.InputType.YAPTIDE_PROJECT.value if\
-            "metadata" in json_data["sim_data"] else\
-            SimulationModel.InputType.INPUT_FILES.value
+        input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
+                      if "metadata" in json_data["sim_data"]
+                      else SimulationModel.InputType.INPUT_FILES.value)
 
-        job = run_simulation.delay(param_dict={
+        job = run_simulation.delay(json_data={
             "ntasks": json_data["ntasks"] if "ntasks" in json_data else -1,
-            "sim_type": sim_type.lower()
-        }, raw_input_dict=json_data["sim_data"])
+            "sim_type": sim_type.lower(),
+            "sim_data": json_data["sim_data"]
+        })
 
         simulation = SimulationModel(
             job_id=job.id,
@@ -124,26 +126,24 @@ class JobsDirect(Resource):
 class ConvertInputFiles(Resource):
     """Class responsible for returning input files converted from front JSON"""
 
-    class _Schema(Schema):
-        """Class specifies API parameters"""
-
-        sim_type = fields.String(load_default="shieldhit")
-
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):  # skipcq: PYL-W0613
+    def post(_: UserModel):
         """Method handling input files convertion"""
-        schema = ConvertInputFiles._Schema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        param_dict: dict = schema.load(request.args)
-
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return yaptide_response(message="No JSON in body", code=400)
 
-        job = convert_input_files.delay(param_dict=param_dict, raw_input_dict=json_data)
+        sim_type = (SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in json_data
+                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    else SimulationModel.SimType.DUMMY.value)
+
+        # Rework in later PRs to match pattern from jobs endpoint
+        job = convert_input_files.delay(json_data={
+            "sim_type": sim_type.lower(),
+            "sim_data": json_data
+        })
         result: dict = job.wait()
 
         return yaptide_response(
