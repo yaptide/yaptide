@@ -7,3 +7,9 @@ RUN pip install -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
+
+# export port 5000
+EXPOSE 5000
+
+# Run the app
+CMD [ "flask" , "run" , "--host=0.0.0.0" ]
