@@ -1,6 +1,7 @@
 FROM python:3.10-slim
-ARG SHIELDHIT_PATH
-COPY $SHIELDHIT_PATH /usr/local/bin/shieldhit
+
+# add directory /usr/local/simulators to PATH
+ENV PATH="/usr/local/simulators:${PATH}"
 
 # install dependencies
 WORKDIR /usr/local/app

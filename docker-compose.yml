@@ -31,6 +31,8 @@ services:
             resources:
                 limits:
                     cpus: ${MAX_CORES-/1}
+        volumes:
+            - simulators:/usr/local/simulators
         container_name: yaptide_worker
         command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
         environment:
@@ -47,3 +49,4 @@ services:
 
 volumes:
     data:
+    simulators:

@@ -1,4 +1,5 @@
 FROM python:3.10-slim
+
 WORKDIR /usr/local/app
 
 # install dependencies
@@ -10,6 +11,11 @@ COPY yaptide ./yaptide
 
 # export port 5000
 EXPOSE 5000
+
+# Openshift uses a random user id to run the container at a later stage
+# therefore we need to make sure that the user has the correct permissions
+RUN chgrp -R 0 /usr/local/app
+RUN chmod -R g=u /usr/local/app
 
 # Run the app
 CMD [ "flask" , "run" , "--host=0.0.0.0" ]
