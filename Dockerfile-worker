@@ -9,3 +9,6 @@ RUN pip install -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
+
+# run app via `celery --app yaptide.celery.worker worker -P threads --loglevel=info`
+CMD ["celery", "--app", "yaptide.celery.worker", "worker", "-P", "threads", "--loglevel=info"]
