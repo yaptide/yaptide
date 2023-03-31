@@ -4,7 +4,9 @@ import time
 import argparse
 import signal
 
+
 def log_generator(thefile):
+    """Generator function for monitoring purpose"""
     while True:
         line = thefile.readline()
         if not line:
@@ -13,7 +15,8 @@ def log_generator(thefile):
         yield line
 
 
-def read_file(filepath: Path, job_id: str, task_id: int):
+def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
+    """Monitoring function"""
     run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
     complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
     requested_match = r"\bRequested number of primaries NSTAT"
@@ -24,10 +27,10 @@ def read_file(filepath: Path, job_id: str, task_id: int):
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
-            time.sleep(3)
+            time.sleep(1)
 
     if logfile is None:
-        up_dict = {
+        up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED"
         }
         print(f"Update for task: {task_id} - FAILED")
@@ -37,7 +40,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):
     for line in loglines:
         if re.search(run_match, line):
             splitted = line.split()
-            up_dict = {
+            up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": int(splitted[3]),
                 "estimated_time": {
                     "hours": int(splitted[5]),
@@ -49,7 +52,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):
 
         elif re.search(requested_match, line):
             splitted = line.split(": ")
-            up_dict = {
+            up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": 0,
                 "requested_primaries": int(splitted[1]),
                 "task_state": "RUNNING"
@@ -58,7 +61,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):
 
         elif re.search(complete_match, line):
             splitted = line.split()
-            up_dict = {
+            up_dict = {  # skipcq: PYL-W0612
                 "run_time": {
                     "hours": int(splitted[2]),
                     "minutes": int(splitted[4]),
@@ -78,10 +81,10 @@ if __name__ == '__main__':
     parser.add_argument('--job_id', type=str)
     parser.add_argument('--task_id', type=int)
     args = parser.parse_args()
-    filepath = Path(args.filepath)
-    job_id = args.job_id
-    task_id = args.task_id
+    filepath_arg = Path(args.filepath)
+    job_id_arg = args.job_id
+    task_id_arg = args.task_id
 
-    print(filepath, job_id, task_id)
+    print(filepath=filepath_arg, job_id=job_id_arg, task_id=task_id_arg)
 
-    read_file(filepath, job_id, task_id)
+    read_file(filepath=filepath_arg, job_id=job_id_arg, task_id=task_id_arg)

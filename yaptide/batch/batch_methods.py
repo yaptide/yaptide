@@ -2,7 +2,6 @@ from fabric import Connection, Result
 from paramiko import Ed25519Key
 
 import io
-import os
 import tempfile
 
 from datetime import datetime
