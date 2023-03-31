@@ -13,7 +13,11 @@ from pymchelper.input_output import fromfile
 
 from yaptide.persistence.models import SimulationModel, ClusterModel
 
-from yaptide.batch.string_templates import SUBMIT_SHIELDHIT, ARRAY_SHIELDHIT_BASH, COLLECT_BASH
+from yaptide.batch.string_templates import (
+    SUBMIT_SHIELDHIT,
+    ARRAY_SHIELDHIT_BASH,
+    COLLECT_BASH,
+    PYTHON_WATCHER_SCRIPT)
 
 from yaptide.utils.sim_utils import pymchelper_output_to_json, write_input_files
 
@@ -50,11 +54,12 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         detect=input_files["detect.dat"],
         geo=input_files["geo.dat"],
         mat=input_files["mat.dat"],
+        watcher=PYTHON_WATCHER_SCRIPT,
         n_tasks=str(1)
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
         root_dir=job_dir,
-        particle_no=str(1000)
+        particle_no=str(10000)
     )
     collect_script = COLLECT_BASH.format(
         root_dir=job_dir
