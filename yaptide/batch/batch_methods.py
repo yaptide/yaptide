@@ -16,19 +16,18 @@ from yaptide.persistence.models import SimulationModel, ClusterModel
 from yaptide.batch.string_templates import (
     SUBMIT_SHIELDHIT,
     ARRAY_SHIELDHIT_BASH,
-    COLLECT_BASH,
-    PYTHON_WATCHER_SCRIPT)
+    COLLECT_BASH)
 
 from yaptide.utils.sim_utils import pymchelper_output_to_json, write_input_files
-
-
-ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
 
 
 def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of submit_job"""
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         input_files = write_input_files(json_data, Path(tmp_dir_path))
+    WATCHER_FILE = Path(__file__).parent.resolve() / "watcher.py"
+    with open(WATCHER_FILE, "r") as reader:
+        watcher_content = reader.read()
 
     utc_time = int(datetime.utcnow().timestamp()*1e6)
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
@@ -54,7 +53,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         detect=input_files["detect.dat"],
         geo=input_files["geo.dat"],
         mat=input_files["mat.dat"],
-        watcher=PYTHON_WATCHER_SCRIPT,
+        watcher=watcher_content,
         n_tasks=str(1)
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
