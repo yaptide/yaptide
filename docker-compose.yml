@@ -30,7 +30,8 @@ services:
         deploy:
             resources:
                 limits:
-                    cpus: ${MAX_CORES-/1}
+                    # the explanation of below syntax: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
+                    cpus: ${MAX_CORES-1.0}
         container_name: yaptide_worker
         command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
         environment:
