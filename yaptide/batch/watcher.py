@@ -6,7 +6,7 @@ import signal
 
 
 def log_generator(thefile):
-    """Generator function for monitoring purpose"""
+    """Generator equivalent to `tail -f` Linux command. Yields new lines appended to the end of the file. Main purpose is monitoring of the log files"""
     while True:
         line = thefile.readline()
         if not line:
