@@ -1,8 +1,8 @@
-from pathlib import Path
-import re
-import time
 import argparse
+import re
 import signal
+import time
+from pathlib import Path
 
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -11,7 +11,7 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(thefile, timeout: int = 3600):
+def log_generator(thefile, timeout: int = 3600) -> str:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
@@ -24,8 +24,7 @@ def log_generator(thefile, timeout: int = 3600):
             time.sleep(1)
             sleep_counter += 1
             if sleep_counter >= timeout:
-                yield "Timeout occured"
-                break
+                return "Timeout occured"
             continue
         sleep_counter = 0
         yield line
@@ -90,6 +89,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
             }
             print(f"Update for task: {task_id} - TIMEOUT")
             return
+    return
 
 
 if __name__ == '__main__':
