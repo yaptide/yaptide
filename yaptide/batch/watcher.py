@@ -12,9 +12,11 @@ TIMEOUT_MATCH = r"\bTimeout occured"
 
 
 def log_generator(thefile, timeout: int = 3600):
-    """Generator equivalent to `tail -f` Linux command.
+    """
+    Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
-    Main purpose is monitoring of the log files"""
+    Main purpose is monitoring of the log files
+    """
     sleep_counter = 0
     while True:
         line = thefile.readline()
