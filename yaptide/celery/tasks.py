@@ -69,7 +69,9 @@ class SharedResourcesManager(BaseManager):
 
 
 def log_generator(thefile):
-    """Generator function for monitoring purpose"""
+    """Generator equivalent to `tail -f` Linux command.
+    Yields new lines appended to the end of the file.
+    Main purpose is monitoring of the log files"""
     while True:
         line = thefile.readline()
         if not line:
@@ -79,7 +81,7 @@ def log_generator(thefile):
 
 
 def read_file(stats: SimulationStats, filepath: Path, task_id: int):
-    """Monitoring function"""
+    """Monitors log file of certain task"""
     run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
     complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
     requested_match = r"\bRequested number of primaries NSTAT"
