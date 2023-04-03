@@ -92,18 +92,18 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
     return
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--filepath', type=str)
-    parser.add_argument('--job_id', type=str)
-    parser.add_argument('--task_id', type=int)
+    parser.add_argument("--filepath", type=str)
+    parser.add_argument("--job_id", type=str)
+    parser.add_argument("--task_id", type=int)
     args = parser.parse_args()
     filepath_arg = Path(args.filepath)
     job_id_arg = args.job_id
     task_id_arg = args.task_id
 
-    print(filepath=filepath_arg, job_id=job_id_arg, task_id=task_id_arg)
+    print(filepath_arg, job_id_arg, task_id_arg)
 
     read_file(filepath=filepath_arg, job_id=job_id_arg, task_id=task_id_arg)
