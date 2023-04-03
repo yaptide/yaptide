@@ -5,24 +5,32 @@ import argparse
 import signal
 
 
-def log_generator(thefile):
+RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
+REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
+TIMEOUT_MATCH = r"\bTimeout occured"
+
+
+def log_generator(thefile, timeout: int = 3600):
     """Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
     Main purpose is monitoring of the log files"""
+    sleep_counter = 0
     while True:
         line = thefile.readline()
         if not line:
             time.sleep(1)
+            sleep_counter += 1
+            if sleep_counter >= timeout:
+                yield "Timeout occured"
+                break
             continue
+        sleep_counter = 0
         yield line
 
 
 def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
-    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-    complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-    requested_match = r"\bRequested number of primaries NSTAT"
-
     logfile = None
     for _ in range(30):  # 30 stands for maximum attempts
         try:
@@ -40,7 +48,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
 
     loglines = log_generator(logfile)
     for line in loglines:
-        if re.search(run_match, line):
+        if re.search(RUN_MATCH, line):
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": int(splitted[3]),
@@ -52,7 +60,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
             }
             print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
 
-        elif re.search(requested_match, line):
+        elif re.search(REQUESTED_MATCH, line):
             splitted = line.split(": ")
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": 0,
@@ -61,7 +69,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
             }
             print(f"Update for task: {task_id} - RUNNING")
 
-        elif re.search(complete_match, line):
+        elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "run_time": {
@@ -72,6 +80,13 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
                 "task_state": "COMPLETED"
             }
             print(f"Update for task: {task_id} - COMPLETED")
+            return
+
+        elif re.search(TIMEOUT_MATCH, line):
+            up_dict = {  # skipcq: PYL-W0612
+                "task_state": "FAILED"
+            }
+            print(f"Update for task: {task_id} - TIMEOUT")
             return
 
 

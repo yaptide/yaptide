@@ -12,7 +12,7 @@ BEAM_FILE=$ROOT_DIR/input/beam.dat
 GEO_FILE=$ROOT_DIR/input/geo.dat
 MAT_FILE=$ROOT_DIR/input/mat.dat
 DETECT_FILE=$ROOT_DIR/input/detect.dat
-WATCHER_FILE=$ROOT_DIR/watcher.py
+WATCHER_SCRIPT=$ROOT_DIR/watcher.py
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 
@@ -28,7 +28,7 @@ EOF
 cat << EOF > $DETECT_FILE
 {detect}
 EOF
-cat << EOF > $WATCHER_FILE
+cat << EOF > $WATCHER_SCRIPT
 {watcher}
 EOF
 
@@ -75,7 +75,7 @@ BEAM_FILE=$ROOT_DIR/input/beam.dat
 GEO_FILE=$ROOT_DIR/input/geo.dat
 MAT_FILE=$ROOT_DIR/input/mat.dat
 DETECT_FILE=$ROOT_DIR/input/detect.dat
-WATCHER_FILE=$ROOT_DIR/watcher.py
+WATCHER_SCRIPT=$ROOT_DIR/watcher.py
 
 # go to working directory
 cd $WORK_DIR
@@ -88,7 +88,7 @@ sig_handler()
 }}
 
 FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-srun python3 $WATCHER_FILE --filepath=$FILE_TO_WATCH\\
+srun python3 $WATCHER_SCRIPT --filepath=$FILE_TO_WATCH\\
     --job_id=$SLURM_JOB_ID --task_id=$SLURM_ARRAY_TASK_ID &
 
 trap 'sig_handler' SIGUSR1

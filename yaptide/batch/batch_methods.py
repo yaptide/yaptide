@@ -24,8 +24,8 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     """Dummy version of submit_job"""
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         input_files = write_input_files(json_data, Path(tmp_dir_path))
-    WATCHER_FILE = Path(__file__).parent.resolve() / "watcher.py"
-    with open(WATCHER_FILE, "r") as reader:
+    WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
+    with open(WATCHER_SCRIPT, "r") as reader:
         watcher_content = reader.read()
 
     utc_time = int(datetime.utcnow().timestamp()*1e6)
