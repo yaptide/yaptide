@@ -1,4 +1,5 @@
 from flask_restful import Resource
+from flask_restful import Api
 
 from yaptide.routes.celery_routes import JobsDirect, SimulationInputs, ConvertInputFiles
 from yaptide.routes.user_routes import UserSimulations, UserClusters, UserUpdate
@@ -15,7 +16,7 @@ class HelloWorld(Resource):
         return {'message': 'Hello world!'}
 
 
-def initialize_routes(api):
+def initialize_routes(api: Api):
     """Function initializing routes"""
     api.add_resource(HelloWorld, "/")
 
