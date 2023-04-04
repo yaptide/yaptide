@@ -9,6 +9,14 @@ from yaptide.utils.sim_utils import (
     simulation_input_files
 )
 
+from yaptide.batch.watcher import (
+    log_generator,
+    RUN_MATCH,
+    COMPLETE_MATCH,
+    REQUESTED_MATCH,
+    TIMEOUT_MATCH
+)
+
 from pathlib import Path
 import tempfile
 import re
@@ -68,22 +76,8 @@ class SharedResourcesManager(BaseManager):
     """Shared objects manager for multiprocessing"""
 
 
-def log_generator(thefile):
-    """Generator function for monitoring purpose"""
-    while True:
-        line = thefile.readline()
-        if not line:
-            time.sleep(1)
-            continue
-        yield line
-
-
 def read_file(stats: SimulationStats, filepath: Path, task_id: int):
-    """Monitoring function"""
-    run_match = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-    complete_match = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
-    requested_match = r"\bRequested number of primaries NSTAT"
-
+    """Monitors log file of certain task"""
     logfile = None
     for _ in range(30):  # 30 stands for maximum attempts
         try:
@@ -100,7 +94,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
 
     loglines = log_generator(logfile)
     for line in loglines:
-        if re.search(run_match, line):
+        if re.search(RUN_MATCH, line):
             splitted = line.split()
             up_dict = {
                 "simulated_primaries": int(splitted[3]),
@@ -112,7 +106,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
             }
             stats.update(str(task_id), up_dict)
 
-        elif re.search(requested_match, line):
+        elif re.search(REQUESTED_MATCH, line):
             splitted = line.split(": ")
             up_dict = {
                 "simulated_primaries": 0,
@@ -121,7 +115,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
             }
             stats.update(str(task_id), up_dict)
 
-        elif re.search(complete_match, line):
+        elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
             up_dict = {
                 "run_time": {
@@ -132,6 +126,13 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
                 "task_state": SimulationModel.JobStatus.COMPLETED.value
             }
             stats.update(str(task_id), up_dict, True)
+            return
+
+        elif re.search(TIMEOUT_MATCH, line):
+            up_dict = {
+                "task_state": SimulationModel.JobStatus.FAILED.value
+            }
+            stats.update(str(task_id), up_dict)
             return
 
 

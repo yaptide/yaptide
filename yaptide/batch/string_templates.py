@@ -12,6 +12,7 @@ BEAM_FILE=$ROOT_DIR/input/beam.dat
 GEO_FILE=$ROOT_DIR/input/geo.dat
 MAT_FILE=$ROOT_DIR/input/mat.dat
 DETECT_FILE=$ROOT_DIR/input/detect.dat
+WATCHER_SCRIPT=$ROOT_DIR/watcher.py
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 
@@ -26,6 +27,9 @@ cat << EOF > $MAT_FILE
 EOF
 cat << EOF > $DETECT_FILE
 {detect}
+EOF
+cat << EOF > $WATCHER_SCRIPT
+{watcher}
 EOF
 
 SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:04:59\\
@@ -71,6 +75,7 @@ BEAM_FILE=$ROOT_DIR/input/beam.dat
 GEO_FILE=$ROOT_DIR/input/geo.dat
 MAT_FILE=$ROOT_DIR/input/mat.dat
 DETECT_FILE=$ROOT_DIR/input/detect.dat
+WATCHER_SCRIPT=$ROOT_DIR/watcher.py
 
 # go to working directory
 cd $WORK_DIR
@@ -82,9 +87,15 @@ sig_handler()
     wait # wait for all children, this is important!
 }}
 
+FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
+srun python3 $WATCHER_SCRIPT --filepath=$FILE_TO_WATCH\\
+    --job_id=$SLURM_JOB_ID --task_id=$SLURM_ARRAY_TASK_ID &
+
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
 srun shieldhit --beamfile=$BEAM_FILE --geofile=$GEO_FILE --matfile=$MAT_FILE --detectfile=$DETECT_FILE\\
-    -n {particle_no} -N $RNG_SEED  $WORK_DIR
+    -n {particle_no} -N $RNG_SEED  $WORK_DIR &
+
+wait
 """  # skipcq: FLK-E501
