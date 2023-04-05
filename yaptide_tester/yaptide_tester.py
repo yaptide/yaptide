@@ -77,26 +77,30 @@ class YaptideTester:
         self.session = YaptideTesterSession(
             self.endpoints.http_auth_login, self.endpoints.http_auth_logout, username, password)
 
-    def run_all(self, sim_n: int, do_monitor: bool):
+    def run_tests(self, sim_n: int, flags: dict):
         """Function running all important tests - might be extended in future"""
         Path(ROOT_DIR, "output").mkdir(parents=True, exist_ok=True)
         self.session.login(inital_login=True)
 
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} directly with files\n\n')
-        for _ in range(sim_n):
-            self.run_simulation_on_backend(True, do_monitor, True)
+        if flags["all"] or (flags["test_files"] and flags["run_direct"]):
+            print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} directly with files\n\n')
+            for _ in range(sim_n):
+                self.run_simulation_on_backend(True, flags["do_monitor"], True)
 
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} directly with json\n\n')
-        for _ in range(sim_n):
-            self.run_simulation_on_backend(False, do_monitor, True)
+        if flags["all"] or (flags["test_jsons"] and flags["run_direct"]):
+            print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} directly with json\n\n')
+            for _ in range(sim_n):
+                self.run_simulation_on_backend(False, flags["do_monitor"], True)
 
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} via batch with files\n\n')
-        for _ in range(sim_n):
-            self.run_simulation_on_backend(True, do_monitor, False)
+        if flags["all"] or (flags["test_files"] and flags["run_batch"]):
+            print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} via batch with files\n\n')
+            for _ in range(sim_n):
+                self.run_simulation_on_backend(True, flags["do_monitor"], False)
 
-        print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} via batch with json\n\n')
-        for _ in range(sim_n):
-            self.run_simulation_on_backend(False, do_monitor, False)
+        if flags["all"] or (flags["test_jsons"] and flags["run_batch"]):
+            print(f'\n\nRunning {sim_n} simulation{"s" if sim_n > 1 else ""} via batch with json\n\n')
+            for _ in range(sim_n):
+                self.run_simulation_on_backend(False, flags["do_monitor"], False)
 
         print("\n\nRunning simulations pagination check\n\n")
         self.check_backend_jobs()
@@ -248,11 +252,28 @@ if __name__ == "__main__":
     parser.add_argument('--password', help='user password to use for tests', default="password", type=str)
     parser.add_argument('--sim_n', help='number of simulations to run for each type', default=1, type=int)
     parser.add_argument('--do_monitor', help='orders tester to wait for simulations\' results', action='store_true')
-    parser.add_argument(
-        '--no-do_monitor',  dest='do_monitor', action='store_false',
-        help='orders tester not to wait for simulations\' results')
+    parser.add_argument('--test_jsons', help='orders tester to test jsons', action='store_true')
+    parser.add_argument('--test_files', help='orders tester to test files', action='store_true')
+    parser.add_argument('--run_direct', help='orders tester to run directly', action='store_true')
+    parser.add_argument('--run_batch', help='orders tester to wait for simulations\' results', action='store_true')
+    parser.add_argument('--all', help='orders tester to test everything', action='store_true')
+
     parser.set_defaults(do_monitor=False)
+    parser.set_defaults(test_jsons=False)
+    parser.set_defaults(test_files=False)
+    parser.set_defaults(run_direct=False)
+    parser.set_defaults(run_batch=False)
+    parser.set_defaults(all=False)
+
     args = parser.parse_args()
 
+    flags = {
+        "do_monitor": args.do_monitor,
+        "test_jsons": args.test_jsons,
+        "test_files": args.test_files,
+        "run_direct": args.run_direct,
+        "run_batch": args.run_batch,
+        "all": args.all
+    }
     tester = YaptideTester(host=args.host, port=args.port, username=args.username, password=args.password)
-    tester.run_all(sim_n=args.sim_n, do_monitor=args.do_monitor)
+    tester.run_tests(sim_n=args.sim_n, flags=flags)
