@@ -1,7 +1,6 @@
 import argparse
 import json as json_lib
 import math
-import os
 import sys
 import time
 import timeit
@@ -10,7 +9,7 @@ from pathlib import Path
 
 import requests
 
-ROOT_DIR = os.path.dirname(os.path.realpath(__file__))
+ROOT_DIR = Path(__file__).parent.resolve()
 
 
 class Endpoints:

@@ -1,15 +1,14 @@
 import argparse
 import io
+import time
+
+from pathlib import Path
+from datetime import datetime
 
 from fabric import Connection, Result
 from paramiko import Ed25519Key
 
-from datetime import datetime
-import time
-
 from string_templates import SUBMIT_SHIELDHIT, ARRAY_SHIELDHIT_BASH, COLLECT_BASH
-
-from pathlib import Path
 
 
 parser = argparse.ArgumentParser()

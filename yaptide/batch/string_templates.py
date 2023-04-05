@@ -8,35 +8,19 @@ cd $ROOT_DIR
 mkdir -p $ROOT_DIR/workspaces/task_{{0001..{n_tasks}}}
 mkdir -p $ROOT_DIR/input
 
-BEAM_FILE=$ROOT_DIR/input/beam.dat
-GEO_FILE=$ROOT_DIR/input/geo.dat
-MAT_FILE=$ROOT_DIR/input/mat.dat
-DETECT_FILE=$ROOT_DIR/input/detect.dat
-WATCHER_SCRIPT=$ROOT_DIR/watcher.py
+INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
-
-cat << EOF > $BEAM_FILE
-{beam}
-EOF
-cat << EOF > $GEO_FILE
-{geo}
-EOF
-cat << EOF > $MAT_FILE
-{mat}
-EOF
-cat << EOF > $DETECT_FILE
-{detect}
-EOF
-cat << EOF > $WATCHER_SCRIPT
-{watcher}
-EOF
 
 SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:04:59\\
     -A plgccbmc11-cpu --partition=plgrid-testing --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
+
+unzip -d $INPUT_DIR $ROOT_DIR/input.zip
+rm $ROOT_DIR/input.zip
+rm $ROOT_DIR/input.zip
 
 if [ -n "$JOB_ID" ] ; then
     COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID\\
@@ -65,21 +49,18 @@ ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash
 
 ROOT_DIR={root_dir}
 WORK_DIR=$ROOT_DIR/workspaces/task_`printf %04d $SLURM_ARRAY_TASK_ID`
-echo $WORK_DIR
 
 # seed of RNG
 RNG_SEED=$SLURM_ARRAY_TASK_ID
 
 # main SHIELD-HIT12A input files
-BEAM_FILE=$ROOT_DIR/input/beam.dat
-GEO_FILE=$ROOT_DIR/input/geo.dat
-MAT_FILE=$ROOT_DIR/input/mat.dat
-DETECT_FILE=$ROOT_DIR/input/detect.dat
-WATCHER_SCRIPT=$ROOT_DIR/watcher.py
+INPUT_DIR=$ROOT_DIR/input
 
 # go to working directory
 cd $WORK_DIR
-pwd
+
+# make symbolic links to all files from input folder
+ln -s $INPUT_DIR/* .
 
 sig_handler()
 {{
@@ -88,14 +69,13 @@ sig_handler()
 }}
 
 FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-srun python3 $WATCHER_SCRIPT --filepath=$FILE_TO_WATCH\\
+srun python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
     --job_id=$SLURM_JOB_ID --task_id=$SLURM_ARRAY_TASK_ID &
 
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun shieldhit --beamfile=$BEAM_FILE --geofile=$GEO_FILE --matfile=$MAT_FILE --detectfile=$DETECT_FILE\\
-    -n {particle_no} -N $RNG_SEED  $WORK_DIR &
+srun shieldhit -n {particle_no} -N $RNG_SEED  $WORK_DIR &
 
 wait
 """  # skipcq: FLK-E501
