@@ -1,27 +1,8 @@
-from yaptide.celery.worker import celery_app
-
-from yaptide.persistence.models import SimulationModel
-
-from yaptide.utils.sim_utils import (
-    pymchelper_output_to_json,
-    write_input_files,
-    simulation_logfiles,
-    simulation_input_files
-)
-
-from yaptide.batch.watcher import (
-    log_generator,
-    RUN_MATCH,
-    COMPLETE_MATCH,
-    REQUESTED_MATCH,
-    TIMEOUT_MATCH
-)
-
-from pathlib import Path
-import tempfile
 import re
+import tempfile
 import time
 
+from pathlib import Path
 from datetime import datetime
 
 from multiprocessing import Lock, Process
@@ -31,6 +12,22 @@ from celery.result import AsyncResult
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
+
+from yaptide.batch.watcher import (
+    log_generator,
+    RUN_MATCH,
+    COMPLETE_MATCH,
+    REQUESTED_MATCH,
+    TIMEOUT_MATCH
+)
+from yaptide.celery.worker import celery_app
+from yaptide.persistence.models import SimulationModel
+from yaptide.utils.sim_utils import (
+    pymchelper_output_to_json,
+    write_input_files,
+    simulation_logfiles,
+    simulation_input_files
+)
 
 
 class SimulationStats():

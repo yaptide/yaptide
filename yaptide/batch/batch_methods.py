@@ -1,33 +1,26 @@
-from fabric import Connection, Result
-from paramiko import Ed25519Key
-
 import io
 import tempfile
 
+from zipfile import ZipFile
 from datetime import datetime
-
 from pathlib import Path
 
-from pymchelper.input_output import fromfile
+from fabric import Connection, Result
+from paramiko import Ed25519Key
 
-from yaptide.persistence.models import SimulationModel, ClusterModel
+from pymchelper.input_output import fromfile
 
 from yaptide.batch.string_templates import (
     SUBMIT_SHIELDHIT,
     ARRAY_SHIELDHIT_BASH,
-    COLLECT_BASH)
-
+    COLLECT_BASH
+)
+from yaptide.persistence.models import SimulationModel, ClusterModel
 from yaptide.utils.sim_utils import pymchelper_output_to_json, write_input_files
 
 
 def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of submit_job"""
-    with tempfile.TemporaryDirectory() as tmp_dir_path:
-        input_files = write_input_files(json_data, Path(tmp_dir_path))
-    WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
-    with open(WATCHER_SCRIPT, "r") as reader:
-        watcher_content = reader.read()
-
     utc_time = int(datetime.utcnow().timestamp()*1e6)
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
     con = Connection(
@@ -41,6 +34,18 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     job_dir = f"{scratch}/yaptide_runs/{utc_time}"
 
     con.run(f"mkdir -p {job_dir}")
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        zip_path = Path(tmp_dir_path) / "input.zip"
+        write_input_files(json_data, Path(tmp_dir_path))
+        with ZipFile(zip_path, mode="w") as archive:
+            for file in Path(tmp_dir_path).iterdir():
+                if file.name == "input.zip":
+                    continue
+                archive.write(file, arcname=file.name)
+        con.put(zip_path, job_dir)
+
+    WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
+    con.put(WATCHER_SCRIPT, job_dir)
 
     submit_file = f'{job_dir}/yaptide_submitter.sh'
     array_file = f'{job_dir}/array_script.sh'
@@ -48,11 +53,6 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
 
     submit_script = SUBMIT_SHIELDHIT.format(
         root_dir=job_dir,
-        beam=input_files["beam.dat"],
-        detect=input_files["detect.dat"],
-        geo=input_files["geo.dat"],
-        mat=input_files["mat.dat"],
-        watcher=watcher_content,
         n_tasks=str(1)
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
@@ -71,9 +71,11 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     con.run(f'chmod +x {collect_file}')
 
     result: Result = con.run(f'sh {submit_file}', hide=True)
-    lines = result.stdout.split("\n")
-    job_id = lines[0].split()[-1]
-    collect_id = lines[1].split()[-1]
+    for line in result.stdout.split("\n"):
+        if line.startswith("Job id"):
+            job_id = line.split()[-1]
+        if line.startswith("Collect id"):
+            collect_id = line.split()[-1]
 
     return {
         "message": "Job submitted",
