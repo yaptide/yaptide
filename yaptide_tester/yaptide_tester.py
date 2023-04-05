@@ -266,13 +266,12 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    flags = {
+    tester = YaptideTester(host=args.host, port=args.port, username=args.username, password=args.password)
+    tester.run_tests(sim_n=args.sim_n, flags={
         "do_monitor": args.do_monitor,
         "test_jsons": args.test_jsons,
         "test_files": args.test_files,
         "run_direct": args.run_direct,
         "run_batch": args.run_batch,
         "all": args.all
-    }
-    tester = YaptideTester(host=args.host, port=args.port, username=args.username, password=args.password)
-    tester.run_tests(sim_n=args.sim_n, flags=flags)
+    })
