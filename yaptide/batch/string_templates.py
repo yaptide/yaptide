@@ -20,7 +20,6 @@ echo "Job id: $JOB_ID"
 
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
-rm $ROOT_DIR/input.zip
 
 if [ -n "$JOB_ID" ] ; then
     COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID\\
