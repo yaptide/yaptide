@@ -181,7 +181,7 @@ def run_simulation(self, json_data: dict):
 
             estimators_dict: dict = runner_obj.get_data()
 
-            result: dict = pymchelper_output_to_json(estimators_dict)
+            result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict, dir_path=Path(tmp_dir_path))
 
             return {
                 "result": result,

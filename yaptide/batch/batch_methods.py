@@ -117,7 +117,7 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
                 with open(file_path, "wb") as writer:
                     con.get(f'{job_dir}/output/{filename}', writer)
                 estimators_dict[filename.split('.')[0]] = fromfile(str(file_path))
-        result = pymchelper_output_to_json(estimators_dict=estimators_dict)
+            result = pymchelper_output_to_json(estimators_dict=estimators_dict, dir_path=Path(tmp_dir_path))
         now = datetime.utcnow()
         return {
             "job_state": SimulationModel.JobStatus.COMPLETED.value,
