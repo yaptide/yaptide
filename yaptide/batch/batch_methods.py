@@ -9,15 +9,13 @@ from pathlib import Path
 from fabric import Connection, Result
 from paramiko import Ed25519Key
 
-from pymchelper.input_output import fromfile
-
 from yaptide.batch.string_templates import (
     SUBMIT_SHIELDHIT,
     ARRAY_SHIELDHIT_BASH,
     COLLECT_BASH
 )
 from yaptide.persistence.models import SimulationModel, ClusterModel
-from yaptide.utils.sim_utils import pymchelper_output_to_json, write_input_files
+from yaptide.utils.sim_utils import write_input_files
 
 
 def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613

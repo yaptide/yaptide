@@ -16,13 +16,15 @@ if [[ -f ${{BIN_DIR}}/convertmc ]]; then
     if [ $FOUND_VERSION != $CONVERTMC_VERSION ]; then
         echo "Found old version of convertmc: $FOUND_VERSION"
         rm $BIN_DIR/convertmc
-        wget -c -x -O $BIN_DIR/convertmc https://github.com/DataMedSci/pymchelper/releases/download/v$CONVERTMC_VERSION/convertmc
+        wget -c -x -O $BIN_DIR/convertmc\\
+            https://github.com/DataMedSci/pymchelper/releases/download/v$CONVERTMC_VERSION/convertmc
         chmod 750 $BIN_DIR/convertmc
     fi
 else
     mkdir $BIN_DIR -p
 
-    wget -c -x -O $BIN_DIR/convertmc https://github.com/DataMedSci/pymchelper/releases/download/v$CONVERTMC_VERSION/convertmc
+    wget -c -x -O $BIN_DIR/convertmc\\
+        https://github.com/DataMedSci/pymchelper/releases/download/v$CONVERTMC_VERSION/convertmc
 
     chmod 750 $BIN_DIR/convertmc
 fi
