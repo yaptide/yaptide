@@ -11,7 +11,7 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 
 
 def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
-    """Dummy function for converting simulation output to dictionary"""
+    """Convert simulation output to JSON dictionary representation (to be consumed by UI)"""
     if not estimators_dict:
         return {"message": "No estimators"}
 
