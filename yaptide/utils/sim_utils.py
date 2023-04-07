@@ -28,7 +28,7 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
         with open(writer.filename, "r") as json_file:
             est_dict = json.load(json_file)
             est_dict["name"] = estimator_key
-        result_dict["estimators"].append(est_dict)
+            result_dict["estimators"].append(est_dict)
 
     return result_dict
 
