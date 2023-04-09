@@ -5,7 +5,7 @@ flask-restful==0.3.9
 flask_cors==3.0.10
 pytest
 environs
-pymchelper>=2.4.0
+pymchelper==2.4.1
 celery
 redis>=3.5.3
 requests
