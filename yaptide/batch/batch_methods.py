@@ -77,6 +77,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     con.run(f'echo \'{collect_script}\' >> {collect_file}')
     con.run(f'chmod +x {collect_file}')
 
+    job_id = collect_id = None
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
     for line in fabric_result.stdout.split("\n"):
         if line.startswith("Job id"):
@@ -84,6 +85,10 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         if line.startswith("Collect id"):
             collect_id = line.split()[-1]
 
+    if job_id is None or collect_id is None:
+        return {
+            "message": "Job submission failed"
+        }, 500
     return {
         "message": "Job submitted",
         "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}"
@@ -114,7 +119,7 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
         return {
             "job_state": SimulationModel.JobStatus.FAILED.value,
             "message": "Simulation FAILED"
-        }
+        }, 200
     if collect_state == "COMPLETED":
         fabric_result: Result = con.run(f'ls -f {job_dir}/output | grep .json', hide=True)
         result_dict = {"estimators": []}
