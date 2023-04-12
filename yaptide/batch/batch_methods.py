@@ -8,6 +8,7 @@ from pathlib import Path
 
 from fabric import Connection, Result
 from paramiko import Ed25519Key
+import pymchelper
 
 from yaptide.batch.string_templates import (
     SUBMIT_SHIELDHIT,
@@ -53,7 +54,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     submit_script = SUBMIT_SHIELDHIT.format(
         root_dir=job_dir,
         n_tasks=str(3),
-        convertmc_version="2.4.0"
+        convertmc_version=pymchelper.__version__
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
         root_dir=job_dir,
