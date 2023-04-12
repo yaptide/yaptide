@@ -131,6 +131,7 @@ class YaptideTester:
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
 
         res: requests.Response = self.session.post(jobs_url, json={
+            "ntasks": 12,
             "sim_data": sim_data
         })
         res_json: dict = res.json()

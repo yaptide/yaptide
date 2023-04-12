@@ -34,8 +34,8 @@ INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 
-SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:04:59\\
-    -A plgccbmc11-cpu --partition=plgrid-testing --parsable $ARRAY_SCRIPT > $OUT"
+SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:34:59\\
+    -A plgccbmc11-cpu --partition=plgrid --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
@@ -45,7 +45,7 @@ rm $ROOT_DIR/input.zip
 
 if [ -n "$JOB_ID" ] ; then
     COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID\\
-        --time=00:04:59 -A plgccbmc11-cpu --partition=plgrid-testing --parsable $COLLECT_SCRIPT > $OUT"
+        --time=00:34:59 -A plgccbmc11-cpu --partition=plgrid-testing --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
@@ -62,16 +62,12 @@ mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
 
-for INPUT_FILE in $INPUT_WILDCARD; do
-    mv $INPUT_FILE $OUTPUT_DIRECTORY
-done
-
-$BIN_DIR/convertmc json --many "$OUTPUT_DIRECTORY/*.bdo"
+$BIN_DIR/convertmc json --many "$INPUT_WILDCARD"
 
 CLEAR_BDOS={clear_bdos}
 
 if $CLEAR_BDOS; then
-    rm $OUTPUT_DIRECTORY/*.bdo
+    rm $INPUT_WILDCARD
 fi
 """  # skipcq: FLK-E501
 

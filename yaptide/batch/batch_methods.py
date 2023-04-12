@@ -51,9 +51,14 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     array_file = f'{job_dir}/array_script.sh'
     collect_file = f'{job_dir}/collect_script.sh'
 
+    ntasks = int(json_data["ntasks"]
+                 if "ntasks" in json_data
+                 and int(json_data["ntasks"]) > 0
+                 else 1)
+
     submit_script = SUBMIT_SHIELDHIT.format(
         root_dir=job_dir,
-        n_tasks=str(3),
+        n_tasks=str(ntasks),
         convertmc_version=pymchelper.__version__
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
