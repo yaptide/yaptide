@@ -1,16 +1,17 @@
 from pathlib import Path
+import json
 import sys
 
 from pymchelper.estimator import Estimator
-from pymchelper.axis import MeshAxis
+from pymchelper.writers.json import JsonWriter
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
-def pymchelper_output_to_json(estimators_dict: dict) -> dict:
-    """Dummy function for converting simulation output to dictionary"""
+def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
+    """Convert simulation output to JSON dictionary representation (to be consumed by UI)"""
     if not estimators_dict:
         return {"message": "No estimators"}
 
@@ -20,69 +21,14 @@ def pymchelper_output_to_json(estimators_dict: dict) -> dict:
     result_dict = {"estimators": []}
     estimator: Estimator
     for estimator_key, estimator in estimators_dict.items():
-        # est_dict contains list of pages
-        est_dict = {
-            "name": estimator_key,
-            "metadata": {},
-            "pages": []
-        }
+        filepath = dir_path / estimator_key
+        writer = JsonWriter(str(filepath), None)
+        writer.write(estimator)
 
-        # read metadata from estimator object
-        for name, value in estimator.__dict__.items():
-            # skip non-metadata fields
-            if name not in {"data", "data_raw", "error", "error_raw", "counter", "pages", "x", "y", "z"}:
-                # remove \" to properly generate JSON
-                est_dict["metadata"][name] = str(value).replace("\"", "")
-
-        for page in estimator.pages:
-            # page_dict contains:
-            # "dimensions" indicating it is 1 dim page
-            # "data" which has unit, name and list of data values
-            page_dict = {
-                "metadata": {},
-                "dimensions": page.dimension,
-                "data": {
-                    "unit": str(page.unit),
-                    "name": str(page.name),
-                }
-            }
-
-            # read metadata from page object
-            for name, value in page.__dict__.items():
-                # skip non-metadata fields and fields already read from estimator object
-                exclude = {"data_raw", "error_raw", "estimator", "diff_axis1", "diff_axis2"}
-                exclude |= set(estimator.__dict__.keys())
-                if name not in exclude:
-                    # remove \" to properly generate JSON
-                    page_dict["metadata"][name] = str(value).replace("\"", "")
-
-            if page.dimension == 0:
-                page_dict["data"]["values"] = [page.data_raw.tolist()]
-            else:
-                page_dict["data"]["values"] = page.data_raw.tolist()
-            # currently output is returned only when dimension == 1 due to
-            # problems in efficient testing of other dimensions
-
-            if page.dimension in {1, 2}:
-                axis: MeshAxis = page.plot_axis(0)
-                page_dict["first_axis"] = {
-                    "unit": str(axis.unit),
-                    "name": str(axis.name),
-                    "values": axis.data.tolist(),
-                }
-            if page.dimension == 2:
-                axis: MeshAxis = page.plot_axis(1)
-                page_dict["second_axis"] = {
-                    "unit": str(axis.unit),
-                    "name": str(axis.name),
-                    "values": axis.data.tolist(),
-                }
-            if page.dimension > 2:
-                # Add info about the location of the file containging to many dimensions
-                raise ValueError(f"Invalid number of pages {page.dimension}")
-
-            est_dict["pages"].append(page_dict)
-        result_dict["estimators"].append(est_dict)
+        with open(writer.filename, "r") as json_file:
+            est_dict = json.load(json_file)
+            est_dict["name"] = estimator_key
+            result_dict["estimators"].append(est_dict)
 
     return result_dict
 

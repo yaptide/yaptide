@@ -5,21 +5,21 @@
 call scripts\run_yaptide.bat %1 %2
 
 @echo off
-if "%4" == "1" (
+if "%4" == "jd" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_jsons --run_direct
-) else if "%4" == "2" (
+) else if "%4" == "fd" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_files --run_direct
-) else if "%4" == "3" (
+) else if "%4" == "jb" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_jsons --run_batch
-) else if "%4" == "4" (
+) else if "%4" == "fb" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_files --run_batch
-) else if "%4" == "5" (
+) else if "%4" == "jfd" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_jsons --test_files --run_direct
-) else if "%4" == "6" (
+) else if "%4" == "jfb" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_jsons --test_files --run_batch
-) else if "%4" == "7" (
+) else if "%4" == "jdb" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_jsons --run_direct --run_batch
-) else if "%4" == "8" (
+) else if "%4" == "fdb" (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --test_files --run_direct --run_batch
 ) else (
     py .\yaptide_tester\yaptide_tester.py --do_monitor --all

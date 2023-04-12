@@ -1,4 +1,5 @@
 import io
+import json
 import tempfile
 
 from zipfile import ZipFile
@@ -7,8 +8,7 @@ from pathlib import Path
 
 from fabric import Connection, Result
 from paramiko import Ed25519Key
-
-from pymchelper.input_output import fromfile
+import pymchelper
 
 from yaptide.batch.string_templates import (
     SUBMIT_SHIELDHIT,
@@ -16,7 +16,7 @@ from yaptide.batch.string_templates import (
     COLLECT_BASH
 )
 from yaptide.persistence.models import SimulationModel, ClusterModel
-from yaptide.utils.sim_utils import pymchelper_output_to_json, write_input_files
+from yaptide.utils.sim_utils import write_input_files
 
 
 def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
@@ -28,8 +28,8 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         connect_kwargs={"pkey": pkey}
     )
 
-    result: Result = con.run("echo $SCRATCH", hide=True)
-    scratch = result.stdout.split()[0]
+    fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+    scratch = fabric_result.stdout.split()[0]
 
     job_dir = f"{scratch}/yaptide_runs/{utc_time}"
 
@@ -53,14 +53,16 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
 
     submit_script = SUBMIT_SHIELDHIT.format(
         root_dir=job_dir,
-        n_tasks=str(1)
+        n_tasks=str(3),
+        convertmc_version=pymchelper.__version__
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
         root_dir=job_dir,
         particle_no=str(10000)
     )
     collect_script = COLLECT_BASH.format(
-        root_dir=job_dir
+        root_dir=job_dir,
+        clear_bdos="true"
     )
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
@@ -70,8 +72,8 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     con.run(f'echo \'{collect_script}\' >> {collect_file}')
     con.run(f'chmod +x {collect_file}')
 
-    result: Result = con.run(f'sh {submit_file}', hide=True)
-    for line in result.stdout.split("\n"):
+    fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
+    for line in fabric_result.stdout.split("\n"):
         if line.startswith("Job id"):
             job_id = line.split()[-1]
         if line.startswith("Collect id"):
@@ -93,14 +95,14 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
         host=f"{cluster.cluster_username}@{cluster.cluster_name}",
         connect_kwargs={"pkey": pkey}
     )
-    result: Result = con.run("echo $SCRATCH", hide=True)
-    scratch = result.stdout.split()[0]
+    fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+    scratch = fabric_result.stdout.split()[0]
 
     job_dir = f"{scratch}/yaptide_runs/{utc_time}"
-    result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
-    job_state = result.stdout.split()[-1].split()[0]
-    result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
-    collect_state = result.stdout.split()[-1].split()[0]
+    fabric_result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
+    job_state = fabric_result.stdout.split()[-1].split()[0]
+    fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
+    collect_state = fabric_result.stdout.split()[-1].split()[0]
     if job_state == "PENDING":  # skipcq: PTC-W0047
         pass
     if collect_state == "FAILED":
@@ -109,19 +111,21 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
             "message": "Simulation FAILED"
         }
     if collect_state == "COMPLETED":
-        result: Result = con.run(f'ls -f {job_dir}/output | grep .bdo', hide=True)
-        estimators_dict = {}
+        fabric_result: Result = con.run(f'ls -f {job_dir}/output | grep .json', hide=True)
+        result_dict = {"estimators": []}
         with tempfile.TemporaryDirectory() as tmp_dir_path:
-            for filename in result.stdout.split():
+            for filename in fabric_result.stdout.split():
                 file_path = Path(tmp_dir_path, filename)
                 with open(file_path, "wb") as writer:
                     con.get(f'{job_dir}/output/{filename}', writer)
-                estimators_dict[filename.split('.')[0]] = fromfile(str(file_path))
-        result = pymchelper_output_to_json(estimators_dict=estimators_dict)
+                with open(file_path, "r") as json_file:
+                    est_dict = json.load(json_file)
+                    est_dict["name"] = filename.split('.')[0]
+                    result_dict["estimators"].append(est_dict)
         now = datetime.utcnow()
         return {
             "job_state": SimulationModel.JobStatus.COMPLETED.value,
-            "result": result,
+            "result": result_dict,
             "end_time": now,
             "job_tasks_status": [
                 {
