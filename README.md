@@ -33,14 +33,14 @@ You can build and run the app using the following command:
 Linux:
 
 ```shell
-SHIELDHIT_PATH=path/to/shieldhit docker-compose up -d --build
+SHIELDHIT_PATH=path/to/shieldhit docker compose up -d --build
 ```
 
 Windows Powershell:
 
 ```shell
 $env:SHIELDHIT_PATH = "path.to.shieldhit"
-docker-compose up -d --build
+docker compose up -d --build
 ```
 
 Due to docker specific limitations, shieldhit path cannot be absolute path. shieldhit binary needs to be located in the same or in one of yaptide subdirectories (at the same or lower level than Dockerfile).
@@ -50,9 +50,7 @@ Once it's running, the app will be available at [http://localhost:5000](http://l
 When you're ready to stop the containers, use the following commands:
 
 ```shell
-docker-compose stop yaptide_flask
-docker-compose stop yaptide_worker
-docker-compose stop redis
+docker compose stop
 docker system prune
 ```
 
