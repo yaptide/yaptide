@@ -129,11 +129,20 @@ class YaptideTester:
                 sim_data = json_lib.load(json_file)
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
-
-        res: requests.Response = self.session.post(jobs_url, json={
+        json_to_send = {
             "ntasks": 12,
             "sim_data": sim_data
-        })
+        }
+        if not direct:
+            json_to_send["batch_options"] = {
+                "cmd_options": {
+                    "time": "00:59:59",
+                    "account": "plgccbmc11-cpu",
+                    "partition": "plgrid",
+                }
+            }
+
+        res: requests.Response = self.session.post(jobs_url, json=json_to_send)
         res_json: dict = res.json()
         print(res_json)
 

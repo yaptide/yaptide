@@ -28,6 +28,17 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         connect_kwargs={"pkey": pkey}
     )
 
+    advanced_options = ""
+    cmd_options = "--time=00:59:59 --account=plgccbmc11-cpu --partition=plgrid"
+    if "batch_options" in json_data:
+        advanced_options = (json_data["batch_options"]["advanced"]
+                            if "advanced" in json_data["batch_options"]
+                            else advanced_options)
+        cmd_options = (" ".join([f"--{key}={val}" for key, val in json_data["batch_options"]["cmd_options"].items()])
+                       if "cmd_options" in json_data["batch_options"]
+                       else cmd_options)
+        
+
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
 
@@ -57,15 +68,18 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
                  else 1)
 
     submit_script = SUBMIT_SHIELDHIT.format(
+        cmd_options=cmd_options,
         root_dir=job_dir,
         n_tasks=str(ntasks),
         convertmc_version=pymchelper.__version__
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
+        advanced_options=advanced_options,
         root_dir=job_dir,
         particle_no=str(10000)
     )
     collect_script = COLLECT_BASH.format(
+        advanced_options=advanced_options,
         root_dir=job_dir,
         clear_bdos="true"
     )
@@ -87,11 +101,21 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
 
     if job_id is None or collect_id is None:
         return {
-            "message": "Job submission failed"
+            "message": "Job submission failed",
+            "sh_files": {
+                "submit": submit_script,
+                "array": array_script,
+                "collect": collect_script
+            }
         }, 500
     return {
         "message": "Job submitted",
-        "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}"
+        "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}",
+        "sh_files": {
+            "submit": submit_script,
+            "array": array_script,
+            "collect": collect_script
+        }
     }, 202
 
 
