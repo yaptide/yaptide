@@ -37,7 +37,6 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         cmd_options = (" ".join([f"--{key}={val}" for key, val in json_data["batch_options"]["cmd_options"].items()])
                        if "cmd_options" in json_data["batch_options"]
                        else cmd_options)
-        
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
