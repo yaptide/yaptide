@@ -1,5 +1,6 @@
 import io
 import json
+import re
 import tempfile
 
 from zipfile import ZipFile
@@ -31,12 +32,19 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     advanced_options = ""
     cmd_options = "--time=00:59:59 --account=plgccbmc11-cpu --partition=plgrid"
     if "batch_options" in json_data:
+        def sanitize_input(input_str: str):
+            allowed_chars = r'[\w\-.,=/:]+'
+            return re.sub(f'[^\s{allowed_chars}]', '', input_str)
+
         advanced_options = (json_data["batch_options"]["advanced"]
                             if "advanced" in json_data["batch_options"]
                             else advanced_options)
-        cmd_options = (" ".join([f"--{key}={val}" for key, val in json_data["batch_options"]["cmd_options"].items()])
-                       if "cmd_options" in json_data["batch_options"]
-                       else cmd_options)
+
+        if "cmd_options" in json_data["batch_options"]:
+            opt_list = []
+            for key, val in json_data["batch_options"]["cmd_options"].items():
+                opt_list.append(f"--{sanitize_input(key)}={sanitize_input(val)}")
+            cmd_options = " ".join(opt_list)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
@@ -92,7 +100,8 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
 
     job_id = collect_id = None
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
-    for line in fabric_result.stdout.split("\n"):
+    submit_stdout = fabric_result.stdout
+    for line in submit_stdout.split("\n"):
         if line.startswith("Job id"):
             job_id = line.split()[-1]
         if line.startswith("Collect id"):
@@ -101,6 +110,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     if job_id is None or collect_id is None:
         return {
             "message": "Job submission failed",
+            "submit_stdout": submit_stdout,
             "sh_files": {
                 "submit": submit_script,
                 "array": array_script,
@@ -110,6 +120,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
     return {
         "message": "Job submitted",
         "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}",
+        "submit_stdout": submit_stdout,
         "sh_files": {
             "submit": submit_script,
             "array": array_script,
