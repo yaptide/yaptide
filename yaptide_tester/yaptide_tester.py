@@ -135,10 +135,15 @@ class YaptideTester:
         }
         if not direct:
             json_to_send["batch_options"] = {
-                "cmd_options": {
+                "array_options": {
                     "time": "00:59:59",
                     "account": "plgccbmc11-cpu",
                     "partition": "plgrid",
+                },
+                "collect_options": {
+                    "time": "00:29:59",
+                    "account": "plgccbmc11-cpu",
+                    "partition": "plgrid-testing",
                 }
             }
 
