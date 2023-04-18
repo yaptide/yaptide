@@ -15,11 +15,12 @@ from yaptide.batch.string_templates import (
     ARRAY_SHIELDHIT_BASH,
     COLLECT_BASH
 )
+from yaptide.batch.utils.sbatch import extract_sbatch_header, convert_dict_to_sbatch_options
 from yaptide.persistence.models import SimulationModel, ClusterModel
 from yaptide.utils.sim_utils import write_input_files
 
 
-def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     """Dummy version of submit_job"""
     utc_time = int(datetime.utcnow().timestamp()*1e6)
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
@@ -27,6 +28,12 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
         host=f"{cluster.cluster_username}@{cluster.cluster_name}",
         connect_kwargs={"pkey": pkey}
     )
+
+    array_options = convert_dict_to_sbatch_options(json_data=json_data, target_key="array_options")
+    array_header = extract_sbatch_header(json_data=json_data, target_key="array_header")
+
+    collect_options = convert_dict_to_sbatch_options(json_data=json_data, target_key="collect_options")
+    collect_header = extract_sbatch_header(json_data=json_data, target_key="collect_header")
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
@@ -57,15 +64,19 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
                  else 1)
 
     submit_script = SUBMIT_SHIELDHIT.format(
+        array_options=array_options,
+        collect_options=collect_options,
         root_dir=job_dir,
         n_tasks=str(ntasks),
         convertmc_version=pymchelper.__version__
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
+        array_header=array_header,
         root_dir=job_dir,
         particle_no=str(10000)
     )
     collect_script = COLLECT_BASH.format(
+        collect_header=collect_header,
         root_dir=job_dir,
         clear_bdos="true"
     )
@@ -79,7 +90,8 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
 
     job_id = collect_id = None
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
-    for line in fabric_result.stdout.split("\n"):
+    submit_stdout = fabric_result.stdout
+    for line in submit_stdout.split("\n"):
         if line.startswith("Job id"):
             job_id = line.split()[-1]
         if line.startswith("Collect id"):
@@ -87,11 +99,23 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # s
 
     if job_id is None or collect_id is None:
         return {
-            "message": "Job submission failed"
+            "message": "Job submission failed",
+            "submit_stdout": submit_stdout,
+            "sh_files": {
+                "submit": submit_script,
+                "array": array_script,
+                "collect": collect_script
+            }
         }, 500
     return {
         "message": "Job submitted",
-        "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}"
+        "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}",
+        "submit_stdout": submit_stdout,
+        "sh_files": {
+            "submit": submit_script,
+            "array": array_script,
+            "collect": collect_script
+        }
     }, 202
 
 

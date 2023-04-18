@@ -34,8 +34,7 @@ INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 
-SHIELDHIT_CMD="sbatch --array=1-{n_tasks} --time=00:34:59\\
-    -A plgccbmc11-cpu --partition=plgrid --parsable $ARRAY_SCRIPT > $OUT"
+SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
@@ -44,8 +43,7 @@ unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
 
 if [ -n "$JOB_ID" ] ; then
-    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID\\
-        --time=00:34:59 -A plgccbmc11-cpu --partition=plgrid-testing --parsable $COLLECT_SCRIPT > $OUT"
+    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
@@ -53,6 +51,7 @@ fi
 """  # skipcq: FLK-E501
 
 COLLECT_BASH: str = """#!/bin/bash
+{collect_header}
 ROOT_DIR={root_dir}
 INPUT_WILDCARD=$ROOT_DIR/workspaces/task_*/*.bdo
 OUTPUT_DIRECTORY=$ROOT_DIR/output
@@ -72,7 +71,7 @@ fi
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash
-
+{array_header}
 ROOT_DIR={root_dir}
 WORK_DIR=$ROOT_DIR/workspaces/task_`printf %04d $SLURM_ARRAY_TASK_ID`
 
