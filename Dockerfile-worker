@@ -2,6 +2,9 @@ FROM python:3.10-slim
 ARG SHIELDHIT_PATH
 COPY $SHIELDHIT_PATH /usr/local/bin/shieldhit
 
+# install gfortran via apt and clean cache
+RUN apt-get update && apt-get install -y gfortran && rm -rf /var/lib/apt/lists/*
+
 # install dependencies
 WORKDIR /usr/local/app
 COPY ./requirements.txt ./
