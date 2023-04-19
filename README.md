@@ -162,6 +162,26 @@ First script setups the YAPTIDE environment
 Second allows to delete YAPTIDE environment
 Third one setups the environment, runs tests and deletes environment
 
+## For developers
+
+### installation
+
+Alternative method for [installation](#installation) of requirements using **venv**.
+
+```bash
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Testing
+
+Run tests with:
+
+```shell
+pytest ./tests
+```
+
 # Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
