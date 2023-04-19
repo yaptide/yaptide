@@ -15,9 +15,8 @@ git submodule update --init --recursive
 1. Get the redis
 
     - If you already use it just start it on port `6379`
-    - If not good solution would comes with help of docker:
-    -   - Run the following commands
-    -   - `$ docker run -dp 6379:6379 redis`
+    - If not good solution would comes with help of docker, run the following commands:
+      - `$ docker run -dp 6379:6379 redis`
 
 2. Run Celery with `$ celery --app yaptide.celery.worker worker -P threads --loglevel=info`
 
@@ -151,12 +150,14 @@ curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'job_id' :
 
 ## Windows running script
 
-There are 3 scripts prepared for Windows. Example calls: ```shell
+There are 3 scripts prepared for Windows. Example calls: 
+
+```shell
 .\scripts\run_yaptide.bat <shieldhit_binary_file_path>
 .\scripts\kill_yaptide.bat
 .\scripts\run_dev_testing.bat <shieldhit_binary_file_path>
+```
 
-````
 First script setups the YAPTIDE environment
 Second allows to delete YAPTIDE environment
 Third one setups the environment, runs tests and deletes environment
