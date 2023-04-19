@@ -4,6 +4,12 @@
 
 Run: `$ pip install -r requirements.txt`
 
+Download/update sumbmodules:
+
+```shell
+git submodule update --init --recursive
+```
+
 ## Running the app
 
 1. Get the redis
