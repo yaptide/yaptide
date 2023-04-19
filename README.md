@@ -1,8 +1,10 @@
-# Installation
+# yaptide backend
+
+## Installation
 
 Run: `$ pip install -r requirements.txt`
 
-# Running the app
+## Running the app
 
 1. Get the redis
 
@@ -26,7 +28,7 @@ Run: `$ pip install -r requirements.txt`
     - By default the app will re-create the database with each run, dropping it in the process.
     - To persist the database between runs this `with app.app_context(): models.create_models()` in yaptide/application.py inside the `create_app` factory.
 
-# Building/Running with Docker
+## Building/Running with Docker
 
 You can build and run the app using the following command:
 
@@ -54,7 +56,7 @@ docker compose stop
 docker system prune
 ```
 
-# Local Authorisation
+## Local Authorisation
 
 Currently, there is a first version of authorisation. For now we need to register new user and log in.
 
@@ -93,7 +95,7 @@ curl -i -X GET -b cookies.txt -c cookies.txt http://localhost:5000/auth/refresh
 curl -i -X DELETE http://localhost:5000/auth/logout
 ```
 
-# Docker database
+## Docker database
 
 Now registering, updating and deleting users is available with the use of `db_manage.py` located in `yaptide/admin` folder.
 Once docker compose is running, you can use the following command:
@@ -105,7 +107,7 @@ To add an user run:
 docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword
 ```
 
-# Testing API with command-line tools
+## Testing API with command-line tools
 
 Currently converter is parsing some of the frontend input so it would be wise to pass the valid json in order to run the simulation (or you just end up with 500 API status)
 
@@ -141,7 +143,7 @@ And for Linux:
 curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'job_id' : '<job_id>'}" "http://localhost:5000/jobs/direct"
 ```
 
-# Windows running script
+## Windows running script
 
 There are 3 scripts prepared for Windows. Example calls: ```shell
 .\scripts\run_yaptide.bat <shieldhit_binary_file_path>
