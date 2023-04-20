@@ -73,7 +73,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     array_script = ARRAY_SHIELDHIT_BASH.format(
         array_header=array_header,
         root_dir=job_dir,
-        particle_no=str(10000)
+        particle_no=str(json_data["sim_data"]["inputJson"]["beam"]["numberOfParticles"])
     )
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,
