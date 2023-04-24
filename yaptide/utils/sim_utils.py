@@ -1,3 +1,5 @@
+import copy
+import logging
 from pathlib import Path
 import json
 import sys
@@ -33,8 +35,45 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
 
     return result_dict
 
-def convert_payload_to_dict(json_data: dict) -> dict:
-    return {}
+from enum import Enum, auto
+class JSON_TYPE(Enum):
+    Editor = auto()
+    Files = auto()
+
+def get_json_type(json_data: dict) -> JSON_TYPE:
+    possible_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])
+    if possible_input_file_names.intersection(set(json_data["sim_data"].keys())):
+        return JSON_TYPE.Files
+    return JSON_TYPE.Editor
+
+
+def convert_payload_to_dict(json_project_data: dict, parser_type: str) -> dict:
+    """
+    Convert payload data to dictionary with filenames and contents for Editor type projects
+    Otherwise return empty dictionary
+    """
+    conv_parser = get_parser_from_str(parser_type)
+    filenames_content_dict = run_parser(parser=conv_parser, input_data=json_project_data)
+    return filenames_content_dict
+
+
+def check_and_convert_payload_to_dict(json_data: dict) -> dict:
+    """
+    Convert payload data to dictionary with filenames and contents for Editor type projects
+    Otherwise return empty dictionary
+    """
+    filenames_content_dict = {}
+    json_type = get_json_type(json_data)
+    if json_type == JSON_TYPE.Editor:
+        filenames_content_dict = convert_payload_to_dict(json_project_data = json_data["sim_data"], parser_type = json_data["sim_type"])
+    else:
+        logging.warning("Project of %s used, conversion works only for Editor projects", json_type)
+    return filenames_content_dict
+
+def get_json_with_adjusted_primaries(json_data: dict) -> dict:
+    json_project_data = copy.deepcopy(json_data['sim_data'])
+    json_project_data['beam']['numberOfParticles'] //= json_data['ntasks']
+    return json_project_data
 
 def write_input_files(json_data: dict, output_dir: Path) -> dict:
     """
