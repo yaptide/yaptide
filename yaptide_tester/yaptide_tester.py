@@ -50,6 +50,7 @@ class YaptideTesterSession:
                 res_json = res.json()
                 print(res_json)
                 sys.exit()
+            self.timer = timeit.default_timer()
 
     def logout(self):
         """Function allowing to logout"""

@@ -26,7 +26,8 @@ from yaptide.utils.sim_utils import (
     pymchelper_output_to_json,
     write_input_files,
     simulation_logfiles,
-    simulation_input_files
+    simulation_input_files,
+    extract_particles_per_task
 )
 
 
@@ -142,10 +143,6 @@ def run_simulation(self, json_data: dict):
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         input_files = write_input_files(json_data, Path(tmp_dir_path))
-        # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
-        settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
-                                      simulator_exec_path=None,
-                                      cmdline_opts="")
 
         ntasks = json_data["ntasks"] if json_data["ntasks"] > 0 else None
 
@@ -153,6 +150,13 @@ def run_simulation(self, json_data: dict):
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
         ntasks = runner_obj.jobs
+        nstat = extract_particles_per_task(input_files["beam.dat"], ntasks)
+
+        # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
+        settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
+                                      simulator_exec_path=None,
+                                      cmdline_opts="")
+        settings.set_no_of_primaries(nstat)
 
         logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
 

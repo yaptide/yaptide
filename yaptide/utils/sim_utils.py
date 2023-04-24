@@ -1,6 +1,7 @@
 from pathlib import Path
 import json
 import sys
+import math
 
 from pymchelper.estimator import Estimator
 from pymchelper.writers.json import JsonWriter
@@ -33,7 +34,7 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
     return result_dict
 
 
-def write_input_files(json_data: dict, output_dir: Path):
+def write_input_files(json_data: dict, output_dir: Path) -> dict:
     """
     Function used to write input files to output directory.
     Returns dictionary with filenames as keys and their content as values
@@ -46,6 +47,22 @@ def write_input_files(json_data: dict, output_dir: Path):
         with open(Path(output_dir, key), "w") as writer:
             writer.write(file)
     return json_data["sim_data"]
+
+
+def extract_particles_per_task(beam_dat: str, ntasks: int) -> int:
+    """
+    Function extracting number of particles to simulate per 1 task
+    Number provided in beam.dat file is dedicated full amout of particles
+    """
+    try:
+        lines = beam_dat.split("\n")
+        for line in lines:
+            if line.startswith("NSTAT"):
+                return int(math.ceil(float(line.split()[1])/ntasks))
+    except:
+        pass
+    # return default
+    return 1000
 
 
 def simulation_logfiles(path: Path) -> dict:

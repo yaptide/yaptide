@@ -17,7 +17,7 @@ from yaptide.batch.string_templates import (
 )
 from yaptide.batch.utils.sbatch import extract_sbatch_header, convert_dict_to_sbatch_options
 from yaptide.persistence.models import SimulationModel, ClusterModel
-from yaptide.utils.sim_utils import write_input_files
+from yaptide.utils.sim_utils import write_input_files, extract_particles_per_task
 
 
 def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
@@ -43,7 +43,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         zip_path = Path(tmp_dir_path) / "input.zip"
-        write_input_files(json_data, Path(tmp_dir_path))
+        input_files = write_input_files(json_data, Path(tmp_dir_path))
         with ZipFile(zip_path, mode="w") as archive:
             for file in Path(tmp_dir_path).iterdir():
                 if file.name == "input.zip":
@@ -62,6 +62,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
                  if "ntasks" in json_data
                  and int(json_data["ntasks"]) > 0
                  else 1)
+    nstat = extract_particles_per_task(input_files["beam.dat"], ntasks)
 
     submit_script = SUBMIT_SHIELDHIT.format(
         array_options=array_options,
@@ -73,7 +74,7 @@ def submit_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     array_script = ARRAY_SHIELDHIT_BASH.format(
         array_header=array_header,
         root_dir=job_dir,
-        particle_no=str(json_data["sim_data"]["beam"]["numberOfParticles"])
+        particle_no=str(nstat)
     )
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,

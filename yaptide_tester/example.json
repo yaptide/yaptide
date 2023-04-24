@@ -320,7 +320,7 @@
 			"z": 1
 		},
 		"colorHex": 16776960,
-		"numberOfParticles": 1000
+		"numberOfParticles": 10000
 	},
 	"materialManager": {
 		"materials": [
