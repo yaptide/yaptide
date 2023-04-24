@@ -145,6 +145,12 @@ def run_simulation(self, json_data: dict):
         input_files = write_input_files(json_data, Path(tmp_dir_path))
 
         ntasks = json_data["ntasks"] if json_data["ntasks"] > 0 else None
+        
+        # here we need a dictionary with filenames and contents with correct primary number
+        # filename_and_content_dict = json_with_adjusted_primaries(json_data)
+
+        # here we need an output directory with simulation input files with correct primary number
+        # write_simulation_input_files(filename_and_content_dict, Path(tmp_dir_path))
 
         runner_obj = SHRunner(jobs=ntasks,
                               keep_workspace_after_run=True,

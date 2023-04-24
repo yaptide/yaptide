@@ -74,11 +74,23 @@ def check_and_convert_payload_to_dict(json_data: dict) -> dict:
     return filenames_content_dict
 
 
-def get_json_with_adjusted_primaries(json_editor_data: dict) -> dict:
+def editor_json_with_adjusted_primaries(json_editor_data: dict) -> dict:
     json_project_data = copy.deepcopy(json_editor_data['sim_data'])
     json_project_data['beam']['numberOfParticles'] //= json_editor_data['ntasks']
     return json_project_data
 
+def files_json_with_adjusted_primaries(json_files_data: dict) -> dict:
+    json_files_data_current = copy.deepcopy(json_files_data['sim_data'])
+    # TODO: check if this is correct
+    return json_files_data_current
+
+def json_with_adjusted_primaries(json_data: dict) -> dict:
+    json_type = get_json_type(json_data)
+    if json_type == JSON_TYPE.Editor:
+        return editor_json_with_adjusted_primaries(json_editor_data=json_data)
+    elif json_type == JSON_TYPE.Files:
+        return files_json_with_adjusted_primaries(json_files_data=json_data)
+    return {}
 
 def write_simulation_input_files(filename_and_content_dict: dict, output_dir: Path) -> None:
     for filename, file_contents in filename_and_content_dict.items():
