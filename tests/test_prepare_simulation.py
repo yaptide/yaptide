@@ -4,7 +4,7 @@ import logging
 from pathlib import Path
 import pytest
 import sys
-from yaptide.utils.sim_utils import check_and_convert_payload_to_dict, convert_payload_to_dict, get_json_type, JSON_TYPE, get_json_with_adjusted_primaries
+from yaptide.utils.sim_utils import check_and_convert_payload_to_dict, convert_editor_payload_to_dict, get_json_type, JSON_TYPE, get_json_with_adjusted_primaries, write_simulation_input_files
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 converter_path = Path(__file__).resolve().parent.parent / "yaptide" / "converter"
@@ -22,6 +22,7 @@ def project_json_path() -> Path:
     logger.debug("Main dir", main_dir)
     return main_dir / "yaptide_tester" / "example.json"
 
+
 @pytest.fixture(scope='module')
 def project_json_data(project_json_path) -> dict:
     json_data = {}
@@ -35,6 +36,7 @@ def payload_editor_json_path() -> Path:
     """Location of this script according to pathlib"""
     main_dir = Path(__file__).resolve().parent
     return main_dir / "res" / "json_editor_payload.json"
+
 
 @pytest.fixture(scope='module')
 def payload_editor_json_data(payload_editor_json_path) -> dict:
@@ -57,8 +59,6 @@ def payload_files_json_data(payload_files_json_path) -> dict:
     with open(payload_files_json_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
-
-
 
 
 @pytest.mark.parametrize("json_fixture", ["project_json_path", "payload_files_json_path", "payload_editor_json_path"])
@@ -105,7 +105,7 @@ def validate_config_dict(filename_content_dict: dict, expected_primaries: int = 
     assert number_of_primaries == f'{expected_primaries}'
 
 
-def test_json_type_detection(payload_editor_json_data: dict):
+def test_json_type_detection_editor(payload_editor_json_data: dict):
     ''' We have two possible types of JSON project data : 
        - generated using editor (project) or 
        - containing user uploaded files (files) '''
@@ -114,12 +114,21 @@ def test_json_type_detection(payload_editor_json_data: dict):
     assert json_type != JSON_TYPE.Files
 
 
+def test_json_type_detection_files(payload_files_json_data: dict):
+    ''' We have two possible types of JSON project data : 
+       - generated using editor (project) or 
+       - containing user uploaded files (files) '''
+    json_type = get_json_type(payload_files_json_data)
+    assert json_type != JSON_TYPE.Editor
+    assert json_type == JSON_TYPE.Files
+
+
 def test_if_parsing_works_for_payload(payload_editor_json_data: dict):
     """Check if JSON data is parseable by converter"""
     assert payload_editor_json_data is not None
 
-    filename_content_dict = convert_payload_to_dict(json_project_data=payload_editor_json_data["sim_data"],
-                                                    parser_type="shieldhit")
+    filename_content_dict = convert_editor_payload_to_dict(json_project_data=payload_editor_json_data["sim_data"],
+                                                           parser_type="shieldhit")
     assert filename_content_dict is not None
     validate_config_dict(filename_content_dict)
 
@@ -139,9 +148,29 @@ def test_setting_primaries_per_task(payload_editor_json_data: dict):
     """Check if JSON data is parseable by converter"""
     assert payload_editor_json_data is not None
 
-    number_of_primaries_per_task = payload_editor_json_data['sim_data']['beam']['numberOfParticles'] // payload_editor_json_data['ntasks']
+    number_of_primaries_per_task = payload_editor_json_data['sim_data']['beam']['numberOfParticles']
+    number_of_primaries_per_task //= payload_editor_json_data['ntasks']
     json_project_data_with_adjust_prim_no = get_json_with_adjusted_primaries(payload_editor_json_data)
-    filename_content_dict = convert_payload_to_dict(json_project_data=json_project_data_with_adjust_prim_no,
-                                                    parser_type="shieldhit")
+    filename_content_dict = convert_editor_payload_to_dict(json_project_data=json_project_data_with_adjust_prim_no,
+                                                           parser_type="shieldhit")
     assert filename_content_dict is not None
     validate_config_dict(filename_content_dict, expected_primaries=number_of_primaries_per_task)
+
+
+def test_input_files_writing(payload_editor_json_data: dict, tmp_path: Path):
+    filename_content_dict = check_and_convert_payload_to_dict(payload_editor_json_data)
+
+    # check if temporary directory exists
+    assert tmp_path.exists()
+    # check if temporary directory is empty
+    assert len(list(tmp_path.iterdir())) == 0
+
+    write_simulation_input_files(filename_and_content_dict=filename_content_dict, output_dir=tmp_path)
+
+    # check if simulation input files are generated
+    for filename in ('beam.dat', 'detect.dat', 'geo.dat', 'mat.dat'):
+        assert (tmp_path / filename).exists()
+        assert (tmp_path / filename).stat().st_size > 0
+    # check if file named 'beam.dat' contains 'NSTAT' keyword
+    with open(tmp_path / 'beam.dat', 'r') as file_handle:
+        assert 'NSTAT' in file_handle.read()
