@@ -33,6 +33,8 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
 
     return result_dict
 
+def convert_payload_to_dict(json_data: dict) -> dict:
+    return {}
 
 def write_input_files(json_data: dict, output_dir: Path) -> dict:
     """
