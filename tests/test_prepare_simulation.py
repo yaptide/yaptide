@@ -57,22 +57,23 @@ def test_if_parsing_works_for_project(project_json: Path):
         assert conv_parser is not None
 
         filename_content_dict = run_parser(parser=conv_parser, input_data=json_data)
-        assert filename_content_dict is not None
-        assert 'beam.dat' in filename_content_dict
-        assert 'dupa' not in filename_content_dict
-        assert 'NSTAT' in filename_content_dict['beam.dat']
-        all_beam_strings_with_nstat = [
-            line for line in filename_content_dict['beam.dat'].split('\n') if 'NSTAT' in line
-        ]
-        assert len(all_beam_strings_with_nstat) == 1
-        line_with_nstat = all_beam_strings_with_nstat[0]
-        print(line_with_nstat)
-        assert len(line_with_nstat.split()) > 2
-        nstat_keyword = line_with_nstat.split()[0]
-        assert nstat_keyword == 'NSTAT'
-        number_of_primaries = line_with_nstat.split()[1]
-        assert number_of_primaries == '10000'
+        validate_dict(filename_content_dict)
 
+
+def validate_dict(filename_content_dict: dict):
+    assert filename_content_dict is not None
+    assert 'beam.dat' in filename_content_dict
+    assert 'dupa' not in filename_content_dict
+    assert 'NSTAT' in filename_content_dict['beam.dat']
+    all_beam_strings_with_nstat = [line for line in filename_content_dict['beam.dat'].split('\n') if 'NSTAT' in line]
+    assert len(all_beam_strings_with_nstat) == 1
+    line_with_nstat = all_beam_strings_with_nstat[0]
+    print(line_with_nstat)
+    assert len(line_with_nstat.split()) > 2
+    nstat_keyword = line_with_nstat.split()[0]
+    assert nstat_keyword == 'NSTAT'
+    number_of_primaries = line_with_nstat.split()[1]
+    assert number_of_primaries == '10000'
 
 
 def test_if_parsing_works_for_payload(payload_json: Path):
@@ -83,3 +84,4 @@ def test_if_parsing_works_for_payload(payload_json: Path):
 
         filename_content_dict = convert_payload_to_dict(json_data)
         assert filename_content_dict is not None
+        validate_dict(filename_content_dict)
