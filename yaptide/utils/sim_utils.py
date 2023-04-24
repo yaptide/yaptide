@@ -59,7 +59,7 @@ def extract_particles_per_task(beam_dat: str, ntasks: int) -> int:
         for line in lines:
             if line.startswith("NSTAT"):
                 return int(math.ceil(float(line.split()[1])/ntasks))
-    except:
+    except:  # skipcq: FLK-E722
         pass
     # return default
     return 1000
