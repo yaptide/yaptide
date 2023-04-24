@@ -31,8 +31,23 @@ We have 3 types of JSON files:
     - examples of such files are in tests/res/json_files_payload.json
     - inside "sim_data" key we have dictionary with filenames as keys and contents of input files as values
  
-In the source code we assume following convention: `project_json`, `editor_json`, `files_json`
-Therefore editor_json['sim_data'] can be passed as `project_json` 
+In the source code we assume following convention: `project_json`, `editor_json`, `files_json` and `payload_json` 
+
+`project_json['metadata']`, `project_json['scene']` is always valid
+`project_json['sim_data']` is not valid
+
+`payload_json` can be either `editor_json` or `files_json`
+`payload_json['sim_data']` is always valid
+
+Therefore `editor_json['sim_data']` can be passed as `project_json`,
+ `editor_json['sim_data']['metadata']` is valid
+ `editor_json['sim_data']['scene']` is valid
+ `editor_json['sim_data']['beam.dat']` is not valid
+
+Therefore for `files_json['sim_data']`,
+ `files_json['sim_data']['metadata']` is not valid
+ `files_json['sim_data']['beam.dat']` is valid
+
 
 """
 
