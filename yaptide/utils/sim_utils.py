@@ -79,18 +79,30 @@ def editor_json_with_adjusted_primaries(json_editor_data: dict) -> dict:
     json_project_data['beam']['numberOfParticles'] //= json_editor_data['ntasks']
     return json_project_data
 
-def files_json_with_adjusted_primaries(json_files_data: dict) -> dict:
-    json_files_data_current = copy.deepcopy(json_files_data['sim_data'])
-    # TODO: check if this is correct
-    return json_files_data_current
+def files_dict_with_adjusted_primaries(files_json: dict) -> dict:
+    filename_and_content_dict = copy.deepcopy(files_json['sim_data'])
+    # number_of_tasks = files_json['ntasks']  -> to be implemented in UI
+    # here we manipulate the filename_and_content_dict['beam.dat'] file to adjust number of primaries
+    # we manipulate content of the file, no need to write the file to disk
+    return filename_and_content_dict
 
 def json_with_adjusted_primaries(json_data: dict) -> dict:
     json_type = get_json_type(json_data)
     if json_type == JSON_TYPE.Editor:
         return editor_json_with_adjusted_primaries(json_editor_data=json_data)
     elif json_type == JSON_TYPE.Files:
-        return files_json_with_adjusted_primaries(json_files_data=json_data)
+        return files_dict_with_adjusted_primaries(files_json=json_data)
     return {}
+
+def dict_with_adjusted_primaries(payload_json: dict) -> dict:
+    json_type = get_json_type(payload_json)
+    filename_content_dict = {}
+    if json_type == JSON_TYPE.Editor:
+        editor_json_fixed = editor_json_with_adjusted_primaries(json_editor_data=payload_json)
+        filename_content_dict = check_and_convert_payload_to_dict(editor_json_fixed)
+    elif json_type == JSON_TYPE.Files:
+        filename_content_dict = files_dict_with_adjusted_primaries(files_json=payload_json)
+    return filename_content_dict
 
 def write_simulation_input_files(filename_and_content_dict: dict, output_dir: Path) -> None:
     for filename, file_contents in filename_and_content_dict.items():

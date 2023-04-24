@@ -48,6 +48,9 @@ Therefore for `files_json['sim_data']`,
  `files_json['sim_data']['metadata']` is not valid
  `files_json['sim_data']['beam.dat']` is valid
 
+ We have as well `filename_and_content_dict` where keys are filenames and values are contents of input files
+ `filename[beam.dat]` is valid
+
 
 """
 
