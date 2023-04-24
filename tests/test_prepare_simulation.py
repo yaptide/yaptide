@@ -22,22 +22,6 @@ def project_json_path() -> Path:
     logger.debug("Main dir", main_dir)
     return main_dir / "yaptide_tester" / "example.json"
 
-
-@pytest.fixture(scope='module')
-def payload_json_path() -> Path:
-    """Location of this script according to pathlib"""
-    main_dir = Path(__file__).resolve().parent
-    return main_dir / "res" / "json_payload.json"
-
-
-@pytest.fixture(scope='module')
-def payload_json_data(payload_json_path) -> dict:
-    json_data = {}
-    with open(payload_json_path, 'r') as file_handle:
-        json_data = json.load(file_handle)
-    return json_data
-
-
 @pytest.fixture(scope='module')
 def project_json_data(project_json_path) -> dict:
     json_data = {}
@@ -46,7 +30,38 @@ def project_json_data(project_json_path) -> dict:
     return json_data
 
 
-@pytest.mark.parametrize("json_fixture", ["project_json_path", "payload_json_path"])
+@pytest.fixture(scope='module')
+def payload_editor_json_path() -> Path:
+    """Location of this script according to pathlib"""
+    main_dir = Path(__file__).resolve().parent
+    return main_dir / "res" / "json_editor_payload.json"
+
+@pytest.fixture(scope='module')
+def payload_editor_json_data(payload_editor_json_path) -> dict:
+    json_data = {}
+    with open(payload_editor_json_path, 'r') as file_handle:
+        json_data = json.load(file_handle)
+    return json_data
+
+
+@pytest.fixture(scope='module')
+def payload_files_json_path() -> Path:
+    """Location of this script according to pathlib"""
+    main_dir = Path(__file__).resolve().parent
+    return main_dir / "res" / "json_files_payload.json"
+
+
+@pytest.fixture(scope='module')
+def payload_files_json_data(payload_files_json_path) -> dict:
+    json_data = {}
+    with open(payload_files_json_path, 'r') as file_handle:
+        json_data = json.load(file_handle)
+    return json_data
+
+
+
+
+@pytest.mark.parametrize("json_fixture", ["project_json_path", "payload_files_json_path", "payload_editor_json_path"])
 def test_if_json_valid(json_fixture: str, request):
     """Check if test file exists."""
     # we cannot pass directly a fixture object (pytest limitation)
@@ -90,42 +105,42 @@ def validate_config_dict(filename_content_dict: dict, expected_primaries: int = 
     assert number_of_primaries == f'{expected_primaries}'
 
 
-def test_json_type_detection(payload_json_data: dict):
+def test_json_type_detection(payload_editor_json_data: dict):
     ''' We have two possible types of JSON project data : 
        - generated using editor (project) or 
        - containing user uploaded files (files) '''
-    json_type = get_json_type(payload_json_data)
+    json_type = get_json_type(payload_editor_json_data)
     assert json_type == JSON_TYPE.Editor
     assert json_type != JSON_TYPE.Files
 
 
-def test_if_parsing_works_for_payload(payload_json_data: dict):
+def test_if_parsing_works_for_payload(payload_editor_json_data: dict):
     """Check if JSON data is parseable by converter"""
-    assert payload_json_data is not None
+    assert payload_editor_json_data is not None
 
-    filename_content_dict = convert_payload_to_dict(json_project_data=payload_json_data["sim_data"],
+    filename_content_dict = convert_payload_to_dict(json_project_data=payload_editor_json_data["sim_data"],
                                                     parser_type="shieldhit")
     assert filename_content_dict is not None
     validate_config_dict(filename_content_dict)
 
 
-def test_if_setting_primaries_works(payload_json_data: dict):
+def test_if_setting_primaries_works(payload_editor_json_data: dict):
     """Check if JSON data is parseable by converter"""
-    assert payload_json_data is not None
+    assert payload_editor_json_data is not None
 
     number_of_primaries = 137
-    payload_json_data['sim_data']['beam']['numberOfParticles'] = number_of_primaries
-    filename_content_dict = check_and_convert_payload_to_dict(payload_json_data)
+    payload_editor_json_data['sim_data']['beam']['numberOfParticles'] = number_of_primaries
+    filename_content_dict = check_and_convert_payload_to_dict(payload_editor_json_data)
     assert filename_content_dict is not None
     validate_config_dict(filename_content_dict, expected_primaries=number_of_primaries)
 
 
-def test_setting_primaries_per_task(payload_json_data: dict):
+def test_setting_primaries_per_task(payload_editor_json_data: dict):
     """Check if JSON data is parseable by converter"""
-    assert payload_json_data is not None
+    assert payload_editor_json_data is not None
 
-    number_of_primaries_per_task = payload_json_data['sim_data']['beam']['numberOfParticles'] // payload_json_data['ntasks']
-    json_project_data_with_adjust_prim_no = get_json_with_adjusted_primaries(payload_json_data)
+    number_of_primaries_per_task = payload_editor_json_data['sim_data']['beam']['numberOfParticles'] // payload_editor_json_data['ntasks']
+    json_project_data_with_adjust_prim_no = get_json_with_adjusted_primaries(payload_editor_json_data)
     filename_content_dict = convert_payload_to_dict(json_project_data=json_project_data_with_adjust_prim_no,
                                                     parser_type="shieldhit")
     assert filename_content_dict is not None
