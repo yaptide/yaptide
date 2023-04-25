@@ -20,11 +20,11 @@ class JobsBatch(Resource):
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
         """Method handling running shieldhit with batch"""
-        json_data: dict = request.get_json(force=True)
-        if not json_data:
+        payload_dict: dict = request.get_json(force=True)
+        if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
 
-        if "sim_data" not in json_data:
+        if "sim_data" not in payload_dict:
             return error_validation_response()
 
         clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
@@ -32,22 +32,22 @@ class JobsBatch(Resource):
             return error_validation_response({"message": "User has no clusters available"})
 
         filtered_clusters: list[ClusterModel] = []
-        if "batch_options" in json_data and "cluster_name" in json_data["batch_options"]:
-            cluster_name = json_data["batch_options"]["cluster_name"]
+        if "batch_options" in payload_dict and "cluster_name" in payload_dict["batch_options"]:
+            cluster_name = payload_dict["batch_options"]["cluster_name"]
             filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
         cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
 
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
-                    if "sim_type" not in json_data
-                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in payload_dict
+                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
                     else SimulationModel.SimType.DUMMY.value)
-        json_data["sim_type"] = sim_type.lower()
+        payload_dict["sim_type"] = sim_type.lower()
 
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
-                      if "metadata" in json_data["sim_data"]
+                      if "metadata" in payload_dict["sim_data"]
                       else SimulationModel.InputType.INPUT_FILES.value)
 
-        result, status_code = submit_job(json_data=json_data, cluster=cluster)
+        result, status_code = submit_job(payload_dict=payload_dict, cluster=cluster)
 
         if "job_id" in result:
             simulation = SimulationModel(
@@ -57,8 +57,8 @@ class JobsBatch(Resource):
                 sim_type=sim_type,
                 input_type=input_type
             )
-            if "title" in json_data:
-                simulation.set_title(json_data["title"])
+            if "title" in payload_dict:
+                simulation.set_title(payload_dict["title"])
 
             db.session.add(simulation)
             db.session.commit()

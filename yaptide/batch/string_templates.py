@@ -100,7 +100,7 @@ srun python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun shieldhit -n {particle_no} -N $RNG_SEED  $WORK_DIR &
+srun shieldhit -N $RNG_SEED $WORK_DIR &
 
 wait
 """  # skipcq: FLK-E501
