@@ -51,7 +51,7 @@ def get_json_type(payload_dict: dict) -> JSON_TYPE:
     return JSON_TYPE.Editor
 
 
-def convert_editor_payload_to_dict(editor_dict: dict, parser_type: str) -> dict:
+def convert_editor_dict_to_files_dict(editor_dict: dict, parser_type: str) -> dict:
     """
     Convert payload data to dictionary with filenames and contents for Editor type projects
     Otherwise return empty dictionary
@@ -69,8 +69,8 @@ def check_and_convert_payload_to_files_dict(payload_dict: dict) -> dict:
     files_dict = {}
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
-        files_dict = convert_editor_payload_to_dict(editor_dict=payload_dict["sim_data"],
-                                                    parser_type=payload_dict["sim_type"])
+        files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_dict["sim_data"],
+                                                       parser_type=payload_dict["sim_type"])
     else:
         logging.warning("Project of %s used, conversion works only for Editor projects", json_type)
     return files_dict

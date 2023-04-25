@@ -7,7 +7,7 @@ import sys
 
 from yaptide.utils.sim_utils import (
     check_and_convert_payload_to_files_dict,
-    convert_editor_payload_to_dict,
+    convert_editor_dict_to_files_dict,
     editor_dict_with_adjusted_primaries,
     files_dict_with_adjusted_primaries,
     write_simulation_input_files,
@@ -178,8 +178,8 @@ def test_if_parsing_works_for_payload(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
     assert payload_editor_dict_data is not None
 
-    files_dict = convert_editor_payload_to_dict(editor_dict=payload_editor_dict_data["sim_data"],
-                                                      parser_type="shieldhit")
+    files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_editor_dict_data["sim_data"],
+                                                   parser_type="shieldhit")
     assert files_dict is not None
     validate_config_dict(files_dict)
 
@@ -200,22 +200,22 @@ def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     number_of_primaries_per_task = payload_editor_dict_data['sim_data']['beam']['numberOfParticles']
     number_of_primaries_per_task //= payload_editor_dict_data['ntasks']
     json_project_data_with_adjust_prim_no = editor_dict_with_adjusted_primaries(payload_editor_dict_data)
-    files_dict = convert_editor_payload_to_dict(editor_dict=json_project_data_with_adjust_prim_no,
-                                                           parser_type="shieldhit")
+    files_dict = convert_editor_dict_to_files_dict(editor_dict=json_project_data_with_adjust_prim_no,
+                                                   parser_type="shieldhit")
     assert files_dict is not None
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
 
 def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
     """Check if JSON data is parseable by converter"""
-    beam_nstat_line: str = [line for line in payload_files_dict_data['sim_data']['beam.dat'].split('\n') if 'NSTAT' in line][0]
+    beam_nstat_line: str = [line for line in payload_files_dict_data['sim_data']
+                            ['beam.dat'].split('\n') if 'NSTAT' in line][0]
     number_of_primaries_per_task = int(beam_nstat_line.split()[1])
     number_of_primaries_per_task //= payload_files_dict_data['ntasks']
     # print(number_of_primaries_per_task)
     files_dict = files_dict_with_adjusted_primaries(payload_files_dict_data)
     assert files_dict is not None
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
-
 
 
 def test_input_files_writing(payload_editor_dict_data: dict, tmp_path: Path):
