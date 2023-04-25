@@ -87,7 +87,7 @@ def files_dict_with_adjusted_primaries(payload_files_dict: dict) -> dict:
     """Replace number of primaries in files dict"""
     files_dict = copy.deepcopy(payload_files_dict['sim_data'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
-    all_beam_strings_with_nstat = [line for line in all_beam_lines if 'NSTAT' in line]
+    all_beam_strings_with_nstat = [line for line in all_beam_lines if line.lstrip().beginswith('NSTAT')]
     if len(all_beam_strings_with_nstat) != 1:
         return files_dict
     old_nstat: str = all_beam_strings_with_nstat[0].split()[1]
