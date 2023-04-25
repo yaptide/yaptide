@@ -3,24 +3,24 @@ from yaptide.persistence.database import db
 from yaptide.application import create_app
 
 
-# @pytest.fixture
-# def app():
-#     _app = create_app()
-#     with _app.app_context():
-#         db.create_all()
-#     yield _app
+@pytest.fixture
+def app():
+    _app = create_app()
+    with _app.app_context():
+        db.create_all()
+    yield _app
 
-#     with _app.app_context():
-#         db.drop_all()
-
-
-# @pytest.fixture
-# def client(app):
-#     _client = app.test_client()
-#     yield _client
+    with _app.app_context():
+        db.drop_all()
 
 
-# def test_app_started(client):
-#     resp = client.get("/")
+@pytest.fixture
+def client(app):
+    _client = app.test_client()
+    yield _client
 
-#     assert resp.json['message'] == 'Hello world!'
+
+def test_app_started(client):
+    resp = client.get("/")
+
+    assert resp.json['message'] == 'Hello world!'
