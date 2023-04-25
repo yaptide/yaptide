@@ -140,6 +140,11 @@ def run_simulation(self, payload_dict: dict):
     """Simulation runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir_path:
+        # we may face the situation that payload_dict has no key named `ntasks`
+        # this is why we use `payload_dict.get("ntasks")` and not `payload_dict["ntasks"]`
+        # `payload_dict["ntasks"]` would throw an exception if `ntasks` is missing, while
+        # `payload_dict.get("ntasks")` will give us `None` if `ntasks` is missing
+        # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
         runner_obj = SHRunner(jobs=payload_dict.get("ntasks"),
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
