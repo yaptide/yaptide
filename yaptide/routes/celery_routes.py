@@ -116,11 +116,11 @@ class JobsDirect(Resource):
         job = cancel_simulation.delay(job_id=json_data.get('job_id'))
         result: dict = job.wait()
 
-        if result:
+        if result["was_canceled"]:
             db.session.query(SimulationModel).filter_by(job_id=json_data.get('job_id')).delete()
             db.session.commit()
 
-        return error_internal_response()
+        return yaptide_response(message=result["message"], code=200)
 
 
 class ConvertInputFiles(Resource):

@@ -8,11 +8,12 @@ from datetime import datetime
 from multiprocessing import Lock, Process
 from multiprocessing.managers import BaseManager
 
-from celery.result import AsyncResult
-
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
+from celery.result import AsyncResult
+
+from yaptide.celery.worker import celery_app
 from yaptide.batch.watcher import (
     log_generator,
     RUN_MATCH,
@@ -20,7 +21,6 @@ from yaptide.batch.watcher import (
     REQUESTED_MATCH,
     TIMEOUT_MATCH
 )
-from yaptide.celery.worker import celery_app
 from yaptide.persistence.models import SimulationModel
 from yaptide.utils.sim_utils import (
     pymchelper_output_to_json,
@@ -204,27 +204,29 @@ def convert_input_files(json_data: dict):
 def simulation_task_status(job_id: str) -> dict:
     """Task responsible for returning simulation status"""
     job = AsyncResult(id=job_id, app=celery_app)
-    job_state = job.state
+    job_state = translate_celery_state_naming(job.state)
     result = {
-        "job_state": translate_celery_state_naming(job_state)
+        "job_state": job_state
     }
-    if job_state == "PENDING":
-        pass
-    elif job_state == "PROGRESS":
-        if not job.info.get("sim_type") in {"shieldhit", "sh_dummy"}:
-            return result
-        result["job_tasks_status"] = job.info.get("job_tasks_status")
-    elif job_state != "FAILURE":
-        if "result" in job.info:
-            for key in ["result", "input_files", "input_json", "end_time", "job_tasks_status"]:
-                result[key] = job.info[key]
-        elif "logfile" in job.info:
-            result["job_state"] = translate_celery_state_naming("FAILURE")
-            result["error"] = "Simulation error"
-            result["logfiles"] = job.info.get("logfiles")
-            result["input_files"] = job.info.get("input_files")
-    else:
+    if job_state == SimulationModel.JobStatus.PENDING.value:
+        return result
+    if job_state == SimulationModel.JobStatus.RUNNING.value:
+        if job.info.get("sim_type") in {"shieldhit", "sh_dummy"}:
+            result["job_tasks_status"] = job.info.get("job_tasks_status")
+        return result
+    if job_state == SimulationModel.JobStatus.FAILED.value:
         result["error"] = str(job.info)
+        return result
+    if job_state == SimulationModel.JobStatus.CANCELED.value:
+        return result
+    if "result" in job.info:
+        for key in ["result", "input_files", "input_json", "end_time", "job_tasks_status"]:
+            result[key] = job.info[key]
+    elif "logfile" in job.info:
+        result["job_state"] = translate_celery_state_naming("FAILURE")
+        result["error"] = "Simulation error"
+        result["logfiles"] = job.info.get("logfiles")
+        result["input_files"] = job.info.get("input_files")
 
     return result
 
@@ -246,9 +248,38 @@ def get_input_files(job_id: str) -> dict:
 @celery_app.task
 def cancel_simulation(job_id: str) -> bool:
     """Task responsible for canceling simulation in progress"""
-    # Currently this task does nothing because to working properly it requires changes in pymchelper
-    print(job_id)
-    return False
+    job = AsyncResult(id=job_id, app=celery_app)
+    job_state = translate_celery_state_naming(job.state)
+    if job_state == SimulationModel.JobStatus.CANCELED.value:
+        # already canceled job cannot be canceled
+        return {
+            "message": "Job is canceled",
+            "was_canceled": False
+        }
+    if job_state == SimulationModel.JobStatus.COMPLETED.value:
+        # already completed job cannot be canceled
+        return {
+            "message": "Job completed already",
+            "was_canceled": False
+        }
+    if job_state == SimulationModel.JobStatus.FAILED.value:
+        # already failed job cannot be canceled
+        return {
+            "message": "Job failed already",
+            "was_canceled": False
+        }
+    celery_app.control.revoke(job_id, terminate=True)
+    job = AsyncResult(id=job_id, app=celery_app)
+    job_state = translate_celery_state_naming(job.state)
+    if job_state == SimulationModel.JobStatus.CANCELED.value:
+        return {
+            "message": "Job canceled",
+            "was_canceled": True
+        }
+    return {
+        "message": "Something went wrong",
+        "was_canceled": False
+    }
 
 
 def translate_celery_state_naming(job_state: str) -> str:
@@ -257,8 +288,10 @@ def translate_celery_state_naming(job_state: str) -> str:
         return SimulationModel.JobStatus.PENDING.value
     if job_state in ["PROGRESS", "STARTED"]:
         return SimulationModel.JobStatus.RUNNING.value
-    if job_state in ["FAILURE", "REVOKED"]:
+    if job_state in ["FAILURE"]:
         return SimulationModel.JobStatus.FAILED.value
+    if job_state in ["REVOKED"]:
+        return SimulationModel.JobStatus.CANCELED.value
     if job_state in ["SUCCESS"]:
         return SimulationModel.JobStatus.COMPLETED.value
     # Others are the same

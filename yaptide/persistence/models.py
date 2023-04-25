@@ -58,6 +58,7 @@ class SimulationModel(db.Model):
         RUNNING = "RUNNING"
         COMPLETED = "COMPLETED"
         FAILED = "FAILED"
+        CANCELED = "CANCELED"
 
     class InputType(Enum):
         """Input type specification"""
