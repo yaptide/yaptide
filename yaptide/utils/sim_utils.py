@@ -37,15 +37,14 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
 
 
 class JSON_TYPE(Enum):
+    """Class defining custom JSON types"""
     Editor = auto()
     Files = auto()
 
 
 def get_json_type(payload_dict: dict) -> JSON_TYPE:
-    """
-    Returns type of provided JSON
-    """
-    possible_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])
+    """Returns type of provided JSON"""
+    possible_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])  # skipcq: PTC-W0018
     if possible_input_file_names.intersection(set(payload_dict["sim_data"].keys())):
         return JSON_TYPE.Files
     return JSON_TYPE.Editor
@@ -77,12 +76,14 @@ def check_and_convert_payload_to_files_dict(payload_dict: dict) -> dict:
 
 
 def editor_dict_with_adjusted_primaries(payload_editor_dict: dict) -> dict:
+    """Replace number of primaries in editor dict"""
     editor_dict = copy.deepcopy(payload_editor_dict['sim_data'])
     editor_dict['beam']['numberOfParticles'] //= payload_editor_dict['ntasks']
     return editor_dict
 
 
 def files_dict_with_adjusted_primaries(payload_files_dict: dict) -> dict:
+    """Replace number of primaries in files dict"""
     files_dict = copy.deepcopy(payload_files_dict['sim_data'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
     all_beam_strings_with_nstat = [line for line in all_beam_lines if 'NSTAT' in line]
@@ -100,29 +101,23 @@ def files_dict_with_adjusted_primaries(payload_files_dict: dict) -> dict:
     print(files_dict['beam.dat'])
     return files_dict
 
+
 def dict_with_adjusted_primaries(payload_dict: dict) -> dict:
-    """
-    Replace number of primaries
-    """
+    """Replace number of primaries"""
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
         new_payload_dict = copy.deepcopy(payload_dict)
         new_payload_dict["sim_data"] = editor_dict_with_adjusted_primaries(payload_editor_dict=payload_dict)
         return check_and_convert_payload_to_files_dict(new_payload_dict)
-    elif json_type == JSON_TYPE.Files:
+    if json_type == JSON_TYPE.Files:
         return files_dict_with_adjusted_primaries(payload_files_dict=payload_dict)
     return {}
 
 
 def write_simulation_input_files(files_dict: dict, output_dir: Path) -> None:
-    """
-    Save files from provided dict (filenames as keys and content as values) into the provided directory
-    """
+    """Save files from provided dict (filenames as keys and content as values) into the provided directory"""
     for filename, file_contents in files_dict.items():
-        print(output_dir)
-        print(filename)
-        print(output_dir / filename)
-        with open(output_dir / filename, "w") as writer:
+        with open(output_dir / filename, "w") as writer:  # skipcq: PTC-W6004
             writer.write(file_contents)
 
 

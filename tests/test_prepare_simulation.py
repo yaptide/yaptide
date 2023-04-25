@@ -18,12 +18,12 @@ from yaptide.utils.sim_utils import (
 # dirty hack needed to properly handle relative imports in the converter submodule
 converter_path = Path(__file__).resolve().parent.parent / "yaptide" / "converter"
 sys.path.append(str(converter_path))
-import converter
 from converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 logger = logging.getLogger(__name__)
 
-""" Notepad :
+"""
+Notepad :
 We have 3 types of JSON files:
 1. Project JSON - file that could be generated using UI and saved using "Save project" button
   - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples or in yaptide_tester/example.json
@@ -59,8 +59,6 @@ Therefore for `payload_files_dict['sim_data']`,
 
  We have as well `files_dict` where keys are filenames and values are contents of input files
  `files_dict[beam.dat]` is valid
-
-
 """
 
 
@@ -68,7 +66,7 @@ Therefore for `payload_files_dict['sim_data']`,
 def project_json_path() -> Path:
     """Location of this script according to pathlib"""
     main_dir = Path(__file__).resolve().parent.parent
-    logger.debug("Main dir", main_dir)
+    logger.debug("Main dir %s", main_dir)
     return main_dir / "yaptide_tester" / "example.json"
 
 
@@ -155,18 +153,22 @@ def validate_config_dict(files_dict: dict, expected_primaries: int = 10000):
 
 
 def test_json_type_detection_editor(payload_editor_dict_data: dict):
-    ''' We have two possible types of JSON project data : 
+    """
+    We have two possible types of JSON project data : 
        - generated using editor (project) or 
-       - containing user uploaded files (files) '''
+       - containing user uploaded files (files)
+    """
     json_type = get_json_type(payload_editor_dict_data)
     assert json_type == JSON_TYPE.Editor
     assert json_type != JSON_TYPE.Files
 
 
 def test_json_type_detection_files(payload_files_dict_data: dict):
-    ''' We have two possible types of JSON project data : 
+    """
+    We have two possible types of JSON project data : 
        - generated using editor (project) or 
-       - containing user uploaded files (files) '''
+       - containing user uploaded files (files)
+    """
     json_type = get_json_type(payload_files_dict_data)
     assert json_type != JSON_TYPE.Editor
     assert json_type == JSON_TYPE.Files

@@ -34,7 +34,6 @@ def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
 
     job_dir = f"{scratch}/yaptide_runs/{utc_time}"
 
-
     # since it is not obligatory for UI to provide ntasks parameters it is set here for sure
     # if it is provided it will be overwritten by itself so nothing will change
     payload_dict["ntasks"] = int(payload_dict["ntasks"]
@@ -83,6 +82,7 @@ def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
 
 
 def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> tuple[str, dict]:
+    """Prepares script files to run them on cluster"""
     submit_file = f'{job_dir}/yaptide_submitter.sh'
     array_file = f'{job_dir}/array_script.sh'
     collect_file = f'{job_dir}/collect_script.sh'
