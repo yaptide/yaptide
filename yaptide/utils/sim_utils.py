@@ -38,6 +38,7 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
 
 class JSON_TYPE(Enum):
     """Class defining custom JSON types"""
+
     Editor = auto()
     Files = auto()
 
