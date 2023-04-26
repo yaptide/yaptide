@@ -3,6 +3,7 @@ import logging
 from pathlib import Path
 import json
 import sys
+import re
 from enum import Enum, auto
 
 from pymchelper.estimator import Estimator
@@ -11,6 +12,9 @@ from pymchelper.writers.json import JsonWriter
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
+
+
+NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*\s*!\s*NSTAT,\s*Step\s*of\s*saving"
 
 
 def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
@@ -111,7 +115,7 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     old_nstat: str = all_beam_strings_with_nstat[0].split()[1]
     new_nstat = str(int(old_nstat) // ntasks)
     for i in range(len(all_beam_lines)):
-        if 'NSTAT' in all_beam_lines[i]:
+        if re.search(NSTAT_MATCH, all_beam_lines[i]):
             # line below replaces first found nstat value
             # it is important to specify 3rd argument as 1
             # because otherwise values further in line might be changed to
