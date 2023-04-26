@@ -14,7 +14,7 @@ sys.path.append("yaptide/converter")
 from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
-NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*\s*!\s*NSTAT,\s*Step\s*of\s*saving"
+NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
 
 def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
