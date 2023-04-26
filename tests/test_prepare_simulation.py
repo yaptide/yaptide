@@ -4,14 +4,16 @@ import logging
 from pathlib import Path
 import pytest
 import sys
+import copy
 
 from yaptide.utils.sim_utils import (
     check_and_convert_payload_to_files_dict,
     convert_editor_dict_to_files_dict,
-    editor_dict_with_adjusted_primaries,
-    files_dict_with_adjusted_primaries,
+    adjust_primaries_in_editor_dict,
+    adjust_primaries_in_files_dict,
     write_simulation_input_files,
     get_json_type,
+    handle_ntasks_from_payload,
     JSON_TYPE
 )
 
@@ -199,7 +201,7 @@ def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
     number_of_primaries_per_task = payload_editor_dict_data['sim_data']['beam']['numberOfParticles']
     number_of_primaries_per_task //= payload_editor_dict_data['ntasks']
-    json_project_data_with_adjust_prim_no = editor_dict_with_adjusted_primaries(payload_editor_dict_data)
+    json_project_data_with_adjust_prim_no = adjust_primaries_in_editor_dict(payload_editor_dict_data)
     files_dict = convert_editor_dict_to_files_dict(editor_dict=json_project_data_with_adjust_prim_no,
                                                    parser_type="shieldhit")
     assert files_dict is not None
@@ -213,7 +215,7 @@ def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
     number_of_primaries_per_task = int(beam_nstat_line.split()[1])
     number_of_primaries_per_task //= payload_files_dict_data['ntasks']
     # print(number_of_primaries_per_task)
-    files_dict = files_dict_with_adjusted_primaries(payload_files_dict_data)
+    files_dict = adjust_primaries_in_files_dict(payload_files_dict_data)
     assert files_dict is not None
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
@@ -235,3 +237,27 @@ def test_input_files_writing(payload_editor_dict_data: dict, tmp_path: Path):
     # check if file named 'beam.dat' contains 'NSTAT' keyword
     with open(tmp_path / 'beam.dat', 'r') as file_handle:
         assert 'NSTAT' in file_handle.read()
+
+
+def test_handle_ntasks_from_payload(payload_editor_dict_data: dict):
+    modified_payload = copy.deepcopy(payload_editor_dict_data)
+    provided_ntasks = modified_payload['ntasks']
+    ntasks, flag = handle_ntasks_from_payload(modified_payload)
+    assert ntasks == provided_ntasks
+    assert flag
+    modified_payload['ntasks'] = 0
+    ntasks, flag = handle_ntasks_from_payload(modified_payload)
+    assert ntasks == 1
+    assert not flag
+    modified_payload['ntasks'] = 2.0
+    ntasks, flag = handle_ntasks_from_payload(modified_payload)
+    assert ntasks == 1
+    assert not flag
+    modified_payload['ntasks'] = "2"
+    ntasks, flag = handle_ntasks_from_payload(modified_payload)
+    assert ntasks == 1
+    assert not flag
+    modified_payload.pop('ntasks')
+    ntasks, flag = handle_ntasks_from_payload(modified_payload)
+    assert ntasks == 1
+    assert not flag

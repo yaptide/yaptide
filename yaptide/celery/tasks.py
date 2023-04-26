@@ -25,7 +25,7 @@ from yaptide.persistence.models import SimulationModel
 from yaptide.utils.sim_utils import (
     pymchelper_output_to_json,
     check_and_convert_payload_to_files_dict,
-    dict_with_adjusted_primaries,
+    files_dict_with_adjusted_primaries,
     simulation_logfiles,
     simulation_input_files,
     write_simulation_input_files
@@ -156,7 +156,7 @@ def run_simulation(self, payload_dict: dict):
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        files_dict = dict_with_adjusted_primaries(payload_dict=payload_dict)
+        files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it

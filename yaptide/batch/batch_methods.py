@@ -17,7 +17,7 @@ from yaptide.batch.string_templates import (
 )
 from yaptide.batch.utils.sbatch import extract_sbatch_header, convert_dict_to_sbatch_options
 from yaptide.persistence.models import SimulationModel, ClusterModel
-from yaptide.utils.sim_utils import dict_with_adjusted_primaries, write_simulation_input_files
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, write_simulation_input_files
 
 
 def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
@@ -44,7 +44,7 @@ def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         zip_path = Path(tmp_dir_path) / "input.zip"
-        files_dict = dict_with_adjusted_primaries(payload_dict=payload_dict)
+        files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
         with ZipFile(zip_path, mode="w") as archive:
             for file in Path(tmp_dir_path).iterdir():
@@ -118,10 +118,10 @@ def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> t
     con.run(f'chmod +x {collect_file}')
 
     return submit_file, {
-            "submit": submit_script,
-            "array": array_script,
-            "collect": collect_script
-        }
+        "submit": submit_script,
+        "array": array_script,
+        "collect": collect_script
+    }
 
 
 def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
