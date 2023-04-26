@@ -76,22 +76,40 @@ def check_and_convert_payload_to_files_dict(payload_dict: dict) -> dict:
     return files_dict
 
 
-def adjust_primaries_in_editor_dict(payload_editor_dict: dict) -> dict:
-    """Replace number of primaries in editor dict"""
+def adjust_primaries_in_editor_dict(payload_editor_dict: dict, ntasks: int = None) -> dict:
+    """
+    Replaces number of primaries in `payload_editor_dict`
+    if `ntasks` parameter is provided, it is used over one
+    provided in `payload_editor_dict`
+    """
+    if ntasks is None:
+        ntasks = payload_editor_dict['ntasks']
+    else:
+        logging.info("ntasks value was specified as %d and will be overwritten", ntasks)
+
     editor_dict = copy.deepcopy(payload_editor_dict['sim_data'])
-    editor_dict['beam']['numberOfParticles'] //= payload_editor_dict['ntasks']
+    editor_dict['beam']['numberOfParticles'] //= ntasks
     return editor_dict
 
 
-def adjust_primaries_in_files_dict(payload_files_dict: dict) -> dict:
-    """Replace number of primaries in files dict"""
+def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None) -> dict:
+    """
+    Replaces number of primaries in `payload_files_dict`
+    if `ntasks` parameter is provided, it is used over one
+    provided in `payload_files_dict`
+    """
+    if ntasks is None:
+        ntasks = payload_files_dict['ntasks']
+    else:
+        logging.info("ntasks value was specified as %d and will be overwritten", ntasks)
+
     files_dict = copy.deepcopy(payload_files_dict['sim_data'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
     all_beam_strings_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
     if len(all_beam_strings_with_nstat) != 1:
         return files_dict
     old_nstat: str = all_beam_strings_with_nstat[0].split()[1]
-    new_nstat = str(int(old_nstat) // payload_files_dict['ntasks'])
+    new_nstat = str(int(old_nstat) // ntasks)
     for i in range(len(all_beam_lines)):
         if 'NSTAT' in all_beam_lines[i]:
             # line below replaces first found nstat value
@@ -106,30 +124,20 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict) -> dict:
     return files_dict
 
 
-def files_dict_with_adjusted_primaries(payload_dict: dict) -> dict:
-    """Replace number of primaries"""
+def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -> dict:
+    """
+    Replaces number of primaries in `payload_dict`
+    if `ntasks` parameter is provided, it is used over one
+    provided in `payload_dict`
+    """
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
         new_payload_dict = copy.deepcopy(payload_dict)
-        new_payload_dict["sim_data"] = adjust_primaries_in_editor_dict(payload_editor_dict=payload_dict)
+        new_payload_dict["sim_data"] = adjust_primaries_in_editor_dict(payload_editor_dict=payload_dict, ntasks=ntasks)
         return check_and_convert_payload_to_files_dict(new_payload_dict)
     if json_type == JSON_TYPE.Files:
-        return adjust_primaries_in_files_dict(payload_files_dict=payload_dict)
+        return adjust_primaries_in_files_dict(payload_files_dict=payload_dict, ntasks=ntasks)
     return {}
-
-
-def handle_ntasks_from_payload(payload_dict: dict) -> tuple[int, bool]:
-    """
-    Handle `ntasks` parameter from payload dict
-    Returns ntasks and flag if its value was NOT changed
-    """
-    if 'ntasks' not in payload_dict:
-        return 1, False
-    if not isinstance(payload_dict['ntasks'], int):
-        return 1, False
-    if payload_dict['ntasks'] < 1:
-        return 1, False
-    return payload_dict['ntasks'], True
 
 
 def write_simulation_input_files(files_dict: dict, output_dir: Path) -> None:

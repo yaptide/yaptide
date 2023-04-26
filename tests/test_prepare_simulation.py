@@ -13,7 +13,6 @@ from yaptide.utils.sim_utils import (
     adjust_primaries_in_files_dict,
     write_simulation_input_files,
     get_json_type,
-    handle_ntasks_from_payload,
     JSON_TYPE
 )
 
@@ -200,7 +199,7 @@ def test_if_manual_setting_primaries_works_for_editor(payload_editor_dict_data: 
 def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
     number_of_primaries_per_task = payload_editor_dict_data['sim_data']['beam']['numberOfParticles']
-    number_of_primaries_per_task //= payload_editor_dict_data['ntasks']
+    number_of_primaries_per_task //= payload_editor_dict_data["ntasks"]
     json_project_data_with_adjust_prim_no = adjust_primaries_in_editor_dict(payload_editor_dict_data)
     files_dict = convert_editor_dict_to_files_dict(editor_dict=json_project_data_with_adjust_prim_no,
                                                    parser_type="shieldhit")
@@ -237,27 +236,3 @@ def test_input_files_writing(payload_editor_dict_data: dict, tmp_path: Path):
     # check if file named 'beam.dat' contains 'NSTAT' keyword
     with open(tmp_path / 'beam.dat', 'r') as file_handle:
         assert 'NSTAT' in file_handle.read()
-
-
-def test_handle_ntasks_from_payload(payload_editor_dict_data: dict):
-    modified_payload = copy.deepcopy(payload_editor_dict_data)
-    provided_ntasks = modified_payload['ntasks']
-    ntasks, flag = handle_ntasks_from_payload(modified_payload)
-    assert ntasks == provided_ntasks
-    assert flag
-    modified_payload['ntasks'] = 0
-    ntasks, flag = handle_ntasks_from_payload(modified_payload)
-    assert ntasks == 1
-    assert not flag
-    modified_payload['ntasks'] = 2.0
-    ntasks, flag = handle_ntasks_from_payload(modified_payload)
-    assert ntasks == 1
-    assert not flag
-    modified_payload['ntasks'] = "2"
-    ntasks, flag = handle_ntasks_from_payload(modified_payload)
-    assert ntasks == 1
-    assert not flag
-    modified_payload.pop('ntasks')
-    ntasks, flag = handle_ntasks_from_payload(modified_payload)
-    assert ntasks == 1
-    assert not flag

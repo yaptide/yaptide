@@ -1,6 +1,7 @@
 import re
 import tempfile
 import time
+import logging
 
 from pathlib import Path
 from datetime import datetime
@@ -149,10 +150,7 @@ def run_simulation(self, payload_dict: dict):
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
-        # since it is not obligatory for UI to provide ntasks parameters it is set here for sure
-        # if it is provided it will be overwritten by itself so nothing will change
-        payload_dict["ntasks"] = runner_obj.jobs
-        ntasks = payload_dict["ntasks"]
+        ntasks = runner_obj.jobs
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files

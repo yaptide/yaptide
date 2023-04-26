@@ -17,7 +17,10 @@ from yaptide.batch.string_templates import (
 )
 from yaptide.batch.utils.sbatch import extract_sbatch_header, convert_dict_to_sbatch_options
 from yaptide.persistence.models import SimulationModel, ClusterModel
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, write_simulation_input_files
+from yaptide.utils.sim_utils import (
+    files_dict_with_adjusted_primaries,
+    write_simulation_input_files
+)
 
 
 def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
@@ -36,10 +39,6 @@ def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
 
     # since it is not obligatory for UI to provide ntasks parameters it is set here for sure
     # if it is provided it will be overwritten by itself so nothing will change
-    payload_dict["ntasks"] = int(payload_dict["ntasks"]
-                                 if "ntasks" in payload_dict
-                                 and int(payload_dict["ntasks"]) > 0
-                                 else 1)
 
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:

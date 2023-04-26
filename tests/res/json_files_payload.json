@@ -1,7 +1,4 @@
 {
-    "ntasks": 17,
-    "sim_type": "shieldhit",
-    "title": "Proton pencil beam in water",
     "sim_data": {
         "info.json": "{'version': 'unknown', 'label': 'development', 'simulator': 'shieldhit'}",
         "beam.dat": "\nRNDSEED      \t89736501     ! Random seed\nJPART0       \t2            ! Incident particle type\nTMAX0      \t150.0 1.5       ! Incident energy and energy spread; both in (MeV/nucl)\nTCUT0 0 1000  ! energy cutoffs [MeV]\nNSTAT       10000    0       ! NSTAT, Step of saving\nSTRAGG          2            ! Straggling: 0-Off 1-Gauss, 2-Vavilov\nMSCAT           2            ! Mult. scatt 0-Off 1-Gauss, 2-Moliere\nNUCRE           1            ! Nucl.Reac. switcher: 1-ON, 0-OFF\nBEAMPOS 0 0 0 ! Position of the beam\nBEAMDIR 0.0 0.0 ! Direction of the beam\nBEAMSIGMA  0 0  ! Beam extension\n! no BEAMSAD value\nDELTAE   0.03   ! relative mean energy loss per transportation step\n",
