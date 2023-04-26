@@ -124,7 +124,6 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     # number_of_tasks = payload_files_dict['ntasks']  -> to be implemented in UI
     # here we manipulate the files_dict['beam.dat'] file to adjust number of primaries
     # we manipulate content of the file, no need to write the file to disk
-    print(files_dict['beam.dat'])
     return files_dict
 
 
