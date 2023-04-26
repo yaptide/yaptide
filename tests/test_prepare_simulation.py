@@ -4,7 +4,6 @@ import logging
 from pathlib import Path
 import pytest
 import sys
-import copy
 
 from yaptide.utils.sim_utils import (
     check_and_convert_payload_to_files_dict,
