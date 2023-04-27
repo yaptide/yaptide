@@ -109,10 +109,13 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
 
     files_dict = copy.deepcopy(payload_files_dict['sim_data'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
-    all_beam_strings_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
-    if len(all_beam_strings_with_nstat) != 1:
+    all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
+    beam_lines_count = len(all_beam_lines_with_nstat)
+    if beam_lines_count != 1:
+        logging.info("Found unexpected number of lines with NSTAT keyword: %d", beam_lines_count)
+    if beam_lines_count < 1:
         return files_dict
-    old_nstat: str = all_beam_strings_with_nstat[0].split()[1]
+    old_nstat: str = all_beam_lines_with_nstat[0].split()[1]
     new_nstat = str(int(old_nstat) // ntasks)
     for i in range(len(all_beam_lines)):
         if re.search(NSTAT_MATCH, all_beam_lines[i]):
