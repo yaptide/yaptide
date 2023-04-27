@@ -7,7 +7,7 @@ from marshmallow import fields
 from datetime import datetime
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel
+from yaptide.persistence.models import UserModel, SimulationModel, ResultModel, TaskModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
@@ -18,7 +18,7 @@ from yaptide.celery.tasks import (
     get_input_files,
     cancel_simulation
 )
-from yaptide.celery.utils.utils import get_task_status
+from yaptide.celery.utils.utils import get_job_status, get_job_results
 
 
 class JobsDirect(Resource):
@@ -85,11 +85,11 @@ class JobsDirect(Resource):
         param_dict: dict = schema.load(request.args)
 
         job_id = param_dict['job_id']
-        is_owned, error_message, res_code = check_if_task_is_owned(job_id=job_id, user=user)
+        is_owned, error_message, res_code = check_if_job_is_owned(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        result: dict = get_task_status(job_id=job_id)
+        result: dict = get_job_status(job_id=job_id)
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
         if "end_time" in result and simulation.end_time is None:
@@ -113,7 +113,7 @@ class JobsDirect(Resource):
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(job_id=payload_dict.get('job_id'), user=user)
+        is_owned, error_message, res_code = check_if_job_is_owned(job_id=payload_dict.get('job_id'), user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
@@ -125,6 +125,55 @@ class JobsDirect(Resource):
             db.session.commit()
 
         return error_internal_response()
+
+
+class ResultsDirect(Resource):
+    """Class responsible for returning simulation results"""
+
+    class _Schema(Schema):
+        """Class specifies API parameters"""
+
+        job_id = fields.String()
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning job status and results"""
+        schema = JobsDirect._Schema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        job_id = param_dict['job_id']
+        is_owned, error_message, res_code = check_if_job_is_owned(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        results: list[ResultModel] = db.session.query(ResultModel).filter_by(job_id=job_id).all()
+        if len(results) > 0:
+            # TODO: return results from database
+            pass
+        result: dict = get_job_results(job_id=job_id)
+        if "result" not in result:
+            return yaptide_response(
+                message="Results are unavailable",
+                code=200,
+                content=result
+            )
+
+        if "end_time" in result and simulation.end_time is None:
+            simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+            simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
+            db.session.commit()
+
+        result.pop("end_time", None)
+
+        return yaptide_response(
+            message=f"Results for job: {job_id}",
+            code=200,
+            content=result
+        )
 
 
 class ConvertInputFiles(Resource):
@@ -157,7 +206,7 @@ class ConvertInputFiles(Resource):
         )
 
 
-def check_if_task_is_owned(job_id: str, user: UserModel) -> tuple[bool, str]:
+def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str]:
     """Function checking if provided job is owned by user managing action"""
     simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
@@ -187,7 +236,7 @@ class SimulationInputs(Resource):
         param_dict: dict = schema.load(request.args)
         job_id = param_dict['job_id']
 
-        is_owned, error_message, res_code = check_if_task_is_owned(job_id=job_id, user=user)
+        is_owned, error_message, res_code = check_if_job_is_owned(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 

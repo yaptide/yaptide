@@ -19,8 +19,8 @@ from yaptide.batch.watcher import (
 from yaptide.persistence.models import SimulationModel
 
 
-def get_task_status(job_id: str) -> dict:
-    """Task responsible for returning simulation status"""
+def get_job_status(job_id: str) -> dict:
+    """Returns simulation status"""
     job = AsyncResult(id=job_id, app=celery_app)
     job_state = job.state
     result = {
@@ -45,6 +45,18 @@ def get_task_status(job_id: str) -> dict:
         result["error"] = str(job.info)
 
     return result
+
+
+def get_job_results(job_id: str) -> dict:
+    """Returns simulation results"""
+    job = AsyncResult(id=job_id, app=celery_app)
+    if "result" in job.info:
+        return {
+            "result": job.info("result"),
+            "input_files": job.info("input_files"),
+            "input_json": job.info("input_json"),
+            "result": job.info("result")
+        }
 
 
 def translate_celery_state_naming(job_state: str) -> str:
