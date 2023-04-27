@@ -12,8 +12,13 @@ from yaptide.persistence.models import UserModel, SimulationModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 
-from yaptide.celery.tasks import (run_simulation, convert_input_files, simulation_task_status,
-                                  get_input_files, cancel_simulation)
+from yaptide.celery.tasks import (
+    run_simulation,
+    convert_input_files,
+    get_input_files,
+    cancel_simulation
+)
+from yaptide.celery.utils.utils import get_task_status
 
 
 class JobsDirect(Resource):
@@ -84,8 +89,7 @@ class JobsDirect(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        job = simulation_task_status.delay(job_id=job_id)
-        result: dict = job.wait()
+        result: dict = get_task_status(job_id=job_id)
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
         if "end_time" in result and simulation.end_time is None:
