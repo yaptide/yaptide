@@ -24,9 +24,11 @@ from yaptide.celery.worker import celery_app
 from yaptide.persistence.models import SimulationModel
 from yaptide.utils.sim_utils import (
     pymchelper_output_to_json,
-    write_input_files,
+    check_and_convert_payload_to_files_dict,
+    files_dict_with_adjusted_primaries,
     simulation_logfiles,
-    simulation_input_files
+    simulation_input_files,
+    write_simulation_input_files
 )
 
 
@@ -134,29 +136,34 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
 
 
 @celery_app.task(bind=True)
-def run_simulation(self, json_data: dict):
+def run_simulation(self, payload_dict: dict):
     """Simulation runner"""
     # create temporary directory
     with tempfile.TemporaryDirectory() as tmp_dir_path:
+        # we may face the situation that payload_dict has no key named `ntasks`
+        # this is why we use `payload_dict.get("ntasks")` and not `payload_dict["ntasks"]`
+        # `payload_dict["ntasks"]` would throw an exception if `ntasks` is missing, while
+        # `payload_dict.get("ntasks")` will give us `None` if `ntasks` is missing
+        # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
+        runner_obj = SHRunner(jobs=payload_dict.get("ntasks"),
+                              keep_workspace_after_run=True,
+                              output_directory=tmp_dir_path)
+
+        ntasks = runner_obj.jobs
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        input_files = write_input_files(json_data, Path(tmp_dir_path))
+        files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
+
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
                                       cmdline_opts="")
 
-        ntasks = json_data["ntasks"] if json_data["ntasks"] > 0 else None
-
-        runner_obj = SHRunner(jobs=ntasks,
-                              keep_workspace_after_run=True,
-                              output_directory=tmp_dir_path)
-        ntasks = runner_obj.jobs
-
         logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
 
-        self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": json_data["sim_type"]})
+        self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": payload_dict["sim_type"]})
 
         SharedResourcesManager.register('SimulationStats', SimulationStats)
         with SharedResourcesManager() as manager:
@@ -171,8 +178,7 @@ def run_simulation(self, json_data: dict):
                     raise Exception
             except Exception:  # skipcq: PYL-W0703
                 logfiles = simulation_logfiles(path=Path(tmp_dir_path))
-                input_files = simulation_input_files(path=Path(tmp_dir_path))
-                return {"logfiles": logfiles, "input_files": input_files}
+                return {"logfiles": logfiles, "input_files": files_dict}
 
             for process in monitoring_processes:
                 process.join()
@@ -185,19 +191,18 @@ def run_simulation(self, json_data: dict):
 
             return {
                 "result": result,
-                "input_json": json_data["sim_data"] if "metadata" in json_data["sim_data"] else None,
-                "input_files": input_files,
+                "input_json": payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None,
+                "input_files": files_dict,
                 "end_time": datetime.utcnow(),
                 "job_tasks_status": final_stats
             }
 
 
 @celery_app.task
-def convert_input_files(json_data: dict):
+def convert_input_files(payload_dict: dict):
     """Function converting output"""
-    with tempfile.TemporaryDirectory() as tmp_dir_path:
-        input_files = write_input_files(json_data, Path(tmp_dir_path))
-        return {"input_files": input_files}
+    files_dict = check_and_convert_payload_to_files_dict(payload_dict=payload_dict)
+    return {"input_files": files_dict}
 
 
 @celery_app.task

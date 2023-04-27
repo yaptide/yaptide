@@ -23,26 +23,26 @@ class JobsDirect(Resource):
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
         """Method handling running shieldhit with server"""
-        json_data: dict = request.get_json(force=True)
-        if not json_data:
+        payload_dict: dict = request.get_json(force=True)
+        if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
 
-        if "sim_data" not in json_data:
+        if "sim_data" not in payload_dict:
             return error_validation_response()
 
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
-                    if "sim_type" not in json_data
-                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in payload_dict
+                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
                     else SimulationModel.SimType.DUMMY.value)
 
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
-                      if "metadata" in json_data["sim_data"]
+                      if "metadata" in payload_dict["sim_data"]
                       else SimulationModel.InputType.INPUT_FILES.value)
 
-        job = run_simulation.delay(json_data={
-            "ntasks": json_data["ntasks"] if "ntasks" in json_data else -1,
+        job = run_simulation.delay(payload_dict={
+            "ntasks": payload_dict["ntasks"] if "ntasks" in payload_dict else -1,
             "sim_type": sim_type.lower(),
-            "sim_data": json_data["sim_data"]
+            "sim_data": payload_dict["sim_data"]
         })
 
         simulation = SimulationModel(
@@ -52,8 +52,8 @@ class JobsDirect(Resource):
             sim_type=sim_type,
             input_type=input_type
         )
-        if "title" in json_data:
-            simulation.set_title(json_data["title"])
+        if "title" in payload_dict:
+            simulation.set_title(payload_dict["title"])
 
         db.session.add(simulation)
         db.session.commit()
@@ -105,19 +105,19 @@ class JobsDirect(Resource):
     def delete(user: UserModel):
         """Method canceling simulation and returning status of this action"""
         try:
-            json_data: dict = JobsDirect._Schema().load(request.get_json(force=True))
+            payload_dict: dict = JobsDirect._Schema().load(request.get_json(force=True))
         except ValidationError:
             return error_validation_response()
 
-        is_owned, error_message, res_code = check_if_task_is_owned(job_id=json_data.get('job_id'), user=user)
+        is_owned, error_message, res_code = check_if_task_is_owned(job_id=payload_dict.get('job_id'), user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        job = cancel_simulation.delay(job_id=json_data.get('job_id'))
+        job = cancel_simulation.delay(job_id=payload_dict.get('job_id'))
         result: dict = job.wait()
 
         if result:
-            db.session.query(SimulationModel).filter_by(job_id=json_data.get('job_id')).delete()
+            db.session.query(SimulationModel).filter_by(job_id=payload_dict.get('job_id')).delete()
             db.session.commit()
 
         return error_internal_response()
@@ -130,19 +130,19 @@ class ConvertInputFiles(Resource):
     @requires_auth(is_refresh=False)
     def post(_: UserModel):
         """Method handling input files convertion"""
-        json_data: dict = request.get_json(force=True)
-        if not json_data:
+        payload_dict: dict = request.get_json(force=True)
+        if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
 
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
-                    if "sim_type" not in json_data
-                    or json_data["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
+                    if "sim_type" not in payload_dict
+                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
                     else SimulationModel.SimType.DUMMY.value)
 
         # Rework in later PRs to match pattern from jobs endpoint
-        job = convert_input_files.delay(json_data={
+        job = convert_input_files.delay(payload_dict={
             "sim_type": sim_type.lower(),
-            "sim_data": json_data
+            "sim_data": payload_dict
         })
         result: dict = job.wait()
 
