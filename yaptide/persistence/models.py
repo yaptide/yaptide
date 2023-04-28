@@ -1,5 +1,4 @@
 from enum import Enum
-from platform import platform
 from yaptide.persistence.database import db
 
 from sqlalchemy.orm import relationship
@@ -99,17 +98,23 @@ class TaskModel(db.Model):
     requested_primaries: int = db.Column(db.Integer, nullable=False, default=0)
     simulated_primaries: int = db.Column(db.Integer, nullable=False, default=0)
     status: str = db.Column(db.String, nullable=False, default='PENDING')
-    time_hours: int = db.Column(db.Integer, nullable=False, default=0)
-    time_minutes: int = db.Column(db.Integer, nullable=False, default=0)
-    time_seconds: int = db.Column(db.Integer, nullable=False, default=0)
+    estimated_time: int = db.Column(db.Integer)
+    start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
+    end_time = db.Column(db.DateTime(timezone=True), nullable=True)
 
     def update_state(self, update_dict: dict):
-        self.requested_primaries = update_dict["requested_primaries"]
-        self.simulated_primaries = update_dict["simulated_primaries"]
-        self.status = update_dict["status"]
-        self.time_hours = update_dict["estimated_time"]["hours"]
-        self.time_minutes = update_dict["estimated_time"]["minutes"]
-        self.time_seconds = update_dict["estimated_time"]["seconds"]
+        if "requested_primaries" in update_dict and self.status != update_dict["requested_primaries"]:
+            self.status = update_dict["requested_primaries"]
+        if "simulated_primaries" in update_dict and self.status != update_dict["simulated_primaries"]:
+            self.status = update_dict["simulated_primaries"]
+        if "status" in update_dict and self.status != update_dict["status"]:
+            self.status = update_dict["status"]
+        if "estimated_time" in update_dict:
+            estimated_time = update_dict["estimated_time"]["seconds"]\
+                + update_dict["estimated_time"]["minutes"] * 60\
+                + update_dict["estimated_time"]["hours"] * 3600
+            if self.estimated_time != estimated_time:
+                self.estimated_time = estimated_time
 
 
 class ResultModel(db.Model):
