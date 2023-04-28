@@ -55,10 +55,9 @@ class JobsBatch(Resource):
                 user_id=user.id,
                 platform=SimulationModel.Platform.BATCH.value,
                 sim_type=sim_type,
+                title = payload_dict.get("title", ''),
                 input_type=input_type
             )
-            if "title" in payload_dict:
-                simulation.set_title(payload_dict["title"])
 
             db.session.add(simulation)
             db.session.commit()
@@ -151,7 +150,7 @@ class JobsBatch(Resource):
         )
 
 
-def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str]:
+def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str, int]:
     """Function checking if provided task is owned by user managing action"""
     simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 

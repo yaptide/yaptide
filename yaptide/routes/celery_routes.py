@@ -18,7 +18,7 @@ from yaptide.celery.tasks import (
     get_input_files,
     cancel_simulation
 )
-from yaptide.celery.utils.utils import get_job_status, get_job_results
+from yaptide.celery.utils.utils import get_job_status_as_dict, get_job_results
 
 
 class JobsDirect(Resource):
@@ -27,7 +27,7 @@ class JobsDirect(Resource):
     @staticmethod
     @requires_auth(is_refresh=False)
     def post(user: UserModel):
-        """Method handling running shieldhit with server"""
+        """Submit simulation job to celery"""
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
@@ -35,6 +35,7 @@ class JobsDirect(Resource):
         if "sim_data" not in payload_dict:
             return error_validation_response()
 
+        # TODO handle better lower and upper case
         sim_type = (SimulationModel.SimType.SHIELDHIT.value
                     if "sim_type" not in payload_dict
                     or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
@@ -44,22 +45,18 @@ class JobsDirect(Resource):
                       if "metadata" in payload_dict["sim_data"]
                       else SimulationModel.InputType.INPUT_FILES.value)
 
-        job = run_simulation.delay(payload_dict={
-            "ntasks": payload_dict["ntasks"] if "ntasks" in payload_dict else -1,
-            "sim_type": sim_type.lower(),
-            "sim_data": payload_dict["sim_data"]
-        })
+        # submit the job to the Celery queue
+        job = run_simulation.delay(payload_dict=payload_dict)
 
+        # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(
             job_id=job.id,
             user_id=user.id,
             platform=SimulationModel.Platform.DIRECT.value,
             sim_type=sim_type,
+            title = payload_dict.get("title", ''),
             input_type=input_type
         )
-        if "title" in payload_dict:
-            simulation.set_title(payload_dict["title"])
-
         db.session.add(simulation)
         db.session.commit()
 
@@ -70,32 +67,39 @@ class JobsDirect(Resource):
         )
 
     class _Schema(Schema):
-        """Class specifies API parameters"""
-
+        """Class specifies API parameters for GET and DELETE request"""
         job_id = fields.String()
 
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning job status and results"""
+        # validate request parameters and handle errors
         schema = JobsDirect._Schema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
 
+        # get job_id from request parameters and check if user owns this job
         job_id = param_dict['job_id']
         is_owned, error_message, res_code = check_if_job_is_owned(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        result: dict = get_job_status(job_id=job_id)
+        # get job status from Celery, extracting status from job.info
+        # this dict will be returned to the user as a response to GET request
+        result: dict = get_job_status_as_dict(job_id=job_id)
+
+        # find appropriate simulation in the database
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
+        # if simulation is not found, return error
         if "end_time" in result and simulation.end_time is None:
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
             db.session.commit()
 
+        # remove end_time from result, as it is not needed in response
         result.pop("end_time", None)
 
         return yaptide_response(
@@ -206,7 +210,7 @@ class ConvertInputFiles(Resource):
         )
 
 
-def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str]:
+def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str, int]:
     """Function checking if provided job is owned by user managing action"""
     simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 

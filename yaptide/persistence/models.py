@@ -1,4 +1,7 @@
+from datetime import datetime
 from enum import Enum
+
+from sqlalchemy import Column
 from yaptide.persistence.database import db
 
 from sqlalchemy.orm import relationship
@@ -11,9 +14,9 @@ class UserModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
-    id: int = db.Column(db.Integer, primary_key=True)
-    username: str = db.Column(db.String, nullable=False, unique=True)
-    password_hash: str = db.Column(db.String, nullable=False)
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    username: Column[str] = db.Column(db.String, nullable=False, unique=True)
+    password_hash: Column[str] = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
     clusters = relationship("ClusterModel")
 
@@ -33,21 +36,24 @@ class ClusterModel(db.Model):
     """Cluster info for specific user"""
 
     __tablename__ = 'Cluster'
-    id: int = db.Column(db.Integer, primary_key=True)
-    user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
-    cluster_name: str = db.Column(db.String, nullable=False)
-    cluster_username: str = db.Column(db.String, nullable=False)
-    cluster_ssh_key: str = db.Column(db.String, nullable=False)
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'))
+    cluster_name: Column[str] = db.Column(db.String, nullable=False)
+    cluster_username: Column[str] = db.Column(db.String, nullable=False)
+    cluster_ssh_key: Column[str] = db.Column(db.String, nullable=False)
 
 
 class SimulationModel(db.Model):
     """Simulation model"""
 
+    # TODO: move enums to a separate file
+    # TODO: use DBEnum for enums
+    # TODO: use auto for enums
+
     class Platform(Enum):
         """Platform specification"""
 
         DIRECT = "DIRECT"
-        RIMROCK = "RIMROCK"
         BATCH = "BATCH"
 
     class JobStatus(Enum):
@@ -55,6 +61,7 @@ class SimulationModel(db.Model):
 
         PENDING = "PENDING"
         RUNNING = "RUNNING"
+        CANCELLED = "CANCELLED"
         COMPLETED = "COMPLETED"
         FAILED = "FAILED"
 
@@ -68,39 +75,50 @@ class SimulationModel(db.Model):
         """Simulation type specification"""
 
         SHIELDHIT = "SHIELDHIT"
+        TOPAS = "TOPAS"
+        FLUKA = "FLUKA"
         DUMMY = "DUMMY"
 
     __tablename__ = 'Simulation'
-    id: int = db.Column(db.Integer, primary_key=True)
-    job_id: str = db.Column(db.String, nullable=False, unique=True)
-    user_id: int = db.Column(db.Integer, db.ForeignKey('User.id'))
-    start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
-    end_time = db.Column(db.DateTime(timezone=True), nullable=True)
-    title: str = db.Column(db.String, nullable=False, default='workspace')
-    platform: str = db.Column(db.String, nullable=False)
-    input_type: str = db.Column(db.String, nullable=False)
-    sim_type: str = db.Column(db.String, nullable=False)
-    status: str = db.Column(db.String, nullable=False, default='PENDING')
+    
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    
+    # we encode job_id as string, because that is the convention in Celery queue and in SLURM
+    # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
+    # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
+    # example SLURM job_ids are: 12345678
+    job_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Simulation job ID")
+
+    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), doc="User ID")
+    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=func.now(), doc="Submission time")
+    end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Job end time (including merging)")
+    title: Column[str] = db.Column(db.String, nullable=False, default='', doc="Job title")
+    platform: Column[str] = db.Column(db.String, nullable=False, doc="Execution platform name (i.e. 'direct', 'batch')")
+    input_type: Column[str] = db.Column(db.String, nullable=False, doc="Input type (i.e. 'yaptide_project', 'input_files')")
+    sim_type: Column[str] = db.Column(db.String, nullable=False, doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
+    status: Column[str] = db.Column(db.String, nullable=False, default='PENDING', doc="Simulation status (i.e. 'pending', 'running', 'completed', 'failed')")
     tasks = relationship("TaskModel")
     results = relationship("ResultModel")
-
-    def set_title(self, title: str) -> None:
-        """Title variable setter"""
-        self.title = title
 
 
 class TaskModel(db.Model):
     """Simulation task model"""
 
     __tablename__ = 'Task'
-    id: int = db.Column(db.Integer, primary_key=True)
-    job_id: int = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
-    requested_primaries: int = db.Column(db.Integer, nullable=False, default=0)
-    simulated_primaries: int = db.Column(db.Integer, nullable=False, default=0)
-    status: str = db.Column(db.String, nullable=False, default='PENDING')
-    estimated_time: int = db.Column(db.Integer)
-    start_time = db.Column(db.DateTime(timezone=True), default=func.now())  # skipcq: PYL-E1102
-    end_time = db.Column(db.DateTime(timezone=True), nullable=True)
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), doc="Simulation job ID (foreign key)")
+
+    # we encode task_id as string, because that is the convention in Celery queue and in SLURM
+    # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
+    # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
+    # example SLURM job_ids are: 12345678_12
+    task_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Task ID")
+    requested_primaries: Column[int] = db.Column(db.Integer, nullable=False, default=0, doc="Requested number of primaries")
+    simulated_primaries: Column[int] = db.Column(db.Integer, nullable=False, default=0, doc="Simulated number of primaries")
+    status: Column[str] = db.Column(db.String, nullable=False, default='PENDING', doc="Task status (i.e. 'pending', 'running', 'completed', 'failed')")
+    estimated_time_seconds: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
+    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=func.now(), doc="Task start time")  # skipcq: PYL-E1102
+    end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
 
     def update_state(self, update_dict: dict):
         if "requested_primaries" in update_dict and self.status != update_dict["requested_primaries"]:
@@ -113,16 +131,16 @@ class TaskModel(db.Model):
             estimated_time = update_dict["estimated_time"]["seconds"]\
                 + update_dict["estimated_time"]["minutes"] * 60\
                 + update_dict["estimated_time"]["hours"] * 3600
-            if self.estimated_time != estimated_time:
-                self.estimated_time = estimated_time
+            if self.estimated_time_seconds != estimated_time:
+                self.estimated_time_seconds = estimated_time
 
 
 class ResultModel(db.Model):
     """Simulation results model"""
 
     __tablename__ = 'Result'
-    id: int = db.Column(db.Integer, primary_key=True)
-    job_id: int = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
 
 
 def create_models():

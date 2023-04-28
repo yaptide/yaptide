@@ -49,7 +49,7 @@ class UserSimulations(Resource):
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
-        """Method returning simulations"""
+        """Method returning simulations from the database"""
         schema = UserSimulations._ParamsSchema()
         params_dict: dict = schema.load(request.args)
 

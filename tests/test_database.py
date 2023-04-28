@@ -109,7 +109,7 @@ def test_simulation_model_creation(db_session: scoped_session):
 
 #     # create a new task for the simulation
 #     task = TaskModel(
-#         job_id=simulation.id,
+#         simulation_id=simulation.id,
 #         requested_primaries=1000,
 #         simulated_primaries=500,
 #         status=SimulationModel.JobStatus.PENDING.value,
@@ -121,5 +121,5 @@ def test_simulation_model_creation(db_session: scoped_session):
 #     db_session.commit()
 
 #     # retrieve the task from the database and check its fields
-#     task = TaskModel.query.filter_by(job_id=simulation.id).first()
+#     task = TaskModel.query.filter_by(simulation_id=simulation.id).first()
 #     assert task.id is not None

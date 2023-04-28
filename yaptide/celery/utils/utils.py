@@ -19,10 +19,16 @@ from yaptide.batch.watcher import (
 from yaptide.persistence.models import SimulationModel
 
 
-def get_job_status(job_id: str) -> dict:
-    """Returns simulation status"""
+def get_job_status_as_dict(job_id: str) -> dict:
+    """
+    Returns simulation status, results are not returned here
+    Simulation may consist of multiple tasks, so we need to check all of them
+    """
+    # Here we ask Celery (via Redis) for job status
     job = AsyncResult(id=job_id, app=celery_app)
-    job_state = job.state
+    job_state : str = job.state
+
+    # TODO convert string to enum and operate later on Enum
     result = {
         "job_state": translate_celery_state_naming(job_state)
     }
@@ -78,7 +84,7 @@ class SimulationStats():
 
     def __init__(self, ntasks: int, parent, parent_id: str):
         self.lock = Lock()
-        self.tasks_status = {}
+        self.tasks_status : dict = {}
         self.parent = parent
         self.parent_id = parent_id
         for i in range(ntasks):
@@ -88,7 +94,7 @@ class SimulationStats():
             }
         parent_state = AsyncResult(parent_id).state
         parent_meta = AsyncResult(parent_id).info
-        parent_meta["job_tasks_status"] = self.to_list()
+        parent_meta["job_tasks_status"] = list(self.tasks_status.values())
         self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
 
     def update(self, task_id: str, up_dict: dict, final: bool = False):
@@ -102,14 +108,11 @@ class SimulationStats():
                 self.tasks_status[task_id].pop("estimated_time", None)
             parent_state = AsyncResult(self.parent_id).state
             parent_meta = AsyncResult(self.parent_id).info
-            parent_meta["job_tasks_status"] = self.to_list()
+            parent_meta["job_tasks_status"] = list(self.tasks_status.values())
+            # update parent state (parent.info)
             self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
         finally:
             self.lock.release()
-
-    def to_list(self) -> list:
-        """To list"""
-        return [value for _, value in self.tasks_status.items()]
 
 
 class SharedResourcesManager(BaseManager):
@@ -144,6 +147,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
                     "seconds": int(splitted[9]),
                 }
             }
+            
             stats.update(str(task_id), up_dict)
 
         elif re.search(REQUESTED_MATCH, line):
