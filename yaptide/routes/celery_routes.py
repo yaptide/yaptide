@@ -5,6 +5,7 @@ from marshmallow import Schema, ValidationError
 from marshmallow import fields
 
 from datetime import datetime
+import uuid
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel, ResultModel, TaskModel
@@ -46,6 +47,7 @@ class JobsDirect(Resource):
                       else SimulationModel.InputType.INPUT_FILES.value)
 
         # submit the job to the Celery queue
+        update_key = str(uuid.uuid4())
         job = run_simulation.delay(payload_dict=payload_dict)
 
         # create a new simulation in the database, not waiting for the job to finish
@@ -178,6 +180,44 @@ class ResultsDirect(Resource):
             code=200,
             content=result
         )
+
+
+class TaskDirect(Resource):
+    """Class responsible for updating tasks"""
+
+    @staticmethod
+    def post():
+        """
+        Method updating task state
+        Structure required by this method to work properly:
+        {
+            "simulation_id": <string>,
+            "task_id": <string>,
+            "update_key": <string>,
+            "update_dict": <dict>
+        }
+        simulation_id and task_id self explanatory
+        """
+        payload_dict: dict = request.get_json(force=True)
+        required_keys = set(["simulation_id", "task_id", "auth_key", "update_dict"])
+        if not required_keys.intersection(set(payload_dict.keys())):
+            return yaptide_response(message="Incomplete JSON data", code=400)
+        
+        # TODO: make use of auth_key or any other auth method
+
+        simulation: SimulationModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"]).first()
+
+        if not simulation:
+            return yaptide_response(message="Task does not exist", code=400)
+        task: TaskModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"], task_id=payload_dict["task_id"]).first()
+
+        if not task:
+            return yaptide_response(message="Task does not exist", code=400)
+
+        task.update_state(payload_dict["update_dict"])
+        db.session.commit()
+
+        return yaptide_response(message="Task updated", code=202)
 
 
 class ConvertInputFiles(Resource):

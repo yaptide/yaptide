@@ -1,6 +1,7 @@
 import re
 import time
 
+from datetime import datetime
 from pathlib import Path
 
 from multiprocessing import Lock
@@ -21,12 +22,12 @@ from yaptide.persistence.models import SimulationModel
 
 def get_job_status_as_dict(job_id: str) -> dict:
     """
-    Returns simulation status, results are not returned here
+    Returns simulation state, results are not returned here
     Simulation may consist of multiple tasks, so we need to check all of them
     """
-    # Here we ask Celery (via Redis) for job status
+    # Here we ask Celery (via Redis) for job state
     job = AsyncResult(id=job_id, app=celery_app)
-    job_state : str = job.state
+    job_state: str = job.state
 
     # TODO convert string to enum and operate later on Enum
     result = {
@@ -68,13 +69,13 @@ def get_job_results(job_id: str) -> dict:
 def translate_celery_state_naming(job_state: str) -> str:
     """Function translating celery states' names to ones used in YAPTIDE"""
     if job_state in ["RECEIVED", "RETRY"]:
-        return SimulationModel.JobStatus.PENDING.value
+        return SimulationModel.JobState.PENDING.value
     if job_state in ["PROGRESS", "STARTED"]:
-        return SimulationModel.JobStatus.RUNNING.value
+        return SimulationModel.JobState.RUNNING.value
     if job_state in ["FAILURE", "REVOKED"]:
-        return SimulationModel.JobStatus.FAILED.value
+        return SimulationModel.JobState.FAILED.value
     if job_state in ["SUCCESS"]:
-        return SimulationModel.JobStatus.COMPLETED.value
+        return SimulationModel.JobState.COMPLETED.value
     # Others are the same
     return job_state
 
@@ -84,13 +85,13 @@ class SimulationStats():
 
     def __init__(self, ntasks: int, parent, parent_id: str):
         self.lock = Lock()
-        self.tasks_status : dict = {}
+        self.tasks_status: dict = {}
         self.parent = parent
         self.parent_id = parent_id
         for i in range(ntasks):
             self.tasks_status[str(i+1)] = {
                 "task_id": i+1,
-                "task_state": SimulationModel.JobStatus.PENDING.value
+                "task_state": SimulationModel.JobState.PENDING.value
             }
         parent_state = AsyncResult(parent_id).state
         parent_meta = AsyncResult(parent_id).info
@@ -131,7 +132,7 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
 
     if logfile is None:
         up_dict = {
-            "task_state": SimulationModel.JobStatus.FAILED.value
+            "task_state": SimulationModel.JobState.FAILED.value
         }
         stats.update(str(task_id), up_dict)
 
@@ -141,13 +142,11 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
             splitted = line.split()
             up_dict = {
                 "simulated_primaries": int(splitted[3]),
-                "estimated_time": {
-                    "hours": int(splitted[5]),
-                    "minutes": int(splitted[7]),
-                    "seconds": int(splitted[9]),
-                }
+                "estimated_time": int(splitted[9])
+                + int(splitted[7]) * 60
+                + int(splitted[5]) * 3600
             }
-            
+
             stats.update(str(task_id), up_dict)
 
         elif re.search(REQUESTED_MATCH, line):
@@ -155,26 +154,22 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
             up_dict = {
                 "simulated_primaries": 0,
                 "requested_primaries": int(splitted[1]),
-                "task_state": SimulationModel.JobStatus.RUNNING.value
+                "task_state": SimulationModel.JobState.RUNNING.value
             }
             stats.update(str(task_id), up_dict)
 
         elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
             up_dict = {
-                "run_time": {
-                    "hours": int(splitted[2]),
-                    "minutes": int(splitted[4]),
-                    "seconds": int(splitted[6]),
-                },
-                "task_state": SimulationModel.JobStatus.COMPLETED.value
+                "end_time": datetime.utcnow(),
+                "task_state": SimulationModel.JobState.COMPLETED.value
             }
             stats.update(str(task_id), up_dict, True)
             return
 
         elif re.search(TIMEOUT_MATCH, line):
             up_dict = {
-                "task_state": SimulationModel.JobStatus.FAILED.value
+                "task_state": SimulationModel.JobState.FAILED.value
             }
             stats.update(str(task_id), up_dict)
             return

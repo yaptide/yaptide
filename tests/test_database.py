@@ -1,3 +1,6 @@
+from datetime import datetime
+from time import sleep
+
 import pytest
 
 from sqlalchemy.orm.scoping import scoped_session
@@ -74,52 +77,64 @@ def test_simulation_model_creation(db_session: scoped_session):
         user_id=user.id,
         platform=SimulationModel.Platform.DIRECT.value,
         input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
-        sim_type=SimulationModel.SimType.SHIELDHIT.value
+        sim_type=SimulationModel.SimType.SHIELDHIT.value,
+        update_key='testkey'
     )
     db_session.add(simulation)
     db_session.commit()
 
     # retrieve the simulation from the database and check its fields
-    simulation = SimulationModel.query.filter_by(user_id=user.id).first()
+    simulation: SimulationModel = SimulationModel.query.filter_by(user_id=user.id).first()
     assert simulation.id is not None
     assert simulation.job_id == 'testjob'
     assert simulation.platform == SimulationModel.Platform.DIRECT.value
     assert simulation.input_type == SimulationModel.InputType.YAPTIDE_PROJECT.value
     assert simulation.sim_type == SimulationModel.SimType.SHIELDHIT.value
+    assert simulation.job_state == SimulationModel.JobState.PENDING.value
 
 
-# def test_task_model_creation(db_session: scoped_session):
-#     """Test task model creation"""
-#     # create a new user
-#     user = UserModel(username='testuser')
-#     user.set_password("testpassword")
-#     db_session.add(user)
-#     db_session.commit()
+def test_task_model_creation_and_update(db_session: scoped_session):
+    """Test task model creation"""
+    # create a new user
+    user = UserModel(username='testuser')
+    user.set_password("testpassword")
+    db_session.add(user)
+    db_session.commit()
 
-#     # create a new simulation for the user
-#     simulation = SimulationModel(
-#         job_id='testjob',
-#         user_id=user.id,
-#         platform=SimulationModel.Platform.DIRECT.value,
-#         input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
-#         sim_type=SimulationModel.SimType.SHIELDHIT.value
-#     )
-#     db_session.add(simulation)
-#     db_session.commit()
+    # create a new simulation for the user
+    simulation = SimulationModel(
+        job_id='testjob',
+        user_id=user.id,
+        platform=SimulationModel.Platform.DIRECT.value,
+        input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+        sim_type=SimulationModel.SimType.SHIELDHIT.value,
+        update_key='testkey'
+    )
+    db_session.add(simulation)
+    db_session.commit()
 
-#     # create a new task for the simulation
-#     task = TaskModel(
-#         simulation_id=simulation.id,
-#         requested_primaries=1000,
-#         simulated_primaries=500,
-#         status=SimulationModel.JobStatus.PENDING.value,
-#         time_hours=1,
-#         time_minutes=30,
-#         time_seconds=0
-#     )
-#     db_session.add(task)
-#     db_session.commit()
+    # create a new task for the simulation
+    task = TaskModel(
+        simulation_id=simulation.id,
+        task_id='testtask',
+        requested_primaries=1000,
+        simulated_primaries=0
+    )
+    db_session.add(task)
+    db_session.commit()
 
-#     # retrieve the task from the database and check its fields
-#     task = TaskModel.query.filter_by(simulation_id=simulation.id).first()
-#     assert task.id is not None
+    # retrieve the task from the database and check its fields
+    task: TaskModel = TaskModel.query.filter_by(simulation_id=simulation.id).first()
+    assert task.id is not None
+    assert task.task_state == SimulationModel.JobState.PENDING.value
+    sleep(2)
+    end_time = datetime.utcnow()
+    update_dict = {
+        'task_state': SimulationModel.JobState.COMPLETED.value,
+        'end_time': str(end_time),
+        'simulated_primaries': 1000
+    }
+    task.update_state(update_dict=update_dict)
+    assert task.simulated_primaries == 1000
+    assert task.task_state == SimulationModel.JobState.COMPLETED.value
+    assert task.end_time is not None

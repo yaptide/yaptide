@@ -1,7 +1,7 @@
 from flask_restful import Resource
 from flask_restful import Api
 
-from yaptide.routes.celery_routes import JobsDirect, SimulationInputs, ConvertInputFiles
+from yaptide.routes.celery_routes import JobsDirect, TaskDirect, SimulationInputs, ConvertInputFiles
 from yaptide.routes.user_routes import UserSimulations, UserClusters, UserUpdate
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 from yaptide.routes.batch_routes import JobsBatch
@@ -22,6 +22,8 @@ def initialize_routes(api: Api):
 
     api.add_resource(JobsDirect, "/jobs/direct")
     api.add_resource(JobsBatch, "/jobs/batch")
+
+    api.add_resource(TaskDirect, "/tasks/direct")
 
     api.add_resource(ConvertInputFiles, "/sh/convert")
     api.add_resource(SimulationInputs, "/sh/inputs")

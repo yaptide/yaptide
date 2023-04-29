@@ -56,8 +56,8 @@ class SimulationModel(db.Model):
         DIRECT = "DIRECT"
         BATCH = "BATCH"
 
-    class JobStatus(Enum):
-        """Job status types - move it to more utils like place in future"""
+    class JobState(Enum):
+        """Job state types - move it to more utils like place in future"""
 
         PENDING = "PENDING"
         RUNNING = "RUNNING"
@@ -80,9 +80,9 @@ class SimulationModel(db.Model):
         DUMMY = "DUMMY"
 
     __tablename__ = 'Simulation'
-    
+
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    
+
     # we encode job_id as string, because that is the convention in Celery queue and in SLURM
     # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
     # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
@@ -91,12 +91,18 @@ class SimulationModel(db.Model):
 
     user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), doc="User ID")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=func.now(), doc="Submission time")
-    end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Job end time (including merging)")
+    end_time: Column[datetime] = db.Column(
+        db.DateTime(timezone=True), nullable=True, doc="Job end time (including merging)")
     title: Column[str] = db.Column(db.String, nullable=False, default='', doc="Job title")
     platform: Column[str] = db.Column(db.String, nullable=False, doc="Execution platform name (i.e. 'direct', 'batch')")
-    input_type: Column[str] = db.Column(db.String, nullable=False, doc="Input type (i.e. 'yaptide_project', 'input_files')")
-    sim_type: Column[str] = db.Column(db.String, nullable=False, doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
-    status: Column[str] = db.Column(db.String, nullable=False, default='PENDING', doc="Simulation status (i.e. 'pending', 'running', 'completed', 'failed')")
+    input_type: Column[str] = db.Column(
+        db.String, nullable=False, doc="Input type (i.e. 'yaptide_project', 'input_files')")
+    sim_type: Column[str] = db.Column(
+        db.String, nullable=False, doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
+    job_state: Column[str] = db.Column(
+        db.String, nullable=False, default='PENDING', doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
+    update_key: Column[str] = db.Column(
+        db.String, nullable=False, doc="Update key shared by tasks granting access to update themselves")
     tasks = relationship("TaskModel")
     results = relationship("ResultModel")
 
@@ -106,33 +112,45 @@ class TaskModel(db.Model):
 
     __tablename__ = 'Task'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), doc="Simulation job ID (foreign key)")
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey(
+        'Simulation.id'), doc="Simulation job ID (foreign key)")
 
     # we encode task_id as string, because that is the convention in Celery queue and in SLURM
     # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
     # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
     # example SLURM job_ids are: 12345678_12
     task_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Task ID")
-    requested_primaries: Column[int] = db.Column(db.Integer, nullable=False, default=0, doc="Requested number of primaries")
-    simulated_primaries: Column[int] = db.Column(db.Integer, nullable=False, default=0, doc="Simulated number of primaries")
-    status: Column[str] = db.Column(db.String, nullable=False, default='PENDING', doc="Task status (i.e. 'pending', 'running', 'completed', 'failed')")
-    estimated_time_seconds: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
-    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=func.now(), doc="Task start time")  # skipcq: PYL-E1102
+    requested_primaries: Column[int] = db.Column(
+        db.Integer, nullable=False, default=0, doc="Requested number of primaries")
+    simulated_primaries: Column[int] = db.Column(
+        db.Integer, nullable=False, default=0, doc="Simulated number of primaries")
+    task_state: Column[str] = db.Column(
+        db.String, nullable=False, default='PENDING', doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
+    estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
+    start_time: Column[datetime] = db.Column(
+        db.DateTime(timezone=True), default=func.now(), doc="Task start time")  # skipcq: PYL-E1102
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
 
     def update_state(self, update_dict: dict):
-        if "requested_primaries" in update_dict and self.status != update_dict["requested_primaries"]:
-            self.status = update_dict["requested_primaries"]
-        if "simulated_primaries" in update_dict and self.status != update_dict["simulated_primaries"]:
-            self.status = update_dict["simulated_primaries"]
-        if "status" in update_dict and self.status != update_dict["status"]:
-            self.status = update_dict["status"]
-        if "estimated_time" in update_dict:
-            estimated_time = update_dict["estimated_time"]["seconds"]\
-                + update_dict["estimated_time"]["minutes"] * 60\
-                + update_dict["estimated_time"]["hours"] * 3600
-            if self.estimated_time_seconds != estimated_time:
-                self.estimated_time_seconds = estimated_time
+        """
+        Updating database is more costly than a simple query. 
+        Therefore we check first if update is needed and 
+        perform it only for such fields which exists and which have updated values.
+        """
+        if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
+            self.requested_primaries = update_dict["requested_primaries"]
+        if "simulated_primaries" in update_dict and self.simulated_primaries != update_dict["simulated_primaries"]:
+            self.simulated_primaries = update_dict["simulated_primaries"]
+        if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
+            self.task_state = update_dict["task_state"]
+        if "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]:
+            self.estimated_time = update_dict["estimated_time"]
+        # Here we have a special case, `end_time` can be set only once
+        # therefore we update it only if it not set previously (`self.end_time is None`)
+        # and if update was requested (`"end_time" in update_dict`)
+        if "end_time" in update_dict and self.end_time is None:
+            # a convertion from string to datetime is needed, as in the POST payload end_time comes in string format
+            self.end_time = datetime.strptime(update_dict["end_time"], '%Y-%m-%d %H:%M:%S.%f')
 
 
 class ResultModel(db.Model):

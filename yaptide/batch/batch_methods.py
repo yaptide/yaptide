@@ -145,7 +145,7 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
         pass
     if collect_state == "FAILED":
         return {
-            "job_state": SimulationModel.JobStatus.FAILED.value,
+            "job_state": SimulationModel.JobState.FAILED.value,
             "message": "Simulation FAILED"
         }, 200
     if collect_state == "COMPLETED":
@@ -162,13 +162,13 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
                     result_dict["estimators"].append(est_dict)
         now = datetime.utcnow()
         return {
-            "job_state": SimulationModel.JobStatus.COMPLETED.value,
+            "job_state": SimulationModel.JobState.COMPLETED.value,
             "result": result_dict,
             "end_time": now,
             "job_tasks_status": [
                 {
                     "task_id": 1,
-                    "task_state": SimulationModel.JobStatus.COMPLETED.value,
+                    "task_state": SimulationModel.JobState.COMPLETED.value,
                     "simulated_primaries": 2000,
                     "requested_primaries": 2000,
                     "run_time": {
@@ -187,11 +187,11 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
         pass
 
     return {
-        "job_state": SimulationModel.JobStatus.RUNNING.value,
+        "job_state": SimulationModel.JobState.RUNNING.value,
         "job_tasks_status": [
             {
                 "task_id": 1,
-                "task_state": SimulationModel.JobStatus.RUNNING.value,
+                "task_state": SimulationModel.JobState.RUNNING.value,
                 "simulated_primaries": 1000,
                 "requested_primaries": 2000,
                 "estimated_time": {

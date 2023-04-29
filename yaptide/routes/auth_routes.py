@@ -73,7 +73,7 @@ class AuthLogIn(Resource):
         try:
             user = db.session.query(UserModel).filter_by(username=json_data.get('username')).first()
             if not user:
-                return yaptide_response(message='User not existing', code=401)
+                return yaptide_response(message='Invalid login or password', code=401)
 
             if not user.check_password(password=json_data.get('password')):
                 return yaptide_response(message='Invalid login or password', code=401)
