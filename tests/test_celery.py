@@ -1,7 +1,7 @@
 import pytest
 from celery.contrib.testing.tasks import ping
 
-from yaptide.celery.tasks import cancel_simulation, dupa
+from yaptide.celery.tasks import cancel_simulation
 
 @pytest.fixture(scope='session')
 def celery_app(request):
