@@ -5,8 +5,8 @@ flask-sqlalchemy==3.0.0
 flask-restful==0.3.9
 flask_cors==3.0.10
 pytest==7.3.1
-pytest-celery
-pytest-redis
+pytest-celery==0.0.0
+pytest-env==0.8.1
 environs==9.5.0
 pymchelper==2.4.1
 celery==5.2.7
