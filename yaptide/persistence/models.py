@@ -93,7 +93,7 @@ class SimulationModel(db.Model):
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=func.now(), doc="Submission time")
     end_time: Column[datetime] = db.Column(
         db.DateTime(timezone=True), nullable=True, doc="Job end time (including merging)")
-    title: Column[str] = db.Column(db.String, nullable=False, default='', doc="Job title")
+    title: Column[str] = db.Column(db.String, nullable=False, doc="Job title")
     platform: Column[str] = db.Column(db.String, nullable=False, doc="Execution platform name (i.e. 'direct', 'batch')")
     input_type: Column[str] = db.Column(
         db.String, nullable=False, doc="Input type (i.e. 'yaptide_project', 'input_files')")
@@ -101,10 +101,18 @@ class SimulationModel(db.Model):
         db.String, nullable=False, doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
     job_state: Column[str] = db.Column(
         db.String, nullable=False, default='PENDING', doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
-    update_key: Column[str] = db.Column(
-        db.String, nullable=False, doc="Update key shared by tasks granting access to update themselves")
+    update_key_hash: Column[str] = db.Column(
+        db.String, doc="Update key shared by tasks granting access to update themselves")
     tasks = relationship("TaskModel")
     results = relationship("ResultModel")
+
+    def set_update_key(self, update_key: str):
+        """Sets hashed update key"""
+        self.update_key_hash = generate_password_hash(update_key)
+
+    def check_update_key(self, update_key: str) -> bool:
+        """Checks update key correctness"""
+        return check_password_hash(self.update_key_hash, update_key)
 
 
 class TaskModel(db.Model):

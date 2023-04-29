@@ -38,6 +38,7 @@ services:
             - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
+            - FLASK_INTERNAL_URL=http://yaptide_flask:5000
         depends_on:
             - redis
             - yaptide_flask

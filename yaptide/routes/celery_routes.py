@@ -56,10 +56,18 @@ class JobsDirect(Resource):
             user_id=user.id,
             platform=SimulationModel.Platform.DIRECT.value,
             sim_type=sim_type,
-            title = payload_dict.get("title", ''),
-            input_type=input_type
+            input_type=input_type,
+            title = payload_dict.get("title", '')
         )
+        simulation.set_update_key(update_key)
         db.session.add(simulation)
+
+        for i in range(payload_dict["ntasks"]):
+            task = TaskModel(
+                simulation_id=simulation.id,
+                task_id=i
+            )
+            db.session.add(task)
         db.session.commit()
 
         return yaptide_response(
@@ -202,13 +210,15 @@ class TaskDirect(Resource):
         required_keys = set(["simulation_id", "task_id", "auth_key", "update_dict"])
         if not required_keys.intersection(set(payload_dict.keys())):
             return yaptide_response(message="Incomplete JSON data", code=400)
-        
-        # TODO: make use of auth_key or any other auth method
 
         simulation: SimulationModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"]).first()
 
         if not simulation:
             return yaptide_response(message="Task does not exist", code=400)
+
+        if not simulation.check_update_key(payload_dict["update_key"]):
+            return yaptide_response(message="Invalid update key", code=400)
+
         task: TaskModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"], task_id=payload_dict["task_id"]).first()
 
         if not task:
