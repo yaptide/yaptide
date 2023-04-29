@@ -78,7 +78,8 @@ def test_simulation_model_creation(db_session: scoped_session):
         platform=SimulationModel.Platform.DIRECT.value,
         input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
         sim_type=SimulationModel.SimType.SHIELDHIT.value,
-        update_key='testkey'
+        title='testtitle',
+        update_key_hash='testkey'
     )
     db_session.add(simulation)
     db_session.commit()
@@ -108,7 +109,8 @@ def test_task_model_creation_and_update(db_session: scoped_session):
         platform=SimulationModel.Platform.DIRECT.value,
         input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
         sim_type=SimulationModel.SimType.SHIELDHIT.value,
-        update_key='testkey'
+        title='testtitle',
+        update_key_hash='testkey'
     )
     db_session.add(simulation)
     db_session.commit()
