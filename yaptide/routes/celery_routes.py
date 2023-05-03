@@ -13,12 +13,7 @@ from yaptide.persistence.models import UserModel, SimulationModel, ResultModel, 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 
-from yaptide.celery.tasks import (
-    run_simulation,
-    convert_input_files,
-    get_input_files,
-    cancel_simulation
-)
+from yaptide.celery.tasks import (run_simulation, convert_input_files, get_input_files, cancel_simulation)
 from yaptide.celery.utils.utils import get_job_status_as_dict, get_job_results
 
 
@@ -37,44 +32,33 @@ class JobsDirect(Resource):
             return error_validation_response()
 
         # TODO handle better lower and upper case
-        sim_type = (SimulationModel.SimType.SHIELDHIT.value
-                    if "sim_type" not in payload_dict
-                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
-                    else SimulationModel.SimType.DUMMY.value)
+        sim_type = (SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in payload_dict
+                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else
+                    SimulationModel.SimType.DUMMY.value)
 
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
-                      if "metadata" in payload_dict["sim_data"]
-                      else SimulationModel.InputType.INPUT_FILES.value)
+                      if "metadata" in payload_dict["sim_data"] else SimulationModel.InputType.INPUT_FILES.value)
 
         # submit the job to the Celery queue
         update_key = str(uuid.uuid4())
         job = run_simulation.delay(payload_dict=payload_dict)
 
         # create a new simulation in the database, not waiting for the job to finish
-        simulation = SimulationModel(
-            job_id=job.id,
-            user_id=user.id,
-            platform=SimulationModel.Platform.DIRECT.value,
-            sim_type=sim_type,
-            input_type=input_type,
-            title = payload_dict.get("title", '')
-        )
+        simulation = SimulationModel(job_id=job.id,
+                                     user_id=user.id,
+                                     platform=SimulationModel.Platform.DIRECT.value,
+                                     sim_type=sim_type,
+                                     input_type=input_type,
+                                     title=payload_dict.get("title", ''))
         simulation.set_update_key(update_key)
         db.session.add(simulation)
 
         for i in range(payload_dict["ntasks"]):
-            task = TaskModel(
-                simulation_id=simulation.id,
-                task_id=i
-            )
+            task = TaskModel(simulation_id=simulation.id, task_id=i)
             db.session.add(task)
         db.session.commit()
 
-        return yaptide_response(
-            message="Task started",
-            code=202,
-            content={'job_id': job.id}
-        )
+        return yaptide_response(message="Task started", code=202, content={'job_id': job.id})
 
     class _Schema(Schema):
         """Class specifies API parameters for GET and DELETE request"""
@@ -112,11 +96,7 @@ class JobsDirect(Resource):
         # remove end_time from result, as it is not needed in response
         result.pop("end_time", None)
 
-        return yaptide_response(
-            message=f"Job state: {result['job_state']}",
-            code=200,
-            content=result
-        )
+        return yaptide_response(message=f"Job state: {result['job_state']}", code=200, content=result)
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -167,24 +147,16 @@ class ResultsDirect(Resource):
         results: list[ResultModel] = db.session.query(ResultModel).filter_by(job_id=job_id).all()
         result: dict = get_job_results(job_id=job_id)
         if "result" not in result:
-            return yaptide_response(
-                message="Results are unavailable",
-                code=200,
-                content=result
-            )
+            return yaptide_response(message="Results are unavailable", code=200, content=result)
 
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
         if "end_time" in result and simulation.end_time is None:
-            simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
             db.session.commit()
 
         result.pop("end_time", None)
 
-        return yaptide_response(
-            message=f"Results for job: {job_id}",
-            code=200,
-            content=result
-        )
+        return yaptide_response(message=f"Results for job: {job_id}", code=200, content=result)
 
 
 class TaskDirect(Resource):
@@ -216,7 +188,8 @@ class TaskDirect(Resource):
         if not simulation.check_update_key(payload_dict["update_key"]):
             return yaptide_response(message="Invalid update key", code=400)
 
-        task: TaskModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"], task_id=payload_dict["task_id"]).first()
+        task: TaskModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"],
+                                                     task_id=payload_dict["task_id"]).first()
 
         if not task:
             return yaptide_response(message="Task does not exist", code=400)
@@ -238,23 +211,15 @@ class ConvertInputFiles(Resource):
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
 
-        sim_type = (SimulationModel.SimType.SHIELDHIT.value
-                    if "sim_type" not in payload_dict
-                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
-                    else SimulationModel.SimType.DUMMY.value)
+        sim_type = (SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in payload_dict
+                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else
+                    SimulationModel.SimType.DUMMY.value)
 
         # Rework in later PRs to match pattern from jobs endpoint
-        job = convert_input_files.delay(payload_dict={
-            "sim_type": sim_type.lower(),
-            "sim_data": payload_dict
-        })
+        job = convert_input_files.delay(payload_dict={"sim_type": sim_type.lower(), "sim_data": payload_dict})
         result: dict = job.wait()
 
-        return yaptide_response(
-            message="Converted Input Files",
-            code=200,
-            content=result
-        )
+        return yaptide_response(message="Converted Input Files", code=200, content=result)
 
 
 def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str, int]:
@@ -294,8 +259,4 @@ class SimulationInputs(Resource):
         job = get_input_files.delay(job_id=job_id)
         result: dict = job.wait()
 
-        return yaptide_response(
-            message=result['info'],
-            code=200,
-            content=result
-        )
+        return yaptide_response(message=result['info'], code=200, content=result)
