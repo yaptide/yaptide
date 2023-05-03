@@ -1,6 +1,7 @@
 import json
 import logging
 from pathlib import Path
+import platform
 import pytest
 
 """
@@ -88,7 +89,9 @@ def payload_files_dict_data(payload_files_dict_path) -> dict:
         json_data = json.load(file_handle)
     return json_data
 
+
 @pytest.fixture(scope='session')
+@pytest.mark.skipif(platform.system() != 'Linux', reason="SHIELDHIT demo binary is only supported on Linux.")
 def shieldhit_demo_binary():
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
     shieldhit_bin_path = installation_path / 'shieldhit'

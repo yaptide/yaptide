@@ -9,43 +9,41 @@ WORKER_LOGLEVEL=debug pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=
 """
 
 import logging
+import platform
 import pytest
 
+# note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
+# that will create a `celery_app` instance
 from yaptide.celery.tasks import cancel_simulation, run_simulation
 
 
 @pytest.fixture(scope='module')
 def celery_app():
+    """
+    Create celery app for testing, we reuse the one from yaptide.celery.worker module.
+    The choice of broker and backend is important, as we don't want to run external redis server.
+    That is being configured via environment variables in pytest.ini file.
+    """
     from yaptide.celery.worker import celery_app as app
     return app
 
 
-'''
-def start_worker(
-    app,  # type: Celery
-    concurrency=1,  # type: int
-    pool='solo',  # type: str
-    loglevel=WORKER_LOGLEVEL,  # type: Union[str, int]
-    logfile=None,  # type: str
-    perform_ping_check=True,  # type: bool
-    ping_task_timeout=10.0,  # type: float
-    shutdown_timeout=10.0,  # type: float
-
-    # dummy celery worker performs ping tests, 
-# if we don't import it, the worker won't be able to find the ping task
-# see also https://github.com/celery/celery/issues/4851#issuecomment-604073785
-#from celery.contrib.testing.tasks import ping
-'''
-
-
 @pytest.fixture(scope="module")
 def celery_worker_parameters():
+    """
+    Default celery worker parameters cause problems with finding "ping task" module, as being described here:
+    https://github.com/celery/celery/issues/4851#issuecomment-604073785
+    To solve that issue we disable the ping check.
+    Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
+
+    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
+    """
     return {
         "perform_ping_check": False,
         "concurrency": 1,
     }
 
-
+@pytest.mark.skipif(platform.system() != 'Linux', reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
 def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path,
                         shieldhit_demo_binary):
     payload_editor_dict_data["ntasks"] = 2
@@ -54,7 +52,7 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
     assert 'input_files' in result.keys()
     assert 'result' in result.keys()
 
-
+@pytest.mark.skipif(platform.system() != 'Linux', reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
 def test_cancel_simulation(celery_app, celery_worker):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")

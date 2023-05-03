@@ -42,13 +42,8 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
-      - name: Run debug main tests
-        env:
-          WORKER_LOGLEVEL: debug
-        run: pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
-
-      # - name: Run main tests
-      #   run: pytest tests/
+      - name: Run main tests
+        run: pytest tests/
 
   # upload coverage report to deepsource
   report-test-converage-deepsource:
