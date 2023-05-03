@@ -47,7 +47,8 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data):
     os.environ['PATH'] = os.environ['PATH'] + f':{shieldhit_bin_path.parent}'
     job = run_simulation.delay(payload_dict=payload_editor_dict_data)
     result: dict = job.wait()
-    assert result == False
+    assert 'input_files' in result.keys()
+    assert 'result' in result.keys()
 
 
 def test_cancel_simulation(celery_app, celery_worker):

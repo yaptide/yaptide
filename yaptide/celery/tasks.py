@@ -96,7 +96,8 @@ def run_simulation(self, payload_dict: dict):
             for process in monitoring_processes:
                 process.join()
 
-            final_stats = stats.to_list()
+            logging.debug("final stats %s", stats)
+            #final_stats = stats.to_list()
 
             estimators_dict: dict = runner_obj.get_data()
 
@@ -107,7 +108,7 @@ def run_simulation(self, payload_dict: dict):
                 "input_json": payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None,
                 "input_files": files_dict,
                 "end_time": datetime.utcnow(),
-                "job_tasks_status": final_stats
+             #   "job_tasks_status": final_stats
             }
 
 

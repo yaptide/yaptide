@@ -1,3 +1,4 @@
+import logging
 import re
 import time
 
@@ -84,10 +85,13 @@ class SimulationStats():
     """Class holding simulation statistics"""
 
     def __init__(self, ntasks: int, parent, parent_id: str):
+        logging.debug("Initializing SimulationStats")
         self.lock = Lock()
+        logging.debug("SimulationStats lock acquired")
         self.tasks_status: dict = {}
         self.parent = parent
         self.parent_id = parent_id
+        logging.debug("parent id: %s", parent_id)
         for i in range(ntasks):
             self.tasks_status[str(i+1)] = {
                 "task_id": i+1,
@@ -95,8 +99,9 @@ class SimulationStats():
             }
         parent_state = AsyncResult(parent_id).state
         parent_meta = AsyncResult(parent_id).info
-        parent_meta["job_tasks_status"] = list(self.tasks_status.values())
-        self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
+        if parent_meta:
+            parent_meta["job_tasks_status"] = list(self.tasks_status.values())
+            self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
 
     def update(self, task_id: str, up_dict: dict, final: bool = False):
         """Method updating simulation statistics"""
