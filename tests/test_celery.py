@@ -1,6 +1,4 @@
 import logging
-import os
-from pathlib import Path
 
 import pytest
 
@@ -32,19 +30,13 @@ def start_worker(
 def celery_worker_parameters():
     return {
         "perform_ping_check": False,
-#        "loglevel": "DEBUG",
-#        "pool"   : "solo",
-        "concurrency": 2,
+        "concurrency": 1,
         }
 
 # to run the test, use: 
 # WORKER_LOGLEVEL=debug pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG
 
 def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data):
-    # it looks that celery_worker is silencing the logging, so we need to figure out how to enable it
-    shieldhit_bin_path = Path(__file__).parent.absolute() / 'res' / 'bin' / 'shieldhit'
-    logging.info("shieldhit_bin_path: %s", shieldhit_bin_path)
-    os.environ['PATH'] = os.environ['PATH'] + f':{shieldhit_bin_path.parent}'
     job = run_simulation.delay(payload_dict=payload_editor_dict_data)
     result: dict = job.wait()
     assert 'input_files' in result.keys()

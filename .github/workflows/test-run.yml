@@ -50,6 +50,7 @@ jobs:
       # - name: Run main tests
       #   run: pytest tests/
 
+  # upload coverage report to deepsource
   report-test-converage-deepsource:
     needs: build-and-test
     runs-on: ubuntu-latest
