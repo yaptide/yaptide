@@ -1,11 +1,11 @@
-from enum import Enum, auto
+from enum import IntEnum, auto
 from pathlib import Path
 import tempfile
 import click
 import requests
 
 
-class SimulatorType(Enum):
+class SimulatorType(IntEnum):
     """Table types"""
 
     shieldhit = auto()
