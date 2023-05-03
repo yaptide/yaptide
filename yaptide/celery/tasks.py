@@ -97,6 +97,7 @@ def run_simulation(self, payload_dict: dict):
                 process.join()
 
             logging.debug("final stats %s", stats)
+            # the line below breaks the tests, why ?
             #final_stats = stats.to_list()
 
             estimators_dict: dict = runner_obj.get_data()
