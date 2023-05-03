@@ -1,39 +1,26 @@
 import logging
 import os
 import tempfile
-
-from pathlib import Path
 from datetime import datetime
-
 from multiprocessing import Process
+from pathlib import Path
 
 from celery.result import AsyncResult
-
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
+from yaptide.celery.utils.utils import (SharedResourcesManager, SimulationStats, read_file)
 from yaptide.celery.worker import celery_app
-from yaptide.utils.sim_utils import (
-    pymchelper_output_to_json,
-    check_and_convert_payload_to_files_dict,
-    files_dict_with_adjusted_primaries,
-    simulation_logfiles,
-    simulation_input_files,
-    write_simulation_input_files
-)
-
-from yaptide.celery.utils.utils import (
-    SharedResourcesManager,
-    SimulationStats,
-    read_file
-)
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, files_dict_with_adjusted_primaries,
+                                     pymchelper_output_to_json, simulation_input_files, simulation_logfiles,
+                                     write_simulation_input_files)
 
 
 @celery_app.task(bind=True)
-def run_simulation(self, payload_dict: dict):
+def run_simulation(self, payload_dict: dict) -> dict:
     """Simulation runner"""
-    # create temporary directory
 
+    result = {}
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -62,9 +49,10 @@ def run_simulation(self, payload_dict: dict):
 
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         logging.debug("PATH is: %s", os.environ["PATH"])
-        settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
-                                      simulator_exec_path=None,
-                                      cmdline_opts="")
+        settings = SimulationSettings(
+            input_path=tmp_dir_path,  # skipcq: PYL-W0612
+            simulator_exec_path=None,
+            cmdline_opts="")
         logging.debug("preparing simulation command: %s", settings)
 
         logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
@@ -82,37 +70,48 @@ def run_simulation(self, payload_dict: dict):
             stats: SimulationStats = manager.SimulationStats(ntasks, self, self.request.id)
             logging.debug("created SimulationStats object for id %s", self.request.id)
 
-            monitoring_processes = [Process(target=read_file, args=(stats, logs_list[i], i+1)) for i in range(ntasks)]
+            monitoring_processes = [Process(target=read_file, args=(stats, logs_list[i], i + 1)) for i in range(ntasks)]
             for process in monitoring_processes:
                 process.start()
             logging.debug("started %d monitoring processes", len(monitoring_processes))
 
             try:
+                logging.debug("starting simulation")
                 is_run_ok = runner_obj.run(settings=settings)
                 if not is_run_ok:
+                    logging.error("simulation failed")
                     raise Exception
+                logging.debug("simulation finished")
             except Exception:  # skipcq: PYL-W0703
                 logfiles = simulation_logfiles(path=Path(tmp_dir_path))
+                logging.debug("simulation failed, logfiles: %s", logfiles)
                 return {"logfiles": logfiles, "input_files": files_dict}
 
+            logging.debug("joining monitoring processes")
             for process in monitoring_processes:
                 process.join()
 
             logging.debug("final stats %s", stats)
-            # the line below breaks the tests, why ?
-            #final_stats = stats.to_list()
+            try:
+                result["job_tasks_status"] = stats.to_list()
+            except AttributeError:
+                logging.warning("stats object has no attribute to_list")
+                result["job_tasks_status"] = []
 
+            logging.debug("getting simulation results")
             estimators_dict: dict = runner_obj.get_data()
 
-            result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict, dir_path=Path(tmp_dir_path))
+            logging.debug("converting simulation results to JSON")
+            simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
+                                                                dir_path=Path(tmp_dir_path))
 
-            return {
-                "result": result,
-                "input_json": payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None,
-                "input_files": files_dict,
-                "end_time": datetime.utcnow(),
-             #   "job_tasks_status": final_stats
-            }
+            result["result"] = simulation_result
+            result["input_json"] = payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None
+            result["input_files"] = files_dict
+            result["end_time"] = datetime.utcnow()
+            logging.debug("simulation result keys: %s", result.keys())
+
+            return result
 
 
 @celery_app.task

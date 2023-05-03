@@ -3,7 +3,6 @@ import logging
 from pathlib import Path
 import platform
 import pytest
-
 """
 Notepad :
 We have 3 types of JSON files:
@@ -97,6 +96,7 @@ def shieldhit_demo_binary():
     shieldhit_bin_path = installation_path / 'shieldhit'
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)
+
 
 @pytest.fixture(scope='session')
 def add_directory_to_path():

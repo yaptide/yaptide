@@ -43,16 +43,21 @@ def celery_worker_parameters():
         "concurrency": 1,
     }
 
-@pytest.mark.skipif(platform.system() != 'Linux', reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
+
+@pytest.mark.skipif(platform.system() != 'Linux',
+                    reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
 def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path,
                         shieldhit_demo_binary):
+    """Test run_simulation task with SHIELDHIT demo binary"""
     payload_editor_dict_data["ntasks"] = 2
     job = run_simulation.delay(payload_dict=payload_editor_dict_data)
     result: dict = job.wait()
     assert 'input_files' in result.keys()
     assert 'result' in result.keys()
 
-@pytest.mark.skipif(platform.system() != 'Linux', reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
+
+@pytest.mark.skipif(platform.system() != 'Linux',
+                    reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
 def test_cancel_simulation(celery_app, celery_worker):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")

@@ -58,13 +58,14 @@ def get_job_status_as_dict(job_id: str) -> dict:
 def get_job_results(job_id: str) -> dict:
     """Returns simulation results"""
     job = AsyncResult(id=job_id, app=celery_app)
+    result = {}
     if "result" in job.info:
-        return {
+        result = {
             "result": job.info("result"),
             "input_files": job.info("input_files"),
-            "input_json": job.info("input_json"),
-            "result": job.info("result")
+            "input_json": job.info("input_json")
         }
+    return result
 
 
 def translate_celery_state_naming(job_state: str) -> str:
