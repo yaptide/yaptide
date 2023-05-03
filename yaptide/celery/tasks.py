@@ -33,7 +33,7 @@ def run_simulation(self, payload_dict: dict):
     """Simulation runner"""
     # create temporary directory
 
-    logging.debug("run_simulation: payload_dict keys: %s", payload_dict.keys())
+    logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         # we may face the situation that payload_dict has no key named `ntasks`
@@ -42,34 +42,48 @@ def run_simulation(self, payload_dict: dict):
         # `payload_dict.get("ntasks")` will give us `None` if `ntasks` is missing
         # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
 
-        logging.debug("ntasks = %s", payload_dict.get("ntasks"))
+        logging.debug("starting SHRunner with ntasks = %s", payload_dict.get("ntasks"))
+        logging.debug("working in temporary directory: %s", tmp_dir_path)
 
         runner_obj = SHRunner(jobs=payload_dict.get("ntasks"),
                               keep_workspace_after_run=True,
                               output_directory=tmp_dir_path)
 
         ntasks = runner_obj.jobs
+        logging.debug("allocated %s jobs", ntasks)
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+        logging.debug("preparing the files for simulation %s", files_dict.keys())
+
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
                                       cmdline_opts="")
+        logging.debug("preparing simulation command: %s", settings)
 
         logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
+        logging.debug("expecting logfiles: %s", logs_list)
 
-        self.update_state(state="PROGRESS", meta={"path": tmp_dir_path, "sim_type": payload_dict["sim_type"]})
+        new_state_meta = {"path": tmp_dir_path, "sim_type": payload_dict["sim_type"]}
+        self.update_state(state="PROGRESS", meta=new_state_meta)
+        logging.debug("state updated to PROGRESS, meta: %s", new_state_meta)
 
         SharedResourcesManager.register('SimulationStats', SimulationStats)
+        logging.debug("starting monitoring processes")
+
         with SharedResourcesManager() as manager:
+            logging.debug("created SharedResourcesManager object")
             stats: SimulationStats = manager.SimulationStats(ntasks, self, self.request.id)
+            logging.debug("created SimulationStats object for id %s", self.request.id)
+
             monitoring_processes = [Process(target=read_file, args=(stats, logs_list[i], i+1)) for i in range(ntasks)]
             for process in monitoring_processes:
                 process.start()
+            logging.debug("started %d monitoring processes", len(monitoring_processes))
 
             try:
                 is_run_ok = runner_obj.run(settings=settings)
