@@ -14,11 +14,11 @@ jobs:
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
-      exclude:
-        - python-version: '3.11'
-          runs-on: windows-latest
-        - python-version: '3.9'
-          runs-on: windows-latest
+        exclude:
+          - python-version: '3.11'
+            runs-on: windows-latest
+          - python-version: '3.9'
+            runs-on: windows-latest
 
     steps:
       - name: Checkout
