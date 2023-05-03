@@ -1,5 +1,6 @@
-import logging
 
+
+import logging
 import pytest
 
 from yaptide.celery.tasks import cancel_simulation, run_simulation

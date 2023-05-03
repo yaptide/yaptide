@@ -94,3 +94,11 @@ def shieldhit_demo_binary():
     shieldhit_bin_path = installation_path / 'shieldhit'
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)
+
+@pytest.fixture(scope='session')
+def add_directory_to_path():
+    import os
+    project_main_dir = Path(__file__).resolve().parent.parent
+    bin_dir = project_main_dir / 'bin'
+    logging.info("Adding %s to PATH", bin_dir)
+    os.environ['PATH'] = f'{bin_dir}:' + os.environ['PATH']

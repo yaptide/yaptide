@@ -45,7 +45,7 @@ jobs:
       - name: Run debug main tests
         env:
           WORKER_LOGLEVEL: debug
-        run: pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG
+        run: pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
 
       # - name: Run main tests
       #   run: pytest tests/
