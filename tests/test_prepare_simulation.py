@@ -1,6 +1,5 @@
 """Tests for JSON converter"""
 import json
-import logging
 from pathlib import Path
 import pytest
 import sys
@@ -19,93 +18,6 @@ from yaptide.utils.sim_utils import (
 converter_path = Path(__file__).resolve().parent.parent / "yaptide" / "converter"
 sys.path.append(str(converter_path))
 from converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
-
-logger = logging.getLogger(__name__)
-
-"""
-Notepad :
-We have 3 types of JSON files:
-1. Project JSON - file that could be generated using UI and saved using "Save project" button
-  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples or in yaptide_tester/example.json
-  - this file can contain only simulation input in JSON format or results as well
-  - top level keys: "metadata", "project", "scene", TODO
-
-2. Payload JSON - object which is sent to the server using POST request from UI
-  - all such objects contain "sim_data" top level key
-
-  a) editor payload JSON type assumes that user defined completely the simulation using UI 3D Editor and selected it for running
-    - examples of such files are in tests/res/json_editor_payload.json
-    - inside "sim_data" key we have contents of project json file
-  b) files payload JSON type assumes that user uploaded input files and selected them for running
-    - examples of such files are in tests/res/json_files_payload.json
-    - inside "sim_data" key we have dictionary with filenames as keys and contents of input files as values
- 
-In the source code we assume following convention: `editor_dict`, `payload_editor_dict`, `payload_files_dict` and `payload_dict` 
-
-`editor_dict['metadata']`, `editor_dict['scene']` is always valid
-`editor_dict['sim_data']` is not valid
-
-`payload_dict` can be either `payload_editor_dict` or `payload_files_dict`
-`payload_dict['sim_data']` is always valid
-
-Therefore `payload_editor_dict['sim_data']` can be passed as `editor_dict`,
- `payload_editor_dict['sim_data']['metadata']` is valid
- `payload_editor_dict['sim_data']['scene']` is valid
- `payload_editor_dict['sim_data']['beam.dat']` is not valid
-
-Therefore for `payload_files_dict['sim_data']`,
- `payload_files_dict['sim_data']['metadata']` is not valid
- `payload_files_dict['sim_data']['beam.dat']` is valid
-
- We have as well `files_dict` where keys are filenames and values are contents of input files
- `files_dict[beam.dat]` is valid
-"""
-
-
-@pytest.fixture(scope='module')
-def project_json_path() -> Path:
-    """Location of this script according to pathlib"""
-    main_dir = Path(__file__).resolve().parent.parent
-    logger.debug("Main dir %s", main_dir)
-    return main_dir / "yaptide_tester" / "example.json"
-
-
-@pytest.fixture(scope='module')
-def project_json_data(project_json_path) -> dict:
-    json_data = {}
-    with open(project_json_path, 'r') as file_handle:
-        json_data = json.load(file_handle)
-    return json_data
-
-
-@pytest.fixture(scope='module')
-def payload_editor_dict_path() -> Path:
-    """Location of this script according to pathlib"""
-    main_dir = Path(__file__).resolve().parent
-    return main_dir / "res" / "json_editor_payload.json"
-
-
-@pytest.fixture(scope='module')
-def payload_editor_dict_data(payload_editor_dict_path) -> dict:
-    json_data = {}
-    with open(payload_editor_dict_path, 'r') as file_handle:
-        json_data = json.load(file_handle)
-    return json_data
-
-
-@pytest.fixture(scope='module')
-def payload_files_dict_path() -> Path:
-    """Location of this script according to pathlib"""
-    main_dir = Path(__file__).resolve().parent
-    return main_dir / "res" / "json_files_payload.json"
-
-
-@pytest.fixture(scope='module')
-def payload_files_dict_data(payload_files_dict_path) -> dict:
-    json_data = {}
-    with open(payload_files_dict_path, 'r') as file_handle:
-        json_data = json.load(file_handle)
-    return json_data
 
 
 @pytest.mark.parametrize("json_fixture", ["project_json_path", "payload_files_dict_path", "payload_editor_dict_path"])
