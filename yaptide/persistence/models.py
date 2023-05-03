@@ -2,10 +2,9 @@ from datetime import datetime
 from enum import Enum
 
 from sqlalchemy import Column
-from yaptide.persistence.database import db
-
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
+from yaptide.persistence.database import db
 
 from werkzeug.security import generate_password_hash, check_password_hash
 

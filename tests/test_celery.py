@@ -7,8 +7,6 @@ We also use celery fixture from pytest-celery plugin, which starts celery worker
 This fixture is silencing most of the logging. To see the logs, use:
 WORKER_LOGLEVEL=debug pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
 """
-
-import logging
 import platform
 import pytest
 
@@ -62,4 +60,4 @@ def test_cancel_simulation(celery_app, celery_worker):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
     result: dict = job.wait()
-    assert result == False
+    assert result is False

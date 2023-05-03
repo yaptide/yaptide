@@ -25,7 +25,6 @@ installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
 def installed(**kwargs):
     """List installed simulators"""
     click.echo('to be implemented')
-    return None
 
 
 def install_simulator(name: SimulatorType) -> bool:
@@ -75,7 +74,6 @@ def install(**kwargs):
     sim_type = SimulatorType[kwargs['name']]
     if install_simulator(sim_type):
         click.echo(f'Simulator {sim_type.name} installed')
-    return None
 
 
 if __name__ == "__main__":

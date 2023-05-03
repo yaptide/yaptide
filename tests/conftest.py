@@ -20,8 +20,8 @@ We have 3 types of JSON files:
   b) files payload JSON type assumes that user uploaded input files and selected them for running
     - examples of such files are in tests/res/json_files_payload.json
     - inside "sim_data" key we have dictionary with filenames as keys and contents of input files as values
- 
-In the source code we assume following convention: `editor_dict`, `payload_editor_dict`, `payload_files_dict` and `payload_dict` 
+
+In the source code we assume following convention: `editor_dict`, `payload_editor_dict`, `payload_files_dict` and `payload_dict`
 
 `editor_dict['metadata']`, `editor_dict['scene']` is always valid
 `editor_dict['sim_data']` is not valid

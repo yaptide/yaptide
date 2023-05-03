@@ -12,8 +12,7 @@ from yaptide.persistence.models import (
     UserModel,
     SimulationModel,
     TaskModel,
-    ClusterModel,
-    ResultModel
+    ClusterModel
 )
 
 

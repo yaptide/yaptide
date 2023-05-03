@@ -165,9 +165,6 @@ class ResultsDirect(Resource):
             return yaptide_response(message=error_message, code=res_code)
 
         results: list[ResultModel] = db.session.query(ResultModel).filter_by(job_id=job_id).all()
-        if len(results) > 0:
-            # TODO: return results from database
-            pass
         result: dict = get_job_results(job_id=job_id)
         if "result" not in result:
             return yaptide_response(
@@ -207,7 +204,7 @@ class TaskDirect(Resource):
         simulation_id and task_id self explanatory
         """
         payload_dict: dict = request.get_json(force=True)
-        required_keys = set(["simulation_id", "task_id", "auth_key", "update_dict"])
+        required_keys = {"simulation_id", "task_id", "auth_key", "update_dict"}
         if not required_keys.intersection(set(payload_dict.keys())):
             return yaptide_response(message="Incomplete JSON data", code=400)
 

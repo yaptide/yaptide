@@ -19,7 +19,6 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, fi
 @celery_app.task(bind=True)
 def run_simulation(self, payload_dict: dict) -> dict:
     """Simulation runner"""
-
     result = {}
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
