@@ -1,4 +1,5 @@
 import logging
+import os
 import tempfile
 
 from pathlib import Path
@@ -60,6 +61,7 @@ def run_simulation(self, payload_dict: dict):
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
+        logging.debug("PATH is: %s", os.environ["PATH"])
         settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
                                       simulator_exec_path=None,
                                       cmdline_opts="")

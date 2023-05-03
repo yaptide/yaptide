@@ -1,4 +1,8 @@
-
+"""
+Unit tests for celery tasks
+By default celery uses redis as a broker and backend, which requires to run external redis server.
+This is somehow problematic to run in CI, so we use in-memory backend and rpc broker.
+"""
 
 import logging
 import pytest
@@ -37,7 +41,8 @@ def celery_worker_parameters():
 # to run the test, use: 
 # WORKER_LOGLEVEL=debug pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG
 
-def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data):
+def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path):
+    payload_editor_dict_data["ntasks"] = 2
     job = run_simulation.delay(payload_dict=payload_editor_dict_data)
     result: dict = job.wait()
     assert 'input_files' in result.keys()
