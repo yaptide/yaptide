@@ -25,10 +25,15 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
-      - name: Install dependencies
+      - name: Install dependencies for production
         run: |
           python3 -m pip install --upgrade pip
-          pip3 install -r requirements.txt
+          pip install -r requirements.txt
+
+      - name: Install dependencies for tests
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements-test.txt
 
       - name: Run main tests
         run: pytest tests/
