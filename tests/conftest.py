@@ -87,3 +87,10 @@ def payload_files_dict_data(payload_files_dict_path) -> dict:
     with open(payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
+
+@pytest.fixture(scope='session')
+def shieldhit_demo_binary():
+    from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
+    shieldhit_bin_path = installation_path / 'shieldhit'
+    if not shieldhit_bin_path.exists():
+        install_simulator(SimulatorType.shieldhit)
