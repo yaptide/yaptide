@@ -17,9 +17,9 @@ jobs:
         platform: [ubuntu-latest, windows-latest]
         exclude:
           - python-version: '3.11'
-            runs-on: windows-latest
+            platform: windows-latest
           - python-version: '3.9'
-            runs-on: windows-latest
+            platform: windows-latest
 
     steps:
       - name: Checkout
