@@ -3,7 +3,7 @@ from enum import Enum
 
 from sqlalchemy import Column
 from sqlalchemy.orm import relationship
-from sqlalchemy.sql import func
+from sqlalchemy.sql.functions import now
 from yaptide.persistence.database import db
 
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -89,19 +89,24 @@ class SimulationModel(db.Model):
     job_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Simulation job ID")
 
     user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), doc="User ID")
-    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=func.now(), doc="Submission time")
-    end_time: Column[datetime] = db.Column(
-        db.DateTime(timezone=True), nullable=True, doc="Job end time (including merging)")
+    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Submission time")
+    end_time: Column[datetime] = db.Column(db.DateTime(timezone=True),
+                                           nullable=True,
+                                           doc="Job end time (including merging)")
     title: Column[str] = db.Column(db.String, nullable=False, doc="Job title")
     platform: Column[str] = db.Column(db.String, nullable=False, doc="Execution platform name (i.e. 'direct', 'batch')")
-    input_type: Column[str] = db.Column(
-        db.String, nullable=False, doc="Input type (i.e. 'yaptide_project', 'input_files')")
-    sim_type: Column[str] = db.Column(
-        db.String, nullable=False, doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
-    job_state: Column[str] = db.Column(
-        db.String, nullable=False, default='PENDING', doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
-    update_key_hash: Column[str] = db.Column(
-        db.String, doc="Update key shared by tasks granting access to update themselves")
+    input_type: Column[str] = db.Column(db.String,
+                                        nullable=False,
+                                        doc="Input type (i.e. 'yaptide_project', 'input_files')")
+    sim_type: Column[str] = db.Column(db.String,
+                                      nullable=False,
+                                      doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
+    job_state: Column[str] = db.Column(db.String,
+                                       nullable=False,
+                                       default='PENDING',
+                                       doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
+    update_key_hash: Column[str] = db.Column(db.String,
+                                             doc="Update key shared by tasks granting access to update themselves")
     tasks = relationship("TaskModel")
     results = relationship("ResultModel")
 
@@ -119,23 +124,29 @@ class TaskModel(db.Model):
 
     __tablename__ = 'Task'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey(
-        'Simulation.id'), doc="Simulation job ID (foreign key)")
+    simulation_id: Column[int] = db.Column(db.Integer,
+                                           db.ForeignKey('Simulation.id'),
+                                           doc="Simulation job ID (foreign key)")
 
     # we encode task_id as string, because that is the convention in Celery queue and in SLURM
     # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
     # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
     # example SLURM job_ids are: 12345678_12
     task_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Task ID")
-    requested_primaries: Column[int] = db.Column(
-        db.Integer, nullable=False, default=0, doc="Requested number of primaries")
-    simulated_primaries: Column[int] = db.Column(
-        db.Integer, nullable=False, default=0, doc="Simulated number of primaries")
-    task_state: Column[str] = db.Column(
-        db.String, nullable=False, default='PENDING', doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
+    requested_primaries: Column[int] = db.Column(db.Integer,
+                                                 nullable=False,
+                                                 default=0,
+                                                 doc="Requested number of primaries")
+    simulated_primaries: Column[int] = db.Column(db.Integer,
+                                                 nullable=False,
+                                                 default=0,
+                                                 doc="Simulated number of primaries")
+    task_state: Column[str] = db.Column(db.String,
+                                        nullable=False,
+                                        default='PENDING',
+                                        doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
-    start_time: Column[datetime] = db.Column(
-        db.DateTime(timezone=True), default=func.now(), doc="Task start time")  # skipcq: PYL-E1102
+    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
 
     def update_state(self, update_dict: dict):

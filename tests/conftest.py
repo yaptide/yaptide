@@ -1,27 +1,22 @@
-import json
-import logging
-from pathlib import Path
-import platform
-import pytest
 """
-Notepad :
 We have 3 types of JSON files:
 1. Project JSON - file that could be generated using UI and saved using "Save project" button
-  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples or in yaptide_tester/example.json
+  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples 
+    or in yaptide_tester/example.json
   - this file can contain only simulation input in JSON format or results as well
-  - top level keys: "metadata", "project", "scene", TODO
+  - top level keys: "metadata", "project", "scene", and others...
 
 2. Payload JSON - object which is sent to the server using POST request from UI
   - all such objects contain "sim_data" top level key
 
-  a) editor payload JSON type assumes that user defined completely the simulation using UI 3D Editor and selected it for running
+  a) editor payload JSON type assumes that user defined the simulation using UI 3D Editor and selected it for running
     - examples of such files are in tests/res/json_editor_payload.json
     - inside "sim_data" key we have contents of project json file
   b) files payload JSON type assumes that user uploaded input files and selected them for running
     - examples of such files are in tests/res/json_files_payload.json
     - inside "sim_data" key we have dictionary with filenames as keys and contents of input files as values
 
-In the source code we assume following convention: `editor_dict`, `payload_editor_dict`, `payload_files_dict` and `payload_dict`
+We assume following convention: `editor_dict`, `payload_editor_dict`, `payload_files_dict` and `payload_dict`
 
 `editor_dict['metadata']`, `editor_dict['scene']` is always valid
 `editor_dict['sim_data']` is not valid
@@ -41,6 +36,12 @@ Therefore for `payload_files_dict['sim_data']`,
  We have as well `files_dict` where keys are filenames and values are contents of input files
  `files_dict[beam.dat]` is valid
 """
+
+import json
+import logging
+from pathlib import Path
+import platform
+import pytest
 
 
 @pytest.fixture(scope='session')
