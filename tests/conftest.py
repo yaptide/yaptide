@@ -109,4 +109,4 @@ def add_directory_to_path():
     project_main_dir = Path(__file__).resolve().parent.parent
     bin_dir = project_main_dir / 'bin'
     logging.info("Adding %s to PATH", bin_dir)
-    os.environ['PATH'] = f'{bin_dir}:' + os.environ['PATH']
+    os.environ['PATH'] = f'{bin_dir}' + os.pathsep + os.environ['PATH']
