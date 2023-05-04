@@ -39,22 +39,23 @@ class JobsDirect(Resource):
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
                       if "metadata" in payload_dict["sim_data"] else SimulationModel.InputType.INPUT_FILES.value)
 
-        # submit the job to the Celery queue
-        update_key = str(uuid.uuid4())
+        # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(user_id=user.id,
                                      platform=SimulationModel.Platform.DIRECT.value,
                                      sim_type=sim_type,
                                      input_type=input_type,
                                      title=payload_dict.get("title", ''))
+        update_key = str(uuid.uuid4())
         simulation.set_update_key(update_key)
         db.session.add(simulation)
+        db.session.commit()
+
+        # submit the job to the Celery queue
         job = run_simulation.delay(payload_dict=payload_dict, update_key=update_key, simulation_id=simulation.id)
         simulation.job_id = job.id
 
-        # create a new simulation in the database, not waiting for the job to finish
-
         for i in range(payload_dict["ntasks"]):
-            task = TaskModel(simulation_id=simulation.id, task_id=i)
+            task = TaskModel(simulation_id=simulation.id, task_id=f"{job.id}_{i+1}")
             db.session.add(task)
         db.session.commit()
 

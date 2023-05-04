@@ -193,10 +193,12 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
         "update_key": update_key,
         "update_dict": update_dict
     }
-    requests.Session().post(url=f"{flask_url}/tasks/update", json=dict_to_send)
+    res: requests.Response = requests.Session().post(url=f"{flask_url}/tasks/update", json=dict_to_send)
+    if res.status_code != 202:
+        logging.debug("Task update for %s - Failed: %s", task_id, res.json().get("message"))
 
 
-def read_file(task_id: str, filepath: Path, simulation_id: int, update_key: str):
+def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):
     """Monitors log file of certain task"""
     logfile = None
     update_time = 0
@@ -241,7 +243,7 @@ def read_file(task_id: str, filepath: Path, simulation_id: int, update_key: str)
         elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
             up_dict = {
-                "end_time": utc_now,
+                "end_time": utc_now.isoformat(sep=" "),
                 "task_state": SimulationModel.JobState.COMPLETED.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)

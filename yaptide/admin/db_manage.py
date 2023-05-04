@@ -12,6 +12,8 @@ class TableTypes(Enum):
     USER = "User"
     SIMULATION = "Simulation"
     CLUSTER = "Cluster"
+    TASK = "Task"
+    RESULT = "Result"
 
 
 def connect_to_db():
@@ -59,6 +61,22 @@ def list_users(**kwargs):
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
         click.echo(f"Login {row.username}; Passw ...{row.password_hash[-10:]}")
+    return None
+
+
+@run.command
+def list_tasks(**kwargs):
+    """List all tasks"""
+    con, metadata, engine = connect_to_db()
+    if con is None or metadata is None or engine is None:
+        return None
+    tasks = db.Table(TableTypes.TASK.value, metadata, autoload=True, autoload_with=engine)
+    query = db.select([tasks])
+    ResultProxy = con.execute(query)
+    ResultSet = ResultProxy.fetchall()
+    click.echo(f"{len(ResultSet)} tasks in DB:")
+    for row in ResultSet:
+        click.echo(f"Simulation id {row.simulation_id}; Task id ...{row.task_id}")
     return None
 
 

@@ -179,7 +179,7 @@ class TaskModel(db.Model):
         result = {
             "task_state": self.task_state,
             "requested_primaries": self.requested_primaries,
-            "task_state": self.task_state,
+            "simulated_primaries": self.simulated_primaries,
             "last_update_time": self.last_update_time,
         }
         if self.estimated_time:
@@ -188,6 +188,7 @@ class TaskModel(db.Model):
                 "minutes": (self.estimated_time // 60) % 60,
                 "seconds": self.estimated_time % 60,
             }
+        return result
 
 
 class ResultModel(db.Model):

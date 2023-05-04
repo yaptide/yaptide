@@ -24,11 +24,11 @@ class TaskUpdate(Resource):
         simulation_id and task_id self explanatory
         """
         payload_dict: dict = request.get_json(force=True)
-        required_keys = {"simulation_id", "task_id", "auth_key", "update_dict"}
+        required_keys = {"simulation_id", "task_id", "update_key", "update_dict"}
         if not required_keys.intersection(set(payload_dict.keys())):
             return yaptide_response(message="Incomplete JSON data", code=400)
 
-        simulation: SimulationModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"]).first()
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=payload_dict["simulation_id"]).first()
 
         if not simulation:
             return yaptide_response(message="Task does not exist", code=400)
@@ -36,8 +36,8 @@ class TaskUpdate(Resource):
         if not simulation.check_update_key(payload_dict["update_key"]):
             return yaptide_response(message="Invalid update key", code=400)
 
-        task: TaskModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"],
-                                                     task_id=payload_dict["task_id"]).first()
+        task: TaskModel = db.session.query(TaskModel).filter_by(simulation_id=payload_dict["simulation_id"],
+                                                                task_id=payload_dict["task_id"]).first()
 
         if not task:
             return yaptide_response(message="Task does not exist", code=400)

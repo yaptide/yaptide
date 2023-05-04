@@ -132,7 +132,8 @@ class YaptideTester:
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
         json_to_send = {
             "ntasks": 12,
-            "sim_data": sim_data
+            "sim_data": sim_data,
+            "sim_type": "shieldhit",
         }
         if not direct:
             json_to_send["batch_options"] = {
@@ -163,6 +164,8 @@ class YaptideTester:
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
+                        if res_json.get('job_state') == "COMPLETED":
+                            return
                         if res_json.get('result'):
                             if len(job_id.split(":")) == 4:
                                 job_id = job_id.split(":")[1]  # only for file naming purpose

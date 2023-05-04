@@ -9,7 +9,7 @@ from celery.result import AsyncResult
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
-from yaptide.celery.utils.utils import (SharedResourcesManager, SimulationStats, read_file)
+from yaptide.celery.utils.utils import read_file
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, files_dict_with_adjusted_primaries,
                                      pymchelper_output_to_json, simulation_input_files, simulation_logfiles,
@@ -64,7 +64,7 @@ def run_simulation(self, payload_dict: dict, update_key: str, simulation_id: int
         logging.debug("starting monitoring processes")
 
         monitoring_processes = [Process(
-            target=read_file, args=(i + 1, logs_list[i], simulation_id, update_key)) for i in range(ntasks)]
+            target=read_file, args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
         for process in monitoring_processes:
             process.start()
         logging.debug("started %d monitoring processes", len(monitoring_processes))
