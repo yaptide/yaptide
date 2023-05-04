@@ -92,7 +92,7 @@ def run_simulation(self, payload_dict: dict) -> dict:
 
             logging.debug("final stats %s", stats)
             try:
-                result["job_tasks_status"] = stats.to_list()
+                result["job_tasks_status"] = list(stats.tasks_status.values())
             except AttributeError:
                 logging.warning("stats object has no attribute to_list")
                 result["job_tasks_status"] = []
