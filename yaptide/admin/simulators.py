@@ -1,6 +1,10 @@
+import os
+import tarfile
+import tempfile
 from enum import IntEnum, auto
 from pathlib import Path
-import tempfile
+import zipfile
+
 import click
 import requests
 
@@ -27,6 +31,33 @@ def installed(**kwargs):
     click.echo('to be implemented')
 
 
+def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str):
+    with tarfile.open(archive_path, "r:gz") as tar:
+        # print all members
+        for member in tar.getmembers():
+            if Path(member.name).name == member_name and Path(member.name).parent.name == 'bin':
+                click.echo(f"Extracting {member.name}")
+                tar.extract(member, destination_dir)
+                # move to installation path
+                local_file = Path(destination_dir) / member.name
+                click.echo(f"Moving {local_file} to {installation_path}")
+                local_file.rename(installation_path / member_name)
+
+
+def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
+    with zipfile.ZipFile(archive_path) as zip:
+        # print all members
+        for member in zip.infolist():
+            click.echo(f"Member: {member.filename}")
+            if Path(member.filename).name == member_name:
+                click.echo(f"Extracting {member.filename}")
+                zip.extract(member, destination_dir)
+                # move to installation path
+                local_file = Path(destination_dir) / member.filename
+                click.echo(f"Moving {local_file} to {installation_path}")
+                local_file.rename(installation_path / member_name)
+
+
 def install_simulator(name: SimulatorType) -> bool:
     """Add simulator to database"""
     click.echo(f'Installation for simulator: {name} started')
@@ -35,30 +66,27 @@ def install_simulator(name: SimulatorType) -> bool:
         installation_path.mkdir(exist_ok=True, parents=True)
 
         demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.0.tar.gz'
+        # check if working on Windows
+        if os.name == 'nt':
+            demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.0.zip'
+
         # create temporary directory and download
         # Create a temporary file to store the downloaded binary data
         with tempfile.TemporaryDirectory() as tmpdir_name:
             click.echo(f"Downloading from {demo_version_url} to {tmpdir_name}")
             headers = {'User-Agent': 'Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0'}
             response = requests.get(demo_version_url, headers=headers)
-            temp_file_tar_gz = Path(tmpdir_name) / 'shieldhit.tar.gz'
-            with open(temp_file_tar_gz, 'wb') as file_handle:
+            temp_file_archive = Path(tmpdir_name) / Path(demo_version_url).name
+            with open(temp_file_archive, 'wb') as file_handle:
                 file_handle.write(response.content)
-            click.echo(f"Saved to {temp_file_tar_gz} with size {temp_file_tar_gz.stat().st_size} bytes")
+            click.echo(f"Saved to {temp_file_archive} with size {temp_file_archive.stat().st_size} bytes")
 
             # extract
-            click.echo(f"Extracting {temp_file_tar_gz} to {installation_path}")
-            import tarfile
-            with tarfile.open(temp_file_tar_gz, "r:gz") as tar:
-                # print all members
-                for member in tar.getmembers():
-                    if Path(member.name).name == 'shieldhit' and Path(member.name).parent.name == 'bin':
-                        click.echo(f"Extracting {member.name}")
-                        tar.extract(member, tmpdir_name)
-                        # move to installation path
-                        local_file = Path(tmpdir_name) / member.name
-                        click.echo(f"Moving {local_file} to {installation_path}")
-                        local_file.rename(installation_path / 'shieldhit')
+            click.echo(f"Extracting {temp_file_archive} to {installation_path}")
+            if temp_file_archive.suffix == '.gz':
+                extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit')
+            elif temp_file_archive.suffix == '.zip':
+                extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe')
     else:
         click.echo('Not implemented')
         return False
@@ -70,6 +98,11 @@ def install_simulator(name: SimulatorType) -> bool:
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """List installed simulators"""
+    if not 'name' in kwargs or kwargs['name'] is None:
+        click.echo('Please specify a simulator name using --name option, possible values are: ', nl=False)
+        for sim in SimulatorType:
+            click.echo(f'{sim.name} ', nl=False)
+        return
     click.echo(f'Installing simulator: {kwargs["name"]}')
     sim_type = SimulatorType[kwargs['name']]
     if install_simulator(sim_type):

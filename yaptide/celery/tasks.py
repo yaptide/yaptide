@@ -17,8 +17,13 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, fi
 
 
 @celery_app.task(bind=True)
-def run_simulation(self, payload_dict: dict, update_key: str, simulation_id: int) -> dict:
-    """Simulation runner"""
+def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_id: int = None) -> dict:
+    """
+    Simulation runner
+    `payload_dict` parameter holds all the data needed to run the simulation
+    `update_key` and `simulation_id` parameters are required for monitoring purposes
+    If one or both of them are missing, monitoring will not be performed
+    """
     result = {}
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
@@ -61,13 +66,15 @@ def run_simulation(self, payload_dict: dict, update_key: str, simulation_id: int
         self.update_state(state="PROGRESS", meta=new_state_meta)
         logging.debug("state updated to PROGRESS, meta: %s", new_state_meta)
 
-        logging.debug("starting monitoring processes")
-
-        monitoring_processes = [Process(
-            target=read_file, args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
-        for process in monitoring_processes:
-            process.start()
-        logging.debug("started %d monitoring processes", len(monitoring_processes))
+        if update_key is not None and simulation_id is not None:
+            logging.debug("starting monitoring processes")
+            monitoring_processes = [Process(
+                target=read_file, args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
+            for process in monitoring_processes:
+                process.start()
+            logging.debug("started %d monitoring processes", len(monitoring_processes))
+        else:
+            logging.debug("no monitoring processes started")
 
         try:
             logging.debug("starting simulation")
@@ -81,9 +88,11 @@ def run_simulation(self, payload_dict: dict, update_key: str, simulation_id: int
             logging.debug("simulation failed, logfiles: %s", logfiles)
             return {"logfiles": logfiles, "input_files": files_dict}
 
-        logging.debug("joining monitoring processes")
-        for process in monitoring_processes:
-            process.join()
+
+        if update_key is not None and simulation_id is not None:
+            logging.debug("joining monitoring processes")
+            for process in monitoring_processes:
+                process.join()
 
         logging.debug("getting simulation results")
         estimators_dict: dict = runner_obj.get_data()

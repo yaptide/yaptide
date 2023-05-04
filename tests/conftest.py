@@ -40,7 +40,7 @@ Therefore for `payload_files_dict['sim_data']`,
 import json
 import logging
 from pathlib import Path
-import platform
+import os
 import pytest
 
 
@@ -91,10 +91,14 @@ def payload_files_dict_data(payload_files_dict_path) -> dict:
 
 
 @pytest.fixture(scope='session')
-@pytest.mark.skipif(platform.system() != 'Linux', reason="SHIELDHIT demo binary is only supported on Linux.")
 def shieldhit_demo_binary():
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
     shieldhit_bin_path = installation_path / 'shieldhit'
+    # check if on Windows
+    if os.name == 'nt':
+        # append exe extension to the path
+        shieldhit_bin_path = shieldhit_bin_path.with_suffix('.exe')
+    logging.info("SHIELDHIT binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)
 
