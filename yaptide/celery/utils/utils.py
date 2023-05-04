@@ -1,9 +1,12 @@
 import logging
 import re
 import time
+import os
 
 from datetime import datetime
 from pathlib import Path
+
+import requests
 
 from multiprocessing import Lock
 from multiprocessing.managers import BaseManager
@@ -28,24 +31,21 @@ def get_job_status_as_dict(job_id: str) -> dict:
     """
     # Here we ask Celery (via Redis) for job state
     job = AsyncResult(id=job_id, app=celery_app)
-    job_state: str = job.state
+    job_state: str = translate_celery_state_naming(job.state)
 
     # TODO convert string to enum and operate later on Enum
     result = {
-        "job_state": translate_celery_state_naming(job_state)
+        "job_state": job_state
     }
-    if job_state == "PENDING":
+    if job_state == SimulationModel.JobState.PENDING.value:
         pass
-    elif job_state == "PROGRESS":
-        if not job.info.get("sim_type") in {"shieldhit", "sh_dummy"}:
-            return result
-        result["job_tasks_status"] = job.info.get("job_tasks_status")
-    elif job_state != "FAILURE":
-        if "result" in job.info:
-            for key in ["result", "input_files", "input_json", "end_time", "job_tasks_status"]:
-                result[key] = job.info[key]
+    elif job_state == SimulationModel.JobState.RUNNING.value:
+        pass
+    elif job_state != SimulationModel.JobState.FAILED.value:
+        if "end_time" in job.info:
+            result["end_time"] = job.info["end_time"]
         elif "logfile" in job.info:
-            result["job_state"] = translate_celery_state_naming("FAILURE")
+            result["job_state"] = SimulationModel.JobState.FAILED.value
             result["error"] = "Simulation error"
             result["logfiles"] = job.info.get("logfiles")
             result["input_files"] = job.info.get("input_files")
@@ -126,7 +126,7 @@ class SharedResourcesManager(BaseManager):
     """Shared objects manager for multiprocessing"""
 
 
-def read_file(stats: SimulationStats, filepath: Path, task_id: int):
+def read_file_old(stats: SimulationStats, filepath: Path, task_id: int):
     """Monitors log file of certain task"""
     logfile = None
     for _ in range(30):  # 30 stands for maximum attempts
@@ -178,4 +178,78 @@ def read_file(stats: SimulationStats, filepath: Path, task_id: int):
                 "task_state": SimulationModel.JobState.FAILED.value
             }
             stats.update(str(task_id), up_dict)
+            return
+
+
+def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict):
+    """Sends task update to database"""
+    flask_url = os.environ.get("FLASK_INTERNAL_URL")
+    if not flask_url:
+        logging.debug("Flask url not found")
+        return
+    dict_to_send = {
+        "simulation_id": simulation_id,
+        "task_id": task_id,
+        "update_key": update_key,
+        "update_dict": update_dict
+    }
+    requests.Session().post(url=f"{flask_url}/tasks/update", json=dict_to_send)
+
+
+def read_file(task_id: str, filepath: Path, simulation_id: int, update_key: str):
+    """Monitors log file of certain task"""
+    logfile = None
+    update_time = 0
+    for _ in range(30):  # 30 stands for maximum attempts
+        try:
+            logfile = open(filepath)  # skipcq: PTC-W6004
+            break
+        except FileNotFoundError:
+            time.sleep(1)
+
+    if logfile is None:
+        up_dict = {
+            "task_state": SimulationModel.JobState.FAILED.value
+        }
+        send_task_update(simulation_id, task_id, update_key, up_dict)
+
+    loglines = log_generator(logfile)
+    for line in loglines:
+        utc_now = datetime.utcnow()
+        if re.search(RUN_MATCH, line):
+            if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+                continue
+            update_time = utc_now.timestamp()
+            splitted = line.split()
+            up_dict = {
+                "simulated_primaries": int(splitted[3]),
+                "estimated_time": int(splitted[9])
+                + int(splitted[7]) * 60
+                + int(splitted[5]) * 3600
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+
+        elif re.search(REQUESTED_MATCH, line):
+            splitted = line.split(": ")
+            up_dict = {
+                "simulated_primaries": 0,
+                "requested_primaries": int(splitted[1]),
+                "task_state": SimulationModel.JobState.RUNNING.value
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+
+        elif re.search(COMPLETE_MATCH, line):
+            splitted = line.split()
+            up_dict = {
+                "end_time": utc_now,
+                "task_state": SimulationModel.JobState.COMPLETED.value
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+            return
+
+        elif re.search(TIMEOUT_MATCH, line):
+            up_dict = {
+                "task_state": SimulationModel.JobState.FAILED.value
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
             return

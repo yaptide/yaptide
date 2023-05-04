@@ -17,7 +17,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, fi
 
 
 @celery_app.task(bind=True)
-def run_simulation(self, payload_dict: dict) -> dict:
+def run_simulation(self, payload_dict: dict, update_key: str, simulation_id: int) -> dict:
     """Simulation runner"""
     result = {}
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
@@ -61,56 +61,44 @@ def run_simulation(self, payload_dict: dict) -> dict:
         self.update_state(state="PROGRESS", meta=new_state_meta)
         logging.debug("state updated to PROGRESS, meta: %s", new_state_meta)
 
-        SharedResourcesManager.register('SimulationStats', SimulationStats)
         logging.debug("starting monitoring processes")
 
-        with SharedResourcesManager() as manager:
-            logging.debug("created SharedResourcesManager object")
-            stats: SimulationStats = manager.SimulationStats(ntasks, self, self.request.id)
-            logging.debug("created SimulationStats object for id %s", self.request.id)
+        monitoring_processes = [Process(
+            target=read_file, args=(i + 1, logs_list[i], simulation_id, update_key)) for i in range(ntasks)]
+        for process in monitoring_processes:
+            process.start()
+        logging.debug("started %d monitoring processes", len(monitoring_processes))
 
-            monitoring_processes = [Process(target=read_file, args=(stats, logs_list[i], i + 1)) for i in range(ntasks)]
-            for process in monitoring_processes:
-                process.start()
-            logging.debug("started %d monitoring processes", len(monitoring_processes))
+        try:
+            logging.debug("starting simulation")
+            is_run_ok = runner_obj.run(settings=settings)
+            if not is_run_ok:
+                logging.error("simulation failed")
+                raise Exception
+            logging.debug("simulation finished")
+        except Exception:  # skipcq: PYL-W0703
+            logfiles = simulation_logfiles(path=Path(tmp_dir_path))
+            logging.debug("simulation failed, logfiles: %s", logfiles)
+            return {"logfiles": logfiles, "input_files": files_dict}
 
-            try:
-                logging.debug("starting simulation")
-                is_run_ok = runner_obj.run(settings=settings)
-                if not is_run_ok:
-                    logging.error("simulation failed")
-                    raise Exception
-                logging.debug("simulation finished")
-            except Exception:  # skipcq: PYL-W0703
-                logfiles = simulation_logfiles(path=Path(tmp_dir_path))
-                logging.debug("simulation failed, logfiles: %s", logfiles)
-                return {"logfiles": logfiles, "input_files": files_dict}
+        logging.debug("joining monitoring processes")
+        for process in monitoring_processes:
+            process.join()
 
-            logging.debug("joining monitoring processes")
-            for process in monitoring_processes:
-                process.join()
+        logging.debug("getting simulation results")
+        estimators_dict: dict = runner_obj.get_data()
 
-            logging.debug("final stats %s", stats)
-            try:
-                result["job_tasks_status"] = list(stats.tasks_status.values())
-            except AttributeError:
-                logging.warning("stats object has no attribute to_list")
-                result["job_tasks_status"] = []
+        logging.debug("converting simulation results to JSON")
+        simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
+                                                            dir_path=Path(tmp_dir_path))
 
-            logging.debug("getting simulation results")
-            estimators_dict: dict = runner_obj.get_data()
+        result["result"] = simulation_result
+        result["input_json"] = payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None
+        result["input_files"] = files_dict
+        result["end_time"] = datetime.utcnow()
+        logging.debug("simulation result keys: %s", result.keys())
 
-            logging.debug("converting simulation results to JSON")
-            simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
-                                                                dir_path=Path(tmp_dir_path))
-
-            result["result"] = simulation_result
-            result["input_json"] = payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None
-            result["input_files"] = files_dict
-            result["end_time"] = datetime.utcnow()
-            logging.debug("simulation result keys: %s", result.keys())
-
-            return result
+        return result
 
 
 @celery_app.task

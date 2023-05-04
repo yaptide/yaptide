@@ -41,17 +41,17 @@ class JobsDirect(Resource):
 
         # submit the job to the Celery queue
         update_key = str(uuid.uuid4())
-        job = run_simulation.delay(payload_dict=payload_dict)
-
-        # create a new simulation in the database, not waiting for the job to finish
-        simulation = SimulationModel(job_id=job.id,
-                                     user_id=user.id,
+        simulation = SimulationModel(user_id=user.id,
                                      platform=SimulationModel.Platform.DIRECT.value,
                                      sim_type=sim_type,
                                      input_type=input_type,
                                      title=payload_dict.get("title", ''))
         simulation.set_update_key(update_key)
         db.session.add(simulation)
+        job = run_simulation.delay(payload_dict=payload_dict, update_key=update_key, simulation_id=simulation.id)
+        simulation.job_id = job.id
+
+        # create a new simulation in the database, not waiting for the job to finish
 
         for i in range(payload_dict["ntasks"]):
             task = TaskModel(simulation_id=simulation.id, task_id=i)
@@ -83,20 +83,23 @@ class JobsDirect(Resource):
 
         # get job status from Celery, extracting status from job.info
         # this dict will be returned to the user as a response to GET request
-        result: dict = get_job_status_as_dict(job_id=job_id)
+        job_info: dict = get_job_status_as_dict(job_id=job_id)
 
         # find appropriate simulation in the database
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+        tasks: list[TaskModel] = db.session.query(TaskModel).filter_by(simulation_id=simulation.id).all()
+
+        job_info["job_tasks_status"] = [task.get_status_dict() for task in tasks]
 
         # if simulation is not found, return error
-        if "end_time" in result and simulation.end_time is None:
-            simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
+        if "end_time" in job_info and simulation.end_time is None:
+            simulation.end_time = datetime.strptime(job_info['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
             db.session.commit()
 
-        # remove end_time from result, as it is not needed in response
-        result.pop("end_time", None)
+        # remove end_time from job_info, as it is not needed in response
+        job_info.pop("end_time", None)
 
-        return yaptide_response(message=f"Job state: {result['job_state']}", code=200, content=result)
+        return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
     @staticmethod
     @requires_auth(is_refresh=False)
@@ -157,47 +160,6 @@ class ResultsDirect(Resource):
         result.pop("end_time", None)
 
         return yaptide_response(message=f"Results for job: {job_id}", code=200, content=result)
-
-
-class TaskDirect(Resource):
-    """Class responsible for updating tasks"""
-
-    @staticmethod
-    def post():
-        """
-        Method updating task state
-        Structure required by this method to work properly:
-        {
-            "simulation_id": <string>,
-            "task_id": <string>,
-            "update_key": <string>,
-            "update_dict": <dict>
-        }
-        simulation_id and task_id self explanatory
-        """
-        payload_dict: dict = request.get_json(force=True)
-        required_keys = {"simulation_id", "task_id", "auth_key", "update_dict"}
-        if not required_keys.intersection(set(payload_dict.keys())):
-            return yaptide_response(message="Incomplete JSON data", code=400)
-
-        simulation: SimulationModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"]).first()
-
-        if not simulation:
-            return yaptide_response(message="Task does not exist", code=400)
-
-        if not simulation.check_update_key(payload_dict["update_key"]):
-            return yaptide_response(message="Invalid update key", code=400)
-
-        task: TaskModel = db.session.query.filter_by(simulation_id=payload_dict["simulation_id"],
-                                                     task_id=payload_dict["task_id"]).first()
-
-        if not task:
-            return yaptide_response(message="Task does not exist", code=400)
-
-        task.update_state(payload_dict["update_dict"])
-        db.session.commit()
-
-        return yaptide_response(message="Task updated", code=202)
 
 
 class ConvertInputFiles(Resource):

@@ -86,7 +86,7 @@ class SimulationModel(db.Model):
     # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
     # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
     # example SLURM job_ids are: 12345678
-    job_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Simulation job ID")
+    job_id: Column[str] = db.Column(db.String, nullable=True, unique=True, doc="Simulation job ID")
 
     user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), doc="User ID")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Submission time")
@@ -148,6 +148,7 @@ class TaskModel(db.Model):
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
+    last_update_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task last update time")
 
     def update_state(self, update_dict: dict):
         """
@@ -161,7 +162,8 @@ class TaskModel(db.Model):
             self.simulated_primaries = update_dict["simulated_primaries"]
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
-        if "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]:
+        # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
+        if "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"] and self.end_time is None:
             self.estimated_time = update_dict["estimated_time"]
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)
@@ -169,6 +171,23 @@ class TaskModel(db.Model):
         if "end_time" in update_dict and self.end_time is None:
             # a convertion from string to datetime is needed, as in the POST payload end_time comes in string format
             self.end_time = datetime.strptime(update_dict["end_time"], '%Y-%m-%d %H:%M:%S.%f')
+            self.estimated_time = 0
+        self.last_update_time = now()
+
+    def get_status_dict(self) -> dict:
+        """Returns task information as a dictionary"""
+        result = {
+            "task_state": self.task_state,
+            "requested_primaries": self.requested_primaries,
+            "task_state": self.task_state,
+            "last_update_time": self.last_update_time,
+        }
+        if self.estimated_time:
+            result["estimated_time"] = {
+                "hours": self.estimated_time // 3600,
+                "minutes": (self.estimated_time // 60) % 60,
+                "seconds": self.estimated_time % 60,
+            }
 
 
 class ResultModel(db.Model):
