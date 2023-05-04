@@ -39,23 +39,36 @@ def celery_worker_parameters():
     return {
         "perform_ping_check": False,
         "concurrency": 1,
+        "loglevel": "DEBUG"
     }
 
-
-# @pytest.mark.skipif(platform.system() != 'Linux',
-#                     reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
 def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path,
                         shieldhit_demo_binary):
     """Test run_simulation task with SHIELDHIT demo binary"""
-    payload_editor_dict_data["ntasks"] = 2
+    payload_editor_dict_data["ntasks"] = 1
+
+    if platform.system() == "Windows":
+        '''
+        Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
+        Parser relies on rewind function, which does not work properly on Windows, see:
+        https://stackoverflow.com/questions/47256223/why-does-fseek-0-seek-cur-fail-on-windows/47256758#47256758
+        So to bypass this issue we restrict the detect configuration to only one output and no filter.
+        Below goes the code which reduces the detect.dat.
+        '''
+        payload_editor_dict_data["sim_data"]["detectManager"]["filters"] = []
+        payload_editor_dict_data["sim_data"]["detectManager"]["detectGeometries"] = [payload_editor_dict_data["sim_data"]["detectManager"]["detectGeometries"][0]]
+        payload_editor_dict_data["sim_data"]["scoringManager"]["scoringOutputs"] = [payload_editor_dict_data["sim_data"]["scoringManager"]["scoringOutputs"][0]]
+        for output in payload_editor_dict_data["sim_data"]["scoringManager"]["scoringOutputs"]:
+            for quantity in output["quantities"]["active"]:
+                if "filter" in quantity:
+                    del quantity["filter"]
+
     job = run_simulation.delay(payload_dict=payload_editor_dict_data)
     result: dict = job.wait()
     assert 'input_files' in result.keys()
     assert 'result' in result.keys()
 
 
-# @pytest.mark.skipif(platform.system() != 'Linux',
-#                     reason="Testing Celery with SHIELDHIT demo binary is only supported on Linux.")
 def test_cancel_simulation(celery_app, celery_worker):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
