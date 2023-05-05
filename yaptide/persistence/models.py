@@ -149,7 +149,10 @@ class TaskModel(db.Model):
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
-    last_update_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task last update time")
+    last_update_time: Column[datetime] = db.Column(
+        db.DateTime(timezone=True), 
+        default=now(), 
+        doc="Task last update time")
 
     def update_state(self, update_dict: dict):
         """
@@ -167,7 +170,7 @@ class TaskModel(db.Model):
         if "estimated_time" in update_dict and \
             self.estimated_time != update_dict["estimated_time"] and \
             self.end_time is None:
-            self.estimated_time = update_dict["estimated_time"]
+                self.estimated_time = update_dict["estimated_time"]
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)
         # and if update was requested (`"end_time" in update_dict`)
