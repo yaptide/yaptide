@@ -63,6 +63,7 @@ class JobsDirect(Resource):
 
     class _Schema(Schema):
         """Class specifies API parameters for GET and DELETE request"""
+        
         job_id = fields.String()
 
     @staticmethod
