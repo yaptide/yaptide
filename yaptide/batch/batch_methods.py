@@ -205,7 +205,7 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
 
 
 def get_job_results(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
-    """"""
+    """Returns simulation results"""
 
 
 def delete_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613

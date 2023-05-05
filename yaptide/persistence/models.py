@@ -120,7 +120,11 @@ class SimulationModel(db.Model):
         return check_password_hash(self.update_key_hash, update_key)
 
     def update_state(self, update_dict: dict):
-        """"""
+        """
+        Updating database is more costly than a simple query.
+        Therefore we check first if update is needed and
+        perform it only for such fields which exists and which have updated values.
+        """
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
             self.job_state = update_dict["job_state"]
         # Here we have a special case, `end_time` can be set only once
@@ -189,7 +193,7 @@ class TaskModel(db.Model):
         if "end_time" in update_dict and self.end_time is None:
             # a convertion from string to datetime is needed, as in the POST payload end_time comes in string format
             self.end_time = datetime.strptime(update_dict["end_time"], '%Y-%m-%d %H:%M:%S.%f')
-            self.estimated_time = 0
+            self.estimated_time = None
         self.last_update_time = now()
 
     def get_status_dict(self) -> dict:

@@ -8,9 +8,6 @@ from pathlib import Path
 
 import requests
 
-from multiprocessing import Lock
-from multiprocessing.managers import BaseManager
-
 from celery.result import AsyncResult
 
 from yaptide.celery.worker import celery_app

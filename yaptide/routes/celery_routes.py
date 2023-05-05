@@ -7,6 +7,8 @@ from marshmallow import fields
 from datetime import datetime
 import uuid
 
+import logging
+
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, ResultModel
 
@@ -169,10 +171,11 @@ class ResultsDirect(Resource):
         results: list[ResultModel] = db.session.query(ResultModel).filter_by(simulation_id=simulation.id).all()
         if len(results) > 0:
             # later on we would like to return persistent results
-            pass
+            logging.debug("Returning results from database")
         result: dict = get_job_results(job_id=job_id)
         # later on we would like to add results to database here
         if "result" not in result:
+            logging.debug("Results for job %s are unavailable", job_id)
             return yaptide_response(message="Results are unavailable", code=404, content=result)
 
         if "end_time" in result and simulation.end_time is None:
@@ -181,6 +184,7 @@ class ResultsDirect(Resource):
 
         result.pop("end_time", None)
 
+        logging.debug("Returning results from Celery")
         return yaptide_response(message=f"Results for job: {job_id}", code=200, content=result)
 
 
