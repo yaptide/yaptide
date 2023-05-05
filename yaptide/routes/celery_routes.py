@@ -8,7 +8,7 @@ from datetime import datetime
 import uuid
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, TaskModel
+from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, ResultModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
