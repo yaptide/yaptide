@@ -15,7 +15,7 @@ from yaptide.batch.string_templates import (
     ARRAY_SHIELDHIT_BASH,
     COLLECT_BASH
 )
-from yaptide.batch.utils.sbatch import extract_sbatch_header, convert_dict_to_sbatch_options
+from yaptide.batch.utils.utils import extract_sbatch_header, convert_dict_to_sbatch_options
 from yaptide.persistence.models import SimulationModel, ClusterModel
 from yaptide.utils.sim_utils import (
     files_dict_with_adjusted_primaries,
@@ -202,6 +202,10 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
             }
         ]
     }, 200
+
+
+def get_job_results(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
+    """"""
 
 
 def delete_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613

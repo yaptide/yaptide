@@ -19,6 +19,9 @@ class Endpoints:
         self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
         self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
 
+        self.http_results_direct = f'http://{host}:{port}/results/direct'
+        self.http_results_batch = f'http://{host}:{port}/results/batch'
+
         self.http_convert = f'http://{host}:{port}/sh/convert'
 
         self.http_list_sims = f'http://{host}:{port}/user/simulations'
@@ -130,8 +133,9 @@ class YaptideTester:
                 sim_data = json_lib.load(json_file)
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
+        results_url = self.endpoints.http_results_direct if direct else self.endpoints.http_results_batch
         json_to_send = {
-            "ntasks": 12,
+            "ntasks": 6,
             "sim_data": sim_data,
             "sim_type": "shieldhit",
         }
@@ -165,15 +169,16 @@ class YaptideTester:
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
                         if res_json.get('job_state') == "COMPLETED":
-                            return
-                        if res_json.get('result'):
-                            if len(job_id.split(":")) == 4:
-                                job_id = job_id.split(":")[1]  # only for file naming purpose
-                            with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
-                                data_to_write = str(res_json['result'])
-                                data_to_write = data_to_write.replace("'", "\"")
-                                writer.write(data_to_write)
-                                print(res_json['job_tasks_status'])
+                            res: requests.Response = self.session.get(results_url, params={"job_id": job_id})
+                            res_json: dict = res.json()
+
+                            if res_json.get('result'):
+                                if len(job_id.split(":")) == 4:
+                                    job_id = job_id.split(":")[1]  # only for file naming purpose
+                                with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
+                                    data_to_write = str(res_json['result'])
+                                    data_to_write = data_to_write.replace("'", "\"")
+                                    writer.write(data_to_write)
                             return
                         print(res_json)
                         if res_json.get('logfile'):

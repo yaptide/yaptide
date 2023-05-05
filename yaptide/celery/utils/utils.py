@@ -61,9 +61,9 @@ def get_job_results(job_id: str) -> dict:
     result = {}
     if "result" in job.info:
         result = {
-            "result": job.info("result"),
-            "input_files": job.info("input_files"),
-            "input_json": job.info("input_json")
+            "result": job.info.get("result"),
+            "input_files": job.info.get("input_files"),
+            "input_json": job.info.get("input_json")
         }
     return result
 
@@ -80,105 +80,6 @@ def translate_celery_state_naming(job_state: str) -> str:
         return SimulationModel.JobState.COMPLETED.value
     # Others are the same
     return job_state
-
-
-class SimulationStats():
-    """Class holding simulation statistics"""
-
-    def __init__(self, ntasks: int, parent, parent_id: str):
-        logging.debug("Initializing SimulationStats")
-        self.lock = Lock()
-        logging.debug("SimulationStats lock acquired")
-        self.tasks_status: dict = {}
-        self.parent = parent
-        self.parent_id = parent_id
-        logging.debug("parent id: %s", parent_id)
-        for i in range(ntasks):
-            self.tasks_status[str(i+1)] = {
-                "task_id": i+1,
-                "task_state": SimulationModel.JobState.PENDING.value
-            }
-        parent_state = AsyncResult(parent_id).state
-        parent_meta = AsyncResult(parent_id).info
-        if parent_meta:
-            parent_meta["job_tasks_status"] = list(self.tasks_status.values())
-            self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
-
-    def update(self, task_id: str, up_dict: dict, final: bool = False):
-        """Method updating simulation statistics"""
-        self.lock.acquire()
-        try:
-            for key, value in up_dict.items():
-                self.tasks_status[task_id][key] = value
-            if final:
-                self.tasks_status[task_id]["simulated_primaries"] = self.tasks_status[task_id]["requested_primaries"]
-                self.tasks_status[task_id].pop("estimated_time", None)
-            parent_state = AsyncResult(self.parent_id).state
-            parent_meta = AsyncResult(self.parent_id).info
-            parent_meta["job_tasks_status"] = list(self.tasks_status.values())
-            # update parent state (parent.info)
-            self.parent.update_state(task_id=self.parent_id, state=parent_state, meta=parent_meta)
-        finally:
-            self.lock.release()
-
-
-class SharedResourcesManager(BaseManager):
-    """Shared objects manager for multiprocessing"""
-
-
-def read_file_old(stats: SimulationStats, filepath: Path, task_id: int):
-    """Monitors log file of certain task"""
-    logfile = None
-    for _ in range(30):  # 30 stands for maximum attempts
-        try:
-            logfile = open(filepath)  # skipcq: PTC-W6004
-            break
-        except FileNotFoundError:
-            time.sleep(1)
-
-    if logfile is None:
-        up_dict = {
-            "task_state": SimulationModel.JobState.FAILED.value
-        }
-        stats.update(str(task_id), up_dict)
-
-    loglines = log_generator(logfile)
-    for line in loglines:
-        if re.search(RUN_MATCH, line):
-            splitted = line.split()
-            up_dict = {
-                "simulated_primaries": int(splitted[3]),
-                "estimated_time": int(splitted[9])
-                + int(splitted[7]) * 60
-                + int(splitted[5]) * 3600
-            }
-
-            stats.update(str(task_id), up_dict)
-
-        elif re.search(REQUESTED_MATCH, line):
-            splitted = line.split(": ")
-            up_dict = {
-                "simulated_primaries": 0,
-                "requested_primaries": int(splitted[1]),
-                "task_state": SimulationModel.JobState.RUNNING.value
-            }
-            stats.update(str(task_id), up_dict)
-
-        elif re.search(COMPLETE_MATCH, line):
-            splitted = line.split()
-            up_dict = {
-                "end_time": datetime.utcnow(),
-                "task_state": SimulationModel.JobState.COMPLETED.value
-            }
-            stats.update(str(task_id), up_dict, True)
-            return
-
-        elif re.search(TIMEOUT_MATCH, line):
-            up_dict = {
-                "task_state": SimulationModel.JobState.FAILED.value
-            }
-            stats.update(str(task_id), up_dict)
-            return
 
 
 def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict):

@@ -104,7 +104,7 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
         result["result"] = simulation_result
         result["input_json"] = payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None
         result["input_files"] = files_dict
-        result["end_time"] = datetime.utcnow()
+        result["end_time"] = datetime.utcnow().isoformat(sep=" ")
         logging.debug("simulation result keys: %s", result.keys())
 
         return result

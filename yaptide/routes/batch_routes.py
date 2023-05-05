@@ -10,7 +10,7 @@ from yaptide.routes.utils.response_templates import yaptide_response, error_vali
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
 
-from yaptide.batch.batch_methods import submit_job, get_job, delete_job
+from yaptide.batch.batch_methods import submit_job, get_job, delete_job, get_job_results
 
 
 class JobsBatch(Resource):

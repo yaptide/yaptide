@@ -82,23 +82,34 @@ class JobsDirect(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
+        # find appropriate simulation in the database
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+        if simulation is None:
+            return yaptide_response(message="Simulation not found", code=404)
+
+        tasks: list[TaskModel] = db.session.query(TaskModel).filter_by(simulation_id=simulation.id).all()
+
+        job_tasks_status = [task.get_status_dict() for task in tasks]
+
+        if simulation.job_state == SimulationModel.JobState.COMPLETED.value:
+            return yaptide_response(message=f"Job state: {simulation.job_state}",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                        "job_tasks_status": job_tasks_status,
+                                    })
+
         # get job status from Celery, extracting status from job.info
         # this dict will be returned to the user as a response to GET request
         job_info: dict = get_job_status_as_dict(job_id=job_id)
 
-        # find appropriate simulation in the database
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
-        tasks: list[TaskModel] = db.session.query(TaskModel).filter_by(simulation_id=simulation.id).all()
-
-        job_info["job_tasks_status"] = [task.get_status_dict() for task in tasks]
-
         # if simulation is not found, return error
-        if "end_time" in job_info and simulation.end_time is None:
-            simulation.end_time = datetime.strptime(job_info['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
-            db.session.commit()
+        simulation.update_state(job_info)
+        db.session.commit()
 
         # remove end_time from job_info, as it is not needed in response
         job_info.pop("end_time", None)
+        job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
@@ -148,12 +159,19 @@ class ResultsDirect(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        results: list[ResultModel] = db.session.query(ResultModel).filter_by(job_id=job_id).all()
-        result: dict = get_job_results(job_id=job_id)
-        if "result" not in result:
-            return yaptide_response(message="Results are unavailable", code=200, content=result)
-
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+        if simulation is None:
+            return yaptide_response(message="Simulation not found", code=404)
+
+        results: list[ResultModel] = db.session.query(ResultModel).filter_by(simulation_id=simulation.id).all()
+        if len(results) > 0:
+            # later on we would like to return persistent results
+            pass
+        result: dict = get_job_results(job_id=job_id)
+        # later on we would like to add results to database here
+        if "result" not in result:
+            return yaptide_response(message="Results are unavailable", code=404, content=result)
+
         if "end_time" in result and simulation.end_time is None:
             simulation.end_time = datetime.strptime(result['end_time'], '%Y-%m-%dT%H:%M:%S.%f')
             db.session.commit()
