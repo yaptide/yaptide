@@ -69,7 +69,8 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
         if update_key is not None and simulation_id is not None:
             logging.debug("starting monitoring processes")
             monitoring_processes = [Process(
-                target=read_file, args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
+                target=read_file,
+                args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
             for process in monitoring_processes:
                 process.start()
             logging.debug("started %d monitoring processes", len(monitoring_processes))
@@ -87,7 +88,6 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.debug("simulation failed, logfiles: %s", logfiles)
             return {"logfiles": logfiles, "input_files": files_dict}
-
 
         if update_key is not None and simulation_id is not None:
             logging.debug("joining monitoring processes")

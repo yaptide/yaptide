@@ -1,7 +1,7 @@
 """
 We have 3 types of JSON files:
 1. Project JSON - file that could be generated using UI and saved using "Save project" button
-  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples 
+  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples
     or in yaptide_tester/example.json
   - this file can contain only simulation input in JSON format or results as well
   - top level keys: "metadata", "project", "scene", and others...
@@ -53,8 +53,11 @@ def project_json_path() -> Path:
 
 
 @pytest.fixture(scope='session')
-def project_json_data(project_json_path) -> dict:
+def project_json_data(project_json_path: Path) -> dict:
+    """Reads project JSON file and returns its contents as dictionary"""
     json_data = {}
+    if not project_json_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
     with open(project_json_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
@@ -68,8 +71,11 @@ def payload_editor_dict_path() -> Path:
 
 
 @pytest.fixture(scope='session')
-def payload_editor_dict_data(payload_editor_dict_path) -> dict:
+def payload_editor_dict_data(payload_editor_dict_path: Path) -> dict:
+    """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
+    if not payload_editor_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
     with open(payload_editor_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
@@ -83,8 +89,11 @@ def payload_files_dict_path() -> Path:
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_data(payload_files_dict_path) -> dict:
+def payload_files_dict_data(payload_files_dict_path: Path) -> dict:
+    """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
+    if not payload_files_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
     with open(payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
@@ -92,6 +101,7 @@ def payload_files_dict_data(payload_files_dict_path) -> dict:
 
 @pytest.fixture(scope='session')
 def shieldhit_demo_binary():
+    """Checks if SHIELDHIT binary is installed and installs it if not"""
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
     shieldhit_bin_path = installation_path / 'shieldhit'
     # check if on Windows
@@ -105,8 +115,8 @@ def shieldhit_demo_binary():
 
 @pytest.fixture(scope='session')
 def add_directory_to_path():
-    import os
+    """Adds bin directory to PATH"""
     project_main_dir = Path(__file__).resolve().parent.parent
     bin_dir = project_main_dir / 'bin'
     logging.info("Adding %s to PATH", bin_dir)
-    os.environ['PATH'] = f'{bin_dir}:' + os.environ['PATH']
+    os.environ['PATH'] = f'{bin_dir}' + os.pathsep + os.environ['PATH']

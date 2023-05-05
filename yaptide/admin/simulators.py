@@ -1,4 +1,5 @@
 import os
+import shutil
 import tarfile
 import tempfile
 from enum import IntEnum, auto
@@ -32,6 +33,7 @@ def installed(**kwargs):
 
 
 def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str):
+    """Extracts a single file from a tar.gz archive"""
     with tarfile.open(archive_path, "r:gz") as tar:
         # print all members
         for member in tar.getmembers():
@@ -45,17 +47,21 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
 
 
 def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
-    with zipfile.ZipFile(archive_path) as zip:
+    """Extracts a single file from a zip archive"""
+    with zipfile.ZipFile(archive_path) as zip_handle:
         # print all members
-        for member in zip.infolist():
+        for member in zip_handle.infolist():
             click.echo(f"Member: {member.filename}")
             if Path(member.filename).name == member_name:
                 click.echo(f"Extracting {member.filename}")
-                zip.extract(member, destination_dir)
+                zip_handle.extract(member, destination_dir)
                 # move to installation path
-                local_file = Path(destination_dir) / member.filename
-                click.echo(f"Moving {local_file} to {installation_path}")
-                local_file.rename(installation_path / member_name)
+                local_file_path = Path(destination_dir) / member.filename
+                destination_file_path = installation_path / member_name
+                click.echo(f"Moving {local_file_path} to {installation_path}")
+                # move file from temporary directory to installation path using shutils
+                if not destination_file_path.exists():
+                    shutil.move(local_file_path, destination_file_path)
 
 
 def install_simulator(name: SimulatorType) -> bool:
@@ -98,7 +104,7 @@ def install_simulator(name: SimulatorType) -> bool:
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """List installed simulators"""
-    if not 'name' in kwargs or kwargs['name'] is None:
+    if 'name' not in kwargs or kwargs['name'] is None:
         click.echo('Please specify a simulator name using --name option, possible values are: ', nl=False)
         for sim in SimulatorType:
             click.echo(f'{sim.name} ', nl=False)

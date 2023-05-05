@@ -28,7 +28,8 @@ class TaskUpdate(Resource):
         if not required_keys.intersection(set(payload_dict.keys())):
             return yaptide_response(message="Incomplete JSON data", code=400)
 
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=payload_dict["simulation_id"]).first()
+        sim_id = payload_dict["simulation_id"]
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()
 
         if not simulation:
             return yaptide_response(message="Task does not exist", code=400)

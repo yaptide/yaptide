@@ -45,9 +45,10 @@ class ClusterModel(db.Model):
 class SimulationModel(db.Model):
     """Simulation model"""
 
-    # TODO: move enums to a separate file
-    # TODO: use DBEnum for enums
-    # TODO: use auto for enums
+    # Still needs to be done:
+    # - move enums to a separate file
+    # - use DBEnum for enums
+    # - use auto for enums
 
     class Platform(Enum):
         """Platform specification"""
@@ -160,12 +161,15 @@ class TaskModel(db.Model):
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
-    last_update_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task last update time")
+    last_update_time: Column[datetime] = db.Column(
+        db.DateTime(timezone=True),
+        default=now(),
+        doc="Task last update time")
 
     def update_state(self, update_dict: dict):
         """
-        Updating database is more costly than a simple query. 
-        Therefore we check first if update is needed and 
+        Updating database is more costly than a simple query.
+        Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
         """
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
@@ -175,7 +179,9 @@ class TaskModel(db.Model):
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
-        if "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"] and self.end_time is None:
+        have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
+        end_time_not_set = self.end_time is None
+        if have_estim_time and end_time_not_set:
             self.estimated_time = update_dict["estimated_time"]
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)

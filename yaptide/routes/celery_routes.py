@@ -8,7 +8,7 @@ from datetime import datetime
 import uuid
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, ResultModel, TaskModel
+from yaptide.persistence.models import UserModel, SimulationModel, TaskModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
@@ -31,7 +31,7 @@ class JobsDirect(Resource):
         if "sim_data" not in payload_dict:
             return error_validation_response()
 
-        # TODO handle better lower and upper case
+        # we need to handle better lower and upper case
         sim_type = (SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in payload_dict
                     or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else
                     SimulationModel.SimType.DUMMY.value)
@@ -61,16 +61,18 @@ class JobsDirect(Resource):
 
         return yaptide_response(message="Task started", code=202, content={'job_id': job.id})
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters for GET and DELETE request"""
+
         job_id = fields.String()
 
+    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning job status and results"""
         # validate request parameters and handle errors
-        schema = JobsDirect._Schema()
+        schema = JobsDirect.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -118,7 +120,7 @@ class JobsDirect(Resource):
     def delete(user: UserModel):
         """Method canceling simulation and returning status of this action"""
         try:
-            payload_dict: dict = JobsDirect._Schema().load(request.get_json(force=True))
+            payload_dict: dict = JobsDirect.APIParametersSchema().load(request.get_json(force=True))
         except ValidationError:
             return error_validation_response()
 
@@ -139,16 +141,17 @@ class JobsDirect(Resource):
 class ResultsDirect(Resource):
     """Class responsible for returning simulation results"""
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         job_id = fields.String()
 
+    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning job status and results"""
-        schema = JobsDirect._Schema()
+        schema = ResultsDirect.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -217,16 +220,17 @@ def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str, int]
 class SimulationInputs(Resource):
     """Class responsible for returning converted simulation input files"""
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         job_id = fields.String()
 
+    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning simulation input files"""
-        schema = SimulationInputs._Schema()
+        schema = SimulationInputs.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)

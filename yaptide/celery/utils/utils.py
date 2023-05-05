@@ -33,7 +33,7 @@ def get_job_status_as_dict(job_id: str) -> dict:
     job = AsyncResult(id=job_id, app=celery_app)
     job_state: str = translate_celery_state_naming(job.state)
 
-    # TODO convert string to enum and operate later on Enum
+    # we still need to  convert string to enum and operate later on Enum
     result = {
         "job_state": job_state
     }
