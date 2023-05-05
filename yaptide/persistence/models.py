@@ -45,9 +45,10 @@ class ClusterModel(db.Model):
 class SimulationModel(db.Model):
     """Simulation model"""
 
-    # TODO: move enums to a separate file
-    # TODO: use DBEnum for enums
-    # TODO: use auto for enums
+    # Still needs to be done:
+    # - move enums to a separate file
+    # - use DBEnum for enums
+    # - use auto for enums
 
     class Platform(Enum):
         """Platform specification"""

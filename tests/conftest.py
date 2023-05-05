@@ -54,6 +54,7 @@ def project_json_path() -> Path:
 
 @pytest.fixture(scope='session')
 def project_json_data(project_json_path) -> dict:
+    """Reads project JSON file and returns its contents as dictionary"""
     json_data = {}
     with open(project_json_path, 'r') as file_handle:
         json_data = json.load(file_handle)
@@ -69,6 +70,7 @@ def payload_editor_dict_path() -> Path:
 
 @pytest.fixture(scope='session')
 def payload_editor_dict_data(payload_editor_dict_path) -> dict:
+    """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
     with open(payload_editor_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
@@ -84,6 +86,7 @@ def payload_files_dict_path() -> Path:
 
 @pytest.fixture(scope='session')
 def payload_files_dict_data(payload_files_dict_path) -> dict:
+    """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
     with open(payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
@@ -92,6 +95,7 @@ def payload_files_dict_data(payload_files_dict_path) -> dict:
 
 @pytest.fixture(scope='session')
 def shieldhit_demo_binary():
+    """Checks if SHIELDHIT binary is installed and installs it if not"""
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
     shieldhit_bin_path = installation_path / 'shieldhit'
     # check if on Windows
@@ -105,6 +109,7 @@ def shieldhit_demo_binary():
 
 @pytest.fixture(scope='session')
 def add_directory_to_path():
+    """Adds bin directory to PATH"""
     project_main_dir = Path(__file__).resolve().parent.parent
     bin_dir = project_main_dir / 'bin'
     logging.info("Adding %s to PATH", bin_dir)
