@@ -69,9 +69,11 @@ def payload_editor_dict_path() -> Path:
 
 
 @pytest.fixture(scope='session')
-def payload_editor_dict_data(payload_editor_dict_path) -> dict:
+def payload_editor_dict_data(payload_editor_dict_path: Path) -> dict:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
+    if not payload_editor_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
     with open(payload_editor_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
