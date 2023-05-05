@@ -53,9 +53,11 @@ def project_json_path() -> Path:
 
 
 @pytest.fixture(scope='session')
-def project_json_data(project_json_path) -> dict:
+def project_json_data(project_json_path: Path) -> dict:
     """Reads project JSON file and returns its contents as dictionary"""
     json_data = {}
+    if not payload_editor_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
     with open(project_json_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data
@@ -87,9 +89,11 @@ def payload_files_dict_path() -> Path:
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_data(payload_files_dict_path) -> dict:
+def payload_files_dict_data(payload_files_dict_path: Path) -> dict:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
+    if not payload_editor_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
     with open(payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     return json_data

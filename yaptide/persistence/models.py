@@ -167,9 +167,9 @@ class TaskModel(db.Model):
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
-        have_new_estimated_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
+        have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None
-        if have_new_estimated_time and end_time_not_set:
+        if have_estim_time and end_time_not_set:
             self.estimated_time = update_dict["estimated_time"]
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)

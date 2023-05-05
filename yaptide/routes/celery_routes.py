@@ -61,7 +61,7 @@ class JobsDirect(Resource):
 
         return yaptide_response(message="Task started", code=202, content={'job_id': job.id})
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters for GET and DELETE request"""
 
         job_id = fields.String()
@@ -71,7 +71,7 @@ class JobsDirect(Resource):
     def get(user: UserModel):
         """Method returning job status and results"""
         # validate request parameters and handle errors
-        schema = JobsDirect._Schema()
+        schema = JobsDirect.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -108,7 +108,7 @@ class JobsDirect(Resource):
     def delete(user: UserModel):
         """Method canceling simulation and returning status of this action"""
         try:
-            payload_dict: dict = JobsDirect._Schema().load(request.get_json(force=True))
+            payload_dict: dict = JobsDirect.APIParametersSchema().load(request.get_json(force=True))
         except ValidationError:
             return error_validation_response()
 
@@ -138,7 +138,7 @@ class ResultsDirect(Resource):
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning job status and results"""
-        schema = JobsDirect._Schema()
+        schema = JobsDirect.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
