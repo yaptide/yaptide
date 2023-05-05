@@ -56,7 +56,7 @@ def project_json_path() -> Path:
 def project_json_data(project_json_path: Path) -> dict:
     """Reads project JSON file and returns its contents as dictionary"""
     json_data = {}
-    if not payload_editor_dict_path.suffix == '.json':
+    if not project_json_path.suffix == '.json':
         raise ValueError("Payload file must be JSON file")
     with open(project_json_path, 'r') as file_handle:
         json_data = json.load(file_handle)
@@ -92,7 +92,7 @@ def payload_files_dict_path() -> Path:
 def payload_files_dict_data(payload_files_dict_path: Path) -> dict:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
-    if not payload_editor_dict_path.suffix == '.json':
+    if not payload_files_dict_path.suffix == '.json':
         raise ValueError("Payload file must be JSON file")
     with open(payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)

@@ -66,6 +66,7 @@ class JobsDirect(Resource):
 
         job_id = fields.String()
 
+    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
@@ -129,16 +130,17 @@ class JobsDirect(Resource):
 class ResultsDirect(Resource):
     """Class responsible for returning simulation results"""
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         job_id = fields.String()
 
+    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning job status and results"""
-        schema = JobsDirect.APIParametersSchema()
+        schema = ResultsDirect.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -200,16 +202,17 @@ def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str, int]
 class SimulationInputs(Resource):
     """Class responsible for returning converted simulation input files"""
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         job_id = fields.String()
 
+    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning simulation input files"""
-        schema = SimulationInputs._Schema()
+        schema = SimulationInputs.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
