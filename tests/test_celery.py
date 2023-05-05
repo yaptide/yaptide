@@ -38,8 +38,7 @@ def celery_worker_parameters():
     """
     return {
         "perform_ping_check": False,
-        "concurrency": 1,
-        "loglevel": "DEBUG"
+        "concurrency": 1
     }
 
 def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path,

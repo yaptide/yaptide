@@ -152,8 +152,8 @@ class TaskModel(db.Model):
 
     def update_state(self, update_dict: dict):
         """
-        Updating database is more costly than a simple query. 
-        Therefore we check first if update is needed and 
+        Updating database is more costly than a simple query.
+        Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
         """
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
@@ -163,7 +163,9 @@ class TaskModel(db.Model):
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
-        if "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"] and self.end_time is None:
+        if "estimated_time" in update_dict and \
+            self.estimated_time != update_dict["estimated_time"] and \
+            self.end_time is None:
             self.estimated_time = update_dict["estimated_time"]
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)

@@ -1,7 +1,7 @@
 """
 We have 3 types of JSON files:
 1. Project JSON - file that could be generated using UI and saved using "Save project" button
-  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples 
+  - examples of such files are in https://github.com/yaptide/ui/tree/master/src/ThreeEditor/examples
     or in yaptide_tester/example.json
   - this file can contain only simulation input in JSON format or results as well
   - top level keys: "metadata", "project", "scene", and others...

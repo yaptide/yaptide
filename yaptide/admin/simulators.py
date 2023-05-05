@@ -46,13 +46,13 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
 
 
 def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
-    with zipfile.ZipFile(archive_path) as zip:
+    with zipfile.ZipFile(archive_path) as zip_handle:
         # print all members
-        for member in zip.infolist():
+        for member in zip_handle.infolist():
             click.echo(f"Member: {member.filename}")
             if Path(member.filename).name == member_name:
                 click.echo(f"Extracting {member.filename}")
-                zip.extract(member, destination_dir)
+                zip_handle.extract(member, destination_dir)
                 # move to installation path
                 local_file_path = Path(destination_dir) / member.filename
                 destination_file_path = installation_path / member_name
