@@ -48,7 +48,8 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
     Parser relies on rewind function, which does not work properly on Windows, see:
     https://stackoverflow.com/questions/47256223/why-does-fseek-0-seek-cur-fail-on-windows/47256758#47256758
     So to bypass this issue we restrict the detect configuration to only one output and no filter.
-    Below goes the code which reduces the detect.dat."""
+    Below goes the code which reduces the detect.dat.
+    """
     payload_editor_dict_data["ntasks"] = 1
 
     if platform.system() == "Windows":
