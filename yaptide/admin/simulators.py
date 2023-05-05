@@ -33,6 +33,7 @@ def installed(**kwargs):
 
 
 def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str):
+    """Extracts a single file from a tar.gz archive"""
     with tarfile.open(archive_path, "r:gz") as tar:
         # print all members
         for member in tar.getmembers():
@@ -46,6 +47,7 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
 
 
 def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
+    """Extracts a single file from a zip archive"""
     with zipfile.ZipFile(archive_path) as zip_handle:
         # print all members
         for member in zip_handle.infolist():

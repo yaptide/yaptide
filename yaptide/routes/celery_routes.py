@@ -31,7 +31,7 @@ class JobsDirect(Resource):
         if "sim_data" not in payload_dict:
             return error_validation_response()
 
-        # TODO handle better lower and upper case
+        # we need to handle better lower and upper case
         sim_type = (SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in payload_dict
                     or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else
                     SimulationModel.SimType.DUMMY.value)
@@ -63,7 +63,7 @@ class JobsDirect(Resource):
 
     class _Schema(Schema):
         """Class specifies API parameters for GET and DELETE request"""
-        
+
         job_id = fields.String()
 
     @staticmethod
@@ -149,7 +149,7 @@ class ResultsDirect(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        results: list[ResultModel] = db.session.query(ResultModel).filter_by(job_id=job_id).all()
+        # results: list[ResultModel] = db.session.query(ResultModel).filter_by(job_id=job_id).all()
         result: dict = get_job_results(job_id=job_id)
         if "result" not in result:
             return yaptide_response(message="Results are unavailable", code=200, content=result)
