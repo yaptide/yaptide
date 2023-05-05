@@ -102,7 +102,7 @@ def install_simulator(name: SimulatorType) -> bool:
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """List installed simulators"""
-    if not 'name' in kwargs or kwargs['name'] is None:
+    if 'name' not in kwargs or kwargs['name'] is None:
         click.echo('Please specify a simulator name using --name option, possible values are: ', nl=False)
         for sim in SimulatorType:
             click.echo(f'{sim.name} ', nl=False)
