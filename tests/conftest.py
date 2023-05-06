@@ -46,7 +46,7 @@ import pytest
 
 @pytest.fixture(scope='session')
 def project_json_path() -> Path:
-    """Location of this script according to pathlib"""
+    """Path to JSON project file"""
     main_dir = Path(__file__).resolve().parent.parent
     logging.debug("Main dir %s", main_dir)
     return main_dir / "yaptide_tester" / "example.json"
