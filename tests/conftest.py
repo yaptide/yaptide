@@ -83,7 +83,7 @@ def payload_editor_dict_data(payload_editor_dict_path: Path) -> dict:
 
 @pytest.fixture(scope='session')
 def payload_files_dict_path() -> Path:
-    """Location of this script according to pathlib"""
+    """Path to payload file with simulation defined as user uploaded files"""
     main_dir = Path(__file__).resolve().parent
     return main_dir / "res" / "json_files_payload.json"
 
