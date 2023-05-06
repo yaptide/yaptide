@@ -139,7 +139,6 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.task_state == SimulationModel.JobState.RUNNING.value
     assert task.end_time is None
 
-    sleep(2)
 
     end_time = datetime.utcnow()
     update_dict = {
