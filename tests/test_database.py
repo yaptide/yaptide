@@ -189,7 +189,6 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session):
     tasks: list[TaskModel] = TaskModel.query.filter_by(simulation_id=simulation.id).all()
     assert len(tasks) == 100
 
-    sleep(2)
 
     update_dict = {
         'task_state': SimulationModel.JobState.RUNNING.value,
