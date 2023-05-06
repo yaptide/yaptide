@@ -153,7 +153,7 @@ def get_job_status(concat_job_id: str, cluster: ClusterModel) -> dict:
         logging.debug("Collect job is in RUNNING state")
     if job_state == "RUNNING":
         logging.debug("Main job is in RUNNING state")
-    if collect_state == "PENDING":  
+    if collect_state == "PENDING":
         logging.debug("Collect job is in PENDING state")
     if job_state == "PENDING":
         logging.debug("Main job is in PENDING state")
@@ -165,7 +165,7 @@ def get_job_status(concat_job_id: str, cluster: ClusterModel) -> dict:
 
 def get_job_results(concat_job_id: str, cluster: ClusterModel) -> dict:
     """Returns simulation results"""
-    utc_time, job_id, collect_id, _ = concat_job_id.split(":")
+    utc_time, _, collect_id, _ = concat_job_id.split(":")
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
     con = Connection(
         host=f"{cluster.cluster_username}@{cluster.cluster_name}",

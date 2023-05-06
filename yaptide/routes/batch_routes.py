@@ -78,7 +78,7 @@ class JobsBatch(Resource):
                 code=202,
                 content=result
             )
-        db.session.remove(simulation)
+        db.session.delete(simulation)
         db.session.commit()
         return yaptide_response(
             message="Job submission failed",
@@ -112,8 +112,8 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if (simulation.job_state == SimulationModel.JobState.COMPLETED.value
-            or simulation.job_state == SimulationModel.JobState.FAILED.value):
+        if simulation.job_state in (SimulationModel.JobState.COMPLETED.value,
+                                    SimulationModel.JobState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -163,7 +163,8 @@ class JobsBatch(Resource):
         except ValueError:
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
-        cluster: ClusterModel = db.session.query(ClusterModel).filter_by(user_id=user.id, cluster_name=cluster_name).first()
+        cluster: ClusterModel = db.session.query(ClusterModel).\
+            filter_by(user_id=user.id, cluster_name=cluster_name).first()
 
         result, status_code = delete_job(concat_job_id=job_id, cluster=cluster)
         return yaptide_response(

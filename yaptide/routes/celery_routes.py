@@ -4,7 +4,6 @@ from flask_restful import Resource
 from marshmallow import Schema, ValidationError
 from marshmallow import fields
 
-from datetime import datetime
 import uuid
 
 import logging
@@ -94,8 +93,8 @@ class JobsDirect(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if (simulation.job_state == SimulationModel.JobState.COMPLETED.value
-            or simulation.job_state == SimulationModel.JobState.FAILED.value):
+        if simulation.job_state in (SimulationModel.JobState.COMPLETED.value,
+                                    SimulationModel.JobState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
