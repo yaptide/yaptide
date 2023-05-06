@@ -4,13 +4,17 @@ from flask_restful import Resource
 from marshmallow import Schema
 from marshmallow import fields
 
+import logging
+import uuid
+
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
+from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel, TaskModel, ResultModel
 
-from yaptide.batch.batch_methods import submit_job, get_job, delete_job, get_job_results
+from yaptide.batch.batch_methods import submit_job, get_job_status, delete_job, get_job_results
 
 
 class JobsBatch(Resource):
@@ -47,102 +51,121 @@ class JobsBatch(Resource):
                       if "metadata" in payload_dict["sim_data"]
                       else SimulationModel.InputType.INPUT_FILES.value)
 
-        result, status_code = submit_job(payload_dict=payload_dict, cluster=cluster)
+        # create a new simulation in the database, not waiting for the job to finish
+        simulation = SimulationModel(user_id=user.id,
+                                     platform=SimulationModel.Platform.BATCH.value,
+                                     sim_type=sim_type,
+                                     input_type=input_type,
+                                     title=payload_dict.get("title", ''))
+        update_key = str(uuid.uuid4())
+        simulation.set_update_key(update_key)
+        db.session.add(simulation)
+        db.session.commit()
+
+        result = submit_job(payload_dict=payload_dict, cluster=cluster)
 
         if "job_id" in result:
-            simulation = SimulationModel(
-                job_id=result["job_id"],
-                user_id=user.id,
-                platform=SimulationModel.Platform.BATCH.value,
-                sim_type=sim_type,
-                title=payload_dict.get("title", ''),
-                input_type=input_type
-            )
+            job_id = result["job_id"]
+            simulation.job_id = job_id
 
-            db.session.add(simulation)
+            for i in range(payload_dict["ntasks"]):
+                task = TaskModel(simulation_id=simulation.id, task_id=f"{job_id}_{i+1}")
+                db.session.add(task)
             db.session.commit()
 
+            return yaptide_response(
+                message="Job submitted",
+                code=202,
+                content=result
+            )
+        db.session.remove(simulation)
+        db.session.commit()
         return yaptide_response(
-            message="",
-            code=status_code,
+            message="Job submission failed",
+            code=500,
             content=result
         )
 
-    class _ParamsSchema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
-        job_id = fields.String(load_default="None")
+        job_id = fields.String()
 
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method geting job's result"""
-        schema = JobsBatch._ParamsSchema()
+        schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return error_validation_response(content=errors)
         params_dict: dict = schema.load(request.args)
 
-        is_owned, error_message, res_code = check_if_job_is_owned(job_id=params_dict["job_id"], user=user)
+        job_id: str = params_dict["job_id"]
+
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        simulation: SimulationModel = db.session.query(SimulationModel).\
-            filter_by(job_id=params_dict["job_id"]).first()
-        splitted_job_id: list[str] = params_dict["job_id"].split(":")
+        tasks: list[TaskModel] = db.session.query(TaskModel).filter_by(simulation_id=simulation.id).all()
+
+        job_tasks_status = [task.get_status_dict() for task in tasks]
+
+        if (simulation.job_state == SimulationModel.JobState.COMPLETED.value
+            or simulation.job_state == SimulationModel.JobState.FAILED.value):
+            return yaptide_response(message=f"Job state: {simulation.job_state}",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                        "job_tasks_status": job_tasks_status,
+                                    })
+
         try:
-            utc_time, job_id, collect_id, cluster_name = splitted_job_id
+            _, _, _, cluster_name = job_id.split(":")
         except ValueError:
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
-        json_data = {
-            "utc_time": utc_time,
-            "job_id": job_id,
-            "collect_id": collect_id,
-            "start_time_for_dummy": simulation.start_time,
-            "end_time_for_dummy": simulation.end_time
-        }
 
-        result, status_code = get_job(json_data=json_data, cluster=cluster)
-
-        if "end_time" in result and simulation.end_time is None:
-            simulation.end_time = result['end_time']
+        job_info = get_job_status(concat_job_id=job_id, cluster=cluster)
+        if simulation.update_state(job_info):
             db.session.commit()
 
-        result.pop("end_time", None)
+        job_info.pop("end_time", None)
+        job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(
             message="",
-            code=status_code,
-            content=result
+            code=200,
+            content=job_info
         )
 
     @staticmethod
     @requires_auth(is_refresh=False)
     def delete(user: UserModel):
         """Method canceling job"""
-        schema = JobsBatch._ParamsSchema()
+        schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return error_validation_response(content=errors)
         params_dict: dict = schema.load(request.args)
 
-        is_owned, error_message, res_code = check_if_job_is_owned(job_id=params_dict["job_id"], user=user)
+        job_id: str = params_dict["job_id"]
+
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        splitted_job_id: list[str] = params_dict["job_id"].split(":")
-        utc_time, job_id, collect_id, cluster_name = splitted_job_id
-        cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
-        json_data = {
-            "utc_time": utc_time,
-            "job_id": job_id,
-            "collect_id": collect_id
-        }
-        result, status_code = delete_job(json_data=json_data, cluster=cluster)
+        try:
+            _, _, _, cluster_name = job_id.split(":")
+        except ValueError:
+            return error_validation_response(content={"message": "Job ID is incorrect"})
+
+        cluster: ClusterModel = db.session.query(ClusterModel).filter_by(user_id=user.id, cluster_name=cluster_name).first()
+
+        result, status_code = delete_job(concat_job_id=job_id, cluster=cluster)
         return yaptide_response(
             message="",
             code=status_code,
@@ -150,12 +173,51 @@ class JobsBatch(Resource):
         )
 
 
-def check_if_job_is_owned(job_id: str, user: UserModel) -> tuple[bool, str, int]:
-    """Function checking if provided task is owned by user managing action"""
-    simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+class ResultsBatch(Resource):
+    """Class responsible for returning simulation results"""
 
-    if not simulation:
-        return False, 'Task with provided ID does not exist', 404
-    if simulation.user_id == user.id:
-        return True, "", 200
-    return False, 'Task with provided ID does not belong to the user', 403
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters"""
+
+        job_id = fields.String()
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method geting job's result"""
+        schema = JobsBatch.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return error_validation_response(content=errors)
+        params_dict: dict = schema.load(request.args)
+
+        job_id: str = params_dict["job_id"]
+
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+
+        results: list[ResultModel] = db.session.query(ResultModel).filter_by(simulation_id=simulation.id).all()
+        if len(results) > 0:
+            # later on we would like to return persistent results
+            logging.debug("Returning results from database")
+
+        try:
+            _, _, _, cluster_name = job_id.split(":")
+        except ValueError:
+            return error_validation_response(content={"message": "Job ID is incorrect"})
+
+        cluster: ClusterModel = db.session.query(ClusterModel).\
+            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+
+        result: dict = get_job_results(concat_job_id=job_id, cluster=cluster)
+        if "result" not in result:
+            logging.debug("Results for job %s are unavailable", job_id)
+            return yaptide_response(message="Results are unavailable", code=404, content=result)
+
+        # later on we would like to add results to database here
+
+        logging.debug("Returning results from SLURM")
+        return yaptide_response(message=f"Results for job: {job_id}", code=200, content=result)

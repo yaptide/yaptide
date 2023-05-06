@@ -2,6 +2,8 @@ import io
 import json
 import tempfile
 
+import logging
+
 from zipfile import ZipFile
 from datetime import datetime
 from pathlib import Path
@@ -23,7 +25,7 @@ from yaptide.utils.sim_utils import (
 )
 
 
-def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
+def submit_job(payload_dict: dict, cluster: ClusterModel) -> dict:
     """Dummy version of submit_job"""
     utc_time = int(datetime.utcnow().timestamp()*1e6)
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
@@ -71,13 +73,13 @@ def submit_job(payload_dict: dict, cluster: ClusterModel) -> tuple[dict, int]:
             "message": "Job submission failed",
             "submit_stdout": submit_stdout,
             "sh_files": sh_files
-        }, 500
+        }
     return {
         "message": "Job submitted",
         "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}",
         "submit_stdout": submit_stdout,
         "sh_files": sh_files
-    }, 202
+    }
 
 
 def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> tuple[str, dict]:
@@ -123,11 +125,47 @@ def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> t
     }
 
 
-def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
-    """Dummy version of get_job"""
-    utc_time = json_data["utc_time"]
-    job_id = json_data["job_id"]
-    collect_id = json_data["collect_id"]
+def get_job_status(concat_job_id: str, cluster: ClusterModel) -> dict:
+    """Dummy version of get_job_status"""
+    _, job_id, collect_id, _ = concat_job_id.split(":")
+    pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
+    con = Connection(
+        host=f"{cluster.cluster_username}@{cluster.cluster_name}",
+        connect_kwargs={"pkey": pkey}
+    )
+
+    fabric_result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
+    job_state = fabric_result.stdout.split()[-1].split()[0]
+
+    fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
+    collect_state = fabric_result.stdout.split()[-1].split()[0]
+
+    if job_state == "FAILED" or collect_state == "FAILED":
+        return {
+            "job_state": SimulationModel.JobState.FAILED.value
+        }
+    if collect_state == "COMPLETED":
+        return {
+            "job_state": SimulationModel.JobState.COMPLETED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ")
+        }
+    if collect_state == "RUNNING":
+        logging.debug("Collect job is in RUNNING state")
+    if job_state == "RUNNING":
+        logging.debug("Main job is in RUNNING state")
+    if collect_state == "PENDING":  
+        logging.debug("Collect job is in PENDING state")
+    if job_state == "PENDING":
+        logging.debug("Main job is in PENDING state")
+
+    return {
+        "job_state": SimulationModel.JobState.RUNNING.value
+    }
+
+
+def get_job_results(concat_job_id: str, cluster: ClusterModel) -> dict:
+    """Returns simulation results"""
+    utc_time, job_id, collect_id, _ = concat_job_id.split(":")
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
     con = Connection(
         host=f"{cluster.cluster_username}@{cluster.cluster_name}",
@@ -137,17 +175,9 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
     scratch = fabric_result.stdout.split()[0]
 
     job_dir = f"{scratch}/yaptide_runs/{utc_time}"
-    fabric_result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
-    job_state = fabric_result.stdout.split()[-1].split()[0]
     fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
-    if job_state == "PENDING":  # skipcq: PTC-W0047
-        pass
-    if collect_state == "FAILED":
-        return {
-            "job_state": SimulationModel.JobState.FAILED.value,
-            "message": "Simulation FAILED"
-        }, 200
+
     if collect_state == "COMPLETED":
         fabric_result: Result = con.run(f'ls -f {job_dir}/output | grep .json', hide=True)
         result_dict = {"estimators": []}
@@ -160,54 +190,15 @@ def get_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
                     est_dict = json.load(json_file)
                     est_dict["name"] = filename.split('.')[0]
                     result_dict["estimators"].append(est_dict)
-        now = datetime.utcnow()
+
         return {
-            "job_state": SimulationModel.JobState.COMPLETED.value,
             "result": result_dict,
-            "end_time": now,
-            "job_tasks_status": [
-                {
-                    "task_id": 1,
-                    "task_state": SimulationModel.JobState.COMPLETED.value,
-                    "simulated_primaries": 2000,
-                    "requested_primaries": 2000,
-                    "run_time": {
-                        "hours": 0,
-                        "minutes": 0,
-                        "seconds": 45,
-                    }
-                }
-            ]
-        }, 200
-    if collect_state == "RUNNING":  # skipcq: PTC-W0047
-        pass
-    if job_state == "RUNNING":  # skipcq: PTC-W0047
-        pass
-    if collect_state == "PENDING":    # skipcq: PTC-W0047
-        pass
-
+        }
     return {
-        "job_state": SimulationModel.JobState.RUNNING.value,
-        "job_tasks_status": [
-            {
-                "task_id": 1,
-                "task_state": SimulationModel.JobState.RUNNING.value,
-                "simulated_primaries": 1000,
-                "requested_primaries": 2000,
-                "estimated_time": {
-                    "hours": 0,
-                    "minutes": 0,
-                    "seconds": 30,
-                }
-            }
-        ]
-    }, 200
+        "message": "Results not available"
+    }
 
 
-def get_job_results(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:
-    """Returns simulation results"""
-
-
-def delete_job(json_data: dict, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def delete_job(concat_job_id: str, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
     return {"message": "Not implemented yet"}, 404

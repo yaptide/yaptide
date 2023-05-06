@@ -119,20 +119,25 @@ class SimulationModel(db.Model):
         """Checks update key correctness"""
         return check_password_hash(self.update_key_hash, update_key)
 
-    def update_state(self, update_dict: dict):
+    def update_state(self, update_dict: dict) -> bool:
         """
         Updating database is more costly than a simple query.
         Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
+        Returns bool value telling if it is required to commit changes to db.
         """
+        db_commit_required = False
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
             self.job_state = update_dict["job_state"]
+            db_commit_required = True
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)
         # and if update was requested (`"end_time" in update_dict`)
         if "end_time" in update_dict and self.end_time is None:
             # a convertion from string to datetime is needed, as in the POST payload end_time comes in string format
             self.end_time = datetime.strptime(update_dict["end_time"], '%Y-%m-%d %H:%M:%S.%f')
+            db_commit_required = True
+        return db_commit_required
 
 
 class TaskModel(db.Model):

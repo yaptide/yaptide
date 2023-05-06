@@ -38,7 +38,7 @@ class OrderBy(Enum):
 class UserSimulations(Resource):
     """Class responsible for returning user's simulations' basic infos"""
 
-    class _ParamsSchema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         page_size = fields.Integer(load_default=DEFAULT_PAGE_SIZE)
@@ -50,7 +50,7 @@ class UserSimulations(Resource):
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
         """Method returning simulations from the database"""
-        schema = UserSimulations._ParamsSchema()
+        schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
 
         if params_dict['order_by'] == OrderBy.END_TIME.value:

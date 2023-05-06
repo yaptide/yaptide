@@ -21,7 +21,7 @@ from yaptide.batch.watcher import (
 from yaptide.persistence.models import SimulationModel
 
 
-def get_job_status_as_dict(job_id: str) -> dict:
+def get_job_status(job_id: str) -> dict:
     """
     Returns simulation state, results are not returned here
     Simulation may consist of multiple tasks, so we need to check all of them
@@ -30,7 +30,7 @@ def get_job_status_as_dict(job_id: str) -> dict:
     job = AsyncResult(id=job_id, app=celery_app)
     job_state: str = translate_celery_state_naming(job.state)
 
-    # we still need to  convert string to enum and operate later on Enum
+    # we still need to convert string to enum and operate later on Enum
     result = {
         "job_state": job_state
     }
@@ -55,14 +55,13 @@ def get_job_status_as_dict(job_id: str) -> dict:
 def get_job_results(job_id: str) -> dict:
     """Returns simulation results"""
     job = AsyncResult(id=job_id, app=celery_app)
-    result = {}
-    if "result" in job.info:
-        result = {
-            "result": job.info.get("result"),
-            "input_files": job.info.get("input_files"),
-            "input_json": job.info.get("input_json")
-        }
-    return result
+    if "result" not in job.info:
+        return {}
+    return {
+        "result": job.info.get("result"),
+        "input_files": job.info.get("input_files"),
+        "input_json": job.info.get("input_json")
+    }
 
 
 def translate_celery_state_naming(job_state: str) -> str:
