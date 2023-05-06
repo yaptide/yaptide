@@ -82,7 +82,7 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
     """Sends task update to database"""
     flask_url = os.environ.get("FLASK_INTERNAL_URL")
     if not flask_url:
-        logging.debug("Flask url not found")
+        logging.warning("Flask URL not found via FLASK_INTERNAL_URL")
         return
     dict_to_send = {
         "simulation_id": simulation_id,
