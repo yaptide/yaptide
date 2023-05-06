@@ -101,7 +101,7 @@ def payload_files_dict_data(payload_files_dict_path: Path) -> dict:
 
 @pytest.fixture(scope='session')
 def shieldhit_demo_binary():
-    """Checks if SHIELDHIT binary is installed and installs it if not"""
+    """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
     shieldhit_bin_path = installation_path / 'shieldhit'
     # check if on Windows
