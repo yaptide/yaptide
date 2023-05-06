@@ -115,7 +115,7 @@ def shieldhit_demo_binary():
 
 @pytest.fixture(scope='session')
 def add_directory_to_path():
-    """Adds bin directory to PATH"""
+    """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
     project_main_dir = Path(__file__).resolve().parent.parent
     bin_dir = project_main_dir / 'bin'
     logging.info("Adding %s to PATH", bin_dir)
