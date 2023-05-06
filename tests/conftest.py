@@ -65,7 +65,7 @@ def project_json_data(project_json_path: Path) -> dict:
 
 @pytest.fixture(scope='session')
 def payload_editor_dict_path() -> Path:
-    """Location of this script according to pathlib"""
+    """Path to payload JSON file"""
     main_dir = Path(__file__).resolve().parent
     return main_dir / "res" / "json_editor_payload.json"
 
