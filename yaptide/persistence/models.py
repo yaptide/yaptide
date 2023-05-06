@@ -133,7 +133,6 @@ class SimulationModel(db.Model):
         if "end_time" in update_dict and self.end_time is None:
             # a convertion from string to datetime is needed, as in the POST payload end_time comes in string format
             self.end_time = datetime.strptime(update_dict["end_time"], '%Y-%m-%d %H:%M:%S.%f')
-            self.estimated_time = 0
 
 
 class TaskModel(db.Model):
