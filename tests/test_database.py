@@ -129,7 +129,6 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.id is not None
     assert task.task_state == SimulationModel.JobState.PENDING.value
 
-    sleep(2)
 
     update_dict = {
         'task_state': SimulationModel.JobState.RUNNING.value,
