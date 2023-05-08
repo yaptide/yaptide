@@ -102,12 +102,10 @@ def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> t
         convertmc_version=pymchelper.__version__
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
-        array_header=array_header,
-        root_dir=job_dir
+        array_header=array_header
     )
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,
-        root_dir=job_dir,
         clear_bdos="true"
     )
 

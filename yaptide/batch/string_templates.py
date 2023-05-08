@@ -37,13 +37,13 @@ COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
 
-SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
+SHIELDHIT_CMD="ROOT_DIR=${{ROOT_DIR}} sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
 
 if [ -n "$JOB_ID" ] ; then
-    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
+    COLLECT_CMD="ROOT_DIR=${{ROOT_DIR}} BIN_DIR=${{BIN_DIR}} sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
@@ -52,10 +52,8 @@ fi
 
 COLLECT_BASH: str = """#!/bin/bash
 {collect_header}
-ROOT_DIR={root_dir}
 INPUT_WILDCARD=$ROOT_DIR/workspaces/task_*/*.bdo
 OUTPUT_DIRECTORY=$ROOT_DIR/output
-BIN_DIR=$ROOT_DIR/bin
 
 mkdir -p $OUTPUT_DIRECTORY
 
@@ -72,7 +70,6 @@ fi
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash
 {array_header}
-ROOT_DIR={root_dir}
 WORK_DIR=$ROOT_DIR/workspaces/task_`printf %04d $SLURM_ARRAY_TASK_ID`
 
 # seed of RNG
