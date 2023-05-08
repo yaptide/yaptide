@@ -1,7 +1,7 @@
 SUBMIT_SHIELDHIT: str = """#!/bin/bash
 OUT=`mktemp`
 export PATH="$PATH:$PLG_GROUPS_STORAGE/plggccbmc"
-module load gcc/11.3.0
+module load gcc
 
 ROOT_DIR={root_dir}
 BIN_DIR=$ROOT_DIR/bin

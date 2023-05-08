@@ -1,7 +1,9 @@
 import argparse
+import logging
 import re
 import signal
 import time
+
 from pathlib import Path
 
 
@@ -9,6 +11,8 @@ RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
+ESTIMATOR_MATCH = r"\bEstimator\s*\d*\s*:\s*.*\s*with\s*\d*\s*page.*\b"
+SAVED_MATCH = r"\bSaved all\s*\d*\s*estimator.*\b"
 
 
 def log_generator(thefile, timeout: int = 3600) -> str:
@@ -44,9 +48,10 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED"
         }
-        print(f"Update for task: {task_id} - FAILED")
+        logging.info("Update for task: %s - FAILED", task_id)
         return
 
+    estimators_filenames = []
     loglines = log_generator(logfile)
     for line in loglines:
         if re.search(RUN_MATCH, line):
@@ -59,7 +64,15 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
                     "seconds": int(splitted[9]),
                 }
             }
-            print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
+            logging.info("Update for task: %s - simulated primaries: %s", task_id, splitted[3])
+
+        elif re.search(ESTIMATOR_MATCH, line):
+            splitted = line.split()
+            estimators_filenames.append(splitted[3])
+            logging.info("Update for task: %s - estimator: %s", task_id, splitted[3])
+
+        elif re.search(SAVED_MATCH, line):
+            logging.info("Update for task: %s - estimators saved", task_id)
 
         elif re.search(REQUESTED_MATCH, line):
             splitted = line.split(": ")
@@ -68,7 +81,7 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
                 "requested_primaries": int(splitted[1]),
                 "task_state": "RUNNING"
             }
-            print(f"Update for task: {task_id} - RUNNING")
+            logging.info("Update for task: %s - RUNNING", task_id)
 
         elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
@@ -80,20 +93,24 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
                 },
                 "task_state": "COMPLETED"
             }
-            print(f"Update for task: {task_id} - COMPLETED")
+            logging.info("Update for task: %s - COMPLETED", task_id)
             return
 
         elif re.search(TIMEOUT_MATCH, line):
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED"
             }
-            print(f"Update for task: {task_id} - TIMEOUT")
+            logging.info("Update for task: %s - TIMEOUT", task_id)
             return
     return
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
+
+    logging.basicConfig(format="%(asctime)s - %(levelname)s - %(message)s",
+                        level=logging.INFO,
+                        datefmt="%Y-%m-%d %H:%M:%S")
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str)
@@ -103,7 +120,5 @@ if __name__ == "__main__":
     filepath_arg = Path(args.filepath)
     job_id_arg = args.job_id
     task_id_arg = args.task_id
-
-    print(filepath_arg, job_id_arg, task_id_arg)
 
     read_file(filepath=filepath_arg, job_id=job_id_arg, task_id=task_id_arg)
