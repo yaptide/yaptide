@@ -114,7 +114,7 @@ class YaptideTester:
     def read_input_files() -> dict:
         """Read shieldhit input files from input_files folder"""
         input_files = {}
-        for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat']:
+        for filename in ['geo.dat', 'detect.dat', 'beam.dat', 'mat.dat', 'sobp.dat']:
             file = Path(ROOT_DIR, 'input_files', filename)
             file.parent.mkdir(exist_ok=True, parents=True)
             with open(file, 'r') as reader:
