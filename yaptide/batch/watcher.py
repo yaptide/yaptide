@@ -12,7 +12,8 @@ COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 ESTIMATOR_MATCH = r"\bEstimator\s*\d*\s*:\s*.*\s*with\s*\d*\s*page.*\b"
-SAVED_MATCH = r"\bSaved all\s*\d*\s*estimator.*\b"
+SAVING_ESTIMATOR_MATCH = r"\bSaving estimator to"
+SAVING_END_MATCH = r"\bSaved all\s*\d*\s*estimator.*\b"
 
 
 def log_generator(thefile, timeout: int = 3600) -> str:
@@ -51,8 +52,10 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
         logging.info("Update for task: %s - FAILED", task_id)
         return
 
-    estimators_filenames = []
+    estimators_base_filenames = []
+    # estimators_partial_filenames = []
     loglines = log_generator(logfile)
+    saving_start_timestamp = None
     for line in loglines:
         if re.search(RUN_MATCH, line):
             splitted = line.split()
@@ -66,13 +69,27 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
             }
             logging.info("Update for task: %s - simulated primaries: %s", task_id, splitted[3])
 
+        elif re.search(SAVING_ESTIMATOR_MATCH, line):
+            if saving_start_timestamp is None:
+                saving_start_timestamp = time.time()
+                logging.info("Update for task: %s - saving start", task_id)
+            splitted = line.split()
+
         elif re.search(ESTIMATOR_MATCH, line):
             splitted = line.split()
-            estimators_filenames.append(splitted[3])
+            estimators_base_filenames.append(splitted[3])
             logging.info("Update for task: %s - estimator: %s", task_id, splitted[3])
 
-        elif re.search(SAVED_MATCH, line):
-            logging.info("Update for task: %s - estimators saved", task_id)
+        elif re.search(SAVING_END_MATCH, line):
+            if saving_start_timestamp is None:
+                logging.info("Update for task: %s - saving end without start (cannot measure time)", task_id)
+                continue
+            saving_time = time.time() - saving_start_timestamp
+            # reset saving_start_timestamp
+            saving_start_timestamp = None
+            # reset list of partial filenames
+            estimators_partial_filenames = []
+            logging.info("Update for task: %s - estimators saved in %f seconds", task_id, saving_time)
 
         elif re.search(REQUESTED_MATCH, line):
             splitted = line.split(": ")
