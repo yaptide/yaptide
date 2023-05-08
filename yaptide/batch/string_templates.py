@@ -94,7 +94,7 @@ sig_handler()
 }}
 
 FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-srun python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
+python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
     --job_id=$SLURM_JOB_ID --task_id=$SLURM_ARRAY_TASK_ID &
 
 trap 'sig_handler' SIGUSR1
