@@ -12,14 +12,12 @@ def create_app(config_object="yaptide.settings"):
     app = Flask(__name__.split('.')[0])
 
     SWAGGER_URL = '/api/docs'
-    API_URL = 'http://petstore.swagger.io/v2/swagger.json'
+    API_URL = '/static/openapi.yaml'
 
     swaggerui_blueprint = get_swaggerui_blueprint(
-        SWAGGER_URL,  # Swagger UI static files will be mapped to '{SWAGGER_URL}/dist/'
+        SWAGGER_URL,
         API_URL,
-        config={  # Swagger UI config overrides
-            'app_name': "yaptide"
-        }
+        config={'app_name': "yaptide"}
     )
 
     app.register_blueprint(swaggerui_blueprint)

@@ -1,0 +1,23 @@
+openapi: 3.0.3
+info:
+  title: Yaptide Project Api Documentation
+  version: 1.0.0
+  description: Example Description
+servers:
+  - url: http://localhost:5000/api
+paths:
+  /:
+    get:
+      summary: Allows to check if server is alive
+      description: Allows to check if server is alive
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    description: body message
