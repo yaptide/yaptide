@@ -33,11 +33,12 @@ echo "Using convertmc version: $CONVERTMC_VERSION"
 INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
+SIGNAL_SCRIPT=$ROOT_DIR/signal_script.sh
 
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
 
-SHIELDHIT_CMD="ROOT_DIR=${{ROOT_DIR}} sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
+SHIELDHIT_CMD="ROOT_DIR=${{ROOT_DIR}} BIN_DIR=${BIN_DIR} sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
@@ -47,6 +48,7 @@ if [ -n "$JOB_ID" ] ; then
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
+    SIGNAL_ID=$JOB_ID ROOT_DIR=$ROOT_DIR sbatch --time=00:39:59 --account=plgccbmc11-cpu --partition=plgrid $SIGNAL_SCRIPT
 fi
 """  # skipcq: FLK-E501
 
@@ -91,7 +93,7 @@ sig_handler()
 }}
 
 FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
+python3 $ROOT_DIR/watcher.py --workdir=$WORK_DIR --convertmc=$BIN_DIR/convertmc --filepath=$FILE_TO_WATCH\
     --job_id=$SLURM_JOB_ID --task_id=$SLURM_ARRAY_TASK_ID &
 
 trap 'sig_handler' SIGUSR1
@@ -101,3 +103,11 @@ srun shieldhit -N $RNG_SEED $WORK_DIR &
 
 wait
 """  # skipcq: FLK-E501
+
+SIGNAL_SCRIPT_BASH: str = """#!/bin/bash
+#SBATCH --nodes 1
+#SBATCH --ntasks 1
+#SBATCH --mem=1GB
+
+python3 $ROOT_DIR/analizer.py --root_dir=$ROOT_DIR --job_to_signal_id=$SIGNAL_ID 
+"""
