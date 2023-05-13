@@ -123,8 +123,8 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
             up_dict = {
                 "simulated_primaries": int(splitted[3]),
                 "estimated_time": int(splitted[9])
-                + int(splitted[7]) * 60
-                + int(splitted[5]) * 3600
+                    + int(splitted[7]) * 60
+                    + int(splitted[5]) * 3600
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
@@ -133,6 +133,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
             up_dict = {
                 "simulated_primaries": 0,
                 "requested_primaries": int(splitted[1]),
+                "start_time": utc_now.isoformat(sep=" "),
                 "task_state": SimulationModel.JobState.RUNNING.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)

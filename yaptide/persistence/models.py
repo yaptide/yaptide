@@ -167,7 +167,7 @@ class TaskModel(db.Model):
                                         default='PENDING',
                                         doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
-    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), default=now(), doc="Task start time")
+    start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
     last_update_time: Column[datetime] = db.Column(
         db.DateTime(timezone=True),
@@ -191,6 +191,9 @@ class TaskModel(db.Model):
         end_time_not_set = self.end_time is None
         if have_estim_time and end_time_not_set:
             self.estimated_time = update_dict["estimated_time"]
+        if "start_time" in update_dict and self.start_time is None:
+            # a convertion from string to datetime is needed, as in the POST payload start_time comes in string format
+            self.start_time = datetime.strptime(update_dict["start_time"], '%Y-%m-%d %H:%M:%S.%f')
         # Here we have a special case, `end_time` can be set only once
         # therefore we update it only if it not set previously (`self.end_time is None`)
         # and if update was requested (`"end_time" in update_dict`)
@@ -214,6 +217,10 @@ class TaskModel(db.Model):
                 "minutes": (self.estimated_time // 60) % 60,
                 "seconds": self.estimated_time % 60,
             }
+        if self.start_time:
+            result["start_time"] = self.start_time
+        if self.end_time:
+            result["end_time"] = self.end_time
         return result
 
 
