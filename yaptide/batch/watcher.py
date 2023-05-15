@@ -1,9 +1,10 @@
 import argparse
+import json
 import logging
 import re
 import signal
-import time
 import subprocess
+import time
 
 from pathlib import Path
 
@@ -17,9 +18,8 @@ SAVING_ESTIMATOR_MATCH = r"\bSaving estimator to"
 SAVING_END_MATCH = r"\bSaved all\s*\d*\s*estimator.*\b"
 SIGNAL_MATCH = r"Caught SIGUSR1. Saving data."
 
-HARDCODED_STATS_INFO = [
-    {
-        "name": "Z_narrow_LET",
+HARDCODED_STATS_INFO = {
+    "Z_narrow_LET": {
         "observables": [
             {
                 "page_number": 0,
@@ -31,7 +31,7 @@ HARDCODED_STATS_INFO = [
             }
         ]
     }
-]
+}
 
 
 def log_generator(thefile, timeout: int = 3600) -> str:
@@ -64,13 +64,17 @@ def change_date_to_phrase_in_name(old_name: str, phrase_to_insert: str) -> str:
     return new_name_base
 
 
-def check_if_file_is_observed(filename: str, observables: list[str]) -> bool:
-    """"""
-    filename_base = "_".join(filename.split("_")[:-3])
-    return filename_base in observables
+def get_page(page_number: str, json_obj: dict):
+    try:
+        for page in json_obj["pages"]:
+            if page["metadata"]["page_number"] == page_number:
+                return page
+    except:
+        pass
+    return None
 
 
-def read_file(filepath: Path, statspath: Path, convertmc: str, job_id: str, task_id: int):  # skipcq: PYL-W0613
+def read_file(filepath: Path, workdir: Path, convertmc: str, job_id: str, task_id: int):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
     logfile = None
     for _ in range(30):  # 30 stands for maximum attempts
@@ -87,10 +91,11 @@ def read_file(filepath: Path, statspath: Path, convertmc: str, job_id: str, task
         logging.info("Update for task: %s - FAILED", task_id)
         return
 
+    statspath = workdir / "stats.txt"
     with open(statspath, 'a') as writer:
         writer.write("")
 
-    observable_filenames: list[str] = [item["name"] for item in HARDCODED_STATS_INFO]
+    observables: dict = HARDCODED_STATS_INFO
     estimators_filenames_patterns: list[str] = []
     estimators_filepaths: list[str] = []
     loglines = log_generator(logfile)
@@ -131,14 +136,15 @@ def read_file(filepath: Path, statspath: Path, convertmc: str, job_id: str, task
             phrase_to_insert = ("final"
                                 if saving_start_timestamp is None
                                 else str(signals_caught))
-
+            data_to_write = {}
             for filepath_str in estimators_filepaths:
                 splitted_filepath = filepath_str.split("/")
                 filename = splitted_filepath[-1]
 
                 # we want to enter name changing block if file is observable
                 # or if it is final round of saving at the end of simulation
-                if (check_if_file_is_observed(filename, observable_filenames)
+                filename_base = "_".join(filename.split("_")[:-3])
+                if (filename_base in observables
                     or saving_start_timestamp is None):
                     new_filename = change_date_to_phrase_in_name(filename, phrase_to_insert)
                     splitted_filepath[-1] = new_filename
@@ -149,7 +155,19 @@ def read_file(filepath: Path, statspath: Path, convertmc: str, job_id: str, task
 
                     # we want to convert the file only if it is not final result
                     if saving_start_timestamp is not None:
+                        data_to_write[filename_base] = {}
                         subprocess.run([convertmc, "json", filepath_str])
+                        json_path = workdir / "_".join([filename_base, str(signals_caught), ".json"])
+                        with open(json_path, 'r') as reader:
+                            json_obj = json.load(reader)
+                        
+                        for observable in observables[filename_base]["observables"]:
+                            page_number = str(observable["page_number"])
+                            page = get_page(page_number, json_obj)
+                            if page is None:
+                                logging.info("Page %s not found", page_number)
+                                continue
+                            data_to_write[filename_base][page_number] = [page["data"]["values"][idx] for idx in observable["target_idxs"]]
 
                 # we want to remove unnecessary file (results are necessary)
                 if saving_start_timestamp is not None:
@@ -157,6 +175,7 @@ def read_file(filepath: Path, statspath: Path, convertmc: str, job_id: str, task
 
             if saving_start_timestamp is not None:
                 with open(statspath, 'a') as writer:
+                    writer.write(json.dumps(data_to_write))
                     writer.write("\n")
                 estimators_filepaths = []
                 saving_time = time.time() - saving_start_timestamp
@@ -212,10 +231,10 @@ if __name__ == "__main__":
     parser.add_argument("--job_id", type=str)
     parser.add_argument("--task_id", type=int)
     args = parser.parse_args()
-    stat_output_arg = Path(args.workdir) / "stats.txt"
+    workdir_arg = Path(args.workdir)
     convertmc_arg = args.convertmc
     filepath_arg = Path(args.filepath)
     job_id_arg = args.job_id
     task_id_arg = args.task_id
 
-    read_file(filepath=filepath_arg, statspath=stat_output_arg, convertmc=convertmc_arg, job_id=job_id_arg, task_id=task_id_arg)
+    read_file(filepath=filepath_arg, workdir=workdir_arg, convertmc=convertmc_arg, job_id=job_id_arg, task_id=task_id_arg)
