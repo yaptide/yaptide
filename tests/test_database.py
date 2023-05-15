@@ -128,10 +128,11 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.id is not None
     assert task.task_state == SimulationModel.JobState.PENDING.value
 
-
+    start_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
         'task_state': SimulationModel.JobState.RUNNING.value,
-        'simulated_primaries': 500
+        'simulated_primaries': 500,
+        'start_time': start_time
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 500
@@ -139,10 +140,10 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.end_time is None
 
 
-    end_time = datetime.utcnow()
+    end_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
         'task_state': SimulationModel.JobState.COMPLETED.value,
-        'end_time': str(end_time),
+        'end_time': end_time,
         'simulated_primaries': 1000
     }
     task.update_state(update_dict=update_dict)
@@ -187,17 +188,27 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session):
     tasks: list[TaskModel] = TaskModel.query.filter_by(simulation_id=simulation.id).all()
     assert len(tasks) == 100
 
+    start_time = datetime.utcnow().isoformat(sep=" ")
+    update_dict = {
+        'task_state': SimulationModel.JobState.RUNNING.value,
+        'simulated_primaries': 1,
+        'start_time': start_time
+    }
+    for task in tasks:
+        task.update_state(update_dict=update_dict)
+    db_session.commit()
 
     update_dict = {
         'task_state': SimulationModel.JobState.RUNNING.value,
         'simulated_primaries': 500
     }
+
     for idx, task in enumerate(tasks):
         if idx == 50:
-            end_time = datetime.utcnow()
+            end_time = datetime.utcnow().isoformat(sep=" ")
             update_dict = {
                 'task_state': SimulationModel.JobState.COMPLETED.value,
-                'end_time': str(end_time),
+                'end_time': end_time,
                 'simulated_primaries': 1000
             }
         task.update_state(update_dict=update_dict)
