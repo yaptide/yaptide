@@ -102,6 +102,24 @@ def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[Path | V
     yield json_data
 
 
+@pytest.fixture(scope='session')
+def result_dict_path() -> Generator[Path, None, None]:
+    """Path to json file with simulation results"""
+    main_dir = Path(__file__).resolve().parent
+    yield main_dir / "res" / "json_with_results.json"
+
+
+@pytest.fixture(scope='session')
+def result_dict_data(result_dict_path: Path) -> Generator[Path | ValueError, None, None]:
+    """Reads payload JSON file and returns its contents as dictionary"""
+    json_data = {}
+    if not result_dict_path.suffix == '.json':
+        raise ValueError("Result file must be JSON file")
+    with open(result_dict_path, 'r') as file_handle:
+        json_data = json.load(file_handle)
+    yield json_data
+
+
 @pytest.fixture(scope='function')
 def db_session():
     """Creates database session. For each test function new clean database is created"""

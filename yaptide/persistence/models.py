@@ -254,13 +254,40 @@ class InputModel(db.Model):
 
 
 class EstimatorModel(db.Model):
-    """Simulation single output results model"""
+    """Simulation single estimator model"""
 
-    __tablename__ = 'Result'
+    __tablename__ = 'Estimator'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
-    name: Column[str] = db.Column(db.String, nullable=False, doc="Result name")
-    compressed_data: Column[str] = db.Column(db.Text)
+    name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
+    compressed_data: Column[str] = db.Column(db.Text, doc="Estimator metadata")
+
+    @property
+    def data(self):
+        if self.compressed_data is not None:
+            # Decompress the data
+            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
+            # Deserialize the JSON
+            return json.loads(decompressed_data)
+        return None
+
+    @data.setter
+    def data(self, value):
+        if value is not None:
+            # Serialize the JSON
+            serialized_data = json.dumps(value)
+            # Compress the data
+            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+
+
+class PageModel(db.Model):
+    """Estimator single page model"""
+
+    __tablename__ = 'Page'
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'))
+    page_number: Column[int] = db.Column(db.String, nullable=False, doc="Page number")
+    compressed_data: Column[str] = db.Column(db.Text, doc="Page metadata")
 
     @property
     def data(self):

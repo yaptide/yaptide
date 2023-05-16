@@ -210,3 +210,25 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
         assert task.task_state == SimulationModel.JobState.COMPLETED.value
         assert task.end_time is not None
         assert task.end_time > task.start_time
+
+
+def test_save_results(db_session: scoped_session, db_good_username: str, db_good_password: str, result_dict_data: dict):
+    """Test saving results"""
+    # create a new user
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
+    db_session.add(user)
+    db_session.commit()
+
+    # create a new simulation for the user
+    simulation = SimulationModel(job_id='testjob',
+                                 user_id=user.id,
+                                 platform=SimulationModel.Platform.DIRECT.value,
+                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
+                                 title='testtitle',
+                                 update_key_hash='testkey')
+    db_session.add(simulation)
+    db_session.commit()
+
+    results = result_dict_data['results']
