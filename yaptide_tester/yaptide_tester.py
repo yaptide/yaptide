@@ -173,7 +173,8 @@ class YaptideTester:
                                 res: requests.Response = self.session.get(results_url, params={"job_id": job_id})
                                 res_json: dict = res.json()
                                 print(res_json["message"])
-                                if "estimators" in res_json and i == 0:
+                                # we want to trigger getting results from database not celery
+                                if "estimators" in res_json and i == 1:
                                     if len(job_id.split(":")) == 4:
                                         job_id = job_id.split(":")[1]  # only for file naming purpose
                                     with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
