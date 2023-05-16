@@ -110,3 +110,18 @@ def db_session():
         db.create_all()
         yield db.session
         db.drop_all()
+
+@pytest.fixture(scope='session')
+def db_good_username() -> str:
+    """Username for user with valid password"""
+    return "Gandalf"
+
+@pytest.fixture(scope='session')
+def db_good_password() -> str:
+    """Password for user with valid password"""
+    return "YouShallNotPass"
+
+@pytest.fixture(scope='session')
+def db_bad_username() -> str:
+    """Username for user with invalid password"""
+    return "Sauron"

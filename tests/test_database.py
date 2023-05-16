@@ -5,22 +5,22 @@ from sqlalchemy.orm.scoping import scoped_session
 from yaptide.persistence.models import (UserModel, SimulationModel, TaskModel, ClusterModel)
 
 
-def test_create_user(db_session: scoped_session):
-    user = UserModel(username="testuser")
-    user.set_password("testpassword")
+def test_create_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
     assert user.id is not None
-    assert user.username == 'testuser'
-    assert user.check_password('testpassword')
+    assert user.username == db_good_username
+    assert user.check_password(db_good_password)
 
 
-def test_cluster_model_creation(db_session: scoped_session):
+def test_cluster_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test cluster model creation"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
@@ -40,11 +40,11 @@ def test_cluster_model_creation(db_session: scoped_session):
     assert cluster.cluster_ssh_key == 'ssh_key'
 
 
-def test_simulation_model_creation(db_session: scoped_session):
+def test_simulation_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation model creation"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
@@ -69,11 +69,11 @@ def test_simulation_model_creation(db_session: scoped_session):
     assert simulation.job_state == SimulationModel.JobState.PENDING.value
 
 
-def test_task_model_creation_and_update(db_session: scoped_session):
+def test_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test task model creation"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
@@ -122,11 +122,11 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.end_time > task.start_time
 
 
-def test_simulation_with_multiple_tasks(db_session: scoped_session):
+def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation with multiple tasks"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
