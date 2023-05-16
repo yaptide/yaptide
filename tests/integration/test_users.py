@@ -1,3 +1,6 @@
+import logging
+from typing import Generator
+from flask import Flask
 import pytest
 from yaptide.persistence.database import db
 from yaptide.application import create_app
@@ -9,8 +12,8 @@ _Username_2 = "not_existing_user"
 _Password = "test_password"
 
 
-@pytest.fixture
-def app():  # skipcq: PY-D0003
+@pytest.fixture(scope='module')
+def app() -> Generator[Flask, None, None]:  # skipcq: PY-D0003
     _app = create_app()
     with _app.app_context():
         db.create_all()
@@ -20,7 +23,7 @@ def app():  # skipcq: PY-D0003
         db.drop_all()
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def client(app):  # skipcq: PY-D0003
     _client = app.test_client()
     yield _client
@@ -99,7 +102,7 @@ def test_user_status(client):
 def test_user_status_unauthorized(client):
     """Test checking user's status"""
     resp = client.get("/auth/status")
-
+    logging.info(resp.data)
     assert resp.status_code == 401  # skipcq: BAN-B101
 
 

@@ -7,6 +7,8 @@ We also use celery fixture from pytest-celery plugin, which starts celery worker
 This fixture is silencing most of the logging. To see the logs, use:
 WORKER_LOGLEVEL=debug pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
 """
+import copy
+import logging
 import platform
 import pytest
 
@@ -22,6 +24,7 @@ def celery_app():
     The choice of broker and backend is important, as we don't want to run external redis server.
     That is being configured via environment variables in pytest.ini file.
     """
+    logging.info("Creating celery app for testing")
     from yaptide.celery.worker import celery_app as app
     return app
 
@@ -36,9 +39,15 @@ def celery_worker_parameters():
 
     Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
     """
+    logging.info("Creating celery worker parameters for testing")
+
+    # get current logging level
+    log_level = logging.getLogger().getEffectiveLevel()
+
     return {
         "perform_ping_check": False,
-        "concurrency": 1
+        "concurrency": 1,
+        "loglevel": log_level, # set celery worker log level to the same as the one used by pytest
     }
 
 def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path,
@@ -50,25 +59,35 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
     So to bypass this issue we restrict the detect configuration to only one output and no filter.
     Below goes the code which reduces the detect.dat.
     """
-    payload_editor_dict_data["ntasks"] = 1
+
+    # lets make a local copy of the payload dict, so we don't modify the original one
+    payload_dict = copy.deepcopy(payload_editor_dict_data)
+
+    # limit the particle numbers to get faster results
+    payload_dict["ntasks"] = 100
+    payload_dict["sim_data"]["beam"]["numberOfParticles"] = 1
 
     if platform.system() == "Windows":
-        payload_editor_dict_data["sim_data"]["detectManager"]["filters"] = []
-        payload_editor_dict_data["sim_data"]["detectManager"]["detectGeometries"] = [payload_editor_dict_data["sim_data"]["detectManager"]["detectGeometries"][0]]
-        payload_editor_dict_data["sim_data"]["scoringManager"]["scoringOutputs"] = [payload_editor_dict_data["sim_data"]["scoringManager"]["scoringOutputs"][0]]
-        for output in payload_editor_dict_data["sim_data"]["scoringManager"]["scoringOutputs"]:
+        payload_dict["sim_data"]["detectManager"]["filters"] = []
+        payload_dict["sim_data"]["detectManager"]["detectGeometries"] = [payload_dict["sim_data"]["detectManager"]["detectGeometries"][0]]
+        payload_dict["sim_data"]["scoringManager"]["scoringOutputs"] = [payload_dict["sim_data"]["scoringManager"]["scoringOutputs"][0]]
+        for output in payload_dict["sim_data"]["scoringManager"]["scoringOutputs"]:
             for quantity in output["quantities"]["active"]:
                 if "filter" in quantity:
                     del quantity["filter"]
 
-    job = run_simulation.delay(payload_dict=payload_editor_dict_data)
+    logging.info("Starting run_simulation task")
+    job = run_simulation.delay(payload_dict=payload_dict)
+    logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
+    logging.info("run_simulation task finished")
     assert 'input_files' in result.keys()
     assert 'result' in result.keys()
 
 
-def test_cancel_simulation(celery_app, celery_worker):
+def test_cancel_simulation(celery_app, celery_worker, payload_editor_dict_data):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
     result: dict = job.wait()
+    logging.info(f'Number of particles in the simulation: {payload_editor_dict_data["sim_data"]["beam"]["numberOfParticles"]}')
     assert result is False

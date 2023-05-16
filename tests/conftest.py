@@ -40,83 +40,61 @@ Therefore for `payload_files_dict['sim_data']`,
 import json
 import logging
 from pathlib import Path
-import os
+from typing import Generator
 import pytest
 
 
 @pytest.fixture(scope='session')
-def project_json_path() -> Path:
+def project_json_path() -> Generator[Path, None, None]:
     """Path to JSON project file"""
     main_dir = Path(__file__).resolve().parent.parent
     logging.debug("Main dir %s", main_dir)
-    return main_dir / "yaptide_tester" / "example.json"
+    yield main_dir / "yaptide_tester" / "example.json"
 
 
 @pytest.fixture(scope='session')
-def project_json_data(project_json_path: Path) -> dict:
+def project_json_data(project_json_path: Path) -> Generator[Path | ValueError, None, None]:
     """Reads project JSON file and returns its contents as dictionary"""
     json_data = {}
     if not project_json_path.suffix == '.json':
         raise ValueError("Payload file must be JSON file")
     with open(project_json_path, 'r') as file_handle:
         json_data = json.load(file_handle)
-    return json_data
+    yield json_data
 
 
 @pytest.fixture(scope='session')
-def payload_editor_dict_path() -> Path:
+def payload_editor_dict_path() -> Generator[Path, None, None]:
     """Path to payload JSON file"""
     main_dir = Path(__file__).resolve().parent
-    return main_dir / "res" / "json_editor_payload.json"
+    yield main_dir / "res" / "json_editor_payload.json"
 
 
 @pytest.fixture(scope='session')
-def payload_editor_dict_data(payload_editor_dict_path: Path) -> dict:
+def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[Path | ValueError, None, None]:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
     if not payload_editor_dict_path.suffix == '.json':
         raise ValueError("Payload file must be JSON file")
     with open(payload_editor_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
-    return json_data
+    yield json_data
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_path() -> Path:
+def payload_files_dict_path() -> Generator[Path, None, None]:
     """Path to payload file with simulation defined as user uploaded files"""
     main_dir = Path(__file__).resolve().parent
-    return main_dir / "res" / "json_files_payload.json"
+    yield main_dir / "res" / "json_files_payload.json"
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_data(payload_files_dict_path: Path) -> dict:
+def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[Path | ValueError, None, None]:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
     if not payload_files_dict_path.suffix == '.json':
         raise ValueError("Payload file must be JSON file")
     with open(payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
-    return json_data
+    yield json_data
 
-
-@pytest.fixture(scope='session')
-def shieldhit_demo_binary():
-    """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
-    from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
-    shieldhit_bin_path = installation_path / 'shieldhit'
-    # check if on Windows
-    if os.name == 'nt':
-        # append exe extension to the path
-        shieldhit_bin_path = shieldhit_bin_path.with_suffix('.exe')
-    logging.info("SHIELDHIT binary path %s", shieldhit_bin_path)
-    if not shieldhit_bin_path.exists():
-        install_simulator(SimulatorType.shieldhit)
-
-
-@pytest.fixture(scope='session')
-def add_directory_to_path():
-    """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
-    project_main_dir = Path(__file__).resolve().parent.parent
-    bin_dir = project_main_dir / 'bin'
-    logging.info("Adding %s to PATH", bin_dir)
-    os.environ['PATH'] = f'{bin_dir}' + os.pathsep + os.environ['PATH']

@@ -15,7 +15,7 @@ from yaptide.persistence.models import (
 )
 
 
-@pytest.fixture()
+@pytest.fixture(scope='function')
 def db_session():
     _app = create_app()
     with _app.app_context():
