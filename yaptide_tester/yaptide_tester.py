@@ -169,16 +169,16 @@ class YaptideTester:
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
                         if res_json.get('job_state') == "COMPLETED":
-                            res: requests.Response = self.session.get(results_url, params={"job_id": job_id})
-                            res_json: dict = res.json()
-
-                            if res_json.get('result'):
-                                if len(job_id.split(":")) == 4:
-                                    job_id = job_id.split(":")[1]  # only for file naming purpose
-                                with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
-                                    data_to_write = str(res_json['result'])
-                                    data_to_write = data_to_write.replace("'", "\"")
-                                    writer.write(data_to_write)
+                            for i in range(2):
+                                res: requests.Response = self.session.get(results_url, params={"job_id": job_id})
+                                res_json: dict = res.json()
+                                print(res_json["message"])
+                                if "estimators" in res_json and i == 0:
+                                    if len(job_id.split(":")) == 4:
+                                        job_id = job_id.split(":")[1]  # only for file naming purpose
+                                    with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
+                                        data_to_write = json_lib.dumps({"estimators": res_json['estimators']})
+                                        writer.write(data_to_write)
                             return
                         print(res_json)
                         if res_json.get('logfile'):

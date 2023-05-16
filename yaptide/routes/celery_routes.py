@@ -9,7 +9,7 @@ import uuid
 import logging
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, EstimatorModel
+from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, EstimatorModel, PageModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
@@ -166,20 +166,44 @@ class ResultsDirect(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        results: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
-        if len(results) > 0:
+        estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
+        if len(estimators) > 0:
             # later on we would like to return persistent results
             logging.debug("Returning results from database")
+            result_estimators = []
+            for estimator in estimators:
+                pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
+                estimator_dict = {
+                    "metadata": estimator.data,
+                    "name": estimator.name,
+                    "pages": [page.data for page in pages]
+                }
+                result_estimators.append(estimator_dict)
+            return yaptide_response(message=f"Results for job: {job_id}, from db, estimators No: {len(estimators)}", code=200, content={"estimators": result_estimators})
+
+            # TODO: change API description:
+            # now results are going to be the only data returned from this endpoint
+            # so there is no need of overextended tree structure
 
         result: dict = get_job_results(job_id=job_id)
-        if "result" not in result:
+        if "estimators" not in result:
             logging.debug("Results for job %s are unavailable", job_id)
             return yaptide_response(message="Results are unavailable", code=404, content=result)
 
-        # later on we would like to add results to database here
+        for estimator_dict in result["estimators"]:
+            estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
+            estimator.data = estimator_dict["metadata"]
+            db.session.add(estimator)
+            db.session.commit()
+            for page_dict in estimator_dict["pages"]:
+                page = PageModel(estimator_id=estimator.id,
+                                 page_number=int(page_dict["metadata"]["page_number"]))
+                page.data = page_dict
+                db.session.add(page)
+            db.session.commit()
 
         logging.debug("Returning results from Celery")
-        return yaptide_response(message=f"Results for job: {job_id}", code=200, content=result)
+        return yaptide_response(message=f"Results for job: {job_id}, from Celery, len = {len(estimators)}", code=200, content=result)
 
 
 class ConvertInputFiles(Resource):

@@ -57,11 +57,7 @@ def get_job_results(job_id: str) -> dict:
     job = AsyncResult(id=job_id, app=celery_app)
     if "result" not in job.info:
         return {}
-    return {
-        "result": job.info.get("result"),
-        "input_files": job.info.get("input_files"),
-        "input_json": job.info.get("input_json")
-    }
+    return job.info.get("result")
 
 
 def translate_celery_state_naming(job_state: str) -> str:
