@@ -33,7 +33,7 @@ def add_directory_to_path():
 
 
 @pytest.fixture(scope='function')
-def app() -> Generator[Flask, None, None]:
+def app_fixture() -> Generator[Flask, None, None]:
     _app = create_app()
     with _app.app_context():
         db.create_all()
@@ -44,6 +44,6 @@ def app() -> Generator[Flask, None, None]:
 
 
 @pytest.fixture(scope='function')
-def client(app):
-    _client = app.test_client()
+def client_fixture(app_fixture):
+    _client = app_fixture.test_client()
     yield _client

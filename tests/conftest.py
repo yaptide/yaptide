@@ -43,6 +43,9 @@ from pathlib import Path
 from typing import Generator
 import pytest
 
+from yaptide.application import create_app
+from yaptide.persistence.database import db
+
 
 @pytest.fixture(scope='session')
 def project_json_path() -> Generator[Path, None, None]:
@@ -98,3 +101,27 @@ def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[Path | V
         json_data = json.load(file_handle)
     yield json_data
 
+
+@pytest.fixture(scope='function')
+def db_session():
+    """Creates database session. For each test function new clean database is created"""
+    _app = create_app()
+    with _app.app_context():
+        db.create_all()
+        yield db.session
+        db.drop_all()
+
+@pytest.fixture(scope='session')
+def db_good_username() -> str:
+    """Username for user with valid password"""
+    return "Gandalf"
+
+@pytest.fixture(scope='session')
+def db_good_password() -> str:
+    """Password for user with valid password"""
+    return "YouShallNotPass"
+
+@pytest.fixture(scope='session')
+def db_bad_username() -> str:
+    """Username for user with invalid password"""
+    return "Sauron"

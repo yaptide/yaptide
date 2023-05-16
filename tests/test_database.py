@@ -1,55 +1,34 @@
 from datetime import datetime
 
-import pytest
-
 from sqlalchemy.orm.scoping import scoped_session
 
-from yaptide.application import create_app
-
-from yaptide.persistence.database import db
-from yaptide.persistence.models import (
-    UserModel,
-    SimulationModel,
-    TaskModel,
-    ClusterModel
-)
+from yaptide.persistence.models import (UserModel, SimulationModel, TaskModel, ClusterModel)
 
 
-@pytest.fixture(scope='function')
-def db_session():
-    _app = create_app()
-    with _app.app_context():
-        db.create_all()
-        yield db.session
-        db.drop_all()
-
-
-def test_create_user(db_session: scoped_session):
-    user = UserModel(username="testuser")
-    user.set_password("testpassword")
+def test_create_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
     assert user.id is not None
-    assert user.username == 'testuser'
-    assert user.check_password('testpassword')
+    assert user.username == db_good_username
+    assert user.check_password(db_good_password)
 
 
-def test_cluster_model_creation(db_session: scoped_session):
+def test_cluster_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test cluster model creation"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
     # create a new cluster for the user
-    cluster = ClusterModel(
-        user_id=user.id,
-        cluster_name='testcluster',
-        cluster_username='testuser',
-        cluster_ssh_key='ssh_key'
-    )
+    cluster = ClusterModel(user_id=user.id,
+                           cluster_name='testcluster',
+                           cluster_username='testuser',
+                           cluster_ssh_key='ssh_key')
     db_session.add(cluster)
     db_session.commit()
 
@@ -61,24 +40,22 @@ def test_cluster_model_creation(db_session: scoped_session):
     assert cluster.cluster_ssh_key == 'ssh_key'
 
 
-def test_simulation_model_creation(db_session: scoped_session):
+def test_simulation_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation model creation"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
     # create a new simulation for the user
-    simulation = SimulationModel(
-        job_id='testjob',
-        user_id=user.id,
-        platform=SimulationModel.Platform.DIRECT.value,
-        input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
-        sim_type=SimulationModel.SimType.SHIELDHIT.value,
-        title='testtitle',
-        update_key_hash='testkey'
-    )
+    simulation = SimulationModel(job_id='testjob',
+                                 user_id=user.id,
+                                 platform=SimulationModel.Platform.DIRECT.value,
+                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
+                                 title='testtitle',
+                                 update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 
@@ -92,34 +69,27 @@ def test_simulation_model_creation(db_session: scoped_session):
     assert simulation.job_state == SimulationModel.JobState.PENDING.value
 
 
-def test_task_model_creation_and_update(db_session: scoped_session):
+def test_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test task model creation"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
     # create a new simulation for the user
-    simulation = SimulationModel(
-        job_id='testjob',
-        user_id=user.id,
-        platform=SimulationModel.Platform.DIRECT.value,
-        input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
-        sim_type=SimulationModel.SimType.SHIELDHIT.value,
-        title='testtitle',
-        update_key_hash='testkey'
-    )
+    simulation = SimulationModel(job_id='testjob',
+                                 user_id=user.id,
+                                 platform=SimulationModel.Platform.DIRECT.value,
+                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
+                                 title='testtitle',
+                                 update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 
     # create a new task for the simulation
-    task = TaskModel(
-        simulation_id=simulation.id,
-        task_id='testtask',
-        requested_primaries=1000,
-        simulated_primaries=0
-    )
+    task = TaskModel(simulation_id=simulation.id, task_id='testtask', requested_primaries=1000, simulated_primaries=0)
     db_session.add(task)
     db_session.commit()
 
@@ -139,7 +109,6 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.task_state == SimulationModel.JobState.RUNNING.value
     assert task.end_time is None
 
-
     end_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
         'task_state': SimulationModel.JobState.COMPLETED.value,
@@ -153,35 +122,28 @@ def test_task_model_creation_and_update(db_session: scoped_session):
     assert task.end_time > task.start_time
 
 
-def test_simulation_with_multiple_tasks(db_session: scoped_session):
+def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation with multiple tasks"""
     # create a new user
-    user = UserModel(username='testuser')
-    user.set_password("testpassword")
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
     # create a new simulation for the user
-    simulation = SimulationModel(
-        job_id='testjob',
-        user_id=user.id,
-        platform=SimulationModel.Platform.DIRECT.value,
-        input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
-        sim_type=SimulationModel.SimType.SHIELDHIT.value,
-        title='testtitle',
-        update_key_hash='testkey'
-    )
+    simulation = SimulationModel(job_id='testjob',
+                                 user_id=user.id,
+                                 platform=SimulationModel.Platform.DIRECT.value,
+                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
+                                 title='testtitle',
+                                 update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 
     task_ids = [f"task_{i}" for i in range(100)]
     for task_id in task_ids:
-        task = TaskModel(
-            simulation_id=simulation.id,
-            task_id=task_id,
-            requested_primaries=1000,
-            simulated_primaries=0
-        )
+        task = TaskModel(simulation_id=simulation.id, task_id=task_id, requested_primaries=1000, simulated_primaries=0)
         db_session.add(task)
     db_session.commit()
 
@@ -198,10 +160,7 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session):
         task.update_state(update_dict=update_dict)
     db_session.commit()
 
-    update_dict = {
-        'task_state': SimulationModel.JobState.RUNNING.value,
-        'simulated_primaries': 500
-    }
+    update_dict = {'task_state': SimulationModel.JobState.RUNNING.value, 'simulated_primaries': 500}
 
     for idx, task in enumerate(tasks):
         if idx == 50:
