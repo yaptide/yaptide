@@ -152,3 +152,5 @@ id_ed25519
 
 yaptide_tester/output/
 yaptide/data/
+
+bin/

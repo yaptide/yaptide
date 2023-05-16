@@ -1,6 +1,9 @@
 from datetime import datetime
 from enum import Enum
 
+import gzip
+import json
+
 from sqlalchemy import Column
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
@@ -224,12 +227,57 @@ class TaskModel(db.Model):
         return result
 
 
+class InputModel(db.Model):
+    """Simulation inputs model"""
+
+    __tablename__ = 'Input'
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
+    compressed_data: Column[str] = db.Column(db.Text)
+
+    @property
+    def data(self):
+        if self.compressed_data is not None:
+            # Decompress the data
+            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
+            # Deserialize the JSON
+            return json.loads(decompressed_data)
+        return None
+
+    @data.setter
+    def data(self, value):
+        if value is not None:
+            # Serialize the JSON
+            serialized_data = json.dumps(value)
+            # Compress the data
+            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+
+
 class ResultModel(db.Model):
-    """Simulation results model"""
+    """Simulation single output results model"""
 
     __tablename__ = 'Result'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
+    name: Column[str] = db.Column(db.String, nullable=False, doc="Result name")
+    compressed_data: Column[str] = db.Column(db.Text)
+
+    @property
+    def data(self):
+        if self.compressed_data is not None:
+            # Decompress the data
+            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
+            # Deserialize the JSON
+            return json.loads(decompressed_data)
+        return None
+
+    @data.setter
+    def data(self, value):
+        if value is not None:
+            # Serialize the JSON
+            serialized_data = json.dumps(value)
+            # Compress the data
+            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
 
 
 def create_models():

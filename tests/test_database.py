@@ -2,7 +2,25 @@ from datetime import datetime
 
 from sqlalchemy.orm.scoping import scoped_session
 
-from yaptide.persistence.models import (UserModel, SimulationModel, TaskModel, ClusterModel)
+from yaptide.persistence.models import (
+    UserModel,
+    SimulationModel,
+    TaskModel,
+    ClusterModel,
+    InputModel,
+    ResultModel
+)
+
+
+# def test_json(db_session: scoped_session):
+#     new_data = {'name': 'John', 'age': 30}
+#     record = MyModel()
+#     record.data = new_data
+#     db_session.add(record)
+#     db_session.commit()
+
+#     record: MyModel = MyModel.query.filter_by(id=record.id).first()
+#     assert record.data == new_data
 
 
 def test_create_user(db_session: scoped_session, db_good_username: str, db_good_password: str):

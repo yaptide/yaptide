@@ -1,5 +1,5 @@
 {
-    "ntasks": 12,
+    "ntasks": 4,
     "sim_type": "shieldhit",
     "title": "Proton pencil beam in water",
     "sim_data": {

@@ -64,8 +64,7 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
     # limit the particle numbers to get faster results
-    payload_dict["ntasks"] = 100
-    payload_dict["sim_data"]["beam"]["numberOfParticles"] = 1
+    payload_dict["sim_data"]["beam"]["numberOfParticles"] = 12
 
     if platform.system() == "Windows":
         payload_dict["sim_data"]["detectManager"]["filters"] = []
