@@ -8,7 +8,7 @@ from yaptide.persistence.models import (
     TaskModel,
     ClusterModel,
     InputModel,
-    ResultModel
+    EstimatorModel
 )
 
 

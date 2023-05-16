@@ -9,7 +9,7 @@ import uuid
 import logging
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, ResultModel
+from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, EstimatorModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
@@ -166,7 +166,7 @@ class ResultsDirect(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        results: list[ResultModel] = db.session.query(ResultModel).filter_by(simulation_id=simulation.id).all()
+        results: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
         if len(results) > 0:
             # later on we would like to return persistent results
             logging.debug("Returning results from database")

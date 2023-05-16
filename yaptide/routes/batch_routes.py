@@ -12,7 +12,7 @@ from yaptide.routes.utils.response_templates import yaptide_response, error_vali
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel, TaskModel, ResultModel
+from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel, TaskModel, EstimatorModel
 
 from yaptide.batch.batch_methods import submit_job, get_job_status, delete_job, get_job_results
 
@@ -200,7 +200,7 @@ class ResultsBatch(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        results: list[ResultModel] = db.session.query(ResultModel).filter_by(simulation_id=simulation.id).all()
+        results: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
         if len(results) > 0:
             # later on we would like to return persistent results
             logging.debug("Returning results from database")
