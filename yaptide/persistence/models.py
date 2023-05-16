@@ -287,7 +287,7 @@ class PageModel(db.Model):
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'), nullable=False)
     page_number: Column[int] = db.Column(db.String, nullable=False, doc="Page number")
-    compressed_data: Column[str] = db.Column(db.Text, doc="Page metadata")
+    compressed_data: Column[str] = db.Column(db.Text, doc="Page json object - data, axes and metadata")
 
     @property
     def data(self):
