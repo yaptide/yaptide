@@ -258,7 +258,7 @@ class EstimatorModel(db.Model):
 
     __tablename__ = 'Estimator'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
     name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
     compressed_data: Column[str] = db.Column(db.Text, doc="Estimator metadata")
 
@@ -285,7 +285,7 @@ class PageModel(db.Model):
 
     __tablename__ = 'Page'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'))
+    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'), nullable=False)
     page_number: Column[int] = db.Column(db.String, nullable=False, doc="Page number")
     compressed_data: Column[str] = db.Column(db.Text, doc="Page metadata")
 
