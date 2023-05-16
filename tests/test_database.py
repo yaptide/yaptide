@@ -202,8 +202,38 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
         assert task.end_time > task.start_time
 
 
-def test_save_results(db_session: scoped_session, db_good_username: str, db_good_password: str, result_dict_data: dict):
-    """Test saving results"""
+def test_create_input(db_session: scoped_session, db_good_username: str, db_good_password: str, payload_editor_dict_data: dict):
+    """Test creation of input in db for simulation"""
+    # create a new user
+    user = UserModel(username=db_good_username)
+    user.set_password(db_good_password)
+    db_session.add(user)
+    db_session.commit()
+
+    # create a new simulation for the user
+    simulation = SimulationModel(job_id='testjob',
+                                 user_id=user.id,
+                                 platform=SimulationModel.Platform.DIRECT.value,
+                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
+                                 title='testtitle',
+                                 update_key_hash='testkey')
+    db_session.add(simulation)
+    db_session.commit()
+
+    # create a new input
+    input = InputModel(simulation_id=simulation.id)
+    input.data = payload_editor_dict_data
+    db_session.add(input)
+    db_session.commit()
+
+    assert input.id is not None
+    assert input.simulation_id == simulation.id
+    assert input.data == payload_editor_dict_data
+
+
+def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_username: str, db_good_password: str, result_dict_data: dict):
+    """Test creation of estimators and pages in db for a result"""
     # create a new user
     user = UserModel(username=db_good_username)
     user.set_password(db_good_password)
