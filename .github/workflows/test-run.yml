@@ -43,12 +43,13 @@ jobs:
           pip install -r requirements-test.txt
 
       - name: Run main tests
-        run: pytest tests/
+        run: pytest
 
   # upload coverage report to deepsource
   report-test-converage-deepsource:
     needs: build-and-test
     runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -70,7 +71,7 @@ jobs:
         run: curl https://deepsource.io/cli | sh
 
       - name: Generate tests coverage report
-        run: pytest --cov=./ --cov-report xml  tests/
+        run: pytest --cov=./ --cov-report xml
 
       - name: Upload coverage report to deepsource
         run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
