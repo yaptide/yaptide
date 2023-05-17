@@ -68,7 +68,6 @@ class JobsDirect(Resource):
 
         job_id = fields.String()
 
-    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
@@ -148,7 +147,6 @@ class ResultsDirect(Resource):
 
         job_id = fields.String()
 
-    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
@@ -179,10 +177,6 @@ class ResultsDirect(Resource):
                 }
                 result_estimators.append(estimator_dict)
             return yaptide_response(message=f"Results for job: {job_id}, results from db", code=200, content={"estimators": result_estimators})
-
-            # TODO: change API description:
-            # now results are going to be the only data returned from this endpoint
-            # so there is no need of overextended tree structure
 
         result: dict = get_job_results(job_id=job_id)
         if "estimators" not in result:
@@ -231,7 +225,6 @@ class SimulationInputs(Resource):
 
         job_id = fields.String()
 
-    # why get is a static method ? it could be a class method and have direct access to cls.APIParametersSchema
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):

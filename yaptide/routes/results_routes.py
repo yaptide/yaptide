@@ -1,11 +1,17 @@
-from flask import request
-from flask_restful import Resource
 import logging
 
-from yaptide.persistence.database import db
-from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel
+from flask import request
+from flask_restful import Resource
 
+from marshmallow import Schema, ValidationError
+from marshmallow import fields
+
+from yaptide.persistence.database import db
+from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel, UserModel
+
+from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 
 class Results(Resource):
@@ -63,3 +69,41 @@ class Results(Resource):
             db.session.commit()
 
         return yaptide_response(message="Results saved", code=202)
+
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters"""
+
+        job_id = fields.String()
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning job status and results"""
+        schema = Results.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        job_id = param_dict['job_id']
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+
+        estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
+        if len(estimators) > 0:
+            logging.debug("Returning results from database")
+            result_estimators = []
+            for estimator in estimators:
+                pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
+                estimator_dict = {
+                    "metadata": estimator.data,
+                    "name": estimator.name,
+                    "pages": [page.data for page in pages]
+                }
+                result_estimators.append(estimator_dict)
+            return yaptide_response(message=f"Results for job: {job_id}, results from db", code=200, content={"estimators": result_estimators})
+
+        return yaptide_response(message="Results are unavailable", code=404)

@@ -19,7 +19,7 @@ class Endpoints:
         self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
         self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
 
-        self.http_results_direct = f'http://{host}:{port}/results/direct'
+        self.http_results_direct = f'http://{host}:{port}/results'
         self.http_results_batch = f'http://{host}:{port}/results/batch'
 
         self.http_convert = f'http://{host}:{port}/sh/convert'

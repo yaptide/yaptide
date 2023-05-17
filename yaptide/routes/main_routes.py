@@ -28,7 +28,6 @@ def initialize_routes(api: Api):
     api.add_resource(TaskUpdate, "/tasks/update")
     api.add_resource(Results, "/results")
 
-    api.add_resource(ResultsDirect, "/results/direct")
     api.add_resource(ResultsBatch, "/results/batch")
 
     api.add_resource(ConvertInputFiles, "/sh/convert")
