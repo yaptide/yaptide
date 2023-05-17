@@ -8,8 +8,15 @@ from flask import Flask
 from yaptide.persistence.database import db
 
 
-def test_run_simulation_with_flask(celery_app, celery_worker, client_fixture: Flask, db_good_username: str, db_good_password: str, payload_editor_dict_data: dict):
-    """Test if user can log in"""
+def test_run_simulation_with_flask(celery_app, 
+                                   celery_worker, 
+                                   client_fixture: Flask, 
+                                   db_good_username: str, 
+                                   db_good_password: str, 
+                                   payload_editor_dict_data: dict,
+                                   add_directory_to_path,
+                                   shieldhit_demo_binary):
+    """Test we can run simulations"""
     client_fixture.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
