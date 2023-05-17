@@ -10,6 +10,7 @@ def create_app(config_object="yaptide.settings"):
     """Function starting Flask Server"""
     app = Flask(__name__.split('.')[0])
     app.config.from_object(config_object)
+    
     db.init_app(app)
     CORS(app, supports_credentials=True)
 

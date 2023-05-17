@@ -9,6 +9,7 @@ import pytest
 from yaptide.application import create_app
 from yaptide.persistence.database import db
 
+
 @pytest.fixture(scope='session')
 def shieldhit_demo_binary():
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
@@ -47,3 +48,37 @@ def app_fixture() -> Generator[Flask, None, None]:
 def client_fixture(app_fixture):
     _client = app_fixture.test_client()
     yield _client
+
+
+@pytest.fixture(scope='function')
+def celery_app():
+    """
+    Create celery app for testing, we reuse the one from yaptide.celery.worker module.
+    The choice of broker and backend is important, as we don't want to run external redis server.
+    That is being configured via environment variables in pytest.ini file.
+    """
+    logging.info("Creating celery app for testing")
+    from yaptide.celery.worker import celery_app as app
+    return app
+
+
+@pytest.fixture(scope="function")
+def celery_worker_parameters():
+    """
+    Default celery worker parameters cause problems with finding "ping task" module, as being described here:
+    https://github.com/celery/celery/issues/4851#issuecomment-604073785
+    To solve that issue we disable the ping check.
+    Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
+
+    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
+    """
+    logging.info("Creating celery worker parameters for testing")
+
+    # get current logging level
+    log_level = logging.getLogger().getEffectiveLevel()
+
+    return {
+        "perform_ping_check": False,
+        "concurrency": 1,
+        "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
+    }
