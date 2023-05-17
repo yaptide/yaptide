@@ -9,7 +9,7 @@ from celery.result import AsyncResult
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
-from yaptide.celery.utils.utils import read_file
+from yaptide.celery.utils.utils import read_file, send_simulation_results
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, files_dict_with_adjusted_primaries,
                                      pymchelper_output_to_json, simulation_input_files, simulation_logfiles,
@@ -25,6 +25,7 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
     If one or both of them are missing, monitoring will not be performed
     """
     result = {}
+    logging.getLogger(__name__).setLevel(logging.WARNING)
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -102,7 +103,8 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
         simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
                                                             dir_path=Path(tmp_dir_path))
 
-        result["result"] = simulation_result
+        if not send_simulation_results(simulation_id=simulation_id, update_key=update_key, estimators=simulation_result):
+            result["result"] = simulation_result
         result["input_json"] = payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None
         result["input_files"] = files_dict
         result["end_time"] = datetime.utcnow().isoformat(sep=" ")

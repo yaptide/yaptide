@@ -181,8 +181,8 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
         task.update_state(update_dict=update_dict)
     db_session.commit()
 
-    tasks_running: list[TaskModel] = TaskModel.query.filter_by(simulation_id=simulation.id).\
-        filter_by(task_state=SimulationModel.JobState.RUNNING.value).all()
+    tasks_running: list[TaskModel] = TaskModel.query.filter_by(
+        simulation_id=simulation.id, task_state=SimulationModel.JobState.RUNNING.value).all()
     assert len(tasks_running) == 50
 
     for task in tasks_running:
@@ -190,8 +190,8 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
         assert task.task_state == SimulationModel.JobState.RUNNING.value
         assert task.end_time is None
 
-    tasks_completed: list[TaskModel] = TaskModel.query.filter_by(simulation_id=simulation.id).\
-        filter_by(task_state=SimulationModel.JobState.COMPLETED.value).all()
+    tasks_completed: list[TaskModel] = TaskModel.query.filter_by(
+        simulation_id=simulation.id, task_state=SimulationModel.JobState.COMPLETED.value).all()
 
     assert len(tasks_completed) == 50
 
@@ -273,8 +273,8 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
     assert len(estimators) == len(result_dict_data["estimators"])
 
     for estimator_dict in result_dict_data["estimators"]:
-        estimator: EstimatorModel = EstimatorModel.query.filter_by(simulation_id=simulation.id).\
-            filter_by(name=estimator_dict["name"]).first()
+        estimator: EstimatorModel = EstimatorModel.query.filter_by(
+            simulation_id=simulation.id, name=estimator_dict["name"]).first()
         assert estimator is not None
         assert estimator.data == estimator_dict["metadata"]
 
@@ -282,7 +282,7 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
         assert len(pages) == len(estimator_dict["pages"])
 
         for page_dict in estimator_dict["pages"]:
-            page: PageModel = PageModel.query.filter_by(estimator_id=estimator.id).\
-                filter_by(page_number=int(page_dict["metadata"]["page_number"])).first()
+            page: PageModel = PageModel.query.filter_by(
+                estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])).first()
             assert page is not None
             assert page.data == page_dict

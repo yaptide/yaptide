@@ -1,5 +1,6 @@
 from flask import request
 from flask_restful import Resource
+import logging
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel
@@ -23,27 +24,42 @@ class Results(Resource):
         }
         """
         payload_dict: dict = request.get_json(force=True)
-        if {"simulation_id", "update_key", "update_dict"} != set(payload_dict.keys()):
+        if {"simulation_id", "update_key", "estimators"} != set(payload_dict.keys()):
             return yaptide_response(message="Incomplete JSON data", code=400)
 
         sim_id = payload_dict["simulation_id"]
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()
 
         if not simulation:
-            return yaptide_response(message="Task does not exist", code=400)
+            return yaptide_response(message="Simulation does not exist", code=400)
 
         if not simulation.check_update_key(payload_dict["update_key"]):
             return yaptide_response(message="Invalid update key", code=400)
-        
+
         for estimator_dict in payload_dict["estimators"]:
             # We forsee the possibility of the estimator being created earlier as element of partial results
             estimator: EstimatorModel = db.session.query(EstimatorModel).filter_by(
                 simulation_id=sim_id, name=estimator_dict["name"]).first()
-            
+
             if not estimator:
                 estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
                 estimator.data = estimator_dict["metadata"]
                 db.session.add(estimator)
                 db.session.commit()
-        
+            
+            for page_dict in estimator_dict["pages"]:
+                page: PageModel = db.session.query(PageModel).filter_by(
+                    estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])).first()
+
+                page_existed = True if page else False
+                if not page_existed:
+                    # create new page
+                    page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
+                # we always update the data
+                page.data = page_dict
+                if not page_existed:
+                    # if page was created, we add it to the session
+                    db.session.add(page)
+            db.session.commit()
+
         return yaptide_response(message="Results saved", code=202)

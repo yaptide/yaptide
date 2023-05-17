@@ -36,8 +36,8 @@ class TaskUpdate(Resource):
         if not simulation.check_update_key(payload_dict["update_key"]):
             return yaptide_response(message="Invalid update key", code=400)
 
-        task: TaskModel = db.session.query(TaskModel).filter_by(simulation_id=payload_dict["simulation_id"],
-                                                                task_id=payload_dict["task_id"]).first()
+        task: TaskModel = db.session.query(TaskModel).filter_by(
+            simulation_id=payload_dict["simulation_id"], task_id=payload_dict["task_id"]).first()
 
         if not task:
             return yaptide_response(message="Task does not exist", code=400)

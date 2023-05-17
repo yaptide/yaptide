@@ -74,12 +74,12 @@ def translate_celery_state_naming(job_state: str) -> str:
     return job_state
 
 
-def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict):
-    """Sends task update to database"""
+def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
+    """Sends task update to flask to update database"""
     flask_url = os.environ.get("FLASK_INTERNAL_URL")
     if not flask_url:
         logging.warning("Flask URL not found via FLASK_INTERNAL_URL")
-        return
+        return False
     dict_to_send = {
         "simulation_id": simulation_id,
         "task_id": task_id,
@@ -88,7 +88,27 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
     }
     res: requests.Response = requests.Session().post(url=f"{flask_url}/tasks/update", json=dict_to_send)
     if res.status_code != 202:
-        logging.debug("Task update for %s - Failed: %s", task_id, res.json().get("message"))
+        logging.warning("Task update for %s - Failed: %s", task_id, res.json().get("message"))
+        return False
+    return True
+
+
+def send_simulation_results(simulation_id: int, update_key: str, estimators: dict) -> bool:
+    """Sends results of simulation to flask to save it in database"""
+    flask_url = os.environ.get("FLASK_INTERNAL_URL")
+    if not flask_url:
+        logging.warning("Flask URL not found via FLASK_INTERNAL_URL")
+        return False
+    dict_to_send = {
+        "simulation_id": simulation_id,
+        "update_key": update_key,
+        "estimators": estimators["estimators"],
+    }
+    res: requests.Response = requests.Session().post(url=f"{flask_url}/results", json=dict_to_send)
+    if res.status_code != 202:
+        logging.warning("Saving results failed: %s", res.json().get("message"))
+        return False
+    return True
 
 
 def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):
