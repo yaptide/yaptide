@@ -66,6 +66,7 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
         self.update_state(state="PROGRESS", meta=new_state_meta)
         logging.debug("state updated to PROGRESS, meta: %s", new_state_meta)
 
+        monitoring_processes = []
         if update_key is not None and simulation_id is not None:
             logging.debug("starting monitoring processes")
             monitoring_processes = [Process(
