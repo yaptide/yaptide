@@ -56,7 +56,7 @@ def test_run_simulation_with_flask(celery_app,
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
         logging.info(data["message"])
-        assert set(data.keys()) == {"message", "job_state"}
+        assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == payload_dict["ntasks"]
         if data['job_state'] == 'COMPLETED':
             break
