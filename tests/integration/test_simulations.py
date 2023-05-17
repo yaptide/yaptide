@@ -41,6 +41,7 @@ def test_run_simulation_with_flask(celery_app,
                 if "filter" in quantity:
                     del quantity["filter"]
 
+    logging.info("Sending job submition request on /jobs/direct endpoint")
     resp = client_fixture.post("/jobs/direct",
                                data=json.dumps(payload_dict),
                                content_type='application/json')
@@ -51,20 +52,22 @@ def test_run_simulation_with_flask(celery_app,
     job_id = data["job_id"]
 
     while True:
+        logging.info("Sending check job status request on /jobs/direct endpoint")
         resp = client_fixture.get("/jobs/direct",
                                   query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
-        logging.info(data["message"])
+
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == payload_dict["ntasks"]
         if data['job_state'] == 'COMPLETED':
             break
         sleep(1)
 
+    logging.info("Fetching results from /results/direct endpoint")
     resp = client_fixture.get("/results/direct",
                               query_string={"job_id": job_id})
     data: dict = json.loads(resp.data.decode())
-    logging.info(data["message"])
+
     assert resp.status_code == 200  # skipcq: BAN-B101
     assert {"message", "estimators"} == set(data.keys())
