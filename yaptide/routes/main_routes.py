@@ -30,8 +30,8 @@ def initialize_routes(api: Api):
 
     api.add_resource(ResultsBatch, "/results/batch")
 
-    api.add_resource(ConvertInputFiles, "/sh/convert")
-    api.add_resource(SimulationInputs, "/sh/inputs")
+    api.add_resource(ConvertInputFiles, "/convert")
+    api.add_resource(SimulationInputs, "/inputs")
 
     api.add_resource(UserSimulations, "/user/simulations")
     api.add_resource(UserClusters, "/user/clusters")

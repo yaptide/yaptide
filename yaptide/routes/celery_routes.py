@@ -240,7 +240,10 @@ class SimulationInputs(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        job = get_input_files.delay(job_id=job_id)
-        result: dict = job.wait()
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        return yaptide_response(message=result['info'], code=200, content=result)
+        input: InputModel = db.session.query(InputModel).filter_by(simulation_id=simulation.id).first()
+        if not input:
+            return yaptide_response(message="Input of simulation is unavailable", code=404)
+
+        return yaptide_response(message="Input of simulation", code=200, content={"input": input.data})
