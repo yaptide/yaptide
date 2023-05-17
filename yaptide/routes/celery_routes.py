@@ -215,35 +215,3 @@ class ConvertInputFiles(Resource):
         result: dict = job.wait()
 
         return yaptide_response(message="Converted Input Files", code=200, content=result)
-
-
-class SimulationInputs(Resource):
-    """Class responsible for returning converted simulation input files"""
-
-    class APIParametersSchema(Schema):
-        """Class specifies API parameters"""
-
-        job_id = fields.String()
-
-    @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
-        """Method returning simulation input files"""
-        schema = SimulationInputs.APIParametersSchema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        param_dict: dict = schema.load(request.args)
-        job_id = param_dict['job_id']
-
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
-        if not is_owned:
-            return yaptide_response(message=error_message, code=res_code)
-
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
-
-        input: InputModel = db.session.query(InputModel).filter_by(simulation_id=simulation.id).first()
-        if not input:
-            return yaptide_response(message="Input of simulation is unavailable", code=404)
-
-        return yaptide_response(message="Input of simulation", code=200, content={"input": input.data})

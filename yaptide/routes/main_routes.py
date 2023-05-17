@@ -3,9 +3,9 @@ from flask_restful import Api
 
 from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
 from yaptide.routes.batch_routes import JobsBatch, ResultsBatch
-from yaptide.routes.celery_routes import JobsDirect, SimulationInputs, ConvertInputFiles, ResultsDirect
+from yaptide.routes.celery_routes import JobsDirect, ConvertInputFiles
 from yaptide.routes.task_routes import TaskUpdate
-from yaptide.routes.results_routes import Results
+from yaptide.routes.common_sim_routes import SimulationResults, SimulationInputs
 from yaptide.routes.user_routes import UserSimulations, UserClusters, UserUpdate
 
 
@@ -26,12 +26,13 @@ def initialize_routes(api: Api):
     api.add_resource(JobsBatch, "/jobs/batch")
 
     api.add_resource(TaskUpdate, "/tasks/update")
-    api.add_resource(Results, "/results")
+
+    api.add_resource(SimulationResults, "/results")
+    api.add_resource(SimulationInputs, "/inputs")
 
     api.add_resource(ResultsBatch, "/results/batch")
 
     api.add_resource(ConvertInputFiles, "/convert")
-    api.add_resource(SimulationInputs, "/inputs")
 
     api.add_resource(UserSimulations, "/user/simulations")
     api.add_resource(UserClusters, "/user/clusters")
