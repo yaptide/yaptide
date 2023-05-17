@@ -77,10 +77,10 @@ class SimulationModel(db.Model):
     class SimType(Enum):
         """Simulation type specification"""
 
-        SHIELDHIT = "SHIELDHIT"
-        TOPAS = "TOPAS"
-        FLUKA = "FLUKA"
-        DUMMY = "DUMMY"
+        SHIELDHIT = "shieldhit"
+        TOPAS = "topas"
+        FLUKA = "fluka"
+        DUMMY = "dummy"
 
     __tablename__ = 'Simulation'
 

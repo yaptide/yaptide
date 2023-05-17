@@ -18,6 +18,7 @@ from yaptide.persistence.models import (
     ClusterModel,
     TaskModel,
     EstimatorModel,
+    InputModel,
     PageModel
 )
 
@@ -48,12 +49,6 @@ class JobsBatch(Resource):
             filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
         cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
 
-        sim_type = (SimulationModel.SimType.SHIELDHIT.value
-                    if "sim_type" not in payload_dict
-                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value
-                    else SimulationModel.SimType.DUMMY.value)
-        payload_dict["sim_type"] = sim_type.lower()
-
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
                       if "metadata" in payload_dict["sim_data"]
                       else SimulationModel.InputType.INPUT_FILES.value)
@@ -61,7 +56,7 @@ class JobsBatch(Resource):
         # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(user_id=user.id,
                                      platform=SimulationModel.Platform.BATCH.value,
-                                     sim_type=sim_type,
+                                     sim_type=payload_dict["sim_type"],
                                      input_type=input_type,
                                      title=payload_dict.get("title", ''))
         update_key = str(uuid.uuid4())
@@ -78,6 +73,9 @@ class JobsBatch(Resource):
             for i in range(payload_dict["ntasks"]):
                 task = TaskModel(simulation_id=simulation.id, task_id=f"{job_id}_{i+1}")
                 db.session.add(task)
+            input = InputModel(simulation_id=simulation.id)
+            input.data = payload_dict
+            db.session.add(input)
             db.session.commit()
 
             return yaptide_response(

@@ -9,7 +9,7 @@ import uuid
 import logging
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, EstimatorModel, PageModel
+from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, EstimatorModel, PageModel, InputModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
@@ -29,14 +29,11 @@ class JobsDirect(Resource):
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
+        
+        required_keys = {"sim_type", "ntasks", "sim_data"}
 
-        if "sim_data" not in payload_dict:
+        if required_keys != required_keys.intersection(set(payload_dict.keys())):
             return error_validation_response()
-
-        # we need to handle better lower and upper case
-        sim_type = (SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in payload_dict
-                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else
-                    SimulationModel.SimType.DUMMY.value)
 
         input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
                       if "metadata" in payload_dict["sim_data"] else SimulationModel.InputType.INPUT_FILES.value)
@@ -44,7 +41,7 @@ class JobsDirect(Resource):
         # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(user_id=user.id,
                                      platform=SimulationModel.Platform.DIRECT.value,
-                                     sim_type=sim_type,
+                                     sim_type=payload_dict["sim_type"],
                                      input_type=input_type,
                                      title=payload_dict.get("title", ''))
         update_key = str(uuid.uuid4())
@@ -59,6 +56,9 @@ class JobsDirect(Resource):
         for i in range(payload_dict["ntasks"]):
             task = TaskModel(simulation_id=simulation.id, task_id=f"{job.id}_{i+1}")
             db.session.add(task)
+        input = InputModel(simulation_id=simulation.id)
+        input.data = payload_dict
+        db.session.add(input)
         db.session.commit()
 
         return yaptide_response(message="Task started", code=202, content={'job_id': job.id})
@@ -216,12 +216,8 @@ class ConvertInputFiles(Resource):
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
 
-        sim_type = (SimulationModel.SimType.SHIELDHIT.value if "sim_type" not in payload_dict
-                    or payload_dict["sim_type"].upper() == SimulationModel.SimType.SHIELDHIT.value else
-                    SimulationModel.SimType.DUMMY.value)
-
         # Rework in later PRs to match pattern from jobs endpoint
-        job = convert_input_files.delay(payload_dict={"sim_type": sim_type.lower(), "sim_data": payload_dict})
+        job = convert_input_files.delay(payload_dict=payload_dict)
         result: dict = job.wait()
 
         return yaptide_response(message="Converted Input Files", code=200, content=result)

@@ -24,8 +24,7 @@ class TaskUpdate(Resource):
         simulation_id and task_id self explanatory
         """
         payload_dict: dict = request.get_json(force=True)
-        required_keys = {"simulation_id", "task_id", "update_key", "update_dict"}
-        if not required_keys.intersection(set(payload_dict.keys())):
+        if {"simulation_id", "task_id", "update_key", "update_dict"} != set(payload_dict.keys()):
             return yaptide_response(message="Incomplete JSON data", code=400)
 
         sim_id = payload_dict["simulation_id"]
