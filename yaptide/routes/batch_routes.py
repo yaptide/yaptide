@@ -12,7 +12,14 @@ from yaptide.routes.utils.response_templates import yaptide_response, error_vali
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel, TaskModel, EstimatorModel
+from yaptide.persistence.models import (
+    UserModel,
+    SimulationModel,
+    ClusterModel,
+    TaskModel,
+    EstimatorModel,
+    PageModel
+)
 
 from yaptide.batch.batch_methods import submit_job, get_job_status, delete_job, get_job_results
 
@@ -200,10 +207,19 @@ class ResultsBatch(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        results: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
-        if len(results) > 0:
-            # later on we would like to return persistent results
+        estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
+        if len(estimators) > 0:
             logging.debug("Returning results from database")
+            result_estimators = []
+            for estimator in estimators:
+                pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
+                estimator_dict = {
+                    "metadata": estimator.data,
+                    "name": estimator.name,
+                    "pages": [page.data for page in pages]
+                }
+                result_estimators.append(estimator_dict)
+            return yaptide_response(message=f"Results for job: {job_id}, results from db", code=200, content={"estimators": result_estimators})
 
         try:
             _, _, _, cluster_name = job_id.split(":")
@@ -214,11 +230,21 @@ class ResultsBatch(Resource):
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
 
         result: dict = get_job_results(concat_job_id=job_id, cluster=cluster)
-        if "result" not in result:
+        if "estimators" not in result:
             logging.debug("Results for job %s are unavailable", job_id)
             return yaptide_response(message="Results are unavailable", code=404, content=result)
 
-        # later on we would like to add results to database here
+        for estimator_dict in result["estimators"]:
+            estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
+            estimator.data = estimator_dict["metadata"]
+            db.session.add(estimator)
+            db.session.commit()
+            for page_dict in estimator_dict["pages"]:
+                page = PageModel(estimator_id=estimator.id,
+                                 page_number=int(page_dict["metadata"]["page_number"]))
+                page.data = page_dict
+                db.session.add(page)
+            db.session.commit()
 
         logging.debug("Returning results from SLURM")
-        return yaptide_response(message=f"Results for job: {job_id}", code=200, content=result)
+        return yaptide_response(message=f"Results for job: {job_id}, results from Slurm", code=200, content=result)

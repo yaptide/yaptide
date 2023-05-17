@@ -191,9 +191,7 @@ def get_job_results(concat_job_id: str, cluster: ClusterModel) -> dict:
                     est_dict["name"] = filename.split('.')[0]
                     result_dict["estimators"].append(est_dict)
 
-        return {
-            "result": result_dict,
-        }
+        return result_dict
     return {
         "message": "Results not available"
     }

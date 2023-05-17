@@ -168,7 +168,6 @@ class ResultsDirect(Resource):
 
         estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
         if len(estimators) > 0:
-            # later on we would like to return persistent results
             logging.debug("Returning results from database")
             result_estimators = []
             for estimator in estimators:
@@ -179,7 +178,7 @@ class ResultsDirect(Resource):
                     "pages": [page.data for page in pages]
                 }
                 result_estimators.append(estimator_dict)
-            return yaptide_response(message=f"Results for job: {job_id}, from db, estimators No: {len(estimators)}", code=200, content={"estimators": result_estimators})
+            return yaptide_response(message=f"Results for job: {job_id}, results from db", code=200, content={"estimators": result_estimators})
 
             # TODO: change API description:
             # now results are going to be the only data returned from this endpoint
@@ -203,7 +202,7 @@ class ResultsDirect(Resource):
             db.session.commit()
 
         logging.debug("Returning results from Celery")
-        return yaptide_response(message=f"Results for job: {job_id}, from Celery, len = {len(estimators)}", code=200, content=result)
+        return yaptide_response(message=f"Results for job: {job_id}, results from Celery", code=200, content=result)
 
 
 class ConvertInputFiles(Resource):
