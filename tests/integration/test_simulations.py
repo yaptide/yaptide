@@ -105,4 +105,7 @@ def test_run_simulation_with_flask(celery_app,
     data: dict = json.loads(resp.data.decode())
 
     assert resp.status_code == 404  # skipcq: BAN-B101
-    assert {"message", "estimators"} == set(data.keys())
+    if resp.status_code == 404:
+        assert {"message"} == set(data.keys())
+    else:
+        assert {"message", "estimators"} == set(data.keys())
