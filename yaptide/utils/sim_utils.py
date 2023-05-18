@@ -49,8 +49,6 @@ class JSON_TYPE(Enum):
 
 def get_json_type(payload_dict: dict) -> JSON_TYPE:
     """Returns type of provided JSON"""
-    # core_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])  # skipcq: PTC-W0018
-    # if core_input_file_names == core_input_file_names.intersection(set(payload_dict["input_files"].keys())):
     if "input_files" in payload_dict:
         return JSON_TYPE.Files
     return JSON_TYPE.Editor
