@@ -133,6 +133,7 @@ def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
 
 
 def test_input_files_writing(payload_editor_dict_data: dict, tmp_path: Path):
+    """Test if input files are written to the directory"""
     files_dict = check_and_convert_payload_to_files_dict(payload_editor_dict_data)
 
     # check if temporary directory exists

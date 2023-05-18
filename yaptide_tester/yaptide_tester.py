@@ -183,15 +183,12 @@ class YaptideTester:
                                     if len(job_id.split(":")) == 4:
                                         job_id = job_id.split(":")[1]  # only for file naming purpose
                                     with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
-                                        data_to_write = json_lib.dumps({"estimators": res_json['estimators']})
-                                        writer.write(data_to_write)
+                                        writer.write(json_lib.dumps({"estimators": res_json['estimators']}))
                             return
                         print(res_json)
                         if res_json.get('logfile'):
                             with open(Path(ROOT_DIR, 'output', 'error_full_output.json'), 'w') as writer:
-                                data_to_write = str(res_json)
-                                data_to_write = data_to_write.replace("'", "\"")
-                                writer.write(data_to_write)
+                                writer.write(json_lib.dumps(res_json))
                             with open(Path(ROOT_DIR, 'output', 'shieldlog.log'), 'w') as writer:
                                 writer.write(res_json['logfile'])
                             for key, value in res_json['input_files'].items():

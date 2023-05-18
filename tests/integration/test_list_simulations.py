@@ -2,21 +2,18 @@ import copy
 import json
 import logging
 import platform
-import pytest
-from time import sleep
+import pytest  # skipcq: PY-W2000
 from flask import Flask
 
-from yaptide.persistence.database import db
 
-
-def test_list_simulations(celery_app, 
-                                   celery_worker, 
-                                   client_fixture: Flask, 
-                                   db_good_username: str, 
-                                   db_good_password: str, 
-                                   payload_editor_dict_data: dict,
-                                   add_directory_to_path,
-                                   shieldhit_demo_binary):
+def test_list_simulations(celery_app,
+                          celery_worker,
+                          client_fixture: Flask,
+                          db_good_username: str,
+                          db_good_password: str,
+                          payload_editor_dict_data: dict,
+                          add_directory_to_path,
+                          shieldhit_demo_binary):
     """Test we can run simulations"""
     client_fixture.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),

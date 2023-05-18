@@ -19,10 +19,7 @@ from yaptide.batch.string_templates import (
 )
 from yaptide.batch.utils.utils import extract_sbatch_header, convert_dict_to_sbatch_options
 from yaptide.persistence.models import SimulationModel, ClusterModel
-from yaptide.utils.sim_utils import (
-    files_dict_with_adjusted_primaries,
-    write_simulation_input_files
-)
+from yaptide.utils.sim_utils import write_simulation_input_files
 
 
 def submit_job(payload_dict: dict, files_dict: dict, cluster: ClusterModel) -> dict:

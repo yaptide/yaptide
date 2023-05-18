@@ -2,11 +2,9 @@ import copy
 import json
 import logging
 import platform
-import pytest
+import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
-
-from yaptide.persistence.database import db
 
 
 def test_run_simulation_with_flask(celery_app, 
@@ -60,7 +58,7 @@ def test_run_simulation_with_flask(celery_app,
     #   - cluster_name: name of the cluster where the job is running (if slurm is used)
     #   - simulation_type: shieldhit / Fluka / TOPAS
     # some of the stuff above is in the user/simulation endpoint
-    '''
+    """
     "input_type" : "editor", // or "files"
     "input_files": { // always present, we may either get it from UI or we need to generate it using backend
 		"beam.dat": "\nRNDSEED      \t89736501     ! Random seed\nJPART0       \t2            ! Incident particle type\nTMAX0      \t150.0 1.5       ! Incident energy and energy spread; both in (MeV/nucl)\nTCUT0 0 1000  ! energy cutoffs [MeV]\nNSTAT       10000    0       ! NSTAT, Step of saving\nSTRAGG          2            ! Straggling: 0-Off 1-Gauss, 2-Vavilov\nMSCAT           2            ! Mult. scatt 0-Off 1-Gauss, 2-Moliere\nNUCRE           1            ! Nucl.Reac. switcher: 1-ON, 0-OFF\nBEAMPOS 0 0 0 ! Position of the beam\nBEAMDIR 0.0 0.0 ! Direction of the beam\nBEAMSIGMA  0 0  ! Beam extension\n! no BEAMSAD value\nDELTAE   0.03   ! relative mean energy loss per transportation step\n",
@@ -73,7 +71,7 @@ def test_run_simulation_with_flask(celery_app,
 		"beam": {
         }
     }
-    '''
+    """
 
     resp = client_fixture.get("/inputs", 
                               query_string={"job_id": job_id})

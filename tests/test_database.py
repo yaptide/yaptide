@@ -15,6 +15,7 @@ from yaptide.persistence.models import (
 
 
 def test_create_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test user model creation"""
     user = UserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
@@ -208,7 +209,7 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
 
 
 def test_create_input(db_session: scoped_session, db_good_username: str, db_good_password: str, payload_editor_dict_data: dict):
-    """Test creation of input in db for simulation"""
+    """Test creation of input_model in db for simulation"""
     # create a new user
     user = UserModel(username=db_good_username)
     user.set_password(db_good_password)
@@ -226,15 +227,15 @@ def test_create_input(db_session: scoped_session, db_good_username: str, db_good
     db_session.add(simulation)
     db_session.commit()
 
-    # create a new input
-    input = InputModel(simulation_id=simulation.id)
-    input.data = payload_editor_dict_data
-    db_session.add(input)
+    # create a new input_model
+    input_model = InputModel(simulation_id=simulation.id)
+    input_model.data = payload_editor_dict_data
+    db_session.add(input_model)
     db_session.commit()
 
-    assert input.id is not None
-    assert input.simulation_id == simulation.id
-    assert input.data == payload_editor_dict_data
+    assert input_model.id is not None
+    assert input_model.simulation_id == simulation.id
+    assert input_model.data == payload_editor_dict_data
 
 
 def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_username: str, db_good_password: str, result_dict_data: dict):

@@ -1,9 +1,7 @@
-import json
 import logging
 from pathlib import Path
 import os
 from typing import Generator
-from flask import Flask
 import pytest
 
 from yaptide.application import create_app
@@ -35,6 +33,7 @@ def add_directory_to_path():
 
 @pytest.fixture(scope='function')
 def client_fixture():
+    """Flask client fixture for testing"""
     flask_app = create_app()
 
     # Create a test client using the Flask application configured for testing

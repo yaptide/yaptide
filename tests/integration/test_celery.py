@@ -10,7 +10,7 @@ pytest tests/integration/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
 import copy
 import logging
 import platform
-import pytest
+import pytest  # skipcq: PY-W2000
 
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
@@ -31,7 +31,6 @@ def test_run_simulation(celery_app,
     So to bypass this issue we restrict the detect configuration to only one output and no filter.
     Below goes the code which reduces the detect.dat.
     """
-
     # lets make a local copy of the payload dict, so we don't modify the original one
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
@@ -48,7 +47,7 @@ def test_run_simulation(celery_app,
                 if "filter" in quantity:
                     del quantity["filter"]
 
-    files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+    files_dict, _ = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
     job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
     logging.info("Waiting for run_simulation task to finish")
@@ -64,5 +63,5 @@ def test_cancel_simulation(celery_app,
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
     result: dict = job.wait()
-    logging.info(f'Number of particles in the simulation: {payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"]}')
+    logging.info('Number of particles in the simulation: %d', payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"])
     assert result is False

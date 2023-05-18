@@ -1,5 +1,3 @@
-import logging
-from yaptide.persistence.database import db
 from time import sleep
 import json
 

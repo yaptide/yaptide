@@ -52,12 +52,12 @@ class SimulationResults(Resource):
                 estimator.data = estimator_dict["metadata"]
                 db.session.add(estimator)
                 db.session.commit()
-            
+
             for page_dict in estimator_dict["pages"]:
                 page: PageModel = db.session.query(PageModel).filter_by(
                     estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])).first()
 
-                page_existed = True if page else False
+                page_existed = bool(page)
                 if not page_existed:
                     # create new page
                     page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
@@ -104,7 +104,8 @@ class SimulationResults(Resource):
                     "pages": [page.data for page in pages]
                 }
                 result_estimators.append(estimator_dict)
-            return yaptide_response(message=f"Results for job: {job_id}, results from db", code=200, content={"estimators": result_estimators})
+            return yaptide_response(message=f"Results for job: {job_id}", 
+                                    code=200, content={"estimators": result_estimators})
 
         return yaptide_response(message="Results are unavailable", code=404)
 
@@ -134,8 +135,8 @@ class SimulationInputs(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        input: InputModel = db.session.query(InputModel).filter_by(simulation_id=simulation.id).first()
-        if not input:
+        input_model: InputModel = db.session.query(InputModel).filter_by(simulation_id=simulation.id).first()
+        if not input_model:
             return yaptide_response(message="Input of simulation is unavailable", code=404)
 
-        return yaptide_response(message="Input of simulation", code=200, content={"input": input.data})
+        return yaptide_response(message="Input of simulation", code=200, content={"input_model": input_model.data})

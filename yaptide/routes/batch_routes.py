@@ -36,14 +36,13 @@ class JobsBatch(Resource):
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
-        
+
         required_keys = {"sim_type", "ntasks", "input_type"}
 
         if required_keys != required_keys.intersection(set(payload_dict.keys())):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        # TODO: convert it to more proper code
         input_type = None
         if payload_dict["input_type"] == "editor":
             if "input_json" not in payload_dict:
@@ -53,7 +52,7 @@ class JobsBatch(Resource):
             if "input_files" not in payload_dict:
                 return error_validation_response()
             input_type = SimulationModel.InputType.FILES.value
-        
+
         if input_type is None:
             return error_validation_response()
 
@@ -98,9 +97,9 @@ class JobsBatch(Resource):
             for i in range(payload_dict["ntasks"]):
                 task = TaskModel(simulation_id=simulation.id, task_id=f"{job_id}_{i+1}")
                 db.session.add(task)
-            input = InputModel(simulation_id=simulation.id)
-            input.data = input_dict_to_save
-            db.session.add(input)
+            input_model = InputModel(simulation_id=simulation.id)
+            input_model.data = input_dict_to_save
+            db.session.add(input_model)
             db.session.commit()
 
             return yaptide_response(
@@ -242,7 +241,8 @@ class ResultsBatch(Resource):
                     "pages": [page.data for page in pages]
                 }
                 result_estimators.append(estimator_dict)
-            return yaptide_response(message=f"Results for job: {job_id}, results from db", code=200, content={"estimators": result_estimators})
+            return yaptide_response(message=f"Results for job: {job_id}",
+                                    code=200, content={"estimators": result_estimators})
 
         try:
             _, _, _, cluster_name = job_id.split(":")

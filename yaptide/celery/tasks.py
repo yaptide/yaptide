@@ -5,19 +5,18 @@ from datetime import datetime
 from multiprocessing import Process
 from pathlib import Path
 
-from celery.result import AsyncResult
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
 from yaptide.celery.utils.utils import read_file, send_simulation_results
 from yaptide.celery.worker import celery_app
-from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, files_dict_with_adjusted_primaries,
-                                     pymchelper_output_to_json, simulation_input_files, simulation_logfiles,
-                                     write_simulation_input_files)
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
+                                     simulation_logfiles, write_simulation_input_files)
 
 
 @celery_app.task(bind=True)
-def run_simulation(self, payload_dict: dict, files_dict: dict, update_key: str = None, simulation_id: int = None) -> dict:
+def run_simulation(self, payload_dict: dict, files_dict: dict,
+                   update_key: str = None, simulation_id: int = None) -> dict:
     """
     Simulation runner
     `payload_dict` parameter holds all the data needed to run the simulation
@@ -102,7 +101,9 @@ def run_simulation(self, payload_dict: dict, files_dict: dict, update_key: str =
         simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
                                                             dir_path=Path(tmp_dir_path))
 
-        if not send_simulation_results(simulation_id=simulation_id, update_key=update_key, estimators=simulation_result):
+        if not send_simulation_results(simulation_id=simulation_id,
+                                       update_key=update_key,
+                                       estimators=simulation_result):
             result["result"] = simulation_result
         result["end_time"] = datetime.utcnow().isoformat(sep=" ")
         logging.debug("simulation result keys: %s", result.keys())

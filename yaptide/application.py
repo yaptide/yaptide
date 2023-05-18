@@ -13,11 +13,11 @@ def create_app():
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
 
-    # Load configuration from environment variables    
+    # Load configuration from environment variables
     app.config.from_prefixed_env()
     for item in app.config.items():
         logging.debug("Flask config variable: %s", item)
-    
+
     db.init_app(app)
     CORS(app, supports_credentials=True)
 
