@@ -7,31 +7,33 @@ We have 3 types of JSON files:
   - top level keys: "metadata", "project", "scene", and others...
 
 2. Payload JSON - object which is sent to the server using POST request from UI
-  - all such objects contain "sim_data" top level key
+  - all such objects contain "input_files" or "input_json" top level key
 
   a) editor payload JSON type assumes that user defined the simulation using UI 3D Editor and selected it for running
     - examples of such files are in tests/res/json_editor_payload.json
-    - inside "sim_data" key we have contents of project json file
+    - inside "input_json" key we have contents of project json file
   b) files payload JSON type assumes that user uploaded input files and selected them for running
     - examples of such files are in tests/res/json_files_payload.json
-    - inside "sim_data" key we have dictionary with filenames as keys and contents of input files as values
+    - inside "input_files" key we have dictionary with filenames as keys and contents of input files as values
 
 We assume following convention: `editor_dict`, `payload_editor_dict`, `payload_files_dict` and `payload_dict`
 
 `editor_dict['metadata']`, `editor_dict['scene']` is always valid
-`editor_dict['sim_data']` is not valid
+`editor_dict['input_type']` is not valid
 
 `payload_dict` can be either `payload_editor_dict` or `payload_files_dict`
-`payload_dict['sim_data']` is always valid
+`payload_dict['input_type']` is always valid
 
-Therefore `payload_editor_dict['sim_data']` can be passed as `editor_dict`,
- `payload_editor_dict['sim_data']['metadata']` is valid
- `payload_editor_dict['sim_data']['scene']` is valid
- `payload_editor_dict['sim_data']['beam.dat']` is not valid
+Therefore `payload_editor_dict['input_json']` can be passed as `editor_dict`,
+ `payload_editor_dict['input_json']['metadata']` is valid
+ `payload_editor_dict['input_json']['scene']` is valid
+ `payload_editor_dict['input_json']['beam.dat']` is not valid
+ `payload_editor_dict['input_files']['beam.dat']` is not valid
 
-Therefore for `payload_files_dict['sim_data']`,
- `payload_files_dict['sim_data']['metadata']` is not valid
- `payload_files_dict['sim_data']['beam.dat']` is valid
+Therefore for `payload_files_dict['input_files']`,
+ `payload_files_dict['input_files']['metadata']` is not valid
+ `payload_files_dict['input_files']['beam.dat']` is valid
+ `payload_editor_dict['input_json']['metadata']` is not valid
 
  We have as well `files_dict` where keys are filenames and values are contents of input files
  `files_dict[beam.dat]` is valid
@@ -70,7 +72,7 @@ def project_json_data(project_json_path: Path) -> Generator[Path, None, None]:
 def payload_editor_dict_path() -> Generator[Path, None, None]:
     """Path to payload JSON file"""
     main_dir = Path(__file__).resolve().parent
-    yield main_dir / "res" / "new_json_editor_payload.json"
+    yield main_dir / "res" / "json_editor_payload.json"
 
 
 @pytest.fixture(scope='session')
@@ -88,7 +90,7 @@ def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[Path, 
 def payload_files_dict_path() -> Generator[Path, None, None]:
     """Path to payload file with simulation defined as user uploaded files"""
     main_dir = Path(__file__).resolve().parent
-    yield main_dir / "res" / "new_json_files_payload.json"
+    yield main_dir / "res" / "json_files_payload.json"
 
 
 @pytest.fixture(scope='session')

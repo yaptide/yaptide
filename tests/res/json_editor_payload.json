@@ -2,7 +2,8 @@
     "ntasks": 4,
     "sim_type": "shieldhit",
     "title": "Proton pencil beam in water",
-    "sim_data": {
+    "input_type": "editor",
+    "input_json": {
         "metadata": {
             "version": 0.6,
             "type": "Editor",
