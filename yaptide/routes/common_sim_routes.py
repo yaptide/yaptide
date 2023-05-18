@@ -139,4 +139,4 @@ class SimulationInputs(Resource):
         if not input_model:
             return yaptide_response(message="Input of simulation is unavailable", code=404)
 
-        return yaptide_response(message="Input of simulation", code=200, content={"input_model": input_model.data})
+        return yaptide_response(message="Input of simulation", code=200, content={"input": input_model.data})
