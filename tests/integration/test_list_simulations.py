@@ -9,7 +9,6 @@ from flask import Flask
 from yaptide.persistence.database import db
 
 
-# @pytest.mark.skip(reason="no way of currently testing this")
 def test_list_simulations(celery_app, 
                                    celery_worker, 
                                    client_fixture: Flask, 
@@ -32,7 +31,7 @@ def test_list_simulations(celery_app,
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
     # limit the particle numbers to get faster results
-    payload_dict["ntasks"] = 1
+    payload_dict["ntasks"] = 2
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
 
     if platform.system() == "Windows":

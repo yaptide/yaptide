@@ -35,8 +35,6 @@ def add_directory_to_path():
 
 @pytest.fixture(scope='function')
 def client_fixture():
-    # Set the Testing configuration prior to creating the Flask application
-    #os.environ['CONFIG_TYPE'] = 'config.TestingConfig'
     flask_app = create_app()
 
     # Create a test client using the Flask application configured for testing

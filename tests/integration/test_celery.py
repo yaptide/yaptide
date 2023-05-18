@@ -5,7 +5,7 @@ This is somehow problematic to run in CI, so we use in-memory backend and rpc br
 
 We also use celery fixture from pytest-celery plugin, which starts celery worker in a separate thread.
 This fixture is silencing most of the logging. To see the logs, use:
-WORKER_LOGLEVEL=debug pytest tests/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
+pytest tests/integration/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
 """
 import copy
 import logging
