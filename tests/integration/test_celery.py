@@ -76,7 +76,7 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
                 if "filter" in quantity:
                     del quantity["filter"]
 
-    files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+    files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
     job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
     logging.info("Waiting for run_simulation task to finish")

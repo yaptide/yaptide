@@ -65,10 +65,11 @@ class JobsDirect(Resource):
             "input_type": input_type,
         }
         if input_type == SimulationModel.InputType.EDITOR.value:
-            files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
             input_dict_to_save["input_json"] = payload_dict["input_json"]
         else:
-            files_dict = payload_dict["input_files"]
+            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+        input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
         input_dict_to_save["input_files"] = files_dict
 
         # submit the job to the Celery queue

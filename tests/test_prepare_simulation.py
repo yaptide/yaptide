@@ -111,9 +111,10 @@ def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
     number_of_primaries_per_task = payload_editor_dict_data['input_json']['beam']['numberOfParticles']
     number_of_primaries_per_task //= payload_editor_dict_data["ntasks"]
-    json_project_data_with_adjust_prim_no = adjust_primaries_in_editor_dict(payload_editor_dict_data)
+    json_project_data_with_adjust_prim_no, number_of_all_primaries = adjust_primaries_in_editor_dict(payload_editor_dict_data)
     files_dict = convert_editor_dict_to_files_dict(editor_dict=json_project_data_with_adjust_prim_no,
                                                    parser_type="shieldhit")
+    assert number_of_all_primaries == payload_editor_dict_data['input_json']['beam']['numberOfParticles']
     assert files_dict is not None
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
@@ -125,8 +126,9 @@ def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
     number_of_primaries_per_task = int(beam_nstat_line.split()[1])
     number_of_primaries_per_task //= payload_files_dict_data['ntasks']
     # print(number_of_primaries_per_task)
-    files_dict = adjust_primaries_in_files_dict(payload_files_dict_data)
+    files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(payload_files_dict_data)
     assert files_dict is not None
+    assert number_of_all_primaries == int(beam_nstat_line.split()[1])
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
 

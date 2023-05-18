@@ -83,7 +83,7 @@ def test_run_simulation_with_flask(celery_app,
                               query_string={"job_id": job_id})
     data = json.loads(resp.data.decode())
     assert {"message", "input"} == set(data.keys())
-    assert {"input_type", "input_files", "input_json"} == set(data["input"].keys())
+    assert {"input_type", "input_files", "input_json", "number_of_all_primaries"} == set(data["input"].keys())
     
     while True:
         logging.info("Sending check job status request on /jobs/direct endpoint")
