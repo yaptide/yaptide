@@ -40,7 +40,8 @@ class JobsBatch(Resource):
         required_keys = {"sim_type", "ntasks", "input_type"}
 
         if required_keys != required_keys.intersection(set(payload_dict.keys())):
-            return error_validation_response()
+            diff = required_keys.difference(set(payload_dict.keys()))
+            return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         # TODO: convert it to more proper code
         input_type = None

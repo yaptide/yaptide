@@ -24,8 +24,10 @@ class TaskUpdate(Resource):
         simulation_id and task_id self explanatory
         """
         payload_dict: dict = request.get_json(force=True)
-        if {"simulation_id", "task_id", "update_key", "update_dict"} != set(payload_dict.keys()):
-            return yaptide_response(message="Incomplete JSON data", code=400)
+        required_keys = {"simulation_id", "task_id", "update_key", "update_dict"}
+        if required_keys != set(payload_dict.keys()):
+            diff = required_keys.difference(set(payload_dict.keys()))
+            return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         sim_id = payload_dict["simulation_id"]
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()

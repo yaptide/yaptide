@@ -64,7 +64,6 @@ def test_list_simulations(celery_app,
 
     logging.info("Check basic list of simulations with pagination")
 
-    # for page_size in range(2, 5):
     page_size=3
     resp = client_fixture.get("/user/simulations",
                               query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "desc"})
@@ -74,19 +73,3 @@ def test_list_simulations(celery_app,
     assert data["simulations_count"] == number_of_simulations
     assert data["page_count"] == number_of_simulations // page_size + 1 if number_of_simulations % page_size else 0
     assert len(data["simulations"]) == page_size
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
