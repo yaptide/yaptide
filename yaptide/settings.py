@@ -11,8 +11,3 @@ from sys import platform
 env = Env()
 env.read_env()
 
-# ENV = env.str("FLASK_ENV", default="production")
-# DEBUG = ENV == "development"
-# SQLALCHEMY_DATABASE_URI = f'sqlite:////{file_dir}/data/main.db'
-# if "win" in platform:
-#     SQLALCHEMY_DATABASE_URI = f'sqlite:///{file_dir}/data/main.db'
