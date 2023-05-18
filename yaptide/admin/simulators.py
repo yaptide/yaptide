@@ -71,10 +71,10 @@ def install_simulator(name: SimulatorType) -> bool:
         click.echo(f'Installing shieldhit into {installation_path}')
         installation_path.mkdir(exist_ok=True, parents=True)
 
-        demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.0.tar.gz'
+        demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
         # check if working on Windows
         if os.name == 'nt':
-            demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.0.zip'
+            demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.1.zip'
 
         # create temporary directory and download
         # Create a temporary file to store the downloaded binary data
