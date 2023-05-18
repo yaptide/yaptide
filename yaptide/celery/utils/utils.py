@@ -45,7 +45,6 @@ def get_job_status(job_id: str) -> dict:
             result["job_state"] = SimulationModel.JobState.FAILED.value
             result["error"] = "Simulation error"
             result["logfiles"] = job.info.get("logfiles")
-            result["input_files"] = job.info.get("input_files")
     else:
         result["error"] = str(job.info)
 
