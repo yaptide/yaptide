@@ -34,20 +34,20 @@ def add_directory_to_path():
 
 
 @pytest.fixture(scope='function')
-def app_fixture() -> Generator[Flask, None, None]:
-    _app = create_app()
-    with _app.app_context():
-        db.create_all()
-    yield _app
+def client_fixture():
+    # Set the Testing configuration prior to creating the Flask application
+    #os.environ['CONFIG_TYPE'] = 'config.TestingConfig'
+    flask_app = create_app()
 
-    with _app.app_context():
-        db.drop_all()
+    # Create a test client using the Flask application configured for testing
+    with flask_app.test_client() as testing_client:
+        # Establish an application context
+        with flask_app.app_context():
+            db.create_all()
 
+            yield testing_client  # this is where the testing happens!
 
-@pytest.fixture(scope='function')
-def client_fixture(app_fixture):
-    _client = app_fixture.test_client()
-    yield _client
+            db.drop_all()
 
 
 @pytest.fixture(scope='function')
@@ -63,7 +63,7 @@ def celery_app():
 
 
 @pytest.fixture(scope="function")
-def celery_worker_parameters():
+def celery_worker_parameters() -> Generator[dict, None, None]:
     """
     Default celery worker parameters cause problems with finding "ping task" module, as being described here:
     https://github.com/celery/celery/issues/4851#issuecomment-604073785
@@ -77,7 +77,7 @@ def celery_worker_parameters():
     # get current logging level
     log_level = logging.getLogger().getEffectiveLevel()
 
-    return {
+    yield {
         "perform_ping_check": False,
         "concurrency": 1,
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest

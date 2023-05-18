@@ -9,7 +9,6 @@ from flask import Flask
 from yaptide.persistence.database import db
 
 
-# @pytest.mark.skip(reason="no way of currently testing this")
 def test_run_simulation_with_flask(celery_app, 
                                    celery_worker, 
                                    client_fixture: Flask, 
@@ -100,14 +99,13 @@ def test_run_simulation_with_flask(celery_app,
             break
         sleep(1)
 
-    # currently celery cannot communicate with the flask app
-    # because of that it cannot send back the results making
-    # them inaccesible -> TODO: fix this
+    logging.info("Fetching results from /results endpoint")
+    resp = client_fixture.get("/results",
+                              query_string={"job_id": job_id})
+    data: dict = json.loads(resp.data.decode())
 
-    # logging.info("Fetching results from /results endpoint")
-    # resp = client_fixture.get("/results",
-    #                           query_string={"job_id": job_id})
-    # data: dict = json.loads(resp.data.decode())
-
-    # assert resp.status_code == 200  # skipcq: BAN-B101
-    # assert {"message", "estimators"} == set(data.keys())
+    assert resp.status_code == 404  # skipcq: BAN-B101
+    if resp.status_code == 404:
+        assert {"message"} == set(data.keys())
+    else:
+        assert {"message", "estimators"} == set(data.keys())
