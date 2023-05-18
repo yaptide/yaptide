@@ -12,10 +12,11 @@ def create_app(config_object="yaptide.settings"):
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
-    
-    app.config.from_object(config_object)
-    # print flask config
-    logging.info("Flask config: %s", app.config)
+
+    # Load configuration from environment variables    
+    app.config.from_prefixed_env()
+    for item in app.config.items():
+        logging.debug("Flask config variable: %s", item)
     
     db.init_app(app)
     CORS(app, supports_credentials=True)

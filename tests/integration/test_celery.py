@@ -18,40 +18,11 @@ from yaptide.celery.tasks import cancel_simulation, run_simulation
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
-@pytest.fixture(scope='module')
-def celery_app():
-    """
-    Create celery app for testing, we reuse the one from yaptide.celery.worker module.
-    The choice of broker and backend is important, as we don't want to run external redis server.
-    That is being configured via environment variables in pytest.ini file.
-    """
-    logging.info("Creating celery app for testing")
-    from yaptide.celery.worker import celery_app as app
-    return app
-
-
-@pytest.fixture(scope="module")
-def celery_worker_parameters():
-    """
-    Default celery worker parameters cause problems with finding "ping task" module, as being described here:
-    https://github.com/celery/celery/issues/4851#issuecomment-604073785
-    To solve that issue we disable the ping check.
-    Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
-
-    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
-    """
-    logging.info("Creating celery worker parameters for testing")
-
-    # get current logging level
-    log_level = logging.getLogger().getEffectiveLevel()
-
-    return {
-        "perform_ping_check": False,
-        "concurrency": 1,
-        "loglevel": log_level, # set celery worker log level to the same as the one used by pytest
-    }
-
-def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add_directory_to_path,
+def test_run_simulation(celery_app, 
+                        celery_worker, 
+                        payload_editor_dict_data : dict, 
+                        app_fixture,
+                        add_directory_to_path,
                         shieldhit_demo_binary):
     """Test run_simulation task with SHIELDHIT demo binary
     Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
@@ -66,6 +37,7 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
 
     # limit the particle numbers to get faster results
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
+    payload_dict["ntasks"] = 2
 
     if platform.system() == "Windows":
         payload_dict["input_json"]["detectManager"]["filters"] = []
@@ -85,7 +57,10 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
     assert 'result' in result.keys()
 
 
-def test_cancel_simulation(celery_app, celery_worker, payload_editor_dict_data):
+def test_cancel_simulation(celery_app, 
+                           celery_worker, 
+                           app_fixture,
+                           payload_editor_dict_data: dict):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
     result: dict = job.wait()
