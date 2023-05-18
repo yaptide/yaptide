@@ -7,7 +7,7 @@ from yaptide.persistence import models
 from flask_cors import CORS
 
 
-def create_app(config_object="yaptide.settings"):
+def create_app():
     """Function starting Flask Server"""
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)

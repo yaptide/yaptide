@@ -18,7 +18,8 @@ class TableTypes(Enum):
 
 def connect_to_db():
     """Connects to db"""
-    sqlite_file_path = Path(Path(__file__).resolve().parent.parent, 'data', 'main.db')
+    # sqlite_file_path = Path(Path(__file__).resolve().parent.parent, 'data', 'main.db')
+    sqlite_file_path = Path('/main.db')
     if not sqlite_file_path.exists():
         click.echo(f'Database file: {sqlite_file_path} does not exist - aborting', err=True)
         return None, None, None

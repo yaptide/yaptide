@@ -17,9 +17,9 @@ services:
             - FLASK_DEBUG=1
             - FLASK_APP=yaptide.application
 # for some reason the following line does not work, Flask cannot reach the database in the mounted volume            
-            - FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///usr/local/app/yaptide/data/main.db
-#            - FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///local_database.db
-            - APP_SETTINGS=yaptide.settings
+#            - FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///usr/local/app/yaptide/data/main.db
+            - FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///main.db
+            #- APP_SETTINGS=yaptide.settings
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
         depends_on:
