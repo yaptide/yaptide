@@ -1,4 +1,5 @@
 from datetime import datetime
+import time
 
 from sqlalchemy.orm.scoping import scoped_session
 
@@ -117,6 +118,8 @@ def test_task_model_creation_and_update(db_session: scoped_session, db_good_user
     assert task.task_state == SimulationModel.JobState.RUNNING.value
     assert task.end_time is None
 
+    time.sleep(1)
+
     end_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
         'task_state': SimulationModel.JobState.COMPLETED.value,
@@ -167,6 +170,8 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
     for task in tasks:
         task.update_state(update_dict=update_dict)
     db_session.commit()
+
+    time.sleep(1)
 
     update_dict = {'task_state': SimulationModel.JobState.RUNNING.value, 'simulated_primaries': 500}
 

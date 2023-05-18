@@ -10,6 +10,7 @@ import uuid
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
@@ -35,8 +36,24 @@ class JobsBatch(Resource):
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
+        
+        required_keys = {"sim_type", "ntasks", "input_type"}
 
-        if "sim_data" not in payload_dict:
+        if required_keys != required_keys.intersection(set(payload_dict.keys())):
+            return error_validation_response()
+
+        # TODO: convert it to more proper code
+        input_type = None
+        if payload_dict["input_type"] == "editor":
+            if "input_json" not in payload_dict:
+                return error_validation_response()
+            input_type = SimulationModel.InputType.EDITOR.value
+        if payload_dict["input_type"] == "files":
+            if "input_files" not in payload_dict:
+                return error_validation_response()
+            input_type = SimulationModel.InputType.FILES.value
+        
+        if input_type is None:
             return error_validation_response()
 
         clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
@@ -49,10 +66,6 @@ class JobsBatch(Resource):
             filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
         cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
 
-        input_type = (SimulationModel.InputType.EDITOR.value
-                      if "metadata" in payload_dict["sim_data"]
-                      else SimulationModel.InputType.FILES.value)
-
         # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(user_id=user.id,
                                      platform=SimulationModel.Platform.BATCH.value,
@@ -64,7 +77,18 @@ class JobsBatch(Resource):
         db.session.add(simulation)
         db.session.commit()
 
-        result = submit_job(payload_dict=payload_dict, cluster=cluster)
+        input_dict_to_save = {
+            "input_type": input_type,
+        }
+        if input_type == SimulationModel.InputType.EDITOR.value:
+            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+            input_dict_to_save["input_json"] = payload_dict["input_json"]
+        else:
+            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+        input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
+        input_dict_to_save["input_files"] = files_dict
+
+        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, cluster=cluster)
 
         if "job_id" in result:
             job_id = result["job_id"]
@@ -74,7 +98,7 @@ class JobsBatch(Resource):
                 task = TaskModel(simulation_id=simulation.id, task_id=f"{job_id}_{i+1}")
                 db.session.add(task)
             input = InputModel(simulation_id=simulation.id)
-            input.data = payload_dict
+            input.data = input_dict_to_save
             db.session.add(input)
             db.session.commit()
 

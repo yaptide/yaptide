@@ -54,7 +54,7 @@ def test_run_simulation_with_flask(celery_app,
 
     logging.info("Sending request checking if input data is stored in the database")
     # we expect another change on UI
-    # we remove sim_data, we add input_type, input_files and input_editor
+    # we remove sim_data, we add input_type, input_files and input_json
     # we add input_file
     # send back higher level data: input_file, project_data, as in ex1.json
     # for input we need to add following fields static fields (on same level as input_type):

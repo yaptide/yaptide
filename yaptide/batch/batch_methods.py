@@ -25,7 +25,7 @@ from yaptide.utils.sim_utils import (
 )
 
 
-def submit_job(payload_dict: dict, cluster: ClusterModel) -> dict:
+def submit_job(payload_dict: dict, files_dict: dict, cluster: ClusterModel) -> dict:
     """Dummy version of submit_job"""
     utc_time = int(datetime.utcnow().timestamp()*1e6)
     pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
@@ -45,7 +45,6 @@ def submit_job(payload_dict: dict, cluster: ClusterModel) -> dict:
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         zip_path = Path(tmp_dir_path) / "input.zip"
-        files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
         with ZipFile(zip_path, mode="w") as archive:
             for file in Path(tmp_dir_path).iterdir():
