@@ -88,7 +88,9 @@ class UserSimulations(Resource):
                     'title': simulation.title,
                     'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
+                    # submission time, when user send the request to the backend, all jobs may start much later than that
                     'end_time': simulation.end_time,
+                    # end time, when the all jobs are finished and results are merged
                     'metadata': {
                         'platform': simulation.platform,
                         'server': 'Yaptide',
