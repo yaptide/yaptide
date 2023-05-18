@@ -43,7 +43,7 @@ def test_list_simulations(celery_app,
                 if "filter" in quantity:
                     del quantity["filter"]
 
-    logging.info("Sending job submition request on /jobs/direct endpoint")
+    logging.info("Sending multiple job submition requests on /jobs/direct endpoint to test pagination")
     number_of_simulations = 8
     for _ in range(number_of_simulations):
         resp = client_fixture.post("/jobs/direct",
