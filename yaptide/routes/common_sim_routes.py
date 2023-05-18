@@ -104,7 +104,7 @@ class SimulationResults(Resource):
                     "pages": [page.data for page in pages]
                 }
                 result_estimators.append(estimator_dict)
-            return yaptide_response(message=f"Results for job: {job_id}", 
+            return yaptide_response(message=f"Results for job: {job_id}",
                                     code=200, content={"estimators": result_estimators})
 
         return yaptide_response(message="Results are unavailable", code=404)
