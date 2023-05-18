@@ -15,6 +15,7 @@ import pytest
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
 from yaptide.celery.tasks import cancel_simulation, run_simulation
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 @pytest.fixture(scope='module')
@@ -64,23 +65,23 @@ def test_run_simulation(celery_app, celery_worker, payload_editor_dict_data, add
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
     # limit the particle numbers to get faster results
-    payload_dict["sim_data"]["beam"]["numberOfParticles"] = 12
+    payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
 
     if platform.system() == "Windows":
-        payload_dict["sim_data"]["detectManager"]["filters"] = []
-        payload_dict["sim_data"]["detectManager"]["detectGeometries"] = [payload_dict["sim_data"]["detectManager"]["detectGeometries"][0]]
-        payload_dict["sim_data"]["scoringManager"]["scoringOutputs"] = [payload_dict["sim_data"]["scoringManager"]["scoringOutputs"][0]]
-        for output in payload_dict["sim_data"]["scoringManager"]["scoringOutputs"]:
+        payload_dict["input_json"]["detectManager"]["filters"] = []
+        payload_dict["input_json"]["detectManager"]["detectGeometries"] = [payload_dict["input_json"]["detectManager"]["detectGeometries"][0]]
+        payload_dict["input_json"]["scoringManager"]["scoringOutputs"] = [payload_dict["input_json"]["scoringManager"]["scoringOutputs"][0]]
+        for output in payload_dict["input_json"]["scoringManager"]["scoringOutputs"]:
             for quantity in output["quantities"]["active"]:
                 if "filter" in quantity:
                     del quantity["filter"]
 
+    files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
-    job = run_simulation.delay(payload_dict=payload_dict)
+    job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
     logging.info("run_simulation task finished")
-    assert 'input_files' in result.keys()
     assert 'result' in result.keys()
 
 
@@ -88,5 +89,5 @@ def test_cancel_simulation(celery_app, celery_worker, payload_editor_dict_data):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
     result: dict = job.wait()
-    logging.info(f'Number of particles in the simulation: {payload_editor_dict_data["sim_data"]["beam"]["numberOfParticles"]}')
+    logging.info(f'Number of particles in the simulation: {payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"]}')
     assert result is False

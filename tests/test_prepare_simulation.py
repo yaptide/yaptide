@@ -90,7 +90,7 @@ def test_if_parsing_works_for_payload(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
     assert payload_editor_dict_data is not None
 
-    files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_editor_dict_data["sim_data"],
+    files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_editor_dict_data["input_json"],
                                                    parser_type="shieldhit")
     assert files_dict is not None
     validate_config_dict(files_dict)
@@ -101,7 +101,7 @@ def test_if_manual_setting_primaries_works_for_editor(payload_editor_dict_data: 
     assert payload_editor_dict_data is not None
 
     number_of_primaries = 137
-    payload_editor_dict_data['sim_data']['beam']['numberOfParticles'] = number_of_primaries
+    payload_editor_dict_data['input_json']['beam']['numberOfParticles'] = number_of_primaries
     files_dict = check_and_convert_payload_to_files_dict(payload_editor_dict_data)
     assert files_dict is not None
     validate_config_dict(files_dict, expected_primaries=number_of_primaries)
@@ -109,7 +109,7 @@ def test_if_manual_setting_primaries_works_for_editor(payload_editor_dict_data: 
 
 def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
-    number_of_primaries_per_task = payload_editor_dict_data['sim_data']['beam']['numberOfParticles']
+    number_of_primaries_per_task = payload_editor_dict_data['input_json']['beam']['numberOfParticles']
     number_of_primaries_per_task //= payload_editor_dict_data["ntasks"]
     json_project_data_with_adjust_prim_no = adjust_primaries_in_editor_dict(payload_editor_dict_data)
     files_dict = convert_editor_dict_to_files_dict(editor_dict=json_project_data_with_adjust_prim_no,
@@ -120,7 +120,7 @@ def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
 
 def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
     """Check if JSON data is parseable by converter"""
-    beam_nstat_line: str = [line for line in payload_files_dict_data['sim_data']
+    beam_nstat_line: str = [line for line in payload_files_dict_data['input_files']
                             ['beam.dat'].split('\n') if 'NSTAT' in line][0]
     number_of_primaries_per_task = int(beam_nstat_line.split()[1])
     number_of_primaries_per_task //= payload_files_dict_data['ntasks']

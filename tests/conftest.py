@@ -70,7 +70,7 @@ def project_json_data(project_json_path: Path) -> Generator[Path | ValueError, N
 def payload_editor_dict_path() -> Generator[Path, None, None]:
     """Path to payload JSON file"""
     main_dir = Path(__file__).resolve().parent
-    yield main_dir / "res" / "json_editor_payload.json"
+    yield main_dir / "res" / "new_json_editor_payload.json"
 
 
 @pytest.fixture(scope='session')
@@ -88,7 +88,7 @@ def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[Path |
 def payload_files_dict_path() -> Generator[Path, None, None]:
     """Path to payload file with simulation defined as user uploaded files"""
     main_dir = Path(__file__).resolve().parent
-    yield main_dir / "res" / "json_files_payload.json"
+    yield main_dir / "res" / "new_json_files_payload.json"
 
 
 @pytest.fixture(scope='session')

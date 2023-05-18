@@ -17,6 +17,7 @@ from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 from yaptide.celery.tasks import run_simulation, convert_input_files, get_input_files, cancel_simulation
 from yaptide.celery.utils.utils import get_job_status, get_job_results
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 class JobsDirect(Resource):
@@ -30,13 +31,24 @@ class JobsDirect(Resource):
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
         
-        required_keys = {"sim_type", "ntasks", "sim_data"}
+        required_keys = {"sim_type", "ntasks", "input_type"}
 
         if required_keys != required_keys.intersection(set(payload_dict.keys())):
             return error_validation_response()
 
-        input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
-                      if "metadata" in payload_dict["sim_data"] else SimulationModel.InputType.INPUT_FILES.value)
+        # TODO: convert it to more proper code
+        input_type = None
+        if payload_dict["input_type"] == "editor":
+            if "input_json" not in payload_dict:
+                return error_validation_response()
+            input_type = SimulationModel.InputType.EDITOR.value
+        if payload_dict["input_type"] == "files":
+            if "input_files" not in payload_dict:
+                return error_validation_response()
+            input_type = SimulationModel.InputType.FILES.value
+        
+        if input_type is None:
+            return error_validation_response()
 
         # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(user_id=user.id,
@@ -49,15 +61,26 @@ class JobsDirect(Resource):
         db.session.add(simulation)
         db.session.commit()
 
+        input_dict_to_save = {
+            "input_type": input_type,
+        }
+        if input_type == SimulationModel.InputType.EDITOR.value:
+            files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
+            input_dict_to_save["input_json"] = payload_dict["input_json"]
+        else:
+            files_dict = payload_dict["input_files"]
+        input_dict_to_save["input_files"] = files_dict
+
         # submit the job to the Celery queue
-        job = run_simulation.delay(payload_dict=payload_dict, update_key=update_key, simulation_id=simulation.id)
+        job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict,
+                                   update_key=update_key, simulation_id=simulation.id)
         simulation.job_id = job.id
 
         for i in range(payload_dict["ntasks"]):
             task = TaskModel(simulation_id=simulation.id, task_id=f"{job.id}_{i+1}")
             db.session.add(task)
         input = InputModel(simulation_id=simulation.id)
-        input.data = payload_dict
+        input.data = input_dict_to_save
         db.session.add(input)
         db.session.commit()
 

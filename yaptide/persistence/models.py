@@ -71,8 +71,8 @@ class SimulationModel(db.Model):
     class InputType(Enum):
         """Input type specification"""
 
-        YAPTIDE_PROJECT = "YAPTIDE_PROJECT"
-        INPUT_FILES = "INPUT_FILES"
+        EDITOR = "EDITOR"
+        FILES = "FILES"
 
     class SimType(Enum):
         """Simulation type specification"""

@@ -17,7 +17,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, fi
 
 
 @celery_app.task(bind=True)
-def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_id: int = None) -> dict:
+def run_simulation(self, payload_dict: dict, files_dict: dict, update_key: str = None, simulation_id: int = None) -> dict:
     """
     Simulation runner
     `payload_dict` parameter holds all the data needed to run the simulation
@@ -47,7 +47,6 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
 
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
-        files_dict = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
         logging.debug("preparing the files for simulation %s", files_dict.keys())
 
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
@@ -89,7 +88,7 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
         except Exception:  # skipcq: PYL-W0703
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.debug("simulation failed, logfiles: %s", logfiles)
-            return {"logfiles": logfiles, "input_files": files_dict}
+            return {"logfiles": logfiles}
 
         if update_key is not None and simulation_id is not None:
             logging.debug("joining monitoring processes")
@@ -105,8 +104,6 @@ def run_simulation(self, payload_dict: dict, update_key: str = None, simulation_
 
         if not send_simulation_results(simulation_id=simulation_id, update_key=update_key, estimators=simulation_result):
             result["result"] = simulation_result
-        result["input_json"] = payload_dict["sim_data"] if "metadata" in payload_dict["sim_data"] else None
-        result["input_files"] = files_dict
         result["end_time"] = datetime.utcnow().isoformat(sep=" ")
         logging.debug("simulation result keys: %s", result.keys())
 

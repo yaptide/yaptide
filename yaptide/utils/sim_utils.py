@@ -49,8 +49,9 @@ class JSON_TYPE(Enum):
 
 def get_json_type(payload_dict: dict) -> JSON_TYPE:
     """Returns type of provided JSON"""
-    possible_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])  # skipcq: PTC-W0018
-    if possible_input_file_names.intersection(set(payload_dict["sim_data"].keys())):
+    # core_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])  # skipcq: PTC-W0018
+    # if core_input_file_names == core_input_file_names.intersection(set(payload_dict["input_files"].keys())):
+    if "input_files" in payload_dict:
         return JSON_TYPE.Files
     return JSON_TYPE.Editor
 
@@ -73,7 +74,7 @@ def check_and_convert_payload_to_files_dict(payload_dict: dict) -> dict:
     files_dict = {}
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
-        files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_dict["sim_data"],
+        files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_dict["input_json"],
                                                        parser_type=payload_dict["sim_type"])
     else:
         logging.warning("Project of %s used, conversion works only for Editor projects", json_type)
@@ -91,7 +92,7 @@ def adjust_primaries_in_editor_dict(payload_editor_dict: dict, ntasks: int = Non
     else:
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
-    editor_dict = copy.deepcopy(payload_editor_dict['sim_data'])
+    editor_dict = copy.deepcopy(payload_editor_dict['input_json'])
     editor_dict['beam']['numberOfParticles'] //= ntasks
     return editor_dict
 
@@ -107,7 +108,7 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     else:
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
-    files_dict = copy.deepcopy(payload_files_dict['sim_data'])
+    files_dict = copy.deepcopy(payload_files_dict['input_files'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
     all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
     beam_lines_count = len(all_beam_lines_with_nstat)
@@ -139,7 +140,7 @@ def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
         new_payload_dict = copy.deepcopy(payload_dict)
-        new_payload_dict["sim_data"] = adjust_primaries_in_editor_dict(payload_editor_dict=payload_dict, ntasks=ntasks)
+        new_payload_dict["input_json"] = adjust_primaries_in_editor_dict(payload_editor_dict=payload_dict, ntasks=ntasks)
         return check_and_convert_payload_to_files_dict(new_payload_dict)
     if json_type == JSON_TYPE.Files:
         return adjust_primaries_in_files_dict(payload_files_dict=payload_dict, ntasks=ntasks)

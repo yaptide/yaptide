@@ -126,17 +126,22 @@ class YaptideTester:
         if with_files:
             input_files = self.read_input_files()
             sim_data = input_files
+            input_type = "files"
+            input_key = "input_files"
         else:
             example_json = Path(ROOT_DIR, 'example.json')
 
             with open(example_json) as json_file:
                 sim_data = json_lib.load(json_file)
+            input_type = "editor"
+            input_key = "input_json"
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
         results_url = self.endpoints.http_results_direct if direct else self.endpoints.http_results_batch
         json_to_send = {
             "ntasks": 6,
-            "sim_data": sim_data,
+            "input_type": input_type,
+            input_key: sim_data,
             "sim_type": "shieldhit",
         }
         if not direct:

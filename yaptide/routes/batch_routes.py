@@ -49,9 +49,9 @@ class JobsBatch(Resource):
             filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
         cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
 
-        input_type = (SimulationModel.InputType.YAPTIDE_PROJECT.value
+        input_type = (SimulationModel.InputType.EDITOR.value
                       if "metadata" in payload_dict["sim_data"]
-                      else SimulationModel.InputType.INPUT_FILES.value)
+                      else SimulationModel.InputType.FILES.value)
 
         # create a new simulation in the database, not waiting for the job to finish
         simulation = SimulationModel(user_id=user.id,

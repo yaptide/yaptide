@@ -32,13 +32,13 @@ def test_run_simulation_with_flask(celery_app,
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
     # limit the particle numbers to get faster results
-    payload_dict["sim_data"]["beam"]["numberOfParticles"] = 12
+    payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
 
     if platform.system() == "Windows":
-        payload_dict["sim_data"]["detectManager"]["filters"] = []
-        payload_dict["sim_data"]["detectManager"]["detectGeometries"] = [payload_dict["sim_data"]["detectManager"]["detectGeometries"][0]]
-        payload_dict["sim_data"]["scoringManager"]["scoringOutputs"] = [payload_dict["sim_data"]["scoringManager"]["scoringOutputs"][0]]
-        for output in payload_dict["sim_data"]["scoringManager"]["scoringOutputs"]:
+        payload_dict["input_json"]["detectManager"]["filters"] = []
+        payload_dict["input_json"]["detectManager"]["detectGeometries"] = [payload_dict["input_json"]["detectManager"]["detectGeometries"][0]]
+        payload_dict["input_json"]["scoringManager"]["scoringOutputs"] = [payload_dict["input_json"]["scoringManager"]["scoringOutputs"][0]]
+        for output in payload_dict["input_json"]["scoringManager"]["scoringOutputs"]:
             for quantity in output["quantities"]["active"]:
                 if "filter" in quantity:
                     del quantity["filter"]
@@ -83,7 +83,7 @@ def test_run_simulation_with_flask(celery_app,
                               query_string={"job_id": job_id})
     data = json.loads(resp.data.decode())
     assert {"message", "input"} == set(data.keys())
-    assert data["input"] == payload_dict
+    assert {"input_type", "input_files", "input_json"} == set(data["input"].keys())
     
     while True:
         logging.info("Sending check job status request on /jobs/direct endpoint")

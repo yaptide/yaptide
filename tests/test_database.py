@@ -60,7 +60,7 @@ def test_simulation_model_creation(db_session: scoped_session, db_good_username:
     simulation = SimulationModel(job_id='testjob',
                                  user_id=user.id,
                                  platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 input_type=SimulationModel.InputType.EDITOR.value,
                                  sim_type=SimulationModel.SimType.SHIELDHIT.value,
                                  title='testtitle',
                                  update_key_hash='testkey')
@@ -72,7 +72,7 @@ def test_simulation_model_creation(db_session: scoped_session, db_good_username:
     assert simulation.id is not None
     assert simulation.job_id == 'testjob'
     assert simulation.platform == SimulationModel.Platform.DIRECT.value
-    assert simulation.input_type == SimulationModel.InputType.YAPTIDE_PROJECT.value
+    assert simulation.input_type == SimulationModel.InputType.EDITOR.value
     assert simulation.sim_type == SimulationModel.SimType.SHIELDHIT.value
     assert simulation.job_state == SimulationModel.JobState.PENDING.value
 
@@ -89,7 +89,7 @@ def test_task_model_creation_and_update(db_session: scoped_session, db_good_user
     simulation = SimulationModel(job_id='testjob',
                                  user_id=user.id,
                                  platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 input_type=SimulationModel.InputType.EDITOR.value,
                                  sim_type=SimulationModel.SimType.SHIELDHIT.value,
                                  title='testtitle',
                                  update_key_hash='testkey')
@@ -142,7 +142,7 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
     simulation = SimulationModel(job_id='testjob',
                                  user_id=user.id,
                                  platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 input_type=SimulationModel.InputType.EDITOR.value,
                                  sim_type=SimulationModel.SimType.SHIELDHIT.value,
                                  title='testtitle',
                                  update_key_hash='testkey')
@@ -214,7 +214,7 @@ def test_create_input(db_session: scoped_session, db_good_username: str, db_good
     simulation = SimulationModel(job_id='testjob',
                                  user_id=user.id,
                                  platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 input_type=SimulationModel.InputType.EDITOR.value,
                                  sim_type=SimulationModel.SimType.SHIELDHIT.value,
                                  title='testtitle',
                                  update_key_hash='testkey')
@@ -244,7 +244,7 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
     simulation = SimulationModel(job_id='testjob',
                                  user_id=user.id,
                                  platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.YAPTIDE_PROJECT.value,
+                                 input_type=SimulationModel.InputType.EDITOR.value,
                                  sim_type=SimulationModel.SimType.SHIELDHIT.value,
                                  title='testtitle',
                                  update_key_hash='testkey')
