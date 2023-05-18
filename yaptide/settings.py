@@ -8,7 +8,6 @@ from environs import Env
 import os
 from sys import platform
 
-# file_dir = os.path.dirname(os.path.realpath(__file__))
 env = Env()
 env.read_env()
 
