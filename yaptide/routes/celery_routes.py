@@ -15,7 +15,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
-from yaptide.celery.tasks import run_simulation, convert_input_files, get_input_files, cancel_simulation
+from yaptide.celery.tasks import run_simulation, convert_input_files, cancel_simulation
 from yaptide.celery.utils.utils import get_job_status, get_job_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
