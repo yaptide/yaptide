@@ -110,6 +110,24 @@ def send_simulation_results(simulation_id: int, update_key: str, estimators: dic
     return True
 
 
+def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict) -> bool:
+    """Sends results of simulation to flask to save it in database"""
+    flask_url = os.environ.get("FLASK_INTERNAL_URL")
+    if not flask_url:
+        logging.warning("Flask URL not found via FLASK_INTERNAL_URL")
+        return False
+    dict_to_send = {
+        "simulation_id": simulation_id,
+        "update_key": update_key,
+        "logfiles": logfiles,
+    }
+    res: requests.Response = requests.Session().post(url=f"{flask_url}/logfiles", json=dict_to_send)
+    if res.status_code != 202:
+        logging.warning("Saving logfiles failed: %s", res.json().get("message"))
+        return False
+    return True
+
+
 def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):
     """Monitors log file of certain task"""
     logfile = None

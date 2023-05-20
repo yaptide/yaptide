@@ -8,7 +8,7 @@ from pathlib import Path
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 
-from yaptide.celery.utils.utils import read_file, send_simulation_results
+from yaptide.celery.utils.utils import read_file, send_simulation_results, send_simulation_logfiles
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
                                      simulation_logfiles, write_simulation_input_files)
@@ -87,7 +87,10 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
         except Exception:  # skipcq: PYL-W0703
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.debug("simulation failed, logfiles: %s", logfiles)
-            return {"logfiles": logfiles}
+            if not send_simulation_logfiles(simulation_id=simulation_id,
+                                            update_key=update_key,
+                                            logfiles=logfiles):
+                return {"logfiles": logfiles}
 
         if update_key is not None and simulation_id is not None:
             logging.debug("joining monitoring processes")

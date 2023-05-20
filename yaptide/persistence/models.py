@@ -307,6 +307,33 @@ class PageModel(db.Model):
             self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
 
 
+class LogfilesModel(db.Model):
+    """"""
+
+    __tablename__ = 'Logfiles'
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
+    compressed_data: Column[str] = db.Column(db.Text, doc="Json object containing logfiles")
+
+    @property
+    def data(self):
+        if self.compressed_data is not None:
+            # Decompress the data
+            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
+            # Deserialize the JSON
+            return json.loads(decompressed_data)
+        return None
+
+    @data.setter
+    def data(self, value):
+        if value is not None:
+            # Serialize the JSON
+            serialized_data = json.dumps(value)
+            # Compress the data
+            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+
+
+
 def create_models():
     """Function creating database's models"""
     db.create_all()

@@ -93,21 +93,21 @@ class SimulationResults(Resource):
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
         estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
-        if len(estimators) > 0:
-            logging.debug("Returning results from database")
-            result_estimators = []
-            for estimator in estimators:
-                pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
-                estimator_dict = {
-                    "metadata": estimator.data,
-                    "name": estimator.name,
-                    "pages": [page.data for page in pages]
-                }
-                result_estimators.append(estimator_dict)
-            return yaptide_response(message=f"Results for job: {job_id}",
-                                    code=200, content={"estimators": result_estimators})
+        if len(estimators) == 0:
+            return yaptide_response(message="Results are unavailable", code=404)
 
-        return yaptide_response(message="Results are unavailable", code=404)
+        logging.debug("Returning results from database")
+        result_estimators = []
+        for estimator in estimators:
+            pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
+            estimator_dict = {
+                "metadata": estimator.data,
+                "name": estimator.name,
+                "pages": [page.data for page in pages]
+            }
+            result_estimators.append(estimator_dict)
+        return yaptide_response(message=f"Results for job: {job_id}", code=200,
+                                content={"estimators": result_estimators})
 
 
 class SimulationInputs(Resource):
@@ -140,3 +140,69 @@ class SimulationInputs(Resource):
             return yaptide_response(message="Input of simulation is unavailable", code=404)
 
         return yaptide_response(message="Input of simulation", code=200, content={"input": input_model.data})
+
+
+class SimulationLogfiles(Resource):
+    """"""
+
+    @staticmethod
+    def post():
+        """
+        Method for saving logfiles
+        Used by the jobs when the simulation fails
+        Structure required by this method to work properly:
+        {
+            "simulation_id": <int>,
+            "update_key": <string>,
+            "logfiles": <dict>
+        }
+        """
+        payload_dict: dict = request.get_json(force=True)
+        if {"simulation_id", "update_key", "logfiles"} != set(payload_dict.keys()):
+            return yaptide_response(message="Incomplete JSON data", code=400)
+
+        sim_id = payload_dict["simulation_id"]
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()
+
+        if not simulation:
+            return yaptide_response(message="Simulation does not exist", code=400)
+
+        if not simulation.check_update_key(payload_dict["update_key"]):
+            return yaptide_response(message="Invalid update key", code=400)
+        
+        logfiles = SimulationLogfiles(simulation_id=simulation.id)
+        logfiles.data = payload_dict["logfiles"]
+        db.session.add(logfiles)
+        db.session.commit()
+
+        return yaptide_response(message="Results saved", code=202)
+
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters"""
+
+        job_id = fields.String()
+
+    @staticmethod
+    @requires_auth(is_refresh=False)
+    def get(user: UserModel):
+        """Method returning job status and results"""
+        schema = SimulationResults.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        job_id = param_dict['job_id']
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+
+        logfile: SimulationLogfiles = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).first()
+        if not logfile:
+            return yaptide_response(message="Logfiles are unavailable", code=404)
+
+        logging.debug("Returning logfiles from database")
+
+        return yaptide_response(message="Logfiles", code=200, content={"logfiles": logfile.data})
