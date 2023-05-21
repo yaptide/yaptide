@@ -9,6 +9,7 @@ from flask import Flask
 def test_list_simulations(celery_app,
                           celery_worker,
                           client: Flask,
+                          live_server,
                           db_good_username: str,
                           db_good_password: str,
                           payload_editor_dict_data: dict,
