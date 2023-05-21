@@ -179,7 +179,7 @@ pip install -r requirements.txt
 Run tests with:
 
 ```shell
-pytest ./tests
+pytest
 ```
 
 # Credits
