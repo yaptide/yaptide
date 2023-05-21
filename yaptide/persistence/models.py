@@ -308,7 +308,7 @@ class PageModel(db.Model):
 
 
 class LogfilesModel(db.Model):
-    """"""
+    """Simulation logfiles model"""
 
     __tablename__ = 'Logfiles'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
@@ -331,7 +331,6 @@ class LogfilesModel(db.Model):
             serialized_data = json.dumps(value)
             # Compress the data
             self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
-
 
 
 def create_models():

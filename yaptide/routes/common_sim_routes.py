@@ -7,7 +7,7 @@ from marshmallow import Schema
 from marshmallow import fields
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel, UserModel, InputModel
+from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel, UserModel, InputModel, LogfilesModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -143,7 +143,7 @@ class SimulationInputs(Resource):
 
 
 class SimulationLogfiles(Resource):
-    """"""
+    """Class responsible for managing logfiles"""
 
     @staticmethod
     def post():
@@ -169,8 +169,8 @@ class SimulationLogfiles(Resource):
 
         if not simulation.check_update_key(payload_dict["update_key"]):
             return yaptide_response(message="Invalid update key", code=400)
-        
-        logfiles = SimulationLogfiles(simulation_id=simulation.id)
+
+        logfiles = LogfilesModel(simulation_id=simulation.id)
         logfiles.data = payload_dict["logfiles"]
         db.session.add(logfiles)
         db.session.commit()
@@ -199,7 +199,7 @@ class SimulationLogfiles(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        logfile: SimulationLogfiles = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).first()
+        logfile: LogfilesModel = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).first()
         if not logfile:
             return yaptide_response(message="Logfiles are unavailable", code=404)
 
