@@ -60,6 +60,7 @@ class JobsDirect(Resource):
         simulation.set_update_key(update_key)
         db.session.add(simulation)
         db.session.commit()
+        logging.info(f"Simulation {simulation} created")
 
         input_dict_to_save = {
             "input_type": input_type,

@@ -1,10 +1,12 @@
 from time import sleep
 import json
 
+import pytest
 
-def test_register(client_fixture, db_good_username: str, db_good_password: str):
+
+def test_register(client, db_good_username: str, db_good_password: str):
     """Test if user can register"""
-    resp = client_fixture.put("/auth/register",
+    resp = client.put("/auth/register",
                               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                               content_type='application/json')
 
@@ -13,12 +15,12 @@ def test_register(client_fixture, db_good_username: str, db_good_password: str):
     assert resp.status_code == 201  # skipcq: BAN-B101
 
 
-def test_register_existing(client_fixture, db_good_username: str, db_good_password: str):
+def test_register_existing(client, db_good_username: str, db_good_password: str):
     """Test if user can register"""
-    client_fixture.put("/auth/register",
+    client.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
-    resp = client_fixture.put("/auth/register",
+    resp = client.put("/auth/register",
                               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                               content_type='application/json')
 
@@ -27,12 +29,12 @@ def test_register_existing(client_fixture, db_good_username: str, db_good_passwo
     assert resp.status_code == 403  # skipcq: BAN-B101
 
 
-def test_log_in(client_fixture, db_good_username: str, db_good_password: str):
+def test_log_in(client, db_good_username: str, db_good_password: str):
     """Test if user can log in"""
-    client_fixture.put("/auth/register",
+    client.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
-    resp = client_fixture.post("/auth/login",
+    resp = client.post("/auth/login",
                                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                                content_type='application/json')
 
@@ -42,9 +44,9 @@ def test_log_in(client_fixture, db_good_username: str, db_good_password: str):
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
 
-def test_log_in_not_existing(client_fixture, db_good_username: str, db_good_password: str):
+def test_log_in_not_existing(client, db_good_username: str, db_good_password: str):
     """Test if user can log in"""
-    resp = client_fixture.post("/auth/login",
+    resp = client.post("/auth/login",
                                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                                content_type='application/json')
 
@@ -53,18 +55,18 @@ def test_log_in_not_existing(client_fixture, db_good_username: str, db_good_pass
     assert resp.status_code == 401  # skipcq: BAN-B101
 
 
-def test_user_status(client_fixture, db_good_username: str, db_good_password: str):
+def test_user_status(client, db_good_username: str, db_good_password: str):
     """Test checking user's status"""
-    resp = client_fixture.put("/auth/register",
+    resp = client.put("/auth/register",
                               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                               content_type='application/json')
-    resp = client_fixture.post("/auth/login",
+    resp = client.post("/auth/login",
                                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                                content_type='application/json')
 
     sleep(2)
 
-    resp = client_fixture.get("/auth/status")
+    resp = client.get("/auth/status")
 
     data = json.loads(resp.data.decode())
     assert {'message', 'username'} == set(data.keys())
@@ -72,39 +74,38 @@ def test_user_status(client_fixture, db_good_username: str, db_good_password: st
     assert resp.status_code == 200  # skipcq: BAN-B101
 
 
-def test_user_status_unauthorized(client_fixture):
+def test_user_status_unauthorized(client):
     """Test checking user's status"""
-    resp = client_fixture.get("/auth/status")
+    resp = client.get("/auth/status")
     data = json.loads(resp.data.decode())
     assert {'message'} == set(data.keys())
     assert resp.status_code == 401  # skipcq: BAN-B101
 
-
-def test_user_status_after_logout(client_fixture, db_good_username: str, db_good_password: str):
+def test_user_status_after_logout(client, db_good_username: str, db_good_password: str):
     """Test checking user's status"""
-    client_fixture.put("/auth/register",
+    client.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
-    client_fixture.post("/auth/login",
+    client.post("/auth/login",
                         data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                         content_type='application/json')
 
-    sleep(2)
+    # sleep(120)
 
-    resp = client_fixture.get("/auth/status")
+    resp = client.get("/auth/status")
 
     data = json.loads(resp.data.decode())
     assert {'message', 'username'} == set(data.keys())
     assert data['username'] == db_good_username  # skipcq: BAN-B101
     assert resp.status_code == 200  # skipcq: BAN-B101
 
-    resp = client_fixture.delete("/auth/logout")
+    resp = client.delete("/auth/logout")
 
     data = json.loads(resp.data.decode())
     assert {'message'} == set(data.keys())
     assert resp.status_code == 200  # skipcq: BAN-B101
 
-    resp = client_fixture.get("/auth/status")
+    resp = client.get("/auth/status")
 
     data = json.loads(resp.data.decode())
     assert {'message'} == set(data.keys())

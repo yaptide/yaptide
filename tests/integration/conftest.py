@@ -32,22 +32,6 @@ def add_directory_to_path():
 
 
 @pytest.fixture(scope='function')
-def client_fixture():
-    """Flask client fixture for testing"""
-    flask_app = create_app()
-
-    # Create a test client using the Flask application configured for testing
-    with flask_app.test_client() as testing_client:
-        # Establish an application context
-        with flask_app.app_context():
-            db.create_all()
-
-            yield testing_client  # this is where the testing happens!
-
-            db.drop_all()
-
-
-@pytest.fixture(scope='function')
 def celery_app():
     """
     Create celery app for testing, we reuse the one from yaptide.celery.worker module.
@@ -79,3 +63,20 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
         "concurrency": 1,
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
     }
+
+@pytest.fixture(scope="function")
+def app(tmp_path):
+    # for some unknown reasons Flask live server and celery won't work with the default in-memory database
+    # so we need to create a temporary database file
+    # for each new test a new temporary directory is created
+    os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{tmp_path}/main.db'
+    logging.info("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
+
+    app = create_app()
+    with app.app_context():
+        db.create_all()
+
+    yield app
+
+    with app.app_context():
+        db.drop_all()

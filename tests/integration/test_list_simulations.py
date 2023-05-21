@@ -8,17 +8,17 @@ from flask import Flask
 
 def test_list_simulations(celery_app,
                           celery_worker,
-                          client_fixture: Flask,
+                          client: Flask,
                           db_good_username: str,
                           db_good_password: str,
                           payload_editor_dict_data: dict,
                           add_directory_to_path,
                           shieldhit_demo_binary):
     """Test we can run simulations"""
-    client_fixture.put("/auth/register",
+    client.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
-    resp = client_fixture.post("/auth/login",
+    resp = client.post("/auth/login",
                                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                                content_type='application/json')
 
@@ -43,7 +43,7 @@ def test_list_simulations(celery_app,
     logging.info("Sending multiple job submition requests on /jobs/direct endpoint to test pagination")
     number_of_simulations = 8
     for _ in range(number_of_simulations):
-        resp = client_fixture.post("/jobs/direct",
+        resp = client.post("/jobs/direct",
                                 data=json.dumps(payload_dict),
                                 content_type='application/json')
 
@@ -53,7 +53,7 @@ def test_list_simulations(celery_app,
 
     logging.info("Check basic list of simulations")
 
-    resp = client_fixture.get("/user/simulations")
+    resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     assert {"message", "simulations", "page_count", "simulations_count"} == set(data.keys())
@@ -62,7 +62,7 @@ def test_list_simulations(celery_app,
     logging.info("Check basic list of simulations with pagination")
 
     page_size=3
-    resp = client_fixture.get("/user/simulations",
+    resp = client.get("/user/simulations",
                               query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "desc"})
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())

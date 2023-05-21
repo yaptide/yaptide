@@ -103,6 +103,7 @@ def send_simulation_results(simulation_id: int, update_key: str, estimators: dic
         "update_key": update_key,
         "estimators": estimators["estimators"],
     }
+    logging.info("Sending results to flask via %s", flask_url)
     res: requests.Response = requests.Session().post(url=f"{flask_url}/results", json=dict_to_send)
     if res.status_code != 202:
         logging.warning("Saving results failed: %s", res.json().get("message"))
