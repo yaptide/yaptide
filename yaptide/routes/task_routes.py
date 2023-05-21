@@ -33,7 +33,7 @@ class TaskUpdate(Resource):
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()
 
         if not simulation:
-            return yaptide_response(message="Task does not exist", code=400)
+            return yaptide_response(message=f"Simulation {sim_id} does not exist", code=400)
 
         if not simulation.check_update_key(payload_dict["update_key"]):
             return yaptide_response(message="Invalid update key", code=400)
@@ -42,7 +42,7 @@ class TaskUpdate(Resource):
             simulation_id=payload_dict["simulation_id"], task_id=payload_dict["task_id"]).first()
 
         if not task:
-            return yaptide_response(message="Task does not exist", code=400)
+            return yaptide_response(message=f"Task {payload_dict['task_id']} does not exist", code=400)
 
         task.update_state(payload_dict["update_dict"])
         db.session.commit()

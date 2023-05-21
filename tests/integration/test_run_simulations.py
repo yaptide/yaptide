@@ -6,20 +6,20 @@ import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
 
-
 def test_run_simulation_with_flask(celery_app, 
                                    celery_worker, 
-                                   client_fixture: Flask, 
+                                   client: Flask, 
+                                   live_server,
                                    db_good_username: str, 
                                    db_good_password: str, 
                                    payload_editor_dict_data: dict,
                                    add_directory_to_path,
                                    shieldhit_demo_binary):
     """Test we can run simulations"""
-    client_fixture.put("/auth/register",
+    client.put("/auth/register",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
-    resp = client_fixture.post("/auth/login",
+    resp = client.post("/auth/login",
                                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                                content_type='application/json')
 
@@ -41,7 +41,7 @@ def test_run_simulation_with_flask(celery_app,
                     del quantity["filter"]
 
     logging.info("Sending job submition request on /jobs/direct endpoint")
-    resp = client_fixture.post("/jobs/direct",
+    resp = client.post("/jobs/direct",
                                data=json.dumps(payload_dict),
                                content_type='application/json')
 
@@ -59,7 +59,7 @@ def test_run_simulation_with_flask(celery_app,
     #   - simulation_type: shieldhit / Fluka / TOPAS
     # some of the stuff above is in the user/simulation endpoint
 
-    resp = client_fixture.get("/inputs", 
+    resp = client.get("/inputs", 
                               query_string={"job_id": job_id})
     data = json.loads(resp.data.decode())
     assert {"message", "input"} == set(data.keys())
@@ -69,7 +69,7 @@ def test_run_simulation_with_flask(celery_app,
     
     while True:
         logging.info("Sending check job status request on /jobs/direct endpoint")
-        resp = client_fixture.get("/jobs/direct",
+        resp = client.get("/jobs/direct",
                                   query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
@@ -83,12 +83,13 @@ def test_run_simulation_with_flask(celery_app,
         sleep(1)
 
     logging.info("Fetching results from /results endpoint")
-    resp = client_fixture.get("/results",
+    resp = client.get("/results",
                               query_string={"job_id": job_id})
     data: dict = json.loads(resp.data.decode())
+    print(data)
 
-    assert resp.status_code == 404  # skipcq: BAN-B101
-    if resp.status_code == 404:
+    assert resp.status_code == 200  # skipcq: BAN-B101
+    if resp.status_code != 200:
         assert {"message"} == set(data.keys())
     else:
         assert {"message", "estimators"} == set(data.keys())

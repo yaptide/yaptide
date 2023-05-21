@@ -20,8 +20,9 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 def test_run_simulation(celery_app, 
                         celery_worker, 
-                        payload_editor_dict_data : dict, 
-                        client_fixture,
+                        payload_editor_dict_data : dict,
+                        live_server, 
+                        client,
                         add_directory_to_path,
                         shieldhit_demo_binary):
     """Test run_simulation task with SHIELDHIT demo binary
@@ -58,7 +59,7 @@ def test_run_simulation(celery_app,
 
 def test_cancel_simulation(celery_app, 
                            celery_worker, 
-                           client_fixture,
+                           client,
                            payload_editor_dict_data: dict):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")

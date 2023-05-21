@@ -44,6 +44,7 @@ import logging
 from pathlib import Path
 from typing import Generator
 import pytest
+import os
 
 from yaptide.application import create_app
 from yaptide.persistence.database import db
@@ -125,9 +126,10 @@ def result_dict_data(result_dict_path: Path) -> Generator[Path, None, None]:
 @pytest.fixture(scope='function')
 def db_session():
     """Creates database session. For each test function new clean database is created"""
+
+    logging.debug("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
     _app = create_app()
     with _app.app_context():
-        db.create_all()
         yield db.session
         db.drop_all()
 
