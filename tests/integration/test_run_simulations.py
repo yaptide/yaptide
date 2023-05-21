@@ -78,7 +78,7 @@ def test_run_simulation_with_flask(celery_app,
         # and that there is no results and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == payload_dict["ntasks"]
-        if data['job_state'] == 'COMPLETED':
+        if data['job_state'] in ['COMPLETED', 'FAILED']:
             break
         sleep(1)
 
