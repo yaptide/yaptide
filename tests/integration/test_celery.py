@@ -20,7 +20,8 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 def test_run_simulation(celery_app, 
                         celery_worker, 
-                        payload_editor_dict_data : dict, 
+                        payload_editor_dict_data : dict,
+                        live_server, 
                         client,
                         add_directory_to_path,
                         shieldhit_demo_binary):
