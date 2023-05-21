@@ -73,9 +73,6 @@ def app(tmp_path):
     logging.info("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
 
     app = create_app()
-    with app.app_context():
-        db.create_all()
-
     yield app
 
     with app.app_context():
