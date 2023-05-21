@@ -6,10 +6,10 @@ import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
 
+@pytest.mark.usefixtures("live_server", "live_server_win")
 def test_run_simulation_with_flask(celery_app, 
                                    celery_worker, 
                                    client: Flask, 
-                                   live_server,
                                    db_good_username: str, 
                                    db_good_password: str, 
                                    payload_editor_dict_data: dict,
