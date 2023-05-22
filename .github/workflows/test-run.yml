@@ -51,6 +51,7 @@ jobs:
     env:
       USERNAME: ${{ github.actor }}
       PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      REGISTRY: ghcr.io
       IMAGE_NAME: ${{ github.repository }}-flask
     steps:
       - name: Checkout
@@ -61,7 +62,7 @@ jobs:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v1
         with:
-          registry: ghcr.io
+          registry: ${{ env.REGISTRY }}
           username: ${{ env.USERNAME }}
           password: ${{ env.PASSWORD }}
 
