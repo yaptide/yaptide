@@ -69,7 +69,6 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4.4.0
         with:
-          context: git
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
 
       - name: Build and push Docker image
