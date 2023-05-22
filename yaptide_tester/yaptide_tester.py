@@ -22,7 +22,9 @@ class Endpoints:
         self.http_results_direct = f'http://{host}:{port}/results'
         self.http_results_batch = f'http://{host}:{port}/results/batch'
 
-        self.http_convert = f'http://{host}:{port}/sh/convert'
+        self.http_logfiles = f'http://{host}:{port}/logfiles'
+        self.http_inputs = f'http://{host}:{port}/inputs'
+        self.http_convert = f'http://{host}:{port}/convert'
 
         self.http_list_sims = f'http://{host}:{port}/user/simulations'
         self.http_update_user = f'http://{host}:{port}/user/update'
@@ -174,6 +176,7 @@ class YaptideTester:
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
                         if res_json.get('job_state') == "COMPLETED":
+                            print("COMPLETED")
                             for i in range(2):
                                 res: requests.Response = self.session.get(results_url, params={"job_id": job_id})
                                 res_json: dict = res.json()
@@ -185,18 +188,20 @@ class YaptideTester:
                                     with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
                                         json_lib.dump({"estimators": res_json['estimators']}, writer, indent=4)
                             return
-                        print(res_json)
-                        if res_json.get('logfile'):
-                            with open(Path(ROOT_DIR, 'output', 'error_full_output.json'), 'w') as writer:
-                                json_lib.dump(res_json, writer, indent=4)
-                            with open(Path(ROOT_DIR, 'output', 'shieldlog.log'), 'w') as writer:
-                                writer.write(res_json['logfile'])
-                            for key, value in res_json['input_files'].items():
+                        if res_json.get('job_state') == "FAILED":
+                            print("FAILED")
+                            res: requests.Response = self.session.get(
+                                self.endpoints.http_logfiles, params={"job_id": job_id})
+                            res_json: dict = res.json()
+                            if res.status_code != 200:
+                                print(res_json)
+                                return
+                            for key, value in res_json['logfiles'].items():
                                 with open(Path(ROOT_DIR, 'output', key), 'w') as writer:
                                     writer.write(value)
                             return
+                        print(res_json)
                         if res_json.get('error'):
-                            print(res_json.get('error'))
                             return
                     else:
                         print(res_json)

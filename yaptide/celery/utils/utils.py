@@ -41,12 +41,8 @@ def get_job_status(job_id: str) -> dict:
     elif job_state != SimulationModel.JobState.FAILED.value:
         if "end_time" in job.info:
             result["end_time"] = job.info["end_time"]
-        elif "logfile" in job.info:
-            result["job_state"] = SimulationModel.JobState.FAILED.value
-            result["error"] = "Simulation error"
-            result["logfiles"] = job.info.get("logfiles")
     else:
-        result["error"] = str(job.info)
+        result["message"] = str(job.info)
 
     return result
 
@@ -122,9 +118,10 @@ def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict
         "update_key": update_key,
         "logfiles": logfiles,
     }
+    logging.info("Sending log files to flask via %s", flask_url)
     res: requests.Response = requests.Session().post(url=f"{flask_url}/logfiles", json=dict_to_send)
     if res.status_code != 202:
-        logging.warning("Saving logfiles failed: %s", res.json().get("message"))
+        logging.warning("Saving logfiles failed: %s", res.json()["message"])
         return False
     return True
 

@@ -6,6 +6,7 @@ import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
 
+
 @pytest.mark.usefixtures("live_server", "live_server_win")
 def test_run_simulation_with_flask(celery_app, 
                                    celery_worker, 
@@ -17,11 +18,11 @@ def test_run_simulation_with_flask(celery_app,
                                    shieldhit_demo_binary):
     """Test we can run simulations"""
     client.put("/auth/register",
+               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+               content_type='application/json')
+    resp = client.post("/auth/login",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
-    resp = client.post("/auth/login",
-                               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-                               content_type='application/json')
 
     assert resp.status_code == 202  # skipcq: BAN-B101
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
@@ -42,8 +43,8 @@ def test_run_simulation_with_flask(celery_app,
 
     logging.info("Sending job submition request on /jobs/direct endpoint")
     resp = client.post("/jobs/direct",
-                               data=json.dumps(payload_dict),
-                               content_type='application/json')
+                       data=json.dumps(payload_dict),
+                       content_type='application/json')
 
     assert resp.status_code == 202  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
@@ -59,8 +60,7 @@ def test_run_simulation_with_flask(celery_app,
     #   - simulation_type: shieldhit / Fluka / TOPAS
     # some of the stuff above is in the user/simulation endpoint
 
-    resp = client.get("/inputs", 
-                              query_string={"job_id": job_id})
+    resp = client.get("/inputs", query_string={"job_id": job_id})
     data = json.loads(resp.data.decode())
     assert {"message", "input"} == set(data.keys())
     assert {"input_type", "input_files", "input_json", "number_of_all_primaries"} == set(data["input"].keys())
@@ -75,21 +75,18 @@ def test_run_simulation_with_flask(celery_app,
         data = json.loads(resp.data.decode())
 
         # lets ensure that the keys contain only message, job_state and job_tasks_status
-        # and that there is no results and input files here
+        # and that there is no results, logfiles and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == payload_dict["ntasks"]
         if data['job_state'] in ['COMPLETED', 'FAILED']:
+            assert data['job_state'] == 'COMPLETED'
             break
         sleep(1)
 
     logging.info("Fetching results from /results endpoint")
-    resp = client.get("/results",
-                              query_string={"job_id": job_id})
+    resp = client.get("/results", query_string={"job_id": job_id})
     data: dict = json.loads(resp.data.decode())
     print(data)
 
     assert resp.status_code == 200  # skipcq: BAN-B101
-    if resp.status_code != 200:
-        assert {"message"} == set(data.keys())
-    else:
-        assert {"message", "estimators"} == set(data.keys())
+    assert {"message", "estimators"} == set(data.keys())

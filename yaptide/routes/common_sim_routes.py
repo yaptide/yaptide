@@ -175,7 +175,7 @@ class SimulationLogfiles(Resource):
         db.session.add(logfiles)
         db.session.commit()
 
-        return yaptide_response(message="Results saved", code=202)
+        return yaptide_response(message="Log files saved", code=202)
 
     class APIParametersSchema(Schema):
         """Class specifies API parameters"""
@@ -199,7 +199,7 @@ class SimulationLogfiles(Resource):
 
         simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 
-        logfile: LogfilesModel = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).first()
+        logfile: LogfilesModel = db.session.query(LogfilesModel).filter_by(simulation_id=simulation.id).first()
         if not logfile:
             return yaptide_response(message="Logfiles are unavailable", code=404)
 

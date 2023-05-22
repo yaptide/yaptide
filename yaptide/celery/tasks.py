@@ -80,22 +80,22 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
         try:
             logging.debug("starting simulation")
             is_run_ok = runner_obj.run(settings=settings)
+
+            if update_key is not None and simulation_id is not None:
+                logging.debug("joining monitoring processes")
+                for process in monitoring_processes:
+                    process.join()
+
             if not is_run_ok:
-                logging.error("simulation failed")
                 raise Exception
             logging.debug("simulation finished")
         except Exception:  # skipcq: PYL-W0703
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
-            logging.debug("simulation failed, logfiles: %s", logfiles)
-            if not send_simulation_logfiles(simulation_id=simulation_id,
-                                            update_key=update_key,
-                                            logfiles=logfiles):
-                return {"logfiles": logfiles}
-
-        if update_key is not None and simulation_id is not None:
-            logging.debug("joining monitoring processes")
-            for process in monitoring_processes:
-                process.join()
+            logging.info("simulation failed, logfiles: %s", logfiles.keys())
+            send_simulation_logfiles(simulation_id=simulation_id,
+                                     update_key=update_key,
+                                     logfiles=logfiles)
+            raise Exception
 
         logging.debug("getting simulation results")
         estimators_dict: dict = runner_obj.get_data()

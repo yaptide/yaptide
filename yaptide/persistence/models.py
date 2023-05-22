@@ -112,7 +112,7 @@ class SimulationModel(db.Model):
     update_key_hash: Column[str] = db.Column(db.String,
                                              doc="Update key shared by tasks granting access to update themselves")
     tasks = relationship("TaskModel")
-    results = relationship("EstimatorModel")
+    estimators = relationship("EstimatorModel")
 
     def set_update_key(self, update_key: str):
         """Sets hashed update key"""
