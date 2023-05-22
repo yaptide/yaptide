@@ -2,9 +2,9 @@ openapi: 3.0.3
 info:
   title: Yaptide Project Api Documentation
   version: 1.0.0
-  description: Example Description
+  description: Yaptide Project Api Documentation
 servers:
-  - url: http://localhost:5000/api
+  - url: http://localhost:5000
 paths:
   /:
     get:
@@ -16,8 +16,54 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                    description: body message
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/register:
+    put:
+      summary: Allows registration of new users
+      requestBody:
+        description: Allows registration of new users
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+components:
+  schemas:
+    BasicResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Hello world!
+          description: body message
+    RegisterRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
