@@ -88,24 +88,6 @@ def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[Path, 
 
 
 @pytest.fixture(scope='session')
-def payload_files_crushing_dict_path() -> Generator[Path, None, None]:
-    """Path to payload JSON file"""
-    main_dir = Path(__file__).resolve().parent
-    yield main_dir / "res" / "json_payload_files_crushing.json"
-
-
-@pytest.fixture(scope='session')
-def payload_files_crushing_dict_data(payload_files_crushing_dict_path: Path) -> Generator[Path, None, None]:
-    """Reads payload JSON file and returns its contents as dictionary"""
-    json_data = {}
-    if not payload_files_crushing_dict_path.suffix == '.json':
-        raise ValueError("Payload file must be JSON file")
-    with open(payload_files_crushing_dict_path, 'r') as file_handle:
-        json_data = json.load(file_handle)
-    yield json_data
-
-
-@pytest.fixture(scope='session')
 def payload_files_dict_path() -> Generator[Path, None, None]:
     """Path to payload file with simulation defined as user uploaded files"""
     main_dir = Path(__file__).resolve().parent

@@ -13,7 +13,7 @@ def test_run_simulation_with_flask_crushing(celery_app,
                                             client: Flask,
                                             db_good_username: str,
                                             db_good_password: str,
-                                            payload_files_crushing_dict_data: dict,
+                                            payload_files_dict_data: dict,
                                             add_directory_to_path,
                                             shieldhit_demo_binary):
     """Test we can run simulations"""
@@ -27,7 +27,8 @@ def test_run_simulation_with_flask_crushing(celery_app,
     assert resp.status_code == 202  # skipcq: BAN-B101
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
-    payload_dict = copy.deepcopy(payload_files_crushing_dict_data)
+    payload_dict = copy.deepcopy(payload_files_dict_data)
+    payload_dict["input_files"]["mat.dat"] = ""
 
     logging.info("Sending job submition request on /jobs/direct endpoint")
     resp = client.post("/jobs/direct",
