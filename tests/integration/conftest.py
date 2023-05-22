@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 import os
+import platform
+import subprocess
 from typing import Generator
 import pytest
 
@@ -77,3 +79,34 @@ def app(tmp_path):
 
     with app.app_context():
         db.drop_all()
+
+
+def pytest_collection_modifyitems(config, items):
+    """Conditionally remove live_server fixture from tests on Windows and MacOS"""
+    if platform.system() == 'Linux':
+        # Remove live_server_win fixture from tests on Linux
+        for item in items:
+            if 'live_server_win' in item.fixturenames:
+                item.fixturenames.remove('live_server_win')
+    else:
+        # Remove live_server fixture from tests on Windows and MacOS
+        for item in items:
+            if 'live_server' in item.fixturenames:
+                item.fixturenames.remove('live_server')
+
+
+@pytest.fixture(scope="function")
+def live_server_win():
+    """
+    Ideally we would use live_server fixture from pytest-flask library for all operating systems.
+    Unfortunately, it doesn't work on Windows, so we need to create our own fixture.
+    See an issue https://github.com/pytest-dev/pytest-flask/issues/54#issuecomment-535885042
+    This fixture is condionally used only on Windows.
+    """
+    env = os.environ.copy()
+    env["FLASK_APP"] = "yaptide.application"
+    server = subprocess.Popen(['flask', 'run', '--port', '5000'], env=env)
+    try:
+        yield server
+    finally:
+        server.terminate()
