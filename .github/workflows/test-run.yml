@@ -46,6 +46,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: pytest
 
+      # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
       - name: Run main tests on Windows using powershell
         if: matrix.platform == 'windows-latest'
         run: |
