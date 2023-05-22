@@ -126,7 +126,6 @@ def result_dict_data(result_dict_path: Path) -> Generator[Path, None, None]:
 @pytest.fixture(scope='function')
 def db_session():
     """Creates database session. For each test function new clean database is created"""
-
     logging.debug("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
     _app = create_app()
     with _app.app_context():

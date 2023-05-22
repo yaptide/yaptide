@@ -204,28 +204,6 @@ class YaptideTester:
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
 
-    def run_simulation_on_rimrock(self, do_monitor_job: bool):
-        """Example function running simulation on rimrock"""
-        input_files = self.read_input_files()
-        res: requests.Response = self.session.post(self.endpoints.http_rimrock, json=input_files)
-        res_json: dict = res.json()
-        print(res_json)
-        if res.status_code != 201:
-            return
-
-        job_id: str = res_json.get('job_id')
-        if job_id is not None:
-            while do_monitor_job:
-                time.sleep(5)
-                res: requests.Response = self.session.get(self.endpoints.http_rimrock, params={"job_id": job_id})
-                res_json = res.json()
-                print(res_json)
-                if res.status_code != 200:
-                    return
-                if res_json['status'] == 'FINISHED':
-                    self.get_slurm_results(job_id=job_id)
-                    return
-
     def check_backend_jobs(self):
         """Example checking backend jobs with pagination"""
         order_by = "start_time"
@@ -258,16 +236,6 @@ class YaptideTester:
                         params={"job_id": sim["job_id"]}
                     )
                 res_json: dict = res.json()
-
-    def get_slurm_results(self, job_id: str):
-        """Example function getting slurm results"""
-        res: requests.Response = self.session.get(self.endpoints.http_plgdata, params={"job_id": job_id})
-        res_json = res.json()
-        path = Path(ROOT_DIR, 'output', f'{job_id.split(".")[0]}.json')
-        with open(path, 'w') as writer:
-            data_to_write = str(res_json['result'])
-            data_to_write = data_to_write.replace("'", "\"")
-            writer.write(data_to_write)
 
 
 if __name__ == "__main__":

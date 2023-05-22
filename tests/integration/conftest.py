@@ -66,8 +66,10 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
     }
 
+
 @pytest.fixture(scope="function")
 def app(tmp_path):
+    """Create Flask app for testing"""
     # for some unknown reasons Flask live server and celery won't work with the default in-memory database
     # so we need to create a temporary database file
     # for each new test a new temporary directory is created
@@ -81,7 +83,7 @@ def app(tmp_path):
         db.drop_all()
 
 
-def pytest_collection_modifyitems(config, items):
+def pytest_collection_modifyitems(config, items):  # skipcq: PYL-W0613
     """Conditionally remove live_server fixture from tests on Windows and MacOS"""
     if platform.system() == 'Linux':
         # Remove live_server_win fixture from tests on Linux
@@ -105,7 +107,7 @@ def live_server_win():
     """
     env = os.environ.copy()
     env["FLASK_APP"] = "yaptide.application"
-    server = subprocess.Popen(['flask', 'run', '--port', '5000'], env=env)
+    server = subprocess.Popen(['flask', 'run', '--port', '5000'], env=env)  # skipcq: BAN-B607
     try:
         yield server
     finally:

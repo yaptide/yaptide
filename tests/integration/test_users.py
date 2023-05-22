@@ -1,7 +1,6 @@
-from time import sleep
 import json
 
-import pytest
+import pytest  # skipcq: PY-W2000
 
 
 def test_register(client, db_good_username: str, db_good_password: str):
@@ -64,8 +63,6 @@ def test_user_status(client, db_good_username: str, db_good_password: str):
                                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                                content_type='application/json')
 
-    sleep(2)
-
     resp = client.get("/auth/status")
 
     data = json.loads(resp.data.decode())
@@ -89,8 +86,6 @@ def test_user_status_after_logout(client, db_good_username: str, db_good_passwor
     client.post("/auth/login",
                         data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                         content_type='application/json')
-
-    # sleep(120)
 
     resp = client.get("/auth/status")
 
