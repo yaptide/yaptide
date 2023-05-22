@@ -42,8 +42,17 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
-      - name: Run main tests
+      - name: Run main tests on Linux
+        if: matrix.platform == 'ubuntu-latest'
         run: pytest
+
+      - name: Run main tests on Windows using powershell
+        if: matrix.platform == 'windows-latest'
+        run: |
+          Get-ChildItem -Path "tests" -Filter "test_*.py" | foreach { pytest $_.FullName }
+
+
+
 
   # upload coverage report to deepsource
   report-test-converage-deepsource:
