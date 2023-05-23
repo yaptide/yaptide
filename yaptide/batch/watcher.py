@@ -6,6 +6,7 @@ import signal
 import subprocess
 import time
 
+from datetime import datetime
 from pathlib import Path
 
 
@@ -17,21 +18,6 @@ ESTIMATOR_MATCH = r"\bEstimator\s*\d*\s*:\s*.*\s*with\s*\d*\s*page.*\b"
 SAVING_ESTIMATOR_MATCH = r"\bSaving estimator to"
 SAVING_END_MATCH = r"\bSaved all\s*\d*\s*estimator.*\b"
 SIGNAL_MATCH = r"Caught SIGUSR1. Saving data."
-
-HARDCODED_STATS_INFO = {
-    "Z_narrow_LET": {
-        "observables": [
-            {
-                "page_number": 0,
-                "target_idxs": [
-                    23
-                ],
-                "minimal_primaries": 1000,
-                "std": 0.004
-            }
-        ]
-    }
-}
 
 
 def log_generator(thefile, timeout: int = 3600) -> str:
@@ -95,24 +81,29 @@ def read_file(filepath: Path, workdir: Path, convertmc: str, job_id: str, task_i
     with open(statspath, 'a') as writer:
         writer.write("")
 
-    observables: dict = HARDCODED_STATS_INFO
+    confpath = workdir / "watcher_conf.json"
+    with open(confpath, "r") as reader:
+        observables: dict = json.load(reader)
+
     estimators_filenames_patterns: list[str] = []
     estimators_filepaths: list[str] = []
     loglines = log_generator(logfile)
     saving_start_timestamp = None
     signals_caught = 0
+    simulated_primaries = 0
     for line in loglines:
         if re.search(RUN_MATCH, line):
             splitted = line.split()
+            simulated_primaries = int(splitted[3])
             up_dict = {  # skipcq: PYL-W0612
-                "simulated_primaries": int(splitted[3]),
+                "simulated_primaries": simulated_primaries,
                 "estimated_time": {
                     "hours": int(splitted[5]),
                     "minutes": int(splitted[7]),
                     "seconds": int(splitted[9]),
                 }
             }
-            logging.info("Update for task: %s - simulated primaries: %s", task_id, splitted[3])
+            logging.info("Update for task: %s - simulated primaries: %s", task_id, simulated_primaries)
 
         elif re.search(SAVING_ESTIMATOR_MATCH, line):
             if saving_start_timestamp is None:
@@ -122,7 +113,7 @@ def read_file(filepath: Path, workdir: Path, convertmc: str, job_id: str, task_i
             estimators_filepaths.append(filepath_str)
 
         elif re.search(SIGNAL_MATCH, line):
-            saving_start_timestamp = time.time()
+            saving_start_timestamp = datetime.utcnow().timestamp()
             signals_caught+=1
             logging.info("Update for task: %s - saving start", task_id)
 
@@ -146,6 +137,7 @@ def read_file(filepath: Path, workdir: Path, convertmc: str, job_id: str, task_i
                 filename_base = "_".join(filename.split("_")[:-3])
                 if (filename_base in observables
                     or saving_start_timestamp is None):
+                    # we rename observable files and final results 
                     new_filename = change_date_to_phrase_in_name(filename, phrase_to_insert)
                     splitted_filepath[-1] = new_filename
                     new_filepath_str = "/".join(splitted_filepath)
@@ -160,30 +152,38 @@ def read_file(filepath: Path, workdir: Path, convertmc: str, job_id: str, task_i
                         json_path = workdir / "_".join([filename_base, str(signals_caught), ".json"])
                         with open(json_path, 'r') as reader:
                             json_obj = json.load(reader)
-                        
-                        for observable in observables[filename_base]["observables"]:
-                            page_number = str(observable["page_number"])
+                        subprocess.run(["rm", json_path])
+
+                        for page_number in observables[filename_base].keys():
+                            # page_number = str(observable["page_number"])
                             page = get_page(page_number, json_obj)
                             if page is None:
                                 logging.info("Page %s not found", page_number)
                                 continue
-                            data_to_write[filename_base][page_number] = [page["data"]["values"][idx] for idx in observable["target_idxs"]]
-
-                # we want to remove unnecessary file (results are necessary)
-                if saving_start_timestamp is not None:
-                    subprocess.run(["rm", filepath_str])
+                            data_to_write[filename_base][page_number] = [
+                                page["data"]["values"][idx] for idx in observables[filename_base][page_number]["target_idxs"]
+                            ]
 
             if saving_start_timestamp is not None:
+                # we want to remove unnecessary file (results are necessary)
+                subprocess.run(["rm", f"{workdir}/*.bdo"])
+                utc_now = datetime.utcnow().timestamp()
+                data_to_write["task_id"] = task_id
+                data_to_write["simulated_primaries"] = simulated_primaries
+                data_to_write["finish_timestamp"] = utc_now
                 with open(statspath, 'a') as writer:
                     writer.write(json.dumps(data_to_write))
                     writer.write("\n")
                 estimators_filepaths = []
-                saving_time = time.time() - saving_start_timestamp
+                saving_time = datetime.utcnow().timestamp() - saving_start_timestamp
                 # reset saving_start_timestamp
                 saving_start_timestamp = None
                 # reset list of partial filenames
                 logging.info("Update for task: %s - estimators saved in %f seconds", task_id, saving_time)
                 continue
+            else:
+                # remove stats file at the end of job
+                subprocess.run(["rm", statspath])
             logging.info("Update for task: %s - final saving end", task_id)
 
         elif re.search(REQUESTED_MATCH, line):
