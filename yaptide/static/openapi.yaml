@@ -8,6 +8,8 @@ servers:
 paths:
   /:
     get:
+      security:
+        - basicAuth: [ ]
       summary: Allows to check if server is alive
       description: Allows to check if server is alive
       responses:
@@ -17,15 +19,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+
+# Authorisation Routes
   /auth/register:
     put:
       summary: Allows registration of new users
       requestBody:
-        description: Allows registration of new users
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: '#/components/schemas/RegisterLoginRequest'
       responses:
         '201':
           description: TODO
@@ -51,7 +54,159 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+  /auth/login:
+    post:
+      summary: Allows to login the user - server sets refresh and access tokens in cookies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterLoginRequest'
+      responses:
+        '202':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  access_exp:
+                    type: integer
+                  refresh_expired:
+                    type: integer
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/refresh:
+    get:
+      summary: Allows to refresh access token - server sets new access token in cookies
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  access_exp:
+                    type: integer
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/status:
+    get:
+      summary: Allows to retrieve logged in user data
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  username:
+                    type: string
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/logout:
+    delete:
+      summary: Allows to logout the user - server removes tokens from cookies
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+# User Routes
+  /user/simulations:
+    get:
+      parameters:
+        - in: query
+          name: page_size
+          schema:
+            type: string
+          description: Specifies the page size from range [0,100] - incorrect or
+                       non provided value will result in sending page with size 10
+        - in: query
+          name: page_idx
+          schema:
+            type: string
+          description: Specifies the page index to be send - incorrect or non
+                       provided value will result in sending page with index 0
+        - in: query
+          name: order_by
+          schema:
+            type: string
+          description: Specifies the parameter by which pages are sorted, available are start_time or end_time
+                       - incorrect or non provided value will result in sending page sorted by start_time
+        - in: query
+          name: order_type
+          schema:
+            type: string
+          description: Specifies the order in which pages are sorted, available are ascend or descend
+                       - incorrect or non provided value will result in sending page sorted by ascend
+      responses:
+
+
 components:
+  securitySchemes:
+    basicAuth: # <-- arbitrary name for the security scheme
+      type: http
+      scheme: basic
   schemas:
     BasicResponse:
       type: object
@@ -60,10 +215,12 @@ components:
           type: string
           example: Hello world!
           description: body message
-    RegisterRequest:
+    RegisterLoginRequest:
       type: object
       properties:
         username:
           type: string
         password:
           type: string
+security:
+  - basicAuth: []  # <-- use the same name here
