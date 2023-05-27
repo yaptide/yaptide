@@ -1,15 +1,24 @@
 FROM python:3.10-slim
 
 # install gfortran via apt and clean cache
+# skipcq: DOK-DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends gfortran && rm -rf /var/lib/apt/lists/*
 
-# install dependencies
+# set working directory
 WORKDIR /usr/local/app
+
+# openshift permissions
+RUN chgrp -R 0 /usr/local/app && \
+    chmod -R g=u /usr/local/app
+
+# install dependencies
 COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
 
-# run celery --app yaptide.celery.worker worker -P threads --loglevel=info
-CMD ["celery", "--app", "yaptide.celery.worker", "worker", "-P", "threads", "--loglevel=info"]
+# set max task time to 10 hours
+ENV CELERYD_TIME_LIMIT=36000
+
+CMD ["celery", "--app", "yaptide.celery.worker", "worker", "-E", "--loglevel=info", "--hostname", "yaptide-worker"]
