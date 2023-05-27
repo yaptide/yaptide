@@ -16,8 +16,10 @@ services:
             - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
+            - FLOWER_BASIC_AUTH=admin:password
         depends_on:
             - redis
+            - flower
 
     yaptide_worker:
         build:
@@ -42,5 +44,15 @@ services:
         image: redis:6-alpine
         container_name: yaptide_redis
 
+    flower:
+        image: mher/flower
+        container_name: yaptide_flower
+        ports:
+        - 5555:5555
+        environment:
+        - BROKER_URL=redis://redis:6379/0
+        - FLOWER_BASIC_AUTH=admin:password  # Modify this for basic authentication
+        depends_on:
+        - redis
 volumes:
     data:
