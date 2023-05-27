@@ -21,4 +21,7 @@ COPY yaptide ./yaptide
 # set max task time to 10 hours
 ENV CELERYD_TIME_LIMIT=36000
 
+# add path where shieldhit will be installed
+ENV PATH="/usr/local/app/bin:${PATH}"
+
 CMD ["celery", "--app", "yaptide.celery.worker", "worker", "-E", "--loglevel=info", "--hostname", "yaptide-worker"]
