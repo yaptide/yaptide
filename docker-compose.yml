@@ -12,11 +12,8 @@ services:
         container_name: yaptide_flask
         ports:
             - 5000:5000
-        command: flask run --host=0.0.0.0
         environment:
             - FLASK_DEBUG=1
-            - FLASK_APP=yaptide.application
-            - FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
         depends_on:
@@ -25,8 +22,6 @@ services:
     yaptide_worker:
         build:
             context: .
-            args:
-                SHIELDHIT_PATH: ${SHIELDHIT_PATH-/shieldhit}
             dockerfile: Dockerfile-worker
         image: yaptide_worker
         deploy:
@@ -35,7 +30,6 @@ services:
                     # the explanation of below syntax: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
                     cpus: ${MAX_CORES-1.0}
         container_name: yaptide_worker
-        command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
         environment:
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
