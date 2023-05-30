@@ -73,9 +73,9 @@ def install_simulator(name: SimulatorType) -> bool:
         click.echo(f'Installing shieldhit into {installation_path}')
         installation_path.mkdir(exist_ok=True, parents=True)
 
-        if "SHIELDHIT_S3_BUCKET" in os.environ:
+        if "YAPTIDE_S3_CONFIG" in os.environ:
             click.echo("Downloading shieldhit from S3 bucket")
-            endpoint, access_key, secret_key, encryption_key = os.environ["SHIELDHIT_S3_BUCKET"].split()
+            endpoint, access_key, secret_key, encryption_key = os.environ["YAPTIDE_S3_CONFIG"].split()
             s3_client = boto3.client(
                 "s3",
                 aws_access_key_id=access_key,
@@ -83,45 +83,54 @@ def install_simulator(name: SimulatorType) -> bool:
                 endpoint_url=endpoint
             )
             destination_file_path = installation_path / "shieldhit"
-            # Download file from s3 bucket
-            with open(destination_file_path, "wb") as f:
-                s3_client.download_fileobj("shieldhit", "shieldhit", f)
+            with tempfile.TemporaryFile() as temp_file:
+                # Download file from s3 bucket
+                try:
+                    s3_client.download_fileobj("shieldhit", "shieldhit", temp_file)
+                except Exception:
+                    click.echo("S3 download failed.")
+                    return download_shieldhit_demo_version()
+                temp_file.seek(0)
+                encrypted_data = temp_file.read()
             # Decrypt downloaded file
             click.echo("Decrypting downloaded file")
             fernet = Fernet(encryption_key)
-            with open(destination_file_path, "rb") as f:
-                encrypted_data = f.read()
             decrypted_data = fernet.decrypt(encrypted_data)
             with open(destination_file_path, "wb") as f:
                 f.write(decrypted_data)
             # Permission to execute
             os.chmod(destination_file_path, 0o755)
         else:
-            demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
-            # check if working on Windows
-            if os.name == 'nt':
-                demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.1.zip'
-
-            # create temporary directory and download
-            # Create a temporary file to store the downloaded binary data
-            with tempfile.TemporaryDirectory() as tmpdir_name:
-                click.echo(f"Downloading from {demo_version_url} to {tmpdir_name}")
-                headers = {'User-Agent': 'Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0'}
-                response = requests.get(demo_version_url, headers=headers)
-                temp_file_archive = Path(tmpdir_name) / Path(demo_version_url).name
-                with open(temp_file_archive, 'wb') as file_handle:
-                    file_handle.write(response.content)
-                click.echo(f"Saved to {temp_file_archive} with size {temp_file_archive.stat().st_size} bytes")
-
-                # extract
-                click.echo(f"Extracting {temp_file_archive} to {installation_path}")
-                if temp_file_archive.suffix == '.gz':
-                    extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit')
-                elif temp_file_archive.suffix == '.zip':
-                    extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe')
+            return download_shieldhit_demo_version()
     else:
         click.echo('Not implemented')
         return False
+    return True
+
+
+def download_shieldhit_demo_version() -> bool:
+    demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
+    # check if working on Windows
+    if os.name == 'nt':
+        demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.1.zip'
+
+    # create temporary directory and download
+    # Create a temporary file to store the downloaded binary data
+    with tempfile.TemporaryDirectory() as tmpdir_name:
+        click.echo(f"Downloading from {demo_version_url} to {tmpdir_name}")
+        headers = {'User-Agent': 'Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0'}
+        response = requests.get(demo_version_url, headers=headers)
+        temp_file_archive = Path(tmpdir_name) / Path(demo_version_url).name
+        with open(temp_file_archive, 'wb') as file_handle:
+            file_handle.write(response.content)
+        click.echo(f"Saved to {temp_file_archive} with size {temp_file_archive.stat().st_size} bytes")
+
+        # extract
+        click.echo(f"Extracting {temp_file_archive} to {installation_path}")
+        if temp_file_archive.suffix == '.gz':
+            extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit')
+        elif temp_file_archive.suffix == '.zip':
+            extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe')
     return True
 
 
