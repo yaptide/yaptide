@@ -10,6 +10,7 @@ import click
 import requests
 import boto3
 from cryptography.fernet import Fernet
+from botocore.exceptions import ClientError
 
 
 class SimulatorType(IntEnum):
@@ -87,8 +88,8 @@ def install_simulator(name: SimulatorType) -> bool:
                 # Download file from s3 bucket
                 try:
                     s3_client.download_fileobj("shieldhit", "shieldhit", temp_file)
-                except Exception:
-                    click.echo("S3 download failed.")
+                except ClientError as e:
+                    click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
                     return download_shieldhit_demo_version()
                 temp_file.seek(0)
                 encrypted_data = temp_file.read()
@@ -99,7 +100,7 @@ def install_simulator(name: SimulatorType) -> bool:
             with open(destination_file_path, "wb") as f:
                 f.write(decrypted_data)
             # Permission to execute
-            os.chmod(destination_file_path, 0o755)
+            os.chmod(destination_file_path, 0o700)
         else:
             return download_shieldhit_demo_version()
     else:
@@ -109,6 +110,7 @@ def install_simulator(name: SimulatorType) -> bool:
 
 
 def download_shieldhit_demo_version() -> bool:
+    """Download shieldhit demo version from shieldhit.org"""
     demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
     # check if working on Windows
     if os.name == 'nt':

@@ -18,9 +18,8 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, py
 
 @worker_ready.connect
 def on_worker_ready(**kwargs):
-    '''This function will be called when celery worker is ready to accept tasks'''
+    """This function will be called when celery worker is ready to accept tasks"""
     logging.info("on_worker_ready signal received")
-    
     # ask celery to install simulator on the worker and wait for it to finish
     job = install_simulators.delay()
     # we need to do some hackery here to make blocking calls work
@@ -28,12 +27,13 @@ def on_worker_ready(**kwargs):
     try:
         job.wait()
     except RuntimeError as e:
-        logging.info("the only way for blocking calls to work is to catch RuntimeError", e)
+        logging.info("the only way for blocking calls to work is to catch RuntimeError %s", e)
         raise e
 
 
 @celery_app.task()
 def install_simulators() -> bool:
+    """Task responsible for installing simulators on the worker"""
     result = install_simulator(SimulatorType.shieldhit)
     return result
 
