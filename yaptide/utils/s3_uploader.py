@@ -9,6 +9,8 @@ from pathlib import Path
 
 def encrypt_file(file_path: Path, key: str) -> Path:
     """Encrypts a file using Fernet"""
+    if not file_path.is_file():
+        raise ValueError("Invalid file path or file does not exist.")
     with open(file_path, "rb") as file:
         original = file.read()
     fernet = Fernet(key)
@@ -45,8 +47,7 @@ def upload_file_to_s3(
         raise Exception("Could not connect to the specified endpoint.") from e
     except ClientError as e:
         raise Exception(
-            "An error occurred while connecting to S3:", e.response["Error"]["Message"]
-        ) from e
+            "An error occurred while connecting to S3:", e.response["Error"]["Message"]) from e
 
     # Check if bucket exists and create if not
     if bucket not in [bucket["Name"] for bucket in s3_client.list_buckets()["Buckets"]]:
@@ -65,6 +66,7 @@ def upload_file_to_s3(
 
 
 def main():
+    """Responsible for checking input arguments and calling upload_file_to_s3"""
     if "YAPTIDE_S3_CONFIG" not in os.environ:
         raise Exception("YAPTIDE_S3_CONFIG environment variable not set.")
     endpoint, access_key, secret_key, encryption_key = os.environ["YAPTIDE_S3_CONFIG"].split()
@@ -72,9 +74,6 @@ def main():
         raise Exception("Wrong number of arguments <path> <bucket> needed.")
     path = Path(sys.argv[1])
     bucket = sys.argv[2]
-    # Check if file exists
-    if not os.path.exists(path):
-        raise Exception("File does not exist.")
     upload_file_to_s3(endpoint, access_key, secret_key, encryption_key, path, bucket)
 
 
