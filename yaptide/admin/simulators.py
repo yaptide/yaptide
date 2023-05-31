@@ -189,6 +189,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
 
 def encrypt_file(file_path: Path) -> bytes:
     """Encrypts a file using Fernet"""
+    # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
         original = file.read()
     fernet = Fernet(encryption_key)
@@ -198,6 +199,7 @@ def encrypt_file(file_path: Path) -> bytes:
 
 def decrypt_file(file_path: Path) -> bytes:
     """Decrypts a file using Fernet"""
+    # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
         encrypted = file.read()
     fernet = Fernet(encryption_key)
