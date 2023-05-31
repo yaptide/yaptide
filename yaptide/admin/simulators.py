@@ -26,6 +26,7 @@ class SimulatorType(IntEnum):
 def run():
     """Manage simulators"""
 
+
 load_dotenv()
 endpoint = os.getenv('S3_ENDPOINT')
 access_key = os.getenv('S3_ACCESS_KEY')
@@ -78,11 +79,11 @@ def install_simulator(name: SimulatorType) -> bool:
     if name == SimulatorType.shieldhit:
         click.echo(f'Installing shieldhit into {installation_path}')
         installation_path.mkdir(exist_ok=True, parents=True)
-        installed = False
+        shieldhit_installed = False
         if all([endpoint, access_key, secret_key, encryption_key]):
             click.echo('Downloading from S3 bucket')
-            installed = download_shieldhit_from_s3()
-        if not installed:
+            shieldhit_installed = download_shieldhit_from_s3()
+        if not shieldhit_installed:
             click.echo('Downloading demo version from shieldhit.org')
             download_shieldhit_demo_version()
     else:
@@ -116,6 +117,7 @@ def download_shieldhit_demo_version() -> bool:
         elif temp_file_archive.suffix == '.zip':
             extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe')
     return True
+
 
 def download_shieldhit_from_s3() -> bool:
     """Download shieldhit from S3 bucket"""
@@ -178,11 +180,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
     try:
         # Upload encrypted file to S3 bucket
         click.echo("Uploading file.")
-        s3_client.put_object(
-            Body=encrypted_file_contents, 
-            Bucket=bucket, 
-            Key=os.path.basename(file_path)
-        )
+        s3_client.put_object(Body=encrypted_file_contents, Bucket=bucket, Key=os.path.basename(file_path))
         return True
     except ClientError as e:
         click.echo("Upload failed with error: ", e.response["Error"]["Message"])
@@ -222,6 +220,7 @@ def install(**kwargs):
     if install_simulator(sim_type):
         click.echo(f'Simulator {sim_type.name} installed')
 
+
 @run.command
 @click.option('--bucket', help='S3 bucket name')
 @click.option('--file', help='Path to file to upload')
@@ -249,7 +248,6 @@ def upload(**kwargs):
         return
     if upload_file_to_s3(kwargs['bucket'], Path(kwargs['file'])):
         click.echo('File uploaded successfully')
-    
 
 
 if __name__ == "__main__":
