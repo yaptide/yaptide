@@ -502,8 +502,182 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/JobsDeleteResponse'
+# Result Routes
+  /results:
+    description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
+    get:
+      description: Allows getting results of the simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  estimators:
+                    type: array
+                    description: list of resulting estimators
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+  /results/batch:
+    description: We weren't able to fully migrate batch results to new endpoint for now, so it is still required to use this endpoint
+    get:
+      description: Allows getting results of the simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  estimators:
+                    type: array
+                    description: list of resulting estimators
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
 
-
+# Task Routes
+  /tasks/update:
+    description: Route dedicated for Backend internal communication
+    post:
+      description: Updates task state
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                simulation_id:
+                  type: integer
+                  description: id of task's parent simulation
+                task_id:
+                  type: string
+                  description: id task to update
+                update_key:
+                  type: string
+                  description: authentication key provided to tasks
+                update_dict:
+                  type: array
+                  description: dict containing update data
+      responses:
+        default:
+          description: Response JSON for all codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /logfiles:
+    description: Route dedicated for Backend internal communication
+    post:
+      description: Updates task state
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                simulation_id:
+                  type: integer
+                  description: id of task's parent simulation
+                update_key:
+                  type: string
+                  description: authentication key provided to tasks
+                log_files:
+                  type: array
+                  description: dict containing log files
+      responses:
+        default:
+          description: Response JSON for all codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+    get:
+      description: Allows getting results of the simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  logfiles:
+                    type: array
+                    description: dict of log files with names as keys and content as values.
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
 components:
   securitySchemes:
     basicAuth: # <-- arbitrary name for the security scheme
