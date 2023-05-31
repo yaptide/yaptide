@@ -79,11 +79,11 @@ def install_simulator(name: SimulatorType) -> bool:
     if name == SimulatorType.shieldhit:
         click.echo(f'Installing shieldhit into {installation_path}')
         installation_path.mkdir(exist_ok=True, parents=True)
-        shieldhit_installed = False
+        shieldhit_downloaded_from_s3 = False
         if all([endpoint, access_key, secret_key, encryption_key]):
             click.echo('Downloading from S3 bucket')
-            shieldhit_installed = download_shieldhit_from_s3()
-        if not shieldhit_installed:
+            shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
+        if not shieldhit_downloaded_from_s3:
             click.echo('Downloading demo version from shieldhit.org')
             download_shieldhit_demo_version()
     else:
@@ -119,7 +119,7 @@ def download_shieldhit_demo_version() -> bool:
     return True
 
 
-def download_shieldhit_from_s3() -> bool:
+def download_shieldhit_from_s3(bucket: str = "shieldhit", key: str = "shieldhit") -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
         "s3",
@@ -131,20 +131,20 @@ def download_shieldhit_from_s3() -> bool:
     with tempfile.TemporaryFile() as temp_file:
         # Download file from s3 bucket
         try:
-            s3_client.download_fileobj("shieldhit", "shieldhit", temp_file)
+            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
         except ClientError as e:
             click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
             return False
         temp_file.seek(0)
         encrypted_data = temp_file.read()
-    # Decrypt downloaded file
-    click.echo("Decrypting downloaded file")
-    fernet = Fernet(encryption_key)
-    decrypted_data = fernet.decrypt(encrypted_data)
-    with open(destination_file_path, "wb") as f:
-        f.write(decrypted_data)
-    # Permission to execute
-    os.chmod(destination_file_path, 0o700)
+        # Decrypt downloaded file
+        click.echo("Decrypting downloaded file")
+        fernet = Fernet(encryption_key)
+        decrypted_data = fernet.decrypt(encrypted_data)
+        with open(destination_file_path, "wb") as f:
+            f.write(decrypted_data)
+        # Permission to execute
+        os.chmod(destination_file_path, 0o700)
     return True
 
 
@@ -180,7 +180,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
     try:
         # Upload encrypted file to S3 bucket
         click.echo("Uploading file.")
-        s3_client.put_object(Body=encrypted_file_contents, Bucket=bucket, Key=os.path.basename(file_path))
+        s3_client.put_object(Body=encrypted_file_contents, Bucket=bucket, Key=file_path.name)
         return True
     except ClientError as e:
         click.echo("Upload failed with error: ", e.response["Error"]["Message"])
