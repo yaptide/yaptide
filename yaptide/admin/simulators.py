@@ -245,7 +245,7 @@ def upload(**kwargs):
         if not kwargs[arg] or kwargs[arg] is None:
             click.echo(message)
             return
-    if not os.path.isfile(kwargs['file']):
+    if not Path(kwargs['file']).exists():
         click.echo('File does not exist')
         return
     if upload_file_to_s3(kwargs['bucket'], Path(kwargs['file'])):
