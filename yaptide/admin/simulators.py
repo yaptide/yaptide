@@ -118,13 +118,12 @@ def download_shieldhit_demo_version() -> bool:
             extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe')
     return True
 
-    
-# skipcq: PYL-W0621
+
 def download_shieldhit_from_s3(
         bucket: str = "shieldhit",
         key: str = "shieldhit",
-        installation_path: Path = installation_path
-    ) -> bool:
+        installation_path: Path = installation_path # skipcq: PYL-W0621
+        ) -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
         "s3",
