@@ -119,7 +119,7 @@ def download_shieldhit_demo_version() -> bool:
     return True
 
 
-def download_shieldhit_from_s3(bucket: str = "shieldhit", key: str = "shieldhit") -> bool:
+def download_shieldhit_from_s3(bucket: str = "shieldhit", key: str = "shieldhit", installation_path: Path = installation_path) -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
         "s3",
