@@ -2,16 +2,18 @@ import os
 import shutil
 import tarfile
 import tempfile
-from enum import IntEnum, auto
-from pathlib import Path
 import zipfile
-
 import click
 import requests
 import boto3
+from enum import IntEnum, auto
+from pathlib import Path
 from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from botocore.exceptions import NoCredentialsError, EndpointConnectionError, ClientError
 from dotenv import load_dotenv
+from base64 import urlsafe_b64encode
 
 
 class SimulatorType(IntEnum):
@@ -31,7 +33,8 @@ load_dotenv()
 endpoint = os.getenv('S3_ENDPOINT')
 access_key = os.getenv('S3_ACCESS_KEY')
 secret_key = os.getenv('S3_SECRET_KEY')
-encryption_key = os.getenv('S3_ENCRYPTION_KEY')
+password = os.getenv('S3_ENCRYPTION_PASSWORD')
+salt = os.getenv('S3_ENCRYPTION_SALT')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
 
 
@@ -80,7 +83,7 @@ def install_simulator(name: SimulatorType) -> bool:
         click.echo(f'Installing shieldhit into {installation_path}')
         installation_path.mkdir(exist_ok=True, parents=True)
         shieldhit_downloaded_from_s3 = False
-        if all([endpoint, access_key, secret_key, encryption_key]):
+        if all([endpoint, access_key, secret_key, password, salt]):
             click.echo('Downloading from S3 bucket')
             shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
         if not shieldhit_downloaded_from_s3:
@@ -132,23 +135,20 @@ def download_shieldhit_from_s3(
         endpoint_url=endpoint
     )
     destination_file_path = installation_path / "shieldhit"
-    with tempfile.TemporaryFile() as temp_file:
-        # Download file from s3 bucket
-        try:
-            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
-        except ClientError as e:
-            click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
-            return False
-        temp_file.seek(0)
-        encrypted_data = temp_file.read()
-        # Decrypt downloaded file
-        click.echo("Decrypting downloaded file")
-        fernet = Fernet(encryption_key)
-        decrypted_data = fernet.decrypt(encrypted_data)
-        with open(destination_file_path, "wb") as f:
-            f.write(decrypted_data)
-        # Permission to execute
-        os.chmod(destination_file_path, 0o700)
+    temp_file = tempfile.NamedTemporaryFile()
+    # Download file from s3 bucket
+    try:
+        s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+    except ClientError as e:
+        click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
+        return False
+    # Decrypt downloaded file
+    click.echo("Decrypting downloaded file")
+    decrypted_file_contents = decrypt_file(file_path=temp_file.name, encryption_key=derive_key(password, salt))
+    with open(destination_file_path, "wb") as f:
+        f.write(decrypted_file_contents)
+    # Permission to execute
+    os.chmod(destination_file_path, 0o700)
     return True
 
 
@@ -180,7 +180,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
         s3_client.create_bucket(Bucket=bucket)
 
     # Encrypt file
-    encrypted_file_contents = encrypt_file(file_path)
+    encrypted_file_contents = encrypt_file(file_path=file_path, encryption_key=derive_key(password, salt))
     try:
         # Upload encrypted file to S3 bucket
         click.echo("Uploading file.")
@@ -191,7 +191,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
         return False
 
 
-def encrypt_file(file_path: Path) -> bytes:
+def encrypt_file(file_path: Path, encryption_key: bytes) -> bytes:
     """Encrypts a file using Fernet"""
     # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
@@ -201,7 +201,7 @@ def encrypt_file(file_path: Path) -> bytes:
     return encrypted
 
 
-def decrypt_file(file_path: Path) -> bytes:
+def decrypt_file(file_path: Path, encryption_key: bytes) -> bytes:
     """Decrypts a file using Fernet"""
     # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
@@ -209,6 +209,15 @@ def decrypt_file(file_path: Path) -> bytes:
     fernet = Fernet(encryption_key)
     decrypted = fernet.decrypt(encrypted)
     return decrypted
+
+
+def derive_key(password: str, salt: str) -> bytes:
+    """Derives a key from the given password and salt"""
+    password = password.encode()
+    salt = salt.encode()
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=480_000)
+    key = urlsafe_b64encode(kdf.derive(password))
+    return key
 
 
 @run.command
@@ -233,17 +242,19 @@ def install(**kwargs):
 @click.option('--endpoint', envvar='S3_ENDPOINT', default=endpoint, help='S3 endpoint')
 @click.option('--access_key', envvar='S3_ACCESS_KEY', default=access_key, help='S3 access key')
 @click.option('--secret_key', envvar='S3_SECRET_KEY', default=secret_key, help='S3 secret key')
-@click.option('--encryption_key', envvar='S3_ENCRYPTION_KEY', default=encryption_key, help='S3 encryption key')
+@click.option('--password', envvar='S3_ENCRYPTION_PASSWORD', default=password, help='S3 encryption password')
+@click.option('--salt', envvar='S3_ENCRYPTION_SALT', default=salt, help='S3 encryption salt')
 def upload(**kwargs):
     """Manage arguments and upload file to S3 bucket"""
-    args = ['bucket', 'file', 'endpoint', 'access_key', 'secret_key', 'encryption_key']
+    args = ['bucket', 'file', 'endpoint', 'access_key', 'secret_key', 'password', 'salt']
     messages = [
         'Bucket name is required specify with --bucket',
         'Path to file is required specify with --file',
-        'S3 endpoint is required specify with --endpoint',
+        'S3 endpoint not found in environment variables specify with --endpoint',
         'S3 access key not found in environment variables specify with --access_key',
         'S3 secret key not found in environment variables specify with --secret_key',
-        'S3 encryption key not found in environment variables specify with --encryption_key'
+        'S3 encryption password not found in environment variables specify with --password',
+        'S3 encryption salt not found in environment variables specify with --salt'
     ]
     for arg, message in zip(args, messages):
         if not kwargs[arg] or kwargs[arg] is None:
