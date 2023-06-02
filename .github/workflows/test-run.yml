@@ -8,6 +8,8 @@ on:
 
   workflow_dispatch:
 
+env:
+  S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}    
 
 jobs:
   build-and-test:
