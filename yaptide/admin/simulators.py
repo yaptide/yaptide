@@ -25,23 +25,12 @@ class SimulatorType(IntEnum):
     topas = auto()
 
 
-def derive_key() -> bytes:
-    """Derives a key from the password and salt"""
-    if not all([password, salt]):
-        return None
-    click.echo('Deriving key from password and salt')
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt.encode(), iterations=480_000)
-    key = urlsafe_b64encode(kdf.derive(password.encode()))
-    return key
-
-
 load_dotenv()
 endpoint = os.getenv('S3_ENDPOINT')
 access_key = os.getenv('S3_ACCESS_KEY')
 secret_key = os.getenv('S3_SECRET_KEY')
 password = os.getenv('S3_ENCRYPTION_PASSWORD')
 salt = os.getenv('S3_ENCRYPTION_SALT')
-encryption_key = derive_key()
 shieldhit_bucket = os.getenv('S3_SHIELDHIT_BUCKET')
 shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
@@ -158,7 +147,7 @@ def download_shieldhit_from_s3(
         return False
     # Decrypt downloaded file
     click.echo("Decrypting downloaded file")
-    decrypted_file_contents = decrypt_file(file_path=temp_file.name)
+    decrypted_file_contents = decrypt_file(temp_file, password, salt)
     with open(destination_file_path, "wb") as f:
         f.write(decrypted_file_contents)
     # Permission to execute
@@ -166,14 +155,22 @@ def download_shieldhit_from_s3(
     return True
 
 
-def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
+def upload_file_to_s3(
+        bucket: str,
+        file_path: Path,
+        endpoint_url: str = endpoint,
+        aws_access_key_id: str = access_key,
+        aws_secret_access_key: str = secret_key,
+        encryption_password: str = password,
+        encryption_salt: str = salt
+        ) -> bool:
     """Upload file to S3 bucket"""
     # Create S3 client
     s3_client = boto3.client(
         "s3",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        endpoint_url=endpoint,
+        aws_access_key_id=aws_access_key_id,
+        aws_secret_access_key=aws_secret_access_key,
+        endpoint_url=endpoint_url,
     )
     # Check if connection to S3 is possible
     try:
@@ -194,7 +191,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
         s3_client.create_bucket(Bucket=bucket)
 
     # Encrypt file
-    encrypted_file_contents = encrypt_file(file_path=file_path)
+    encrypted_file_contents = encrypt_file(file_path, encryption_password, encryption_salt)
     try:
         # Upload encrypted file to S3 bucket
         click.echo("Uploading file.")
@@ -205,9 +202,10 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
         return False
 
 
-def encrypt_file(file_path: Path) -> bytes:
+def encrypt_file(file_path: Path, encryption_password: str = password, encryption_salt: str = salt) -> bytes:
     """Encrypts a file using Fernet"""
     # skipcq: PTC-W6004
+    encryption_key = derive_key(encryption_password, encryption_salt)
     with open(file_path, "rb") as file:
         original = file.read()
     fernet = Fernet(encryption_key)
@@ -215,14 +213,22 @@ def encrypt_file(file_path: Path) -> bytes:
     return encrypted
 
 
-def decrypt_file(file_path: Path) -> bytes:
+def decrypt_file(file_path: Path, encryption_password: str = password, encryption_salt: str = salt) -> bytes:
     """Decrypts a file using Fernet"""
     # skipcq: PTC-W6004
+    encryption_key = derive_key(encryption_password, encryption_salt)
     with open(file_path, "rb") as file:
         encrypted = file.read()
     fernet = Fernet(encryption_key)
     decrypted = fernet.decrypt(encrypted)
     return decrypted
+
+
+def derive_key(encryption_password: str = password, encryption_salt: str = salt) -> bytes:
+    """Derives a key from the password and salt"""
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=encryption_salt.encode(), iterations=480_000)
+    key = urlsafe_b64encode(kdf.derive(encryption_password.encode()))
+    return key
 
 
 @run.command
@@ -268,15 +274,15 @@ def upload(**kwargs):
     if not Path(kwargs['file']).exists():
         click.echo('File does not exist')
         return
-    # Override environment variables with arguments
-    global endpoint, access_key, secret_key, password, salt, encryption_key
-    endpoint = kwargs['endpoint']
-    access_key = kwargs['access_key']
-    secret_key = kwargs['secret_key']
-    password = kwargs['password']
-    salt = kwargs['salt']
-    encryption_key = derive_key()
-    if upload_file_to_s3(kwargs['bucket'], Path(kwargs['file'])):
+    if upload_file_to_s3(
+        bucket=kwargs['bucket'],
+        file_path=Path(kwargs['file']),
+        endpoint_url=kwargs['endpoint'],
+        aws_access_key_id=kwargs['access_key'],
+        aws_secret_access_key=kwargs['secret_key'],
+        encryption_password=kwargs['password'],
+        encryption_salt=kwargs['salt']
+        ):
         click.echo('File uploaded successfully')
 
 
