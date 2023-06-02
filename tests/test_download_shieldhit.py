@@ -20,7 +20,7 @@ def test_if_shieldhit_downloaded(tmpdir):
     bucket = os.getenv("S3_SHIELDHIT_BUCKET")
     key = os.getenv("S3_SHIELDHIT_KEY")
     assert download_shieldhit_from_s3(bucket=bucket, key=key, installation_path=installation_path) is True
-    expected_path = Path(installation_path / "shieldhit")
+    expected_path = Path(installation_path / key)
     assert expected_path.exists()
     command = f"{expected_path} --version"
     assert os.system(command) == 0

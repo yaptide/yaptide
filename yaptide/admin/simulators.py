@@ -6,6 +6,7 @@ import zipfile
 import click
 import requests
 import boto3
+import platform
 from enum import IntEnum, auto
 from pathlib import Path
 from cryptography.fernet import Fernet
@@ -24,9 +25,14 @@ class SimulatorType(IntEnum):
     topas = auto()
 
 
-@click.group()
-def run():
-    """Manage simulators"""
+def derive_key() -> bytes:
+    """Derives a key from the password and salt"""
+    if not all([password, salt]):
+        return None
+    click.echo('Deriving key from password and salt')
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt.encode(), iterations=480_000)
+    key = urlsafe_b64encode(kdf.derive(password.encode()))
+    return key
 
 
 load_dotenv()
@@ -35,7 +41,15 @@ access_key = os.getenv('S3_ACCESS_KEY')
 secret_key = os.getenv('S3_SECRET_KEY')
 password = os.getenv('S3_ENCRYPTION_PASSWORD')
 salt = os.getenv('S3_ENCRYPTION_SALT')
+encryption_key = derive_key()
+shieldhit_bucket = os.getenv('S3_SHIELDHIT_BUCKET')
+shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
+
+
+@click.group()
+def run():
+    """Manage simulators"""
 
 
 @run.command
@@ -99,7 +113,7 @@ def download_shieldhit_demo_version() -> bool:
     """Download shieldhit demo version from shieldhit.org"""
     demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
     # check if working on Windows
-    if os.name == 'nt':
+    if platform.system() == 'Windows':
         demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.1.zip'
 
     # create temporary directory and download
@@ -123,9 +137,9 @@ def download_shieldhit_demo_version() -> bool:
 
 
 def download_shieldhit_from_s3(
-        bucket: str = "shieldhit",
-        key: str = "shieldhit",
-        installation_path: Path = installation_path  # skipcq: PYL-W0621
+        bucket: str = shieldhit_bucket,
+        key: str = shieldhit_key,
+        installation_path: Path = installation_path   # skipcq: PYL-W0621
         ) -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
@@ -134,8 +148,8 @@ def download_shieldhit_from_s3(
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
-    destination_file_path = installation_path / "shieldhit"
-    temp_file = tempfile.NamedTemporaryFile()
+    destination_file_path = installation_path / key
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
     # Download file from s3 bucket
     try:
         s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
@@ -144,7 +158,7 @@ def download_shieldhit_from_s3(
         return False
     # Decrypt downloaded file
     click.echo("Decrypting downloaded file")
-    decrypted_file_contents = decrypt_file(file_path=temp_file.name, encryption_key=derive_key(password, salt))
+    decrypted_file_contents = decrypt_file(file_path=temp_file.name)
     with open(destination_file_path, "wb") as f:
         f.write(decrypted_file_contents)
     # Permission to execute
@@ -180,7 +194,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
         s3_client.create_bucket(Bucket=bucket)
 
     # Encrypt file
-    encrypted_file_contents = encrypt_file(file_path=file_path, encryption_key=derive_key(password, salt))
+    encrypted_file_contents = encrypt_file(file_path=file_path)
     try:
         # Upload encrypted file to S3 bucket
         click.echo("Uploading file.")
@@ -191,7 +205,7 @@ def upload_file_to_s3(bucket: str, file_path: Path) -> bool:
         return False
 
 
-def encrypt_file(file_path: Path, encryption_key: bytes) -> bytes:
+def encrypt_file(file_path: Path) -> bytes:
     """Encrypts a file using Fernet"""
     # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
@@ -201,7 +215,7 @@ def encrypt_file(file_path: Path, encryption_key: bytes) -> bytes:
     return encrypted
 
 
-def decrypt_file(file_path: Path, encryption_key: bytes) -> bytes:
+def decrypt_file(file_path: Path) -> bytes:
     """Decrypts a file using Fernet"""
     # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
@@ -209,15 +223,6 @@ def decrypt_file(file_path: Path, encryption_key: bytes) -> bytes:
     fernet = Fernet(encryption_key)
     decrypted = fernet.decrypt(encrypted)
     return decrypted
-
-
-def derive_key(password: str, salt: str) -> bytes:
-    """Derives a key from the given password and salt"""
-    password = password.encode()
-    salt = salt.encode()
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt, iterations=480_000)
-    key = urlsafe_b64encode(kdf.derive(password))
-    return key
 
 
 @run.command
@@ -263,6 +268,14 @@ def upload(**kwargs):
     if not Path(kwargs['file']).exists():
         click.echo('File does not exist')
         return
+    # Override environment variables with arguments
+    global endpoint, access_key, secret_key, password, salt, encryption_key
+    endpoint = kwargs['endpoint']
+    access_key = kwargs['access_key']
+    secret_key = kwargs['secret_key']
+    password = kwargs['password']
+    salt = kwargs['salt']
+    encryption_key = derive_key()
     if upload_file_to_s3(kwargs['bucket'], Path(kwargs['file'])):
         click.echo('File uploaded successfully')
 
