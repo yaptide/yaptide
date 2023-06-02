@@ -147,7 +147,7 @@ def download_shieldhit_from_s3(
         return False
     # Decrypt downloaded file
     click.echo("Decrypting downloaded file")
-    decrypted_file_contents = decrypt_file(temp_file, password, salt)
+    decrypted_file_contents = decrypt_file(temp_file.name, password, salt)
     with open(destination_file_path, "wb") as f:
         f.write(decrypted_file_contents)
     # Permission to execute
@@ -204,8 +204,8 @@ def upload_file_to_s3(
 
 def encrypt_file(file_path: Path, encryption_password: str = password, encryption_salt: str = salt) -> bytes:
     """Encrypts a file using Fernet"""
-    # skipcq: PTC-W6004
     encryption_key = derive_key(encryption_password, encryption_salt)
+    # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
         original = file.read()
     fernet = Fernet(encryption_key)
@@ -215,8 +215,8 @@ def encrypt_file(file_path: Path, encryption_password: str = password, encryptio
 
 def decrypt_file(file_path: Path, encryption_password: str = password, encryption_salt: str = salt) -> bytes:
     """Decrypts a file using Fernet"""
-    # skipcq: PTC-W6004
     encryption_key = derive_key(encryption_password, encryption_salt)
+    # skipcq: PTC-W6004
     with open(file_path, "rb") as file:
         encrypted = file.read()
     fernet = Fernet(encryption_key)
@@ -282,7 +282,7 @@ def upload(**kwargs):
         aws_secret_access_key=kwargs['secret_key'],
         encryption_password=kwargs['password'],
         encryption_salt=kwargs['salt']
-        ):
+            ):
         click.echo('File uploaded successfully')
 
 
