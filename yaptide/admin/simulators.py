@@ -1,3 +1,4 @@
+import logging
 import os
 import shutil
 import tarfile
@@ -82,15 +83,19 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
 def install_simulator(name: SimulatorType) -> bool:
     """Add simulator to database"""
     click.echo(f'Installation for simulator: {name} started')
+    logging.info("Installation for simulator: %s started", name)
     if name == SimulatorType.shieldhit:
         click.echo(f'Installing shieldhit into {installation_path}')
+        logging.info("Installing shieldhit into %s", installation_path)
         installation_path.mkdir(exist_ok=True, parents=True)
         shieldhit_downloaded_from_s3 = False
         if all([endpoint, access_key, secret_key, password, salt]):
             click.echo('Downloading from S3 bucket')
+            logging.info("Downloading from S3 bucket")
             shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
         if not shieldhit_downloaded_from_s3:
             click.echo('Downloading demo version from shieldhit.org')
+            logging.info("Downloading demo version from shieldhit.org")
             download_shieldhit_demo_version()
     else:
         click.echo('Not implemented')
