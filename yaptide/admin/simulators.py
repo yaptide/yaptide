@@ -199,7 +199,7 @@ def upload_file_to_s3(
     encrypted_file_contents = encrypt_file(file_path, encryption_password, encryption_salt)
     try:
         # Upload encrypted file to S3 bucket
-        click.echo("Uploading file.")
+        click.echo("Uploading file", file_path)
         s3_client.put_object(Body=encrypted_file_contents, Bucket=bucket, Key=file_path.name)
         return True
     except ClientError as e:
