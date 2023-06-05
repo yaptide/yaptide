@@ -153,12 +153,12 @@ def download_shieldhit_from_s3(
         click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
         return False
     # Decrypt downloaded file
-    click.echo("Decrypting downloaded file")
+    click.echo("Decrypting downloaded file", destination_file_path)
     decrypted_file_contents = decrypt_file(temp_file.name, password, salt)
     with open(destination_file_path, "wb") as f:
         f.write(decrypted_file_contents)
     # Permission to execute
-    os.chmod(destination_file_path, 0o700)
+    destination_file_path.chmod(0o700)
     return True
 
 
