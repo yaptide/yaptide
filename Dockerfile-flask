@@ -1,9 +1,15 @@
 FROM python:3.10-slim
-WORKDIR /usr/local/app
 
 # install dependencies
+WORKDIR /usr/local/app
 COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
+
+# run Flask app
+EXPOSE 5000
+ENV FLASK_APP=yaptide.application
+ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
+CMD ["flask", "run", "--host=0.0.0.0"]

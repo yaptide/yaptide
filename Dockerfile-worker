@@ -1,14 +1,30 @@
 FROM python:3.10-slim
-ARG SHIELDHIT_PATH
-COPY $SHIELDHIT_PATH /usr/local/bin/shieldhit
 
 # install gfortran via apt and clean cache
-RUN apt-get update && apt-get install -y gfortran && rm -rf /var/lib/apt/lists/*
+# skipcq: DOK-DL3008
+RUN apt-get update && apt-get install -y --no-install-recommends gfortran && rm -rf /var/lib/apt/lists/*
+
+# set working directory
+WORKDIR /usr/local/app
+
+# openshift permissions
+RUN chgrp -R 0 /usr/local/app && \
+    chmod -R g=u /usr/local/app
 
 # install dependencies
-WORKDIR /usr/local/app
 COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
+
+# set max task time to 10 hours
+ENV CELERYD_TIME_LIMIT=36000
+
+# add path where shieldhit will be installed
+ENV PATH="/usr/local/app/bin:${PATH}"
+
+# copy worker script
+COPY ./run_worker.sh ./
+
+CMD ["./run_worker.sh"]
