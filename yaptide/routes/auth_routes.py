@@ -15,7 +15,7 @@ from yaptide.routes.utils.response_templates import yaptide_response, error_inte
 class AuthRegister(Resource):
     """Class responsible for user registration"""
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         username = fields.String()
@@ -25,7 +25,7 @@ class AuthRegister(Resource):
     def put():
         """Method returning status of registration"""
         try:
-            json_data: dict = AuthRegister._Schema().load(request.get_json(force=True))
+            json_data: dict = AuthRegister.APIParametersSchema().load(request.get_json(force=True))
         except ValidationError:
             return error_validation_response()
 
@@ -56,7 +56,7 @@ class AuthRegister(Resource):
 class AuthLogIn(Resource):
     """Class responsible for user log in"""
 
-    class _Schema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         username = fields.String()
@@ -66,14 +66,14 @@ class AuthLogIn(Resource):
     def post():
         """Method returning status of logging in (and token if it was successful)"""
         try:
-            json_data: dict = AuthLogIn._Schema().load(request.get_json(force=True))
+            json_data: dict = AuthLogIn.APIParametersSchema().load(request.get_json(force=True))
         except ValidationError:
             return error_validation_response()
 
         try:
             user = db.session.query(UserModel).filter_by(username=json_data.get('username')).first()
             if not user:
-                return yaptide_response(message='User not existing', code=401)
+                return yaptide_response(message='Invalid login or password', code=401)
 
             if not user.check_password(password=json_data.get('password')):
                 return yaptide_response(message='Invalid login or password', code=401)

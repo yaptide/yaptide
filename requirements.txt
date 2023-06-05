@@ -8,9 +8,9 @@ flask-restful==0.3.9
 flask-sqlalchemy==3.0.0
 flask_swagger_ui==4.11.1
 flask==2.3.2
-pyjwt==2.6.0
+pyjwt==2.7.0
 pymchelper==2.4.1
-redis==4.5.4
+redis==4.5.5
 requests==2.29.0
 scipy==1.10.1  # needed by converter submodule
 SQLAlchemy==1.4.44

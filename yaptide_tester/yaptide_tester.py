@@ -19,7 +19,12 @@ class Endpoints:
         self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
         self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
 
-        self.http_convert = f'http://{host}:{port}/sh/convert'
+        self.http_results_direct = f'http://{host}:{port}/results'
+        self.http_results_batch = f'http://{host}:{port}/results/batch'
+
+        self.http_logfiles = f'http://{host}:{port}/logfiles'
+        self.http_inputs = f'http://{host}:{port}/inputs'
+        self.http_convert = f'http://{host}:{port}/convert'
 
         self.http_list_sims = f'http://{host}:{port}/user/simulations'
         self.http_update_user = f'http://{host}:{port}/user/update'
@@ -123,16 +128,23 @@ class YaptideTester:
         if with_files:
             input_files = self.read_input_files()
             sim_data = input_files
+            input_type = "files"
+            input_key = "input_files"
         else:
             example_json = Path(ROOT_DIR, 'example.json')
 
             with open(example_json) as json_file:
                 sim_data = json_lib.load(json_file)
+            input_type = "editor"
+            input_key = "input_json"
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
+        results_url = self.endpoints.http_results_direct if direct else self.endpoints.http_results_batch
         json_to_send = {
-            "ntasks": 12,
-            "sim_data": sim_data
+            "ntasks": 6,
+            "input_type": input_type,
+            input_key: sim_data,
+            "sim_type": "shieldhit",
         }
         if not direct:
             json_to_send["batch_options"] = {
@@ -163,57 +175,39 @@ class YaptideTester:
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
-                        if res_json.get('result'):
-                            if len(job_id.split(":")) == 4:
-                                job_id = job_id.split(":")[1]  # only for file naming purpose
-                            with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
-                                data_to_write = str(res_json['result'])
-                                data_to_write = data_to_write.replace("'", "\"")
-                                writer.write(data_to_write)
-                                print(res_json['job_tasks_status'])
+                        if res_json.get('job_state') == "COMPLETED":
+                            print("COMPLETED")
+                            for i in range(2):
+                                res: requests.Response = self.session.get(results_url, params={"job_id": job_id})
+                                res_json: dict = res.json()
+                                print(res_json["message"])
+                                # we want to trigger getting results from database not celery
+                                if "estimators" in res_json and i == 1:
+                                    if len(job_id.split(":")) == 4:
+                                        job_id = job_id.split(":")[1]  # only for file naming purpose
+                                    with open(Path(ROOT_DIR, 'output', f'sim_output_{job_id}.json'), 'w') as writer:
+                                        json_lib.dump({"estimators": res_json['estimators']}, writer, indent=4)
                             return
-                        print(res_json)
-                        if res_json.get('logfile'):
-                            with open(Path(ROOT_DIR, 'output', 'error_full_output.json'), 'w') as writer:
-                                data_to_write = str(res_json)
-                                data_to_write = data_to_write.replace("'", "\"")
-                                writer.write(data_to_write)
-                            with open(Path(ROOT_DIR, 'output', 'shieldlog.log'), 'w') as writer:
-                                writer.write(res_json['logfile'])
-                            for key, value in res_json['input_files'].items():
+                        if res_json.get('job_state') == "FAILED":
+                            print("FAILED")
+                            res: requests.Response = self.session.get(
+                                self.endpoints.http_logfiles, params={"job_id": job_id})
+                            res_json: dict = res.json()
+                            if res.status_code != 200:
+                                print(res_json)
+                                return
+                            for key, value in res_json['logfiles'].items():
                                 with open(Path(ROOT_DIR, 'output', key), 'w') as writer:
                                     writer.write(value)
                             return
+                        print(res_json)
                         if res_json.get('error'):
-                            print(res_json.get('error'))
                             return
                     else:
                         print(res_json)
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
-
-    def run_simulation_on_rimrock(self, do_monitor_job: bool):
-        """Example function running simulation on rimrock"""
-        input_files = self.read_input_files()
-        res: requests.Response = self.session.post(self.endpoints.http_rimrock, json=input_files)
-        res_json: dict = res.json()
-        print(res_json)
-        if res.status_code != 201:
-            return
-
-        job_id: str = res_json.get('job_id')
-        if job_id is not None:
-            while do_monitor_job:
-                time.sleep(5)
-                res: requests.Response = self.session.get(self.endpoints.http_rimrock, params={"job_id": job_id})
-                res_json = res.json()
-                print(res_json)
-                if res.status_code != 200:
-                    return
-                if res_json['status'] == 'FINISHED':
-                    self.get_slurm_results(job_id=job_id)
-                    return
 
     def check_backend_jobs(self):
         """Example checking backend jobs with pagination"""
@@ -247,16 +241,6 @@ class YaptideTester:
                         params={"job_id": sim["job_id"]}
                     )
                 res_json: dict = res.json()
-
-    def get_slurm_results(self, job_id: str):
-        """Example function getting slurm results"""
-        res: requests.Response = self.session.get(self.endpoints.http_plgdata, params={"job_id": job_id})
-        res_json = res.json()
-        path = Path(ROOT_DIR, 'output', f'{job_id.split(".")[0]}.json')
-        with open(path, 'w') as writer:
-            data_to_write = str(res_json['result'])
-            data_to_write = data_to_write.replace("'", "\"")
-            writer.write(data_to_write)
 
 
 if __name__ == "__main__":

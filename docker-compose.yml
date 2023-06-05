@@ -6,15 +6,17 @@ services:
             context: .
             dockerfile: Dockerfile-flask
         image: yaptide_flask
+        # mount data volume as /usr/local/app/yaptide/data in rw mode
         volumes:
-            - data:/usr/local/app/yaptide/data
+            - data:/usr/local/app/yaptide/data:rw
         container_name: yaptide_flask
         ports:
             - 5000:5000
         command: flask run --host=0.0.0.0
         environment:
+            - FLASK_DEBUG=1
             - FLASK_APP=yaptide.application
-            - APP_SETTINGS=yaptide.settings
+            - FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
         depends_on:
@@ -35,9 +37,9 @@ services:
         container_name: yaptide_worker
         command: celery --app yaptide.celery.worker worker -P threads --loglevel=info
         environment:
-            - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
+            - BACKEND_INTERNAL_URL=http://yaptide_flask:5000
         depends_on:
             - redis
             - yaptide_flask

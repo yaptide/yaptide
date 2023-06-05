@@ -23,12 +23,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: true
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.python-version }}
 
@@ -42,21 +42,33 @@ jobs:
           python3 -m pip install --upgrade pip
           pip install -r requirements-test.txt
 
-      - name: Run main tests
+      - name: Run main tests on Linux
+        if: matrix.platform == 'ubuntu-latest'
         run: pytest
 
+      # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
+      - name: Run main tests on Windows using powershell
+        if: matrix.platform == 'windows-latest'
+        run: |
+          Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
+
+
+
+
+
+  # upload coverage report to deepsource
   report-test-converage-deepsource:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           submodules: true
 
       - name: Setup Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v4
         with:
           python-version: '3.11'
 

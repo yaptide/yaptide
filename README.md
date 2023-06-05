@@ -176,10 +176,16 @@ pip install -r requirements.txt
 
 ### Testing
 
-Run tests with:
+Run tests on Linux with:
 
 ```shell
-pytest ./tests
+pytest
+```
+
+on Windows you need to run them one by one:
+
+```shell
+Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 ```
 
 # Credits

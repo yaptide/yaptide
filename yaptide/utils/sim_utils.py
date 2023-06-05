@@ -49,8 +49,7 @@ class JSON_TYPE(Enum):
 
 def get_json_type(payload_dict: dict) -> JSON_TYPE:
     """Returns type of provided JSON"""
-    possible_input_file_names = set(['beam.dat', 'geo.dat', 'detect.dat', 'mat.dat'])  # skipcq: PTC-W0018
-    if possible_input_file_names.intersection(set(payload_dict["sim_data"].keys())):
+    if "input_files" in payload_dict:
         return JSON_TYPE.Files
     return JSON_TYPE.Editor
 
@@ -73,14 +72,14 @@ def check_and_convert_payload_to_files_dict(payload_dict: dict) -> dict:
     files_dict = {}
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
-        files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_dict["sim_data"],
+        files_dict = convert_editor_dict_to_files_dict(editor_dict=payload_dict["input_json"],
                                                        parser_type=payload_dict["sim_type"])
     else:
         logging.warning("Project of %s used, conversion works only for Editor projects", json_type)
     return files_dict
 
 
-def adjust_primaries_in_editor_dict(payload_editor_dict: dict, ntasks: int = None) -> dict:
+def adjust_primaries_in_editor_dict(payload_editor_dict: dict, ntasks: int = None) -> tuple[dict, int]:
     """
     Replaces number of primaries in `payload_editor_dict`
     if `ntasks` parameter is provided, it is used over one
@@ -91,12 +90,13 @@ def adjust_primaries_in_editor_dict(payload_editor_dict: dict, ntasks: int = Non
     else:
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
-    editor_dict = copy.deepcopy(payload_editor_dict['sim_data'])
+    editor_dict = copy.deepcopy(payload_editor_dict['input_json'])
+    number_of_all_primaries = editor_dict['beam']['numberOfParticles']
     editor_dict['beam']['numberOfParticles'] //= ntasks
-    return editor_dict
+    return editor_dict, number_of_all_primaries
 
 
-def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None) -> dict:
+def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None) -> tuple[dict, int]:
     """
     Replaces number of primaries in `payload_files_dict`
     if `ntasks` parameter is provided, it is used over one
@@ -107,49 +107,53 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     else:
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
-    files_dict = copy.deepcopy(payload_files_dict['sim_data'])
+    files_dict = copy.deepcopy(payload_files_dict['input_files'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
     all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
     beam_lines_count = len(all_beam_lines_with_nstat)
     if beam_lines_count != 1:
         logging.warning("Found unexpected number of lines with NSTAT keyword: %d", beam_lines_count)
     if beam_lines_count < 1:
-        return files_dict
-    old_nstat: str = all_beam_lines_with_nstat[0].split()[1]
-    new_nstat = str(int(old_nstat) // ntasks)
+        return files_dict, 0
+    number_of_all_primaries: str = all_beam_lines_with_nstat[0].split()[1]
+    primaries_per_task = str(int(number_of_all_primaries) // ntasks)
     for i in range(len(all_beam_lines)):
         if re.search(NSTAT_MATCH, all_beam_lines[i]):
             # line below replaces first found nstat value
             # it is important to specify 3rd argument as 1
             # because otherwise values further in line might be changed to
-            all_beam_lines[i] = all_beam_lines[i].replace(old_nstat, new_nstat, 1)
+            all_beam_lines[i] = all_beam_lines[i].replace(number_of_all_primaries, primaries_per_task, 1)
     files_dict['beam.dat'] = '\n'.join(all_beam_lines)
     # number_of_tasks = payload_files_dict['ntasks']  -> to be implemented in UI
     # here we manipulate the files_dict['beam.dat'] file to adjust number of primaries
     # we manipulate content of the file, no need to write the file to disk
-    return files_dict
+    return files_dict, int(number_of_all_primaries)
 
 
-def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -> dict:
+def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -> tuple[dict, int]:
     """
     Replaces number of primaries in `payload_dict`
     if `ntasks` parameter is provided, it is used over one
     provided in `payload_dict`
+    returns dict with input files and full number of requested primaries
     """
     json_type = get_json_type(payload_dict)
     if json_type == JSON_TYPE.Editor:
         new_payload_dict = copy.deepcopy(payload_dict)
-        new_payload_dict["sim_data"] = adjust_primaries_in_editor_dict(payload_editor_dict=payload_dict, ntasks=ntasks)
-        return check_and_convert_payload_to_files_dict(new_payload_dict)
+        new_payload_dict["input_json"], number_of_all_primaries = adjust_primaries_in_editor_dict(
+            payload_editor_dict=payload_dict, ntasks=ntasks)
+        return check_and_convert_payload_to_files_dict(new_payload_dict), number_of_all_primaries
     if json_type == JSON_TYPE.Files:
-        return adjust_primaries_in_files_dict(payload_files_dict=payload_dict, ntasks=ntasks)
-    return {}
+        files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(
+            payload_files_dict=payload_dict, ntasks=ntasks)
+        return files_dict, number_of_all_primaries
+    return {}, 0
 
 
 def write_simulation_input_files(files_dict: dict, output_dir: Path) -> None:
     """Save files from provided dict (filenames as keys and content as values) into the provided directory"""
     for filename, file_contents in files_dict.items():
-        with open(output_dir / filename, "w") as writer:  # skipcq: PTC-W6004
+        with open(output_dir / filename, "w", newline='\n') as writer:  # skipcq: PTC-W6004
             writer.write(file_contents)
 
 

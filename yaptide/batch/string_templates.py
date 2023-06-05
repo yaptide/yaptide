@@ -34,13 +34,13 @@ INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 
+unzip -d $INPUT_DIR $ROOT_DIR/input.zip
+rm $ROOT_DIR/input.zip
+
 SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
-
-unzip -d $INPUT_DIR $ROOT_DIR/input.zip
-rm $ROOT_DIR/input.zip
 
 if [ -n "$JOB_ID" ] ; then
     COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
@@ -94,7 +94,7 @@ sig_handler()
 }}
 
 FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-srun python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
+python3 $ROOT_DIR/watcher.py --filepath=$FILE_TO_WATCH\\
     --job_id=$SLURM_JOB_ID --task_id=$SLURM_ARRAY_TASK_ID &
 
 trap 'sig_handler' SIGUSR1

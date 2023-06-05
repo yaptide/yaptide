@@ -38,7 +38,7 @@ class OrderBy(Enum):
 class UserSimulations(Resource):
     """Class responsible for returning user's simulations' basic infos"""
 
-    class _ParamsSchema(Schema):
+    class APIParametersSchema(Schema):
         """Class specifies API parameters"""
 
         page_size = fields.Integer(load_default=DEFAULT_PAGE_SIZE)
@@ -49,8 +49,8 @@ class UserSimulations(Resource):
     @staticmethod
     @requires_auth(is_refresh=False)
     def get(user: UserModel):
-        """Method returning simulations"""
-        schema = UserSimulations._ParamsSchema()
+        """Method returning simulations from the database"""
+        schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
 
         if params_dict['order_by'] == OrderBy.END_TIME.value:
@@ -88,7 +88,9 @@ class UserSimulations(Resource):
                     'title': simulation.title,
                     'job_id': simulation.job_id,
                     'start_time': simulation.start_time,
+                    # submission time, when user send the request to the backend - jobs may start much later than that
                     'end_time': simulation.end_time,
+                    # end time, when the all jobs are finished and results are merged
                     'metadata': {
                         'platform': simulation.platform,
                         'server': 'Yaptide',

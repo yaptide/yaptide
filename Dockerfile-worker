@@ -8,7 +8,7 @@ RUN apt-get update && apt-get install -y gfortran && rm -rf /var/lib/apt/lists/*
 # install dependencies
 WORKDIR /usr/local/app
 COPY ./requirements.txt ./
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
