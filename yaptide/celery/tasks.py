@@ -4,7 +4,6 @@ import tempfile
 from datetime import datetime
 from multiprocessing import Process
 from pathlib import Path
-from celery.signals import worker_ready
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
@@ -17,6 +16,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, py
 
 
 # this is not being used now but we can use such hook to install simulations on the worker start
+# needs from celery.signals import worker_ready
 # @worker_ready.connect
 # def on_worker_ready(**kwargs):
 #     """This function will be called when celery worker is ready to accept tasks"""
