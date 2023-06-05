@@ -67,10 +67,7 @@ jobs:
           S3_SHIELDHIT_BUCKET: ${{ secrets.S3_WINDOWS_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ secrets.S3_WINDOWS_SHIELDHIT_KEY }}
         run: |
-          Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
-
-
-
+          $exitCode = 0; Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { if ((pytest $_.FullName) -ne 0) { $exitCode = $_.ExitCode } }; exit $exitCode
 
 
   # upload coverage report to deepsource
