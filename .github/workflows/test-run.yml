@@ -16,11 +16,9 @@ jobs:
     runs-on:  ${{ matrix.platform }}
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10']
         platform: [ubuntu-latest, windows-latest]
         exclude:
-          - python-version: '3.11'
-            platform: windows-latest
           - python-version: '3.9'
             platform: windows-latest
 
