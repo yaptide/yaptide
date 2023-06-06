@@ -1,4 +1,4 @@
-name: On-demand deploy
+name: On-demand deploy flask
 
 # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
 on:
