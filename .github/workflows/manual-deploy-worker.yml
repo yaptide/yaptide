@@ -1,4 +1,4 @@
-name: On-demand deploy
+name: On-demand deploy worker
 
 # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
 on:
@@ -68,7 +68,7 @@ jobs:
           # it seems that cache is not giving any benefit in speed, lets keep it disabled for now
           # cache-from: type=gha
           # cache-to: type=gha,mode=max
-S
+
       - name: Add workflow result as comment on PR
         uses: actions/github-script@v6
         if: always()
