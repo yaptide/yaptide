@@ -65,15 +65,17 @@ def test_list_simulations(celery_app,
     assert data["simulations_count"] == number_of_simulations
     start_time_of_newest_simulation = data["simulations"][0]["start_time"]
     start_time_of_second_newest_simulation = data["simulations"][1]["start_time"]
+    start_time_of_oldest_simulation = data["simulations"][-1]["start_time"]
 
     logging.info("Check basic list of simulations with pagination")
 
+    # check first page with 3 items out of 5
     page_size=3
     resp = client.get("/user/simulations",
-                              query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "desc"})
+                              query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "descend"})
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
-    logging.info("descending order")
+    logging.info("descending order, page 1")
     for item in data["simulations"]:
         logging.info(item["start_time"])
     assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
@@ -82,3 +84,15 @@ def test_list_simulations(celery_app,
     assert len(data["simulations"]) == page_size
     assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation
     assert data["simulations"][1]["start_time"] == start_time_of_second_newest_simulation
+
+    # check second page with 2 items out of 5
+    resp = client.get("/user/simulations",
+                              query_string={"page_size": page_size, "page_idx": 2, "order_by": "start_time", "order_type": "descend"})
+    assert resp.status_code == 200  # skipcq: BAN-B101
+    data = json.loads(resp.data.decode())
+    logging.info("descending order, page 2")
+    for item in data["simulations"]:
+        logging.info(item["start_time"])
+    assert data["simulations"][1]["start_time"] == start_time_of_oldest_simulation
+
+

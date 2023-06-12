@@ -38,7 +38,7 @@ def add_directory_to_path(yaptide_bin_dir : Path):
     # Get the current PATH value
     original_path = os.environ.get("PATH", "")
 
-    # Update the PATH with the new directory    
+    # Update the PATH with the new directory
     os.environ['PATH'] = f'{yaptide_bin_dir}' + os.pathsep + os.environ['PATH']
 
     # Yield control back to the test

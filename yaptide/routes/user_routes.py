@@ -54,13 +54,13 @@ class UserSimulations(Resource):
 
         # Query the database for the paginated results
         sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
-        query = SimulationModel.query.order_by(sorting(params_dict['order_by']))
+        query = SimulationModel.query.filter_by(user_id=user.id).order_by(sorting(params_dict['order_by']))
         pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
         simulations = pagination.items
 
         sim_count = pagination.total
         page_count = pagination.pages
-        # TODO check handling out of the range values
+        # check handling out of the range values
 
         result = {
             'simulations': [
