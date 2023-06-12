@@ -8,7 +8,7 @@ from enum import Enum
 
 import math
 
-from sqlalchemy import desc
+from sqlalchemy import asc, desc
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
@@ -53,34 +53,45 @@ class UserSimulations(Resource):
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
 
-        if params_dict['order_by'] == OrderBy.END_TIME.value:
-            if params_dict['order_type'] == OrderType.DESCEND.value:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-                    filter_by(user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
-            else:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-                    filter_by(user_id=user.id).order_by(SimulationModel.end_time).all()
-        else:
-            if params_dict['order_type'] == OrderType.DESCEND.value:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-                    filter_by(user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
-            else:
-                simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-                    filter_by(user_id=user.id).order_by(SimulationModel.start_time).all()
 
-        sim_count = len(simulations)
-        page_size = (
-            params_dict['page_size']
-            if params_dict['page_size'] > 0 and params_dict['page_size'] < MAX_PAGE_SIZE
-            else DEFAULT_PAGE_SIZE
-        )
-        page_count = int(math.ceil(sim_count/page_size))
-        page_idx = (
-            params_dict['page_idx']
-            if params_dict['page_idx'] > -1 and params_dict['page_idx'] < page_count
-            else DEFAULT_PAGE_IDX
-        )
-        simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1), sim_count)]
+        # Query the database for the paginated results
+        sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else desc
+        query = SimulationModel.query.order_by(sorting(params_dict['order_by']))
+        pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
+        simulations = pagination.items
+        # # Retrieve the desired page of results
+        # simulation_models = pagination.items
+
+
+        # if params_dict['order_by'] == OrderBy.END_TIME.value:
+        #     if params_dict['order_type'] == OrderType.DESCEND.value:
+        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+        #             filter_by(user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
+        #     else:
+        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+        #             filter_by(user_id=user.id).order_by(SimulationModel.end_time).all()
+        # else:
+        #     if params_dict['order_type'] == OrderType.DESCEND.value:
+        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+        #             filter_by(user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
+        #     else:
+        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
+        #             filter_by(user_id=user.id).order_by(SimulationModel.start_time).all()
+
+        sim_count = pagination.total
+        # page_size = (
+        #     params_dict['page_size']
+        #     if params_dict['page_size'] > 0 and params_dict['page_size'] < MAX_PAGE_SIZE
+        #     else DEFAULT_PAGE_SIZE
+        # )
+        page_size = pagination.per_page
+        page_count = pagination.pages
+        # page_idx = (
+        #     params_dict['page_idx']
+        #     if params_dict['page_idx'] > -1 and params_dict['page_idx'] < page_count
+        #     else DEFAULT_PAGE_IDX
+        # )
+        # simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1), sim_count)]
 
         result = {
             'simulations': [
