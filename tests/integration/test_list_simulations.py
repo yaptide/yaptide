@@ -2,6 +2,7 @@ import copy
 import json
 import logging
 import platform
+from time import sleep
 import pytest  # skipcq: PY-W2000
 from flask import Flask
 
@@ -41,7 +42,7 @@ def test_list_simulations(celery_app,
                     del quantity["filter"]
 
     logging.info("Sending multiple job submition requests on /jobs/direct endpoint to test pagination")
-    number_of_simulations = 8
+    number_of_simulations = 5
     for _ in range(number_of_simulations):
         resp = client.post("/jobs/direct",
                                 data=json.dumps(payload_dict),
@@ -50,23 +51,32 @@ def test_list_simulations(celery_app,
         assert resp.status_code == 202  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
         assert {"message", "job_id"} == set(data.keys())
+        sleep(1)
 
     logging.info("Check basic list of simulations")
 
     resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
-    assert {"message", "simulations", "page_count", "simulations_count"} == set(data.keys())
+    for item in data["simulations"]:
+        logging.info(item)
+    assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
     assert data["simulations_count"] == number_of_simulations
+    start_time_of_newest_simulation = data["simulations"][0]["start_time"]
+    start_time_of_second_newest_simulation = data["simulations"][1]["start_time"]
 
     logging.info("Check basic list of simulations with pagination")
 
     page_size=3
     resp = client.get("/user/simulations",
-                              query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "desc"})
+                              query_string={"page_size": page_size, "page_idx": 0, "order_by": "start_time", "order_type": "desc"})
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
-    assert {"message", "simulations", "page_count", "simulations_count"} == set(data.keys())
+    for item in data["simulations"]:
+        logging.info(item.keys())
+    assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
     assert data["simulations_count"] == number_of_simulations
     assert data["page_count"] == number_of_simulations // page_size + 1 if number_of_simulations % page_size else 0
     assert len(data["simulations"]) == page_size
+    assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation
+    assert data["simulations"][1]["start_time"] == start_time_of_second_newest_simulation
