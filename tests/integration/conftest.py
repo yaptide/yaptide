@@ -23,15 +23,29 @@ def shieldhit_demo_binary():
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)
 
-
 @pytest.fixture(scope='session')
-def add_directory_to_path():
-    """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
+def yaptide_bin_dir() -> Generator[Path, None, None]:
+    """directory with SHIELD-HIT12A executable file"""
     project_main_dir = Path(__file__).resolve().parent.parent.parent
-    bin_dir = project_main_dir / 'bin'
-    logging.info("Adding %s to PATH", bin_dir)
-    os.environ['PATH'] = f'{bin_dir}' + os.pathsep + os.environ['PATH']
+    yield project_main_dir / 'bin'
 
+
+@pytest.fixture(scope='function')
+def add_directory_to_path(yaptide_bin_dir : Path):
+    """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
+    logging.info("Adding %s to PATH", yaptide_bin_dir)
+
+    # Get the current PATH value
+    original_path = os.environ.get("PATH", "")
+
+    # Update the PATH with the new directory    
+    os.environ['PATH'] = f'{yaptide_bin_dir}' + os.pathsep + os.environ['PATH']
+
+    # Yield control back to the test
+    yield
+
+    # Restore the original PATH
+    os.environ['PATH'] = original_path
 
 @pytest.fixture(scope='function')
 def celery_app():
