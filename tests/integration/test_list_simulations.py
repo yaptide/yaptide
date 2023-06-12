@@ -58,8 +58,9 @@ def test_list_simulations(celery_app,
     resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
+    logging.info("all simulations")
     for item in data["simulations"]:
-        logging.info(item)
+        logging.info(item["start_time"])
     assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
     assert data["simulations_count"] == number_of_simulations
     start_time_of_newest_simulation = data["simulations"][0]["start_time"]
@@ -72,10 +73,11 @@ def test_list_simulations(celery_app,
                               query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "desc"})
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
+    logging.info("descending order")
     for item in data["simulations"]:
-        logging.info(item.keys())
+        logging.info(item["start_time"])
     assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
-#    assert data["simulations_count"] == number_of_simulations
+    assert data["simulations_count"] == number_of_simulations
     assert data["page_count"] == number_of_simulations // page_size + 1 if number_of_simulations % page_size else 0
     assert len(data["simulations"]) == page_size
     assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation

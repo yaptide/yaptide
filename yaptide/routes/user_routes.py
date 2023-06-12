@@ -6,8 +6,6 @@ from marshmallow import fields
 
 from enum import Enum
 
-import math
-
 from sqlalchemy import asc, desc
 
 from yaptide.persistence.database import db
@@ -17,8 +15,8 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 
 MAX_PAGE_SIZE = 100
-DEFAULT_PAGE_SIZE = 10
-DEFAULT_PAGE_IDX = 0
+DEFAULT_PAGE_SIZE = 6
+DEFAULT_PAGE_IDX = 1
 
 
 class OrderType(Enum):
@@ -55,43 +53,14 @@ class UserSimulations(Resource):
 
 
         # Query the database for the paginated results
-        sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else desc
+        sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
         query = SimulationModel.query.order_by(sorting(params_dict['order_by']))
         pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
         simulations = pagination.items
-        # # Retrieve the desired page of results
-        # simulation_models = pagination.items
-
-
-        # if params_dict['order_by'] == OrderBy.END_TIME.value:
-        #     if params_dict['order_type'] == OrderType.DESCEND.value:
-        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-        #             filter_by(user_id=user.id).order_by(desc(SimulationModel.end_time)).all()
-        #     else:
-        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-        #             filter_by(user_id=user.id).order_by(SimulationModel.end_time).all()
-        # else:
-        #     if params_dict['order_type'] == OrderType.DESCEND.value:
-        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-        #             filter_by(user_id=user.id).order_by(desc(SimulationModel.start_time)).all()
-        #     else:
-        #         simulations: list[SimulationModel] = db.session.query(SimulationModel).\
-        #             filter_by(user_id=user.id).order_by(SimulationModel.start_time).all()
 
         sim_count = pagination.total
-        # page_size = (
-        #     params_dict['page_size']
-        #     if params_dict['page_size'] > 0 and params_dict['page_size'] < MAX_PAGE_SIZE
-        #     else DEFAULT_PAGE_SIZE
-        # )
-        page_size = pagination.per_page
         page_count = pagination.pages
-        # page_idx = (
-        #     params_dict['page_idx']
-        #     if params_dict['page_idx'] > -1 and params_dict['page_idx'] < page_count
-        #     else DEFAULT_PAGE_IDX
-        # )
-        # simulations = simulations[page_size*page_idx: min(page_size*(page_idx+1), sim_count)]
+        # TODO check handling out of the range values
 
         result = {
             'simulations': [
