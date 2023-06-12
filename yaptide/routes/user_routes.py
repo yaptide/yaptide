@@ -51,7 +51,6 @@ class UserSimulations(Resource):
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
 
-
         # Query the database for the paginated results
         sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
         query = SimulationModel.query.filter_by(user_id=user.id).order_by(sorting(params_dict['order_by']))

@@ -23,6 +23,7 @@ def shieldhit_demo_binary():
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)
 
+
 @pytest.fixture(scope='session')
 def yaptide_bin_dir() -> Generator[Path, None, None]:
     """directory with SHIELD-HIT12A executable file"""
@@ -46,6 +47,7 @@ def add_directory_to_path(yaptide_bin_dir : Path):
 
     # Restore the original PATH
     os.environ['PATH'] = original_path
+
 
 @pytest.fixture(scope='function')
 def celery_app():
