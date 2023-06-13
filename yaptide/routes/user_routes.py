@@ -15,8 +15,8 @@ from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 
-DEFAULT_PAGE_SIZE = 6 # default number of simulations per page
-DEFAULT_PAGE_IDX = 1 # default page index
+DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
+DEFAULT_PAGE_IDX = 1  # default page index
 
 
 class OrderType(Enum):
@@ -50,7 +50,7 @@ class UserSimulations(Resource):
         """Method returning simulations from the database"""
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
-        logging.info(f'User {user.username} requested simulations with parameters: {params_dict}')
+        logging.info('User %s requested simulations with parameters: %s', user.username, params_dict)
 
         # Query the database for the paginated results
         sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
