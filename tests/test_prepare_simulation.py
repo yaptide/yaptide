@@ -49,6 +49,7 @@ def test_if_parsing_works_for_project(project_json_data: dict):
 
 
 def validate_config_dict(files_dict: dict, expected_primaries: int = 10000):
+    """Validate if config dictionary contains all the required keys and values"""
     assert files_dict is not None
     assert 'beam.dat' in files_dict
     assert 'invalid_key' not in files_dict

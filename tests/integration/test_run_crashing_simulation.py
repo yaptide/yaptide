@@ -7,7 +7,7 @@ from flask import Flask
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation_with_flask_crushing(celery_app,
+def test_run_simulation_with_flask_crashing(celery_app,
                                             celery_worker,
                                             client: Flask,
                                             db_good_username: str,

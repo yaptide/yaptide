@@ -8,16 +8,17 @@ on:
 
   workflow_dispatch:
 
+env:
+  S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+
 jobs:
   build-and-test:
     runs-on:  ${{ matrix.platform }}
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10']
         platform: [ubuntu-latest, windows-latest]
         exclude:
-          - python-version: '3.11'
-            platform: windows-latest
           - python-version: '3.9'
             platform: windows-latest
 
@@ -44,11 +45,25 @@ jobs:
 
       - name: Run main tests on Linux
         if: matrix.platform == 'ubuntu-latest'
+        env:
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          S3_SHIELDHIT_BUCKET: ${{ secrets.S3_LINUX_SHIELDHIT_BUCKET }}
+          S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
         run: pytest
 
       # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
       - name: Run main tests on Windows using powershell
         if: matrix.platform == 'windows-latest'
+        env:
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          S3_SHIELDHIT_BUCKET: ${{ secrets.S3_WINDOWS_SHIELDHIT_BUCKET }}
+          S3_SHIELDHIT_KEY: ${{ secrets.S3_WINDOWS_SHIELDHIT_KEY }}
         run: |
           Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 
@@ -82,6 +97,13 @@ jobs:
         run: curl https://deepsource.io/cli | sh
 
       - name: Generate tests coverage report
+        env:
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          S3_SHIELDHIT_BUCKET: ${{ secrets.S3_LINUX_SHIELDHIT_BUCKET }}
+          S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
         run: pytest --cov=./ --cov-report xml
 
       - name: Upload coverage report to deepsource

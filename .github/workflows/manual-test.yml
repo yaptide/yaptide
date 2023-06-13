@@ -1,0 +1,105 @@
+name: On-demand tests
+
+# https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
+on:
+  issue_comment:
+    types: [created]
+
+env:
+    S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+
+jobs:
+  build_and_test:
+
+    runs-on:  ${{ matrix.platform }}
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11']
+        platform: [ubuntu-latest, windows-latest]
+        exclude:
+          - python-version: '3.11'
+            platform: windows-latest
+          - python-version: '3.9'
+            platform: windows-latest
+
+    # Only run if it is a PR and the comment contains /test
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/test')
+
+    steps:
+      - name: Get branch of PR
+        uses: xt0rted/pull-request-comment-branch@v2
+        id: comment-branch
+
+      - name: Set latest commit status as pending
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: pending          
+
+      - uses: actions/checkout@v3
+        with:
+          submodules: recursive
+          ref: ${{ steps.comment-branch.outputs.head_ref }}
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+            python-version: ${{ matrix.python-version }}
+  
+      - name: Install dependencies for production
+        run: |
+            python3 -m pip install --upgrade pip
+            pip install -r requirements.txt
+    
+      - name: Install dependencies for tests
+        run: |
+           pip install -r requirements-test.txt
+    
+      - name: Run main tests on Linux
+        if: matrix.platform == 'ubuntu-latest'
+        env:
+              S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+              S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+              S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+              S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+              S3_SHIELDHIT_BUCKET: ${{ secrets.S3_LINUX_SHIELDHIT_BUCKET }}
+              S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
+        run: pytest
+    
+       # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
+      - name: Run main tests on Windows using powershell
+        if: matrix.platform == 'windows-latest'
+        env:
+              S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+              S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+              S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+              S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+              S3_SHIELDHIT_BUCKET: ${{ secrets.S3_WINDOWS_SHIELDHIT_BUCKET }}
+              S3_SHIELDHIT_KEY: ${{ secrets.S3_WINDOWS_SHIELDHIT_KEY }}
+        run: |
+            Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
+    
+      - name: Add workflow result as comment on PR
+        uses: actions/github-script@v6
+        if: always()
+        with:
+          script: |
+            const workflow_name = '${{ github.workflow	}}';
+            const url = '${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}';
+            const success = '${{ job.status }}' === 'success';
+            const body = `${workflow_name}: ${success ? 'succeeded ✅' : 'failed ❌'}\n${url}`;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body
+            })
+
+      - name: Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@v1.1.7
+        if: always()
+        with:
+          sha: ${{ steps.comment-branch.outputs.head_sha }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          status: ${{ job.status }}
