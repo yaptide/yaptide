@@ -1,3 +1,4 @@
+import logging
 from flask import request
 from flask_restful import Resource
 
@@ -14,9 +15,8 @@ from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
 
-MAX_PAGE_SIZE = 100
-DEFAULT_PAGE_SIZE = 6
-DEFAULT_PAGE_IDX = 1
+DEFAULT_PAGE_SIZE = 6 # default number of simulations per page
+DEFAULT_PAGE_IDX = 1 # default page index
 
 
 class OrderType(Enum):
@@ -50,16 +50,13 @@ class UserSimulations(Resource):
         """Method returning simulations from the database"""
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
+        logging.info(f'User {user.username} requested simulations with parameters: {params_dict}')
 
         # Query the database for the paginated results
         sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
         query = SimulationModel.query.filter_by(user_id=user.id).order_by(sorting(params_dict['order_by']))
         pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
         simulations = pagination.items
-
-        sim_count = pagination.total
-        page_count = pagination.pages
-        # check handling out of the range values
 
         result = {
             'simulations': [
@@ -78,8 +75,8 @@ class UserSimulations(Resource):
                     }
                 }
                 for simulation in simulations],
-            'page_count': page_count,
-            'simulations_count': sim_count,
+            'page_count': pagination.pages,
+            'simulations_count': pagination.total,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)
 
