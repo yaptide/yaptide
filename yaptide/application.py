@@ -4,7 +4,6 @@ from flask_restful import Api
 from yaptide.routes.main_routes import initialize_routes
 from yaptide.persistence.database import db
 from yaptide.persistence import models
-from flask_cors import CORS
 from flask_swagger_ui import get_swaggerui_blueprint
 
 
@@ -31,7 +30,6 @@ def create_app():
     app.register_blueprint(swaggerui_blueprint)
 
     db.init_app(app)
-    CORS(app, supports_credentials=True)
 
     # Find a better solution (maybe with Flask-Migrate)
     # Uncomment the two lines below to update models

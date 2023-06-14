@@ -1,5 +1,12 @@
 FROM python:3.10-slim
 
+# Install Nginx
+RUN apt-get update && apt-get install -y --no-install-recommends nginx && rm -rf /var/lib/apt/lists/*
+
+# Configure Nginx
+RUN rm /etc/nginx/sites-enabled/default
+COPY nginx.conf /etc/nginx/conf.d/app.conf
+
 # install dependencies
 WORKDIR /usr/local/app
 COPY ./requirements.txt ./
@@ -12,4 +19,6 @@ COPY yaptide ./yaptide
 EXPOSE 5000
 ENV FLASK_APP=yaptide.application
 ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
-CMD ["flask", "run", "--host=0.0.0.0"]
+
+# Run Nginx and Flask app
+CMD service nginx start && flask run --host=0.0.0.0 --port=6000
