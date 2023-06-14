@@ -27,8 +27,12 @@ ENV PATH="/usr/local/app/bin:${PATH}"
 # Copy worker script
 COPY run_worker.sh .
 
-# Make the script executable (if needed)
-RUN chmod +x run_worker.sh
+# Convert line endings using Python
+RUN python3 -c "import os; content = open('run_worker.sh', 'rb').read().replace(b'\r\n', b'\n'); open('run_worker.sh', 'wb').write(content)"
+RUN python3 -c "import os; content = open('yaptide/admin/simulators.py', 'rb').read().replace(b'\r\n', b'\n'); open('yaptide/admin/simulators.py', 'wb').write(content)"
+
+# Make the scripts executable
+RUN chmod +x run_worker.sh yaptide/admin/simulators.py
 
 # Set the script as the entry point
-ENTRYPOINT ["./run_worker.sh"]
+ENTRYPOINT ["bash", "run_worker.sh"]
