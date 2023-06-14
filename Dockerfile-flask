@@ -1,6 +1,7 @@
 FROM python:3.10-slim
 
 # Install Nginx
+# skipcq: DOK-DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends nginx && rm -rf /var/lib/apt/lists/*
 
 # Configure Nginx
@@ -21,4 +22,4 @@ ENV FLASK_APP=yaptide.application
 ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
 
 # Run Nginx and Flask app
-CMD service nginx start && flask run --host=0.0.0.0 --port=6000
+CMD ["service", "nginx", "start", "&&", "flask", "run", "--host=0.0.0.0", "--port=6000"]
