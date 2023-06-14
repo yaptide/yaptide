@@ -24,7 +24,11 @@ ENV CELERYD_TIME_LIMIT=36000
 # add path where shieldhit will be installed
 ENV PATH="/usr/local/app/bin:${PATH}"
 
-# copy worker script
-COPY ./run_worker.sh ./
+# Copy worker script
+COPY run_worker.sh .
 
-CMD ["./run_worker.sh"]
+# Make the script executable (if needed)
+RUN chmod +x run_worker.sh
+
+# Set the script as the entry point
+ENTRYPOINT ["./run_worker.sh"]
