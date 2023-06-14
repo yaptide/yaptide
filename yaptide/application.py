@@ -5,6 +5,7 @@ from yaptide.routes.main_routes import initialize_routes
 from yaptide.persistence.database import db
 from yaptide.persistence import models
 from flask_cors import CORS
+from flask_swagger_ui import get_swaggerui_blueprint
 
 
 def create_app():
@@ -17,6 +18,17 @@ def create_app():
     app.config.from_prefixed_env()
     for item in app.config.items():
         logging.debug("Flask config variable: %s", item)
+
+    SWAGGER_URL = '/api/docs'
+    API_URL = '/static/openapi.yaml'
+
+    swaggerui_blueprint = get_swaggerui_blueprint(
+        SWAGGER_URL,
+        API_URL,
+        config={'app_name': "yaptide"}
+    )
+
+    app.register_blueprint(swaggerui_blueprint)
 
     db.init_app(app)
     CORS(app, supports_credentials=True)

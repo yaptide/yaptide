@@ -1,0 +1,823 @@
+openapi: 3.0.3
+info:
+  title: Yaptide Project Api Documentation
+  version: 1.0.0
+  description: Yaptide Project Api Documentation
+servers:
+  - url: http://localhost:5000
+paths:
+  /:
+    get:
+      security:
+        - basicAuth: [ ]
+      summary: Allows to check if server is alive
+      description: Allows to check if server is alive
+      responses:
+        '200':
+          description: Successful operation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+# Authorisation Routes
+  /auth/register:
+    put:
+      summary: Allows registration of new users
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterLoginRequest'
+      responses:
+        '201':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/login:
+    post:
+      summary: Allows to login the user - server sets refresh and access tokens in cookies
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterLoginRequest'
+      responses:
+        '202':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  access_exp:
+                    type: integer
+                  refresh_expired:
+                    type: integer
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/refresh:
+    get:
+      summary: Allows to refresh access token - server sets new access token in cookies
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  access_exp:
+                    type: integer
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/status:
+    get:
+      summary: Allows to retrieve logged in user data
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  username:
+                    type: string
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /auth/logout:
+    delete:
+      summary: Allows to logout the user - server removes tokens from cookies
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+# User Routes
+  /user/simulations:
+    get:
+      parameters:
+        - in: query
+          name: page_size
+          schema:
+            type: string
+          description: Specifies the page size from range [0,100] - incorrect or
+                       non provided value will result in sending page with size 10
+        - in: query
+          name: page_idx
+          schema:
+            type: string
+          description: Specifies the page index to be send - incorrect or non
+                       provided value will result in sending page with index 0
+        - in: query
+          name: order_by
+          schema:
+            type: string
+          description: Specifies the parameter by which pages are sorted, available are start_time or end_time
+                       - incorrect or non provided value will result in sending page sorted by start_time
+        - in: query
+          name: order_type
+          schema:
+            type: string
+          description: Specifies the order in which pages are sorted, available are ascend or descend
+                       - incorrect or non provided value will result in sending page sorted by ascend
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  page_count:
+                    type: integer
+                    description: returns the number of available pages
+                  simulations_count:
+                    type: integer
+                    description: returns the number of owned simulations
+                  simulations:
+                    description: is a list of simulations returned in requested page
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Simulation'
+
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /user/clusters:
+    description: Returns clusters available for the user
+    get:
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  clusters:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        cluster_name:
+                          type: string
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+# Jobs Routes
+  /jobs/direct:
+    post:
+      summary: Allows for submitting jobs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobsRequest'
+      responses:
+        '202':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  message:
+                    type: string
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /jobs/batch:
+    post:
+      summary: Allows for submitting jobs
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobsRequest'
+      responses:
+        '202':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  job_id:
+                    type: string
+                  message:
+                    type: string
+                  sh_files:
+                    type: object
+                    description: contains sh files used by the job (additional info in response from '/jobs/batch')
+                    properties:
+                      submit:
+                        type: string
+                        description: submit is a file which prepares the environment and starts array and collect
+                      array:
+                        type: string
+                        description: array is array job script which runs the simulation
+                      collect:
+                        type: string
+                        description: collect is a script collecting results generated by simulation
+                  submit_stdout:
+                    type: string
+                    description: submit_stdout is output generated by submit.sh (additional info in response from '/jobs/batch')
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+    get:
+      description: Allows for getting job status.
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  job_state:
+                    type: string
+                    description: job_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+                  job_task_status:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobTaskStatus'
+                  sh_files:
+                    type: object
+                    description: contains sh files used by the job (additional info in response from '/jobs/batch')
+                    properties:
+                      submit:
+                        type: string
+                        description: submit is a file which prepares the environment and starts array and collect
+                      array:
+                        type: string
+                        description: array is array job script which runs the simulation
+                      collect:
+                        type: string
+                        description: collect is a script collecting results generated by simulation
+                  submit_stdout:
+                    type: string
+                    description: submit_stdout is output generated by submit.sh (additional info in response from '/jobs/batch')
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '408':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+    delete:
+      description: Allows for job cancelation. (NOT AVAILABLE)
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '204':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '408':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+
+# Inputs Route
+  /inputs:
+    get:
+      description: Allows for retrieving input used to run simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  input:
+                    type: object
+                    properties:
+                      input_json:
+                        type: array
+                        description: available only if simulation was run with JSON input
+                      input_files:
+                        type: array
+                        description: files used by simulation
+                      input_type:
+                        type: string
+                        description: simulation input type, can be&#58 editor and files
+                      number_of_all_primaries:
+                        type: integer
+                        description: requested number of all primaries
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+# Result Routes
+  /results:
+    description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
+    get:
+      description: Allows getting results of the simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  estimators:
+                    type: array
+                    description: list of resulting estimators
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+  /results/batch:
+    description: We weren't able to fully migrate batch results to new endpoint for now, so it is still required to use this endpoint
+    get:
+      description: Allows getting results of the simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  estimators:
+                    type: array
+                    description: list of resulting estimators
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+
+# Task Routes
+  /tasks/update:
+    description: Route dedicated for Backend internal communication
+    post:
+      description: Updates task state
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                simulation_id:
+                  type: integer
+                  description: id of task's parent simulation
+                task_id:
+                  type: string
+                  description: id task to update
+                update_key:
+                  type: string
+                  description: authentication key provided to tasks
+                update_dict:
+                  type: array
+                  description: dict containing update data
+      responses:
+        default:
+          description: Response JSON for all codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+  /logfiles:
+    description: Route dedicated for Backend internal communication
+    post:
+      description: Updates task state
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                simulation_id:
+                  type: integer
+                  description: id of task's parent simulation
+                update_key:
+                  type: string
+                  description: authentication key provided to tasks
+                log_files:
+                  type: array
+                  description: dict containing log files
+      responses:
+        default:
+          description: Response JSON for all codes
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+    get:
+      description: Allows getting results of the simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  logfiles:
+                    type: array
+                    description: dict of log files with names as keys and content as values.
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDeleteResponse'
+components:
+  securitySchemes:
+    basicAuth: # <-- arbitrary name for the security scheme
+      type: http
+      scheme: basic
+  schemas:
+    BasicResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Hello world!
+          description: body message
+    RegisterLoginRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    Metadata:
+      type: object
+      description: static additional information
+      properties:
+        platform:
+          type: string
+          description: specifies platform on which simulation is running, can be DIRECT or BATCH
+        server:
+          type: string
+          description: specifies platform on which simulation is running, can be DIRECT or BATCH
+        input_type:
+          type: string
+          description: specifies input which was used to run simulation, can be YAPTIDE_PROJECT or INPUT_FILES
+        sim_time:
+          type: string
+          description: specifies simulator which was used to run simulation, can be SHIELDHIT or DUMMY
+    Simulation:
+      type: object
+      properties:
+        title:
+          type: string
+          description: custom title set to for this simulation
+        job_id:
+          type: string
+          description: id of the job
+        start_time:
+          type: string
+          description: starting time of the simulation
+        end_time:
+          type: string
+          description: ending time of the simulation - if it is still running the value is NULL
+        metadata:
+          $ref: '#/components/schemas/Metadata'
+    JobsRequest:
+      type: object
+      properties:
+        ntasks:
+          type: integer
+          description: specifies number of parallel tasks to be run, default is maximum available for '/jobs/direct' and 1 for '/jobs/batch'
+        sim_type:
+          type: string
+          description: specifies simulator type, can be shieldhit or dummy
+        title:
+          type: string
+          description: custom title set to for this simulation, default is workspace
+        input_type:
+          type: string
+          description: specifies the type of sent input&#58; editor or files
+        input_files:
+          type: array
+          items:
+            type: object
+            properties:
+              beam.dat:
+                type: string
+              detect.dat:
+                type: string
+              geo.dat:
+                type: string
+              mat.dat:
+                type: string
+          description: is required if input_type is files
+        input_json:
+          description: input_json is required if input_type is editor
+        batch_options:
+          type: array
+          items:
+            type: object
+            description: available options can be found here&#58 https://slurm.schedmd.com/sbatch.html. NOTE&#58 if batch_options is not provided, SLURM will run both scripts with default settings
+            properties:
+              cluster_name:
+                type: string
+                description: stands for the cluster to be used to run simulation; it has to be one of available clusters for the user - check '/user/clusters' endpoint description; if it is not provided or provided cluster name is incorrect, first available cluster will be used
+              array_options:
+                type: array
+                description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
+              array_header:
+                type: string
+                description: header for files run on SLURM with sbatch
+              collect_options:
+                type: array
+                description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
+              collect_header:
+                type: string
+                description: header for files run on SLURM with sbatch
+    JobTaskStatus:
+      type: object
+      description: error, logfiles, input_files, input_json and results are deprecated&#58 error is now sent as message, logfiles - accessed via /logfiles endpoint, results - accessed via /results endpoint, input_files and input_json - accessed via /inputs endpoint.
+      properties:
+        task_state:
+          type: string
+          description: task_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+        simulated_primaries:
+          type: integer
+          description: primaries already calculated by the task
+        requested_primaries:
+          type: integer
+          description: primaries to calculate for this task
+        last_update_time:
+          type: string
+          description: last time when task was updated
+        estimated_time:
+          type: object
+          description: is returned only, when task_state is RUNNING - not always because estimation is prepared after some period of time
+          properties:
+            hours:
+              type: integer
+            minutes:
+              type: integer
+            seconds:
+              type: integer
+    JobsDeleteResponse:
+      type: object
+      properties:
+        exit_code:
+          type: integer
+        output:
+          type: string
+        message:
+          type: string
+
+security:
+  - basicAuth: []  # <-- use the same name here
