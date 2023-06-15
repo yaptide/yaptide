@@ -325,7 +325,8 @@ paths:
                     type: string
                   job_state:
                     type: string
-                    description: job_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+                    enum: [PENDING, RUNNING, COMPLETED, FAILED]
+                    description: job state
                   job_task_status:
                     type: array
                     items:
@@ -425,7 +426,8 @@ paths:
                     type: string
                   job_state:
                     type: string
-                    description: job_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+                    enum: [PENDING, RUNNING, COMPLETED, FAILED]
+                    description: job state
                   job_task_status:
                     type: array
                     items:
@@ -539,7 +541,8 @@ paths:
                         description: files used by simulation
                       input_type:
                         type: string
-                        description: simulation input type, can be&#58 editor and files
+                        enum: [editor, files]
+                        description: simulation input type
                       number_of_all_primaries:
                         type: integer
                         description: requested number of all primaries
@@ -882,7 +885,7 @@ components:
       properties:
         batch_options:
           type: object
-          description: available options can be found here&#58 https://slurm.schedmd.com/sbatch.html. NOTE&#58 if batch_options is not provided, SLURM will run both scripts with default settings
+          description: available options can be found here&#58; https://slurm.schedmd.com/sbatch.html. NOTE&#58; if batch_options is not provided, SLURM will run both scripts with default settings
           properties:
             cluster_name:
               type: string
@@ -901,11 +904,12 @@ components:
               description: header for files run on SLURM with sbatch
     JobTaskStatus:
       type: object
-      description: error, logfiles, input_files, input_json and results are deprecated&#58 error is now sent as message, logfiles - accessed via /logfiles endpoint, results - accessed via /results endpoint, input_files and input_json - accessed via /inputs endpoint.
+      description: error, logfiles, input_files, input_json and results are deprecated&#58; error is now sent as message, logfiles - accessed via /logfiles endpoint, results - accessed via /results endpoint, input_files and input_json - accessed via /inputs endpoint.
       properties:
         task_state:
           type: string
-          description: task_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+          enum: [PENDING, RUNNING, COMPLETED, FAILED]
+          description: task state
         simulated_primaries:
           type: integer
           description: primaries already calculated by the task
