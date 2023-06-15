@@ -1,3 +1,5 @@
+# JSON files types
+
 We have 3 types of JSON files:
 
 1. **Project JSON** - file that could be generated using UI and saved using "Save project" button
@@ -35,3 +37,11 @@ Therefore, for `payload_files_dict['input_files']`
 
 We also have `files_dict` where keys are filenames and values are contents of input files
 - `files_dict[beam.dat]` is valid
+
+# Testing resources
+
+The testing resources are obtained from the web interface by loading first example (called "Proton pencil beam in water") and submitting such simulation to the backend. The files should captured via developer console in the browser. We aim in the tests to check how backend behaves when processing real files as being sent by the frontend part.
+
+ 1. `json_payload_editor.json` is captured when user selects simulation to run from the editor window (selecting 4 workers)
+ 2. `json_payload_files.json` is captured when user selects simulation to run from the input files window (selecting 4 workers)
+ 3.  `json_with_results.json` is captured when user selects simulation to run from the editor window (selecting 4 workers) and the simulation is finished
