@@ -1,17 +1,19 @@
 FROM python:3.10-slim
 
-# install dependencies
+# expose port to run Flask
+EXPOSE 6000
+
+# set environment variables
+ENV FLASK_APP=yaptide.application
+ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
 WORKDIR /usr/local/app
+
+# install dependencies
 COPY ./requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
 # copy project
 COPY yaptide ./yaptide
-
-# run Flask app
-EXPOSE 6000
-ENV FLASK_APP=yaptide.application
-ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
 
 # Run Flask app
 ENTRYPOINT ["flask", "run", "--host=0.0.0.0", "--port=6000"]
