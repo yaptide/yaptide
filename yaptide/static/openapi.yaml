@@ -180,25 +180,27 @@ paths:
         - in: query
           name: page_size
           schema:
-            type: string
+            type: integer
           description: Specifies the page size from range [0,100] - incorrect or
                        non provided value will result in sending page with size 10
         - in: query
           name: page_idx
           schema:
-            type: string
+            type: integer
           description: Specifies the page index to be send - incorrect or non
                        provided value will result in sending page with index 0
         - in: query
           name: order_by
           schema:
             type: string
+            enum: [start_time, end_time]
           description: Specifies the parameter by which pages are sorted, available are start_time or end_time
                        - incorrect or non provided value will result in sending page sorted by start_time
         - in: query
           name: order_type
           schema:
             type: string
+            enum: [ascend, descend]
           description: Specifies the order in which pages are sorted, available are ascend or descend
                        - incorrect or non provided value will result in sending page sorted by ascend
       responses:
@@ -879,26 +881,24 @@ components:
       type: object
       properties:
         batch_options:
-          type: array
-          items:
-            type: object
-            description: available options can be found here&#58 https://slurm.schedmd.com/sbatch.html. NOTE&#58 if batch_options is not provided, SLURM will run both scripts with default settings
-            properties:
-              cluster_name:
-                type: string
-                description: stands for the cluster to be used to run simulation; it has to be one of available clusters for the user - check '/user/clusters' endpoint description; if it is not provided or provided cluster name is incorrect, first available cluster will be used
-              array_options:
-                type: object
-                description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
-              array_header:
-                type: string
-                description: header for files run on SLURM with sbatch
-              collect_options:
-                type: object
-                description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
-              collect_header:
-                type: string
-                description: header for files run on SLURM with sbatch
+          type: object
+          description: available options can be found here&#58 https://slurm.schedmd.com/sbatch.html. NOTE&#58 if batch_options is not provided, SLURM will run both scripts with default settings
+          properties:
+            cluster_name:
+              type: string
+              description: stands for the cluster to be used to run simulation; it has to be one of available clusters for the user - check '/user/clusters' endpoint description; if it is not provided or provided cluster name is incorrect, first available cluster will be used
+            array_options:
+              type: object
+              description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
+            array_header:
+              type: string
+              description: header for files run on SLURM with sbatch
+            collect_options:
+              type: object
+              description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
+            collect_header:
+              type: string
+              description: header for files run on SLURM with sbatch
     JobTaskStatus:
       type: object
       description: error, logfiles, input_files, input_json and results are deprecated&#58 error is now sent as message, logfiles - accessed via /logfiles endpoint, results - accessed via /results endpoint, input_files and input_json - accessed via /inputs endpoint.
