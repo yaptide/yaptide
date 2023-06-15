@@ -11,7 +11,7 @@ services:
             - data:/usr/local/app/yaptide/data:rw
         container_name: yaptide_flask
         ports:
-            - 5000:5000
+            - 6000:6000
         environment:
             - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
@@ -35,7 +35,7 @@ services:
         environment:
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
-            - BACKEND_INTERNAL_URL=http://yaptide_flask:5000
+            - BACKEND_INTERNAL_URL=http://yaptide_nginx:5000
         depends_on:
             - redis
             - yaptide_flask
@@ -43,6 +43,17 @@ services:
     redis:
         image: redis:6-alpine
         container_name: yaptide_redis
+
+    nginx:
+        image: yaptide_nginx
+        container_name: yaptide_nginx
+        build:
+            context: .
+            dockerfile: Dockerfile-nginx
+        ports:
+            - 5000:5000
+        depends_on:
+            - yaptide_flask
 
     flower:
         image: mher/flower
