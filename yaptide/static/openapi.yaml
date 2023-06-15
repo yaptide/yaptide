@@ -25,6 +25,7 @@ paths:
     put:
       summary: Allows registration of new users
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -58,6 +59,7 @@ paths:
     post:
       summary: Allows to login the user - server sets refresh and access tokens in cookies
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -271,6 +273,7 @@ paths:
     post:
       summary: Allows for submitting jobs
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -299,14 +302,65 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+    get:
+      description: Allows for getting job status.
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  job_state:
+                    type: string
+                    description: job_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+                  job_task_status:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobTaskStatus'
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '408':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
   /jobs/batch:
     post:
       summary: Allows for submitting jobs
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/JobsRequest'
+              allOf:
+                - $ref: '#/components/schemas/JobsRequest'
+                - $ref: '#/components/schemas/BatchOptions'
       responses:
         '202':
           description: TODO
@@ -590,6 +644,7 @@ paths:
     post:
       description: Updates task state
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -619,6 +674,7 @@ paths:
     post:
       description: Updates task state
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -698,6 +754,9 @@ components:
           type: string
         password:
           type: string
+      required:
+        - username
+        - password
     Metadata:
       type: object
       description: static additional information
@@ -762,6 +821,13 @@ components:
           description: is required if input_type is files
         input_json:
           description: input_json is required if input_type is editor
+      required:
+        - ntasks
+        - input_type
+        - sim_type
+    BatchOptions:
+      type: object
+      properties:
         batch_options:
           type: array
           items:
