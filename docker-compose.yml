@@ -10,8 +10,6 @@ services:
         volumes:
             - data:/usr/local/app/yaptide/data:rw
         container_name: yaptide_flask
-        ports:
-            - 6000:6000
         environment:
             - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
@@ -35,7 +33,7 @@ services:
         environment:
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
-            - BACKEND_INTERNAL_URL=http://yaptide_nginx:5000
+            - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
         depends_on:
             - redis
             - yaptide_flask
