@@ -1,7 +1,7 @@
 {
     "input_json": {
         "metadata": {
-            "version": 1,
+            "version": "0.10",
             "type": "Editor",
             "generator": "YaptideEditor.toJSON"
         },
@@ -11,128 +11,62 @@
             "viewManager": {
                 "ViewPanelXY": {
                     "cameraMatrix": [
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        0.9999999999994964,
-                        9.999999999621397e-7,
-                        0,
-                        0,
-                        -9.999999999621397e-7,
-                        0.9999999999994964,
-                        0,
-                        0,
-                        -0.00009999999999621423,
-                        99.99999999994992,
-                        1
+                        1, 0, 0, 0, 0, 0.9999999999994964, 9.999999999621397e-7,
+                        0, 0, -9.999999999621397e-7, 0.9999999999994964, 0, 0,
+                        -0.00009999999999621423, 99.99999999994992, 1
                     ],
-                    "clipPlane": {
-                        "planeConstant": 0,
-                        "visible": true
-                    }
+                    "clipPlane": { "planeConstant": 0, "visible": true }
                 },
                 "ViewPanel3D": {
                     "cameraMatrix": [
-                        0.7071067811865477,
-                        5.5511151231257815e-17,
-                        -0.707106781186547,
-                        0,
-                        -0.4082482904638628,
-                        0.8164965809277258,
-                        -0.4082482904638629,
-                        0,
-                        0.5773502691896248,
-                        0.5773502691896252,
-                        0.5773502691896255,
-                        0,
-                        10,
-                        10,
-                        10.000000000000002,
-                        1
+                        0.7071067811865477, 5.5511151231257815e-17,
+                        -0.707106781186547, 0, -0.4082482904638628,
+                        0.8164965809277258, -0.4082482904638629, 0,
+                        0.5773502691896248, 0.5773502691896252,
+                        0.5773502691896255, 0, 10, 10, 10.000000000000002, 1
                     ]
                 },
                 "ViewPanelY": {
                     "cameraMatrix": [
-                        5.551115123125587e-16,
-                        -4.4408920985004704e-16,
-                        0.9999999999999649,
-                        0,
-                        0.9999999999994634,
-                        9.999999996956521e-7,
-                        -6.661338147750695e-16,
-                        0,
-                        -9.999999998066744e-7,
-                        0.9999999999994634,
-                        3.3306690738753473e-16,
-                        0,
-                        -0.00009999999999998334,
-                        99.99999999994999,
-                        6.1232339957357454e-21,
-                        1
+                        5.551115123125587e-16, -4.4408920985004704e-16,
+                        0.9999999999999649, 0, 0.9999999999994634,
+                        9.999999996956521e-7, -6.661338147750695e-16, 0,
+                        -9.999999998066744e-7, 0.9999999999994634,
+                        3.3306690738753473e-16, 0, -0.00009999999999998334,
+                        99.99999999994999, 6.1232339957357454e-21, 1
                     ],
-                    "clipPlane": {
-                        "planeConstant": 0,
-                        "visible": true
-                    }
+                    "clipPlane": { "planeConstant": 0, "visible": true }
                 },
                 "ViewPanelX": {
                     "cameraMatrix": [
-                        1.1102230246251573e-16,
-                        1.0000000000000007,
-                        2.2204460492503146e-16,
-                        0,
-                        9.999999995846643e-7,
-                        -4.4408920985006163e-16,
-                        0.9999999999994978,
-                        0,
-                        0.9999999999994978,
-                        -2.2204460492503082e-16,
-                        -9.999999996956866e-7,
-                        0,
-                        99.99999999994995,
-                        0,
-                        -0.0000999999999999833,
-                        1
+                        1.1102230246251573e-16, 1.0000000000000007,
+                        2.2204460492503146e-16, 0, 9.999999995846643e-7,
+                        -4.4408920985006163e-16, 0.9999999999994978, 0,
+                        0.9999999999994978, -2.2204460492503082e-16,
+                        -9.999999996956866e-7, 0, 99.99999999994995, 0,
+                        -0.0000999999999999833, 1
                     ],
-                    "clipPlane": {
-                        "planeConstant": 0,
-                        "visible": true
-                    }
+                    "clipPlane": { "planeConstant": 0, "visible": true }
                 },
                 "ViewPanel": {
                     "cameraMatrix": [
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0,
-                        0,
-                        0,
-                        0,
-                        1,
-                        0,
-                        0,
-                        20,
-                        20.000000000000004,
-                        1
+                        0.07426714888874009, 0, 0.9972383820310657, 0,
+                        0.1890359579236641, 0.9818692455756362,
+                        -0.014078039800121761, 0, -0.9791576978239105,
+                        0.18955944870338465, 0.07292062945044075, 0,
+                        -27.694761919291807, 5.361550864645869,
+                        2.0625068629119263, 1
                     ]
                 }
             },
-            "history": {
-                "undos": [],
-                "redos": []
-            }
+            "history": { "undos": [], "redos": [] }
         },
         "figureManager": {
             "uuid": "0F0F0F0F-0F0F-0F0F-0F0F-0F0F0F0F0F0F",
             "name": "Figure Manager",
             "type": "FigureManager",
             "metadata": {
-                "version": 1,
+                "version": "0.10",
                 "type": "Manager",
                 "generator": "FigureManager.toJSON"
             },
@@ -141,22 +75,14 @@
                     "name": "Water_phantom_cylinder",
                     "type": "CylinderFigure",
                     "uuid": "7ab62ba9-6dba-4543-b50b-ce31e143d482",
-                    "visible": true,
+                    "visible": false,
                     "geometryData": {
                         "geometryType": "HollowCylinderGeometry",
-                        "position": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rotation": [
-                            0,
-                            0,
-                            0
-                        ],
+                        "position": [0, 0, 10],
+                        "rotation": [0, 0, 0],
                         "parameters": {
                             "innerRadius": 0,
-                            "radius": 1,
+                            "radius": 5,
                             "depth": 20
                         }
                     },
@@ -166,22 +92,14 @@
                     "name": "Vacuum_cylinder",
                     "type": "CylinderFigure",
                     "uuid": "aeeffad9-ed86-44ae-bfe4-b5f78580741b",
-                    "visible": true,
+                    "visible": false,
                     "geometryData": {
                         "geometryType": "HollowCylinderGeometry",
-                        "position": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rotation": [
-                            0,
-                            0,
-                            0
-                        ],
+                        "position": [0, 0, 10.5],
+                        "rotation": [0, 0, 0],
                         "parameters": {
                             "innerRadius": 0,
-                            "radius": 1,
+                            "radius": 5.5,
                             "depth": 22
                         }
                     },
@@ -194,7 +112,7 @@
             "name": "Zones",
             "type": "ZoneManager",
             "metadata": {
-                "version": 1,
+                "version": "0.10",
                 "type": "Manager",
                 "generator": "ZoneManager.toJSON"
             },
@@ -244,30 +162,18 @@
                 }
             ],
             "worldZone": {
-                "uuid": "1f145d37-5dd6-46fb-b180-7cb1af10fae5",
+                "uuid": "1d148c03-dbda-4f2e-a04c-17d98887e71a",
                 "type": "WorldZone",
                 "name": "World Zone",
                 "marginMultiplier": 1.1,
                 "autoCalculate": false,
                 "materialUuid": "1dd2e8f0-6684-42c2-ad35-7aa55358204e",
-                "visible": true,
+                "visible": false,
                 "geometryData": {
                     "geometryType": "HollowCylinderGeometry",
-                    "position": [
-                        0,
-                        0,
-                        10.5
-                    ],
-                    "rotation": [
-                        0,
-                        0,
-                        0
-                    ],
-                    "parameters": {
-                        "innerRadius": 0,
-                        "radius": 6,
-                        "depth": 24
-                    }
+                    "position": [0, 0, 10.5],
+                    "rotation": [0, 0, 0],
+                    "parameters": { "innerRadius": 6, "radius": 6, "depth": 24 }
                 }
             }
         },
@@ -276,7 +182,7 @@
             "name": "DetectManager",
             "type": "DetectorManager",
             "metadata": {
-                "version": 1,
+                "version": "0.10",
                 "type": "Manager",
                 "generator": "DetectorManager.toJSON"
             },
@@ -289,16 +195,8 @@
                     "colorHex": 327424,
                     "geometryData": {
                         "geometryType": "Cyl",
-                        "position": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rotation": [
-                            0,
-                            0,
-                            0
-                        ],
+                        "position": [0, 0, 10],
+                        "rotation": [0, 0, 0],
                         "parameters": {
                             "radius": 5,
                             "innerRadius": 0,
@@ -316,16 +214,8 @@
                     "colorHex": 65535,
                     "geometryData": {
                         "geometryType": "Mesh",
-                        "position": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rotation": [
-                            0,
-                            0,
-                            0
-                        ],
+                        "position": [0, 0, 10],
+                        "rotation": [0, 0, 0],
                         "parameters": {
                             "width": 0.5,
                             "height": 4,
@@ -344,16 +234,8 @@
                     "colorHex": 65535,
                     "geometryData": {
                         "geometryType": "Cyl",
-                        "position": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rotation": [
-                            0,
-                            0,
-                            0
-                        ],
+                        "position": [0, 0, 0.05],
+                        "rotation": [0, 0, 0],
                         "parameters": {
                             "radius": 5,
                             "innerRadius": 0,
@@ -371,16 +253,8 @@
                     "colorHex": 65535,
                     "geometryData": {
                         "geometryType": "Cyl",
-                        "position": [
-                            0,
-                            0,
-                            0
-                        ],
-                        "rotation": [
-                            0,
-                            0,
-                            0
-                        ],
+                        "position": [0, 0, 15.35],
+                        "rotation": [0, 0, 0],
                         "parameters": {
                             "radius": 5,
                             "innerRadius": 0,
@@ -397,7 +271,7 @@
             "name": "Special Components",
             "type": "SpecialComponentManager",
             "metadata": {
-                "version": 1,
+                "version": "0.10",
                 "type": "Manager",
                 "generator": "SpecialComponentManager.toJSON"
             }
@@ -420,7 +294,7 @@
                     "icru": 276,
                     "density": 1,
                     "color": 34047,
-                    "opacity": 0.4,
+                    "opacity": 0.2,
                     "transparent": true
                 },
                 {
@@ -439,7 +313,7 @@
                 "1dd2e8f0-6684-42c2-ad35-7aa55358204e": 1
             },
             "metadata": {
-                "version": 1,
+                "version": "0.10",
                 "type": "Manager",
                 "generator": "MaterialManager.toJSON"
             }
@@ -466,6 +340,7 @@
                             "uuid": "53ba1036-4975-4a96-a6bd-3d336fc72612",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -473,6 +348,7 @@
                             "uuid": "050f3919-a59b-45a4-9326-38d788c16ab7",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "eacf5223-2411-4529-8abe-2c0fb2daf57f",
                             "modifiers": []
                         },
                         {
@@ -480,6 +356,7 @@
                             "uuid": "b3286437-b2a1-4ee9-b7da-8cc2cc435fcd",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "6ba215e8-359e-447d-bac9-4f2808faed51",
                             "modifiers": []
                         }
                     ],
@@ -503,6 +380,7 @@
                             "uuid": "be97ed10-07af-49d2-b91a-5bfe09c0c228",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -510,6 +388,7 @@
                             "uuid": "69305c71-de72-466c-86bc-ba5e58635a9e",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "6ba215e8-359e-447d-bac9-4f2808faed51",
                             "modifiers": []
                         }
                     ],
@@ -533,6 +412,7 @@
                             "uuid": "48b2c7a4-58c4-4ff7-816b-865ce146ae95",
                             "type": "Quantity",
                             "keyword": "AvgEnergy",
+                            "filter": "eacf5223-2411-4529-8abe-2c0fb2daf57f",
                             "modifiers": []
                         },
                         {
@@ -540,6 +420,7 @@
                             "uuid": "a9164784-1770-48d5-a772-3342fb06efe9",
                             "type": "Quantity",
                             "keyword": "AvgEnergy",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -547,6 +428,7 @@
                             "uuid": "2bf3b68d-a855-443a-8ea0-2bf05eeb9e65",
                             "type": "Quantity",
                             "keyword": "AvgEnergy",
+                            "filter": "6ba215e8-359e-447d-bac9-4f2808faed51",
                             "modifiers": []
                         },
                         {
@@ -554,6 +436,7 @@
                             "uuid": "d0c4addd-0775-420e-9240-d5ba3e279a2b",
                             "type": "Quantity",
                             "keyword": "dLET",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -561,6 +444,7 @@
                             "uuid": "a4e9cac1-a643-4448-bc4a-89977101cc67",
                             "type": "Quantity",
                             "keyword": "tLET",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -568,6 +452,7 @@
                             "uuid": "de64c12b-15cc-4e72-9262-b5507a738c9f",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": [
                                 {
                                     "diffType": "E",
@@ -600,6 +485,7 @@
                             "uuid": "54b85511-c885-41bd-a81d-a97842197764",
                             "type": "Quantity",
                             "keyword": "AvgEnergy",
+                            "filter": "eacf5223-2411-4529-8abe-2c0fb2daf57f",
                             "modifiers": []
                         },
                         {
@@ -607,6 +493,7 @@
                             "uuid": "e7ff88d1-e46a-4a69-b676-e8e3ed1e67fd",
                             "type": "Quantity",
                             "keyword": "AvgEnergy",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -614,6 +501,7 @@
                             "uuid": "95c292b9-966e-42fe-91a0-3d0f0db55876",
                             "type": "Quantity",
                             "keyword": "AvgEnergy",
+                            "filter": "6ba215e8-359e-447d-bac9-4f2808faed51",
                             "modifiers": []
                         },
                         {
@@ -621,6 +509,7 @@
                             "uuid": "efd9f82c-8e0e-4d3d-a22d-70a0cc11ef7b",
                             "type": "Quantity",
                             "keyword": "dLET",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -628,6 +517,7 @@
                             "uuid": "dac16bbd-e361-46d3-8eae-9c69571aea96",
                             "type": "Quantity",
                             "keyword": "tLET",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": []
                         },
                         {
@@ -635,6 +525,7 @@
                             "uuid": "65f821c8-a654-4f6f-b666-0fdc8c925cf5",
                             "type": "Quantity",
                             "keyword": "Fluence",
+                            "filter": "9d0bae09-9ebe-46fe-9e59-bd7888db9442",
                             "modifiers": [
                                 {
                                     "diffType": "E",
@@ -723,7 +614,7 @@
                 }
             ],
             "metadata": {
-                "version": 1,
+                "version": "0.10",
                 "type": "Manager",
                 "generator": "ScoringManager.toJSON"
             }
@@ -732,46 +623,19 @@
             "name": "Beam",
             "type": "Beam",
             "uuid": "0F0F0F0F-0F0F-0F0F-0F0F-0F0F0F0FFFFF",
-            "position": [
-                0,
-                0,
-                0
-            ],
-            "direction": [
-                0,
-                0,
-                1
-            ],
+            "position": [0, 0, 0],
+            "direction": [0, 0, 1],
             "energy": 150,
             "energySpread": 1.5,
             "energyLowCutoff": 0,
             "energyHighCutoff": 1000,
-            "sigma": {
-                "type": "Gaussian",
-                "x": 0,
-                "y": 0
-            },
-            "sad": {
-                "type": "none",
-                "x": 0,
-                "y": 0
-            },
-            "divergence": {
-                "distanceToFocal": 0,
-                "x": 0,
-                "y": 0
-            },
-            "particle": {
-                "a": 1,
-                "id": 2,
-                "z": 1
-            },
+            "sigma": { "type": "Gaussian", "x": 0, "y": 0 },
+            "sad": { "type": "none", "x": 0, "y": 0 },
+            "divergence": { "distanceToFocal": 0, "x": 0, "y": 0 },
+            "particle": { "a": 1, "id": 2, "z": 1 },
             "colorHex": 16776960,
             "numberOfParticles": 10000,
-            "sourceFile": {
-                "name": "",
-                "value": ""
-            },
+            "sourceFile": { "name": "", "value": "" },
             "sourceType": "simple"
         },
         "physic": {
@@ -780,7 +644,7 @@
             "energyModelStraggling": "Vavilov",
             "multipleScattering": "Moliere"
         },
-        "hash": "909d98d9465595644e955975bc41858e6f9d1ab4"
+        "hash": "9b27f7567899c137fa9b980d67c29ed73ae19477"
     },
     "input_type": "editor",
     "ntasks": 4,
