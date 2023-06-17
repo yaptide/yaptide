@@ -19,9 +19,9 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation(celery_app, 
-                        celery_worker, 
-                        payload_editor_dict_data : dict,
+def test_run_simulation(celery_app,
+                        celery_worker,
+                        payload_editor_dict_data: dict,
                         client,
                         add_directory_to_path,
                         shieldhit_demo_binary):
@@ -40,11 +40,13 @@ def test_run_simulation(celery_app,
     payload_dict["ntasks"] = 2
 
     if platform.system() == "Windows":
-        payload_dict["input_json"]["detectManager"]["filters"] = []
-        payload_dict["input_json"]["detectManager"]["detectGeometries"] = [payload_dict["input_json"]["detectManager"]["detectGeometries"][0]]
-        payload_dict["input_json"]["scoringManager"]["scoringOutputs"] = [payload_dict["input_json"]["scoringManager"]["scoringOutputs"][0]]
-        for output in payload_dict["input_json"]["scoringManager"]["scoringOutputs"]:
-            for quantity in output["quantities"]["active"]:
+        payload_dict["input_json"]["scoringManager"]["filters"] = []
+        payload_dict["input_json"]["detectorManager"]["detectors"] = [
+            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
+        payload_dict["input_json"]["scoringManager"]["outputs"] = [
+            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
+        for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
+            for quantity in output["quantities"]:
                 if "filter" in quantity:
                     del quantity["filter"]
 
@@ -57,12 +59,13 @@ def test_run_simulation(celery_app,
     assert 'result' in result.keys()
 
 
-def test_cancel_simulation(celery_app, 
-                           celery_worker, 
+def test_cancel_simulation(celery_app,
+                           celery_worker,
                            client,
                            payload_editor_dict_data: dict):
     """Right now cancel_simulation task does nothing, so it should return False"""
     job = cancel_simulation.delay(job_id="test")
     result: dict = job.wait()
-    logging.info('Number of particles in the simulation: %d', payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"])
+    logging.info('Number of particles in the simulation: %d',
+                 payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"])
     assert result is False

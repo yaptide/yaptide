@@ -8,11 +8,11 @@ from flask import Flask
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation_with_flask(celery_app, 
-                                   celery_worker, 
-                                   client: Flask, 
-                                   db_good_username: str, 
-                                   db_good_password: str, 
+def test_run_simulation_with_flask(celery_app,
+                                   celery_worker,
+                                   client: Flask,
+                                   db_good_username: str,
+                                   db_good_password: str,
                                    payload_editor_dict_data: dict,
                                    add_directory_to_path,
                                    shieldhit_demo_binary):
@@ -33,11 +33,13 @@ def test_run_simulation_with_flask(celery_app,
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
 
     if platform.system() == "Windows":
-        payload_dict["input_json"]["detectManager"]["filters"] = []
-        payload_dict["input_json"]["detectManager"]["detectGeometries"] = [payload_dict["input_json"]["detectManager"]["detectGeometries"][0]]
-        payload_dict["input_json"]["scoringManager"]["scoringOutputs"] = [payload_dict["input_json"]["scoringManager"]["scoringOutputs"][0]]
-        for output in payload_dict["input_json"]["scoringManager"]["scoringOutputs"]:
-            for quantity in output["quantities"]["active"]:
+        payload_dict["input_json"]["scoringManager"]["filters"] = []
+        payload_dict["input_json"]["detectorManager"]["detectors"] = [
+            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
+        payload_dict["input_json"]["scoringManager"]["outputs"] = [
+            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
+        for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
+            for quantity in output["quantities"]:
                 if "filter" in quantity:
                     del quantity["filter"]
 
@@ -66,11 +68,11 @@ def test_run_simulation_with_flask(celery_app,
     assert {"input_type", "input_files", "input_json", "number_of_all_primaries"} == set(data["input"].keys())
     required_converted_files = {"beam.dat", "detect.dat", "geo.dat", "info.json", "mat.dat"}
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
-    
+
     while True:
         logging.info("Sending check job status request on /jobs/direct endpoint")
         resp = client.get("/jobs/direct",
-                                  query_string={"job_id": job_id})
+                          query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
 
