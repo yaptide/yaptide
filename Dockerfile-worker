@@ -4,27 +4,39 @@ FROM python:3.10-slim
 # skipcq: DOK-DL3008
 RUN apt-get update && apt-get install -y --no-install-recommends gfortran && rm -rf /var/lib/apt/lists/*
 
+# set max celery task time to 10 hours
+ENV CELERYD_TIME_LIMIT=36000
+
 # set working directory
 WORKDIR /usr/local/app
+
+# add path where simulator binaries will be installed
+ENV PATH="/usr/local/app/bin:${PATH}"
 
 # openshift permissions
 RUN chgrp -R 0 /usr/local/app && \
     chmod -R g=u /usr/local/app
 
 # install dependencies
-COPY ./requirements.txt ./
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# copy project
+# Copy worker script
+COPY run_worker.sh .
+
+# copy yaptide source code
 COPY yaptide ./yaptide
 
-# set max task time to 10 hours
-ENV CELERYD_TIME_LIMIT=36000
+# Some of our developers use Windows to run Docker, their bash scripts have CRLF line endings
+# therefore when copied to the container they are not executable. This is a workaround to fix that.
+# skipcq: DOK-W1001
+RUN python3 -c "import os; content = open('run_worker.sh', 'rb').read().replace(b'\r\n', b'\n'); open('run_worker.sh', 'wb').write(content)"
+# skipcq: DOK-W1001
+RUN python3 -c "import os; content = open('yaptide/admin/simulators.py', 'rb').read().replace(b'\r\n', b'\n'); open('yaptide/admin/simulators.py', 'wb').write(content)"
 
-# add path where shieldhit will be installed
-ENV PATH="/usr/local/app/bin:${PATH}"
+# Make the scripts executable
+# skipcq: DOK-W1001
+RUN chmod +x run_worker.sh yaptide/admin/simulators.py
 
-# copy worker script
-COPY ./run_worker.sh ./
-
-CMD ["./run_worker.sh"]
+# Set the script as the entry point, Windows users require to run the script via bash, as `./` does not work
+ENTRYPOINT ["bash", "run_worker.sh"]
