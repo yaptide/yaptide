@@ -9,6 +9,7 @@ from flask import Flask
 
 from yaptide.routes.user_routes import DEFAULT_PAGE_SIZE
 
+
 @pytest.mark.usefixtures("live_server", "live_server_win")
 def test_list_simulations(celery_app,
                           celery_worker,
@@ -20,8 +21,8 @@ def test_list_simulations(celery_app,
                           shieldhit_demo_binary):
     """Test we can run simulations"""
     client.put("/auth/register",
-                       data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-                       content_type='application/json')
+               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+               content_type='application/json')
     resp = client.post("/auth/login",
                        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
                        content_type='application/json')
@@ -36,11 +37,13 @@ def test_list_simulations(celery_app,
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
 
     if platform.system() == "Windows":
-        payload_dict["input_json"]["detectManager"]["filters"] = []
-        payload_dict["input_json"]["detectManager"]["detectGeometries"] = [payload_dict["input_json"]["detectManager"]["detectGeometries"][0]]
-        payload_dict["input_json"]["scoringManager"]["scoringOutputs"] = [payload_dict["input_json"]["scoringManager"]["scoringOutputs"][0]]
-        for output in payload_dict["input_json"]["scoringManager"]["scoringOutputs"]:
-            for quantity in output["quantities"]["active"]:
+        payload_dict["input_json"]["scoringManager"]["filters"] = []
+        payload_dict["input_json"]["detectorManager"]["detectors"] = [
+            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
+        payload_dict["input_json"]["scoringManager"]["outputs"] = [
+            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
+        for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
+            for quantity in output["quantities"]:
                 if "filter" in quantity:
                     del quantity["filter"]
 
@@ -49,8 +52,8 @@ def test_list_simulations(celery_app,
     number_of_simulations = 7
     for _ in range(number_of_simulations):
         resp = client.post("/jobs/direct",
-                                data=json.dumps(payload_dict),
-                                content_type='application/json')
+                           data=json.dumps(payload_dict),
+                           content_type='application/json')
 
         assert resp.status_code == 202  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
@@ -86,9 +89,9 @@ def test_list_simulations(celery_app,
     logging.info("Check basic list of simulations with pagination")
 
     # check first page with 3 items out of 7
-    page_size=3
+    page_size = 3
     resp = client.get("/user/simulations",
-                              query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "descend"})
+                      query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "descend"})
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     logging.info("descending order, page 1")
@@ -101,9 +104,9 @@ def test_list_simulations(celery_app,
     assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation
     assert data["simulations"][1]["start_time"] == start_time_of_second_newest_simulation
 
-    # check second page with 1 item out of 7, not different ordering 
+    # check second page with 1 item out of 7, not different ordering
     resp = client.get("/user/simulations",
-                              query_string={"page_size": page_size, "page_idx": 3, "order_by": "start_time", "order_type": "ascend"})
+                      query_string={"page_size": page_size, "page_idx": 3, "order_by": "start_time", "order_type": "ascend"})
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     logging.info("ascending order, page 3")
@@ -112,5 +115,3 @@ def test_list_simulations(celery_app,
     assert data["page_count"] == 3
     assert len(data["simulations"]) == 1
     assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation
-
-
