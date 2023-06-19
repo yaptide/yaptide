@@ -63,11 +63,20 @@ def test_run_simulation_with_flask(celery_app,
         # lets ensure that the keys contain only message, job_state and job_tasks_status
         # and that there is no results, logfiles and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
+
+        logging.info("job tasks status: %s", data["job_tasks_status"])
         assert len(data["job_tasks_status"]) == small_simulation_payload["ntasks"]
+        if data["job_state"] == 'RUNNING':
+            # when job is is running, at least one task should be running
+            # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
+            assert any([task["task_state"] in {"RUNNING", "PENDING", "COMPLETED"} for task in data["job_tasks_status"]])
+
+        # TODO: add tests for end_time here
+
         if data['job_state'] in ['COMPLETED', 'FAILED']:
             assert data['job_state'] == 'COMPLETED'
             break
-        sleep(1)
+        sleep(0.1)
 
     logging.info("Fetching results from /results endpoint")
     resp = client.get("/results", query_string={"job_id": job_id})

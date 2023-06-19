@@ -18,6 +18,20 @@ def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict,
     payload_dict["ntasks"] = 2
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
 
+    # reduce number of segments to get results which are easier to print
+    for detector in payload_dict["input_json"]["detectorManager"]["detectors"]:
+        for segments_type in ["xSegments", "ySegments", "zSegments"]:
+            # if segments_type is missing (for example xSegments is missing for cylinder detector)
+            # then we skip it by comparing default value 2 > 1
+            if detector["geometryData"]["parameters"].get(segments_type, 2) > 1:
+                detector["geometryData"]["parameters"][segments_type] = 4
+    # reduce number of bins to get results which are easier to print
+    for scoring in payload_dict["input_json"]["scoringManager"]["outputs"]:
+        for quantity in scoring["quantities"]:
+            for modifier in quantity["modifiers"]:
+                if modifier.get("binsNumber", 2) > 1:
+                    modifier["binsNumber"] = 4
+
     if platform.system() == "Windows":
         payload_dict["input_json"]["scoringManager"]["filters"] = []
         payload_dict["input_json"]["detectorManager"]["detectors"] = [
