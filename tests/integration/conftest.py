@@ -10,8 +10,10 @@ import pytest
 from yaptide.application import create_app
 from yaptide.persistence.database import db
 
+
 @pytest.fixture(scope='session')
 def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict, None, None]:
+    """Small simulation payload for testing purposes"""
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
     # limit the particle numbers to get faster results
@@ -43,6 +45,7 @@ def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict,
                 if "filter" in quantity:
                     del quantity["filter"]
     yield payload_dict
+
 
 @pytest.fixture(scope='session')
 def shieldhit_demo_binary():
