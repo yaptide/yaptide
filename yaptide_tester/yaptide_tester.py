@@ -64,6 +64,11 @@ class YaptideTesterSession:
         self.login()
         return self.session.post(endpoint, json=json)
 
+    def delete(self, endpoint: str, params: dict = None) -> requests.Response:
+        """Delete method wrapper"""
+        self.login()
+        return self.session.delete(endpoint, params=params)
+
     def get(self, endpoint: str, params: dict = None) -> requests.Response:
         """Get method wrapper"""
         self.login()
@@ -163,6 +168,11 @@ class YaptideTester:
         print(res_json)
 
         job_id: str = res_json.get("job_id")
+
+        # res: requests.Response = self.session.delete(jobs_url, params={"job_id": job_id})
+        # res_json: dict = res.json()
+        # print(res_json)
+        # return
 
         if job_id is not None:
             while do_monitor_job:

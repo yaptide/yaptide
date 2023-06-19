@@ -144,11 +144,3 @@ def convert_input_files(payload_dict: dict):
     """Function converting output"""
     files_dict = check_and_convert_payload_to_files_dict(payload_dict=payload_dict)
     return {"input_files": files_dict}
-
-
-@celery_app.task
-def cancel_simulation(job_id: str) -> bool:
-    """Task responsible for canceling simulation in progress"""
-    # Currently this task does nothing because to working properly it requires changes in pymchelper
-    print(job_id)
-    return False

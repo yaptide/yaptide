@@ -14,7 +14,7 @@ import pytest  # skipcq: PY-W2000
 
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
-from yaptide.celery.tasks import cancel_simulation, run_simulation
+from yaptide.celery.tasks import run_simulation
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
@@ -57,15 +57,3 @@ def test_run_simulation(celery_app,
     result: dict = job.wait()
     logging.info("run_simulation task finished")
     assert 'result' in result.keys()
-
-
-def test_cancel_simulation(celery_app,
-                           celery_worker,
-                           client,
-                           payload_editor_dict_data: dict):
-    """Right now cancel_simulation task does nothing, so it should return False"""
-    job = cancel_simulation.delay(job_id="test")
-    result: dict = job.wait()
-    logging.info('Number of particles in the simulation: %d',
-                 payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"])
-    assert result is False

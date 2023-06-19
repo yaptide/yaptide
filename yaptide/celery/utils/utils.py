@@ -34,17 +34,32 @@ def get_job_status(job_id: str) -> dict:
     result = {
         "job_state": job_state
     }
-    if job_state == SimulationModel.JobState.PENDING.value:
-        pass
-    elif job_state == SimulationModel.JobState.RUNNING.value:
-        pass
-    elif job_state != SimulationModel.JobState.FAILED.value:
-        if "end_time" in job.info:
-            result["end_time"] = job.info["end_time"]
-    else:
+    if job_state == SimulationModel.JobState.FAILED.value:
         result["message"] = str(job.info)
+    elif "end_time" in job.info:
+        result["end_time"] = job.info["end_time"]
 
     return result
+
+
+def cancel_job(job_id: str) -> dict:
+    """Cancels simulation"""
+    job = AsyncResult(id=job_id, app=celery_app)
+    job_state: str = translate_celery_state_naming(job.state)
+
+    if job_state in [SimulationModel.JobState.CANCELLED.value,
+                     SimulationModel.JobState.COMPLETED.value,
+                     SimulationModel.JobState.FAILED.value]:
+        return {"message": f"Cannot cancel job which is already {job_state}"}
+    try:
+        celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
+    except:
+        return {"message": "Failed to cancel job"}
+
+    return {
+        "job_state": SimulationModel.JobState.CANCELLED.value,
+        "message": "Job cancelled"
+    }
 
 
 def get_job_results(job_id: str) -> dict:
@@ -61,8 +76,10 @@ def translate_celery_state_naming(job_state: str) -> str:
         return SimulationModel.JobState.PENDING.value
     if job_state in ["PROGRESS", "STARTED"]:
         return SimulationModel.JobState.RUNNING.value
-    if job_state in ["FAILURE", "REVOKED"]:
+    if job_state in ["FAILURE"]:
         return SimulationModel.JobState.FAILED.value
+    if job_state in ["REVOKED"]:
+        return SimulationModel.JobState.CANCELLED.value
     if job_state in ["SUCCESS"]:
         return SimulationModel.JobState.COMPLETED.value
     # Others are the same

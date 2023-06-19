@@ -15,8 +15,8 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
-from yaptide.celery.tasks import run_simulation, convert_input_files, cancel_simulation
-from yaptide.celery.utils.utils import get_job_status, get_job_results
+from yaptide.celery.tasks import run_simulation, convert_input_files
+from yaptide.celery.utils.utils import get_job_status, cancel_job, get_job_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
@@ -144,22 +144,23 @@ class JobsDirect(Resource):
     @requires_auth()
     def delete(user: UserBaseModel):
         """Method canceling simulation and returning status of this action"""
-        try:
-            payload_dict: dict = JobsDirect.APIParametersSchema().load(request.get_json(force=True))
-        except ValidationError:
-            return error_validation_response()
+        schema = JobsDirect.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return error_validation_response(content=errors)
+        params_dict: dict = schema.load(request.args)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(
-            job_id=payload_dict.get('job_id'), user=user)
+            job_id=params_dict['job_id'], user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        job = cancel_simulation.delay(job_id=payload_dict.get('job_id'))
-        result: dict = job.wait()
+        result: dict = cancel_job(job_id=params_dict['job_id'])
 
-        if result:
-            db.session.query(SimulationModel).filter_by(job_id=payload_dict.get('job_id')).delete()
+        if "job_state" in result:
+            db.session.query(SimulationModel).filter_by(job_id=params_dict['job_id']).delete()
             db.session.commit()
+            return yaptide_response(message="", code=200, content=result)
 
         return error_internal_response()
 
