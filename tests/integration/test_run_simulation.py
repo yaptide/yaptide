@@ -1,7 +1,6 @@
-import copy
+from datetime import datetime
 import json
 import logging
-import platform
 import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
@@ -66,16 +65,30 @@ def test_run_simulation_with_flask(celery_app,
 
         logging.info("job tasks status: %s", data["job_tasks_status"])
         assert len(data["job_tasks_status"]) == small_simulation_payload["ntasks"]
+
+        if data['job_state'] in ['COMPLETED', 'FAILED']:
+            assert data['job_state'] == 'COMPLETED'
+            break
         if data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
             # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
             assert any([task["task_state"] in {"RUNNING", "PENDING", "COMPLETED"} for task in data["job_tasks_status"]])
 
-        # TODO: add tests for end_time here
+            # check if during execution we have non-empty start_time  and empty end_time
+            resp = client.get("/user/simulations")
+            assert resp.status_code == 200  # skipcq: BAN-B101
+            data = json.loads(resp.data.decode())
+            assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
+            assert len(data["simulations"]) == 1
+            start_time = data["simulations"][0]["start_time"]
+            logging.info("start_time: %s", start_time)
+            assert start_time is not None
+            end_time = data["simulations"][0]["end_time"]
+            logging.info("end_time: %s", end_time)
+            assert end_time is None
 
-        if data['job_state'] in ['COMPLETED', 'FAILED']:
-            assert data['job_state'] == 'COMPLETED'
-            break
+
+
         sleep(0.1)
 
     logging.info("Fetching results from /results endpoint")
@@ -85,3 +98,20 @@ def test_run_simulation_with_flask(celery_app,
 
     assert resp.status_code == 200  # skipcq: BAN-B101
     assert {"message", "estimators"} == set(data.keys())
+
+    resp = client.get("/user/simulations")
+    assert resp.status_code == 200  # skipcq: BAN-B101
+    data = json.loads(resp.data.decode())
+    # check if we get expected keys in the response
+    assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
+    # check if we get expected number of simulations in the response in the first page
+    assert len(data["simulations"]) == 1
+    start_time = data["simulations"][0]["start_time"]
+    logging.info("start_time: %s", start_time)
+    assert start_time is not None
+    end_time = data["simulations"][0]["end_time"]
+    logging.info("end_time: %s", end_time)
+    assert end_time is not None
+    datetime_starttime = datetime.strptime(start_time, "%a, %d %b %Y %H:%M:%S %Z")
+    datetime_endtime = datetime.strptime(end_time, "%a, %d %b %Y %H:%M:%S %Z")
+    assert datetime_endtime > datetime_starttime
