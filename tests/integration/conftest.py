@@ -1,3 +1,4 @@
+import copy
 import logging
 from pathlib import Path
 import os
@@ -9,6 +10,25 @@ import pytest
 from yaptide.application import create_app
 from yaptide.persistence.database import db
 
+@pytest.fixture(scope='session')
+def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict, None, None]:
+    payload_dict = copy.deepcopy(payload_editor_dict_data)
+
+    # limit the particle numbers to get faster results
+    payload_dict["ntasks"] = 2
+    payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
+
+    if platform.system() == "Windows":
+        payload_dict["input_json"]["scoringManager"]["filters"] = []
+        payload_dict["input_json"]["detectorManager"]["detectors"] = [
+            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
+        payload_dict["input_json"]["scoringManager"]["outputs"] = [
+            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
+        for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
+            for quantity in output["quantities"]:
+                if "filter" in quantity:
+                    del quantity["filter"]
+    yield payload_dict
 
 @pytest.fixture(scope='session')
 def shieldhit_demo_binary():

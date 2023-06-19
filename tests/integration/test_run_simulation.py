@@ -13,7 +13,7 @@ def test_run_simulation_with_flask(celery_app,
                                    client: Flask,
                                    db_good_username: str,
                                    db_good_password: str,
-                                   payload_editor_dict_data: dict,
+                                   small_simulation_payload: dict,
                                    add_directory_to_path,
                                    shieldhit_demo_binary):
     """Test we can run simulations"""
@@ -27,25 +27,9 @@ def test_run_simulation_with_flask(celery_app,
     assert resp.status_code == 202  # skipcq: BAN-B101
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
-    payload_dict = copy.deepcopy(payload_editor_dict_data)
-
-    # limit the particle numbers to get faster results
-    payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
-
-    if platform.system() == "Windows":
-        payload_dict["input_json"]["scoringManager"]["filters"] = []
-        payload_dict["input_json"]["detectorManager"]["detectors"] = [
-            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
-        payload_dict["input_json"]["scoringManager"]["outputs"] = [
-            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
-        for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
-            for quantity in output["quantities"]:
-                if "filter" in quantity:
-                    del quantity["filter"]
-
     logging.info("Sending job submition request on /jobs/direct endpoint")
     resp = client.post("/jobs/direct",
-                       data=json.dumps(payload_dict),
+                       data=json.dumps(small_simulation_payload),
                        content_type='application/json')
 
     assert resp.status_code == 202  # skipcq: BAN-B101
@@ -79,7 +63,7 @@ def test_run_simulation_with_flask(celery_app,
         # lets ensure that the keys contain only message, job_state and job_tasks_status
         # and that there is no results, logfiles and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
-        assert len(data["job_tasks_status"]) == payload_dict["ntasks"]
+        assert len(data["job_tasks_status"]) == small_simulation_payload["ntasks"]
         if data['job_state'] in ['COMPLETED', 'FAILED']:
             assert data['job_state'] == 'COMPLETED'
             break
