@@ -72,7 +72,7 @@ def test_run_simulation_with_flask(celery_app,
         if data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
             # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
-            assert any([task["task_state"] in {"RUNNING", "PENDING", "COMPLETED"} for task in data["job_tasks_status"]])
+            assert any(task["task_state"] in {"RUNNING", "PENDING", "COMPLETED"} for task in data["job_tasks_status"])
 
             # check if during execution we have non-empty start_time  and empty end_time
             resp = client.get("/user/simulations")
