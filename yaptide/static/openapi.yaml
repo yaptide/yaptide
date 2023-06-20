@@ -25,6 +25,7 @@ paths:
     put:
       summary: Allows registration of new users
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -58,6 +59,7 @@ paths:
     post:
       summary: Allows to login the user - server sets refresh and access tokens in cookies
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -178,25 +180,27 @@ paths:
         - in: query
           name: page_size
           schema:
-            type: string
+            type: integer
           description: Specifies the page size from range [0,100] - incorrect or
                        non provided value will result in sending page with size 10
         - in: query
           name: page_idx
           schema:
-            type: string
+            type: integer
           description: Specifies the page index to be send - incorrect or non
                        provided value will result in sending page with index 0
         - in: query
           name: order_by
           schema:
             type: string
+            enum: [start_time, end_time]
           description: Specifies the parameter by which pages are sorted, available are start_time or end_time
                        - incorrect or non provided value will result in sending page sorted by start_time
         - in: query
           name: order_type
           schema:
             type: string
+            enum: [ascend, descend]
           description: Specifies the order in which pages are sorted, available are ascend or descend
                        - incorrect or non provided value will result in sending page sorted by ascend
       responses:
@@ -271,10 +275,13 @@ paths:
     post:
       summary: Allows for submitting jobs
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/JobsRequest'
+              allOf:
+                - $ref: '#/components/schemas/JobsRequest'
+                - $ref: '#/components/schemas/Input'
       responses:
         '202':
           description: TODO
@@ -299,14 +306,67 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+    get:
+      description: Allows for getting job status.
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  job_state:
+                    type: string
+                    enum: [PENDING, RUNNING, COMPLETED, FAILED]
+                    description: job state
+                  job_task_status:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobTaskStatus'
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '408':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
   /jobs/batch:
     post:
       summary: Allows for submitting jobs
       requestBody:
+        required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/JobsRequest'
+              allOf:
+                - $ref: '#/components/schemas/JobsRequest'
+                - $ref: '#/components/schemas/Input'
+                - $ref: '#/components/schemas/BatchOptions'
       responses:
         '202':
           description: TODO
@@ -366,7 +426,8 @@ paths:
                     type: string
                   job_state:
                     type: string
-                    description: job_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+                    enum: [PENDING, RUNNING, COMPLETED, FAILED]
+                    description: job state
                   job_task_status:
                     type: array
                     items:
@@ -473,14 +534,15 @@ paths:
                     type: object
                     properties:
                       input_json:
-                        type: array
+                        type: object
                         description: available only if simulation was run with JSON input
                       input_files:
-                        type: array
+                        type: object
                         description: files used by simulation
                       input_type:
                         type: string
-                        description: simulation input type, can be&#58 editor and files
+                        enum: [editor, files]
+                        description: simulation input type
                       number_of_all_primaries:
                         type: integer
                         description: requested number of all primaries
@@ -489,19 +551,20 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '404':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '500':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
+
 # Result Routes
   /results:
     description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
@@ -524,25 +587,27 @@ paths:
                     type: string
                   estimators:
                     type: array
+                    items:
+                      $ref: '#/components/schemas/Estimator'
                     description: list of resulting estimators
         '400':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '404':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '500':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
   /results/batch:
     description: We weren't able to fully migrate batch results to new endpoint for now, so it is still required to use this endpoint
     get:
@@ -564,25 +629,27 @@ paths:
                     type: string
                   estimators:
                     type: array
+                    items:
+                      $ref: '#/components/schemas/Estimator'
                     description: list of resulting estimators
         '400':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '404':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '500':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
 
 # Task Routes
   /tasks/update:
@@ -590,6 +657,7 @@ paths:
     post:
       description: Updates task state
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -605,8 +673,13 @@ paths:
                   type: string
                   description: authentication key provided to tasks
                 update_dict:
-                  type: array
+                  type: object
                   description: dict containing update data
+              required:
+                - simulation_id
+                - task_id
+                - update_key
+                - update_dict
       responses:
         default:
           description: Response JSON for all codes
@@ -614,11 +687,14 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+
+# Logfiles Routes
   /logfiles:
     description: Route dedicated for Backend internal communication
     post:
       description: Updates task state
       requestBody:
+        required: true
         content:
           application/json:
             schema:
@@ -630,9 +706,13 @@ paths:
                 update_key:
                   type: string
                   description: authentication key provided to tasks
-                log_files:
-                  type: array
+                logfiles:
+                  type: object
                   description: dict containing log files
+              required:
+                - simulation_id
+                - update_key
+                - logfiles
       responses:
         default:
           description: Response JSON for all codes
@@ -658,26 +738,28 @@ paths:
                   message:
                     type: string
                   logfiles:
-                    type: array
+                    type: object
                     description: dict of log files with names as keys and content as values.
         '400':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '404':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
         '500':
           description: TODO
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
+                $ref: '#/components/schemas/BasicResponse'
+
+# Components
 components:
   securitySchemes:
     basicAuth: # <-- arbitrary name for the security scheme
@@ -698,6 +780,9 @@ components:
           type: string
         password:
           type: string
+      required:
+        - username
+        - password
     Metadata:
       type: object
       description: static additional information
@@ -731,6 +816,31 @@ components:
           description: ending time of the simulation - if it is still running the value is NULL
         metadata:
           $ref: '#/components/schemas/Metadata'
+    Input:
+      oneOf:
+        - type: object
+          properties:
+            input_json:
+              type: object
+              description: specifies input json
+          required:
+            - input_json
+        - type: object
+          properties:
+            input_files:
+              type: object
+              properties:
+                beam.dat:
+                  type: string
+                detect.dat:
+                  type: string
+                geo.dat:
+                  type: string
+                mat.dat:
+                  type: string
+              description: specifies input files
+          required:
+            - input_files
     JobsRequest:
       type: object
       properties:
@@ -739,57 +849,67 @@ components:
           description: specifies number of parallel tasks to be run, default is maximum available for '/jobs/direct' and 1 for '/jobs/batch'
         sim_type:
           type: string
-          description: specifies simulator type, can be shieldhit or dummy
+          enum: [shieldhit, dummy]
+          description: specifies simulator type
         title:
           type: string
           description: custom title set to for this simulation, default is workspace
         input_type:
           type: string
-          description: specifies the type of sent input&#58; editor or files
-        input_files:
-          type: array
-          items:
-            type: object
-            properties:
-              beam.dat:
-                type: string
-              detect.dat:
-                type: string
-              geo.dat:
-                type: string
-              mat.dat:
-                type: string
-          description: is required if input_type is files
-        input_json:
-          description: input_json is required if input_type is editor
+          enum: [editor, files]
+          description: specifies input type
+        # oneOf:
+        #   - input_files:
+        #     type: array
+        #     items:
+        #       type: object
+        #       properties:
+        #         beam.dat:
+        #           type: string
+        #         detect.dat:
+        #           type: string
+        #         geo.dat:
+        #           type: string
+        #         mat.dat:
+        #           type: string
+        #     description: is required if input_type is files
+        #   - input_json:
+        #     type: object
+        #     description: input_json is required if input_type is editor
+      required:
+        - ntasks
+        - input_type
+        - sim_type
+    BatchOptions:
+      type: object
+      properties:
         batch_options:
-          type: array
-          items:
-            type: object
-            description: available options can be found here&#58 https://slurm.schedmd.com/sbatch.html. NOTE&#58 if batch_options is not provided, SLURM will run both scripts with default settings
-            properties:
-              cluster_name:
-                type: string
-                description: stands for the cluster to be used to run simulation; it has to be one of available clusters for the user - check '/user/clusters' endpoint description; if it is not provided or provided cluster name is incorrect, first available cluster will be used
-              array_options:
-                type: array
-                description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
-              array_header:
-                type: string
-                description: header for files run on SLURM with sbatch
-              collect_options:
-                type: array
-                description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
-              collect_header:
-                type: string
-                description: header for files run on SLURM with sbatch
+          type: object
+          description: available options can be found here&#58; https://slurm.schedmd.com/sbatch.html. NOTE&#58; if batch_options is not provided, SLURM will run both scripts with default settings
+          properties:
+            cluster_name:
+              type: string
+              description: stands for the cluster to be used to run simulation; it has to be one of available clusters for the user - check '/user/clusters' endpoint description; if it is not provided or provided cluster name is incorrect, first available cluster will be used
+            array_options:
+              type: object
+              description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
+            array_header:
+              type: string
+              description: header for files run on SLURM with sbatch
+            collect_options:
+              type: object
+              description: dictionary of command line options used while running files with sbatch. Pairs should be option name as key and option value as value. If 2 same parameters are specified in both options and coresponding header, parameters from header will be ignored because command line options are more important for the SLURM
+            collect_header:
+              type: string
+              description: header for files run on SLURM with sbatch
     JobTaskStatus:
       type: object
-      description: error, logfiles, input_files, input_json and results are deprecated&#58 error is now sent as message, logfiles - accessed via /logfiles endpoint, results - accessed via /results endpoint, input_files and input_json - accessed via /inputs endpoint.
+      description: error, logfiles, input_files, input_json and results are deprecated&#58; error is now sent as message, logfiles - accessed via /logfiles endpoint, results - accessed via /results endpoint, input_files and input_json - accessed via /inputs endpoint.
       properties:
         task_state:
           type: string
-          description: task_state can be&#58 PENDING, RUNNING, COMPLETED or FAILED
+          enum: [PENDING, RUNNING, COMPLETED, FAILED]
+          description: task state
         simulated_primaries:
           type: integer
           description: primaries already calculated by the task
@@ -818,6 +938,9 @@ components:
           type: string
         message:
           type: string
+    Estimators:
+      type: object
+      description: dictionary of estimators with names as keys and values as dictionaries with estimator parameters
 
 security:
   - basicAuth: []  # <-- use the same name here
