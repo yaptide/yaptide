@@ -4,7 +4,7 @@ decorator==5.1.1
 environs==9.5.0
 fabric==3.1.0
 flask-restful==0.3.10
-flask-sqlalchemy==3.0.3
+flask-sqlalchemy==3.0.4
 flask_swagger_ui==4.11.1
 flask==2.3.2
 pyjwt==2.7.0
