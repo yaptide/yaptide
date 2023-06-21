@@ -4,13 +4,15 @@ import tempfile
 from datetime import datetime
 from multiprocessing import Process
 from pathlib import Path
+from time import sleep
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
-from yaptide.celery.utils.utils import read_file, send_simulation_results, send_simulation_logfiles
+from yaptide.celery.utils.utils import read_file, send_simulation_results, send_simulation_logfiles, send_task_update
 from yaptide.celery.worker import celery_app
+from yaptide.persistence.models import SimulationModel
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
                                      simulation_logfiles, write_simulation_input_files)
 
@@ -52,7 +54,18 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
     logging.getLogger(__name__).setLevel(logging.WARNING)
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
-    with tempfile.TemporaryDirectory() as tmp_dir_path:
+    tmp_dir = tempfile.gettempdir()
+    logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
+    if os.environ.get("TMPDIR"):
+        tmp_dir = os.environ.get("TMPDIR")
+    logging.info("2. TEMP is: %s", os.environ.get("TEMP", "not set"))
+    if os.environ.get("TEMP"):
+        tmp_dir = os.environ.get("TEMP")
+    logging.info("3. TMP is: %s", os.environ.get("TMP", "not set"))
+    if os.environ.get("TMP"):
+        tmp_dir = os.environ.get("TMP")
+    logging.info("4. tempfile.gettempdir() is: %s", tmp_dir)
+    with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
         # we may face the situation that payload_dict has no key named `ntasks`
         # this is why we use `payload_dict.get("ntasks")` and not `payload_dict["ntasks"]`
         # `payload_dict["ntasks"]` would throw an exception if `ntasks` is missing, while
@@ -60,7 +73,7 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
         # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
 
         logging.debug("starting SHRunner with ntasks = %s", payload_dict.get("ntasks"))
-        logging.debug("working in temporary directory: %s", tmp_dir_path)
+        logging.info("working in temporary directory: %s", tmp_dir_path)
 
         runner_obj = SHRunner(jobs=payload_dict.get("ntasks"),
                               keep_workspace_after_run=True,
@@ -77,6 +90,7 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
 
         # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
         logging.debug("PATH is: %s", os.environ["PATH"])
+        logging.info("input_path type is: %s, value: %s", type(tmp_dir_path), tmp_dir_path)
         settings = SimulationSettings(
             input_path=tmp_dir_path,  # skipcq: PYL-W0612
             simulator_exec_path=None,
@@ -98,29 +112,50 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
                 args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
             for process in monitoring_processes:
                 process.start()
-            logging.debug("started %d monitoring processes", len(monitoring_processes))
+            logging.info("started %d monitoring processes", len(monitoring_processes))
+            sleep(2)
         else:
-            logging.debug("no monitoring processes started")
+            logging.info("no monitoring processes started")
 
         try:
-            logging.debug("starting simulation")
+            logging.info("starting simulation")
             is_run_ok = runner_obj.run(settings=settings)
 
+            sleep(2)
             if update_key is not None and simulation_id is not None:
-                logging.debug("joining monitoring processes")
+                logging.info("joining monitoring processes (normal run)")
                 for process in monitoring_processes:
-                    process.join()
+                    logging.info("joining process %s", process)
+                    process.join(timeout=3)
+                    if process.is_alive():
+                        logging.info("process %s is still alive, terminating", process)
+                        process.terminate()
+                for i in range(ntasks):
+                    up_dict = {
+                        "task_state": SimulationModel.JobState.FAILED.value
+                    }                    
+                    send_task_update(simulation_id, f"{self.request.id}_{i+1}", update_key, up_dict)
 
             if not is_run_ok:
-                raise Exception
-            logging.debug("simulation finished")
+                logging.info("simulation failed without raising an exception")
+                result["message"] = "simulation failed"
+                result["end_time"] = datetime.utcnow().isoformat(sep=" ")
+                return result
+            logging.info("simulation finished")
         except Exception:  # skipcq: PYL-W0703
+            logging.info("simulation failed with an exception")
+            if update_key is not None and simulation_id is not None:
+                logging.debug("joining monitoring processes (abnormal run)")
+                for process in monitoring_processes:
+                    process.join()
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.info("simulation failed, logfiles: %s", logfiles.keys())
             send_simulation_logfiles(simulation_id=simulation_id,
                                      update_key=update_key,
                                      logfiles=logfiles)
-            raise Exception
+            result["message"] = "simulation failed, logfiles available"
+            result["end_time"] = datetime.utcnow().isoformat(sep=" ")
+            return result
 
         logging.debug("getting simulation results")
         estimators_dict: dict = runner_obj.get_data()
@@ -133,6 +168,11 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
                                        update_key=update_key,
                                        estimators=simulation_result):
             result["result"] = simulation_result
+            result["message"] = "simulation finished, results not sent"
+            result["end_time"] = datetime.utcnow().isoformat(sep=" ")
+            
+            # we need to report here to the Flask DB that the simulation failed
+
         result["end_time"] = datetime.utcnow().isoformat(sep=" ")
         logging.debug("simulation result keys: %s", result.keys())
 

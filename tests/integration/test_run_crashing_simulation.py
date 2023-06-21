@@ -14,6 +14,7 @@ def test_run_simulation_with_flask_crashing(celery_app,
                                             db_good_password: str,
                                             payload_files_dict_data: dict,
                                             add_directory_to_path,
+                                            modify_tmpdir,
                                             shieldhit_demo_binary):
     """Test we can run simulations"""
     client.put("/auth/register",
@@ -58,6 +59,8 @@ def test_run_simulation_with_flask_crashing(celery_app,
         # and that there is no results, logfiles and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == payload_dict["ntasks"]
+        logging.info("Data from /jobs/direct endpoint: {%s}", data)
+        logging.info("Job state: {%s}", data['job_state'])
         if data['job_state'] in ['COMPLETED', 'FAILED']:
             assert data['job_state'] == 'FAILED'
             break

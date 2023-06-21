@@ -28,6 +28,7 @@ def get_job_status(job_id: str) -> dict:
     """
     # Here we ask Celery (via Redis) for job state
     job = AsyncResult(id=job_id, app=celery_app)
+
     job_state: str = translate_celery_state_naming(job.state)
 
     # we still need to convert string to enum and operate later on Enum
@@ -94,6 +95,9 @@ def send_simulation_results(simulation_id: int, update_key: str, estimators: dic
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
         return False
+    if not "estimators" in estimators:
+        logging.warning("No estimators in results")
+        return False
     dict_to_send = {
         "simulation_id": simulation_id,
         "update_key": update_key,
@@ -126,30 +130,41 @@ def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict
     return True
 
 
-def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):
+def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str, max_attempts: int = 30, seconds_before_next_update: float = 2) -> None:
     """Monitors log file of certain task"""
+    # Configure logging within the worker process
+    logging.basicConfig(level=logging.INFO)
+
+    logging.info("Starting monitoring for %s (sim %d, task %s)", filepath, simulation_id, task_id)
     logfile = None
     update_time = 0
-    for _ in range(30):  # 30 stands for maximum attempts
+    for _ in range(max_attempts):  # try maximum attempts
         try:
+            logging.info("Trying to open %s", filepath)
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
+            logging.info("File %s not found, waiting...", filepath)
             time.sleep(1)
 
     if logfile is None:
+        logging.warning("File %s not found, aborting", filepath)
         up_dict = {
             "task_state": SimulationModel.JobState.FAILED.value
         }
         send_task_update(simulation_id, task_id, update_key, up_dict)
+    logging.info("File %s opened, waiting for lines", filepath)
 
     loglines = log_generator(logfile)
     for line in loglines:
         utc_now = datetime.utcnow()
+        logging.info("Time: %s, Line: %s", utc_now, line)
         if re.search(RUN_MATCH, line):
-            if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+            if utc_now.timestamp() - update_time < seconds_before_next_update:  # hardcoded time seconds to avoid spamming
+                logging.info("Skipping update, too soon")
                 continue
             update_time = utc_now.timestamp()
+            logging.info("Updating time to %s", update_time)
             splitted = line.split()
             up_dict = {
                 "simulated_primaries": int(splitted[3]),
@@ -158,6 +173,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
                 + int(splitted[5]) * 3600
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
+            logging.info("Sent update for %s, waiting for next line", task_id)
 
         elif re.search(REQUESTED_MATCH, line):
             splitted = line.split(": ")
@@ -168,6 +184,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
                 "task_state": SimulationModel.JobState.RUNNING.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
+            logging.info("Sent update for %s, waiting for next line", task_id)
 
         elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
@@ -176,6 +193,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
                 "task_state": SimulationModel.JobState.COMPLETED.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
+            logging.info("Sent update, file %s completed, returning", filepath)
             return
 
         elif re.search(TIMEOUT_MATCH, line):
@@ -183,4 +201,6 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
                 "task_state": SimulationModel.JobState.FAILED.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
+            logging.info("Sent update, file %s timed out, returning", filepath)
             return
+    logging.info("Reached end of file, returning")
