@@ -70,6 +70,10 @@ def get_job_results(job_id: str) -> dict:
     return job.info.get("result")
 
 
+def run_single_shieldhit(dir_path: Path, options: list[str]):
+    """Function run in eventlet to run single SHIELDHIT simulation"""
+
+
 def translate_celery_state_naming(job_state: str) -> str:
     """Function translating celery states' names to ones used in YAPTIDE"""
     if job_state in ["RECEIVED", "RETRY"]:

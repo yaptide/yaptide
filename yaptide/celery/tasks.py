@@ -5,11 +5,13 @@ from datetime import datetime
 from multiprocessing import Process
 from pathlib import Path
 
+import eventlet
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
-from yaptide.celery.utils.utils import read_file, send_simulation_results, send_simulation_logfiles
+from yaptide.celery.utils.utils import (read_file, send_simulation_results,
+                                        send_simulation_logfiles, run_single_shieldhit)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
                                      simulation_logfiles, write_simulation_input_files)  # skipcq: FLK-E101
@@ -140,7 +142,24 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
 
 
 @celery_app.task
-def convert_input_files(payload_dict: dict):
+def convert_input_files(payload_dict: dict) -> dict:
     """Function converting output"""
     files_dict = check_and_convert_payload_to_files_dict(payload_dict=payload_dict)
     return {"input_files": files_dict}
+
+
+@celery_app.task(bind=True)
+def run_single_simulation(self, payload_dict: dict, files_dict: dict, task_id: int,
+                          update_key: str = None, simulation_id: int = None) -> dict:
+    """Function running single shieldhit simulation"""
+    id_to_log = f"{simulation_id}_{task_id}" if simulation_id is not None else str(task_id)
+
+    with tempfile.TemporaryDirectory() as tmp_dir_path:
+        logging.debug("Task %s saves the files for simulation %s", id_to_log ,files_dict.keys())
+        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
+
+        gt_shieldhit = eventlet.spawn(run_single_shieldhit, tmp_dir_path, [])
+        gt_watcher = eventlet.spawn(read_file, "logfile_path", simulation_id, f"{self.request.id}_{task_id}", update_key)
+
+        gt_shieldhit.wait()
+        gt_watcher.wait()
