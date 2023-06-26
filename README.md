@@ -37,20 +37,9 @@ git submodule update --init --recursive
 
 You can build and run the app using the following command:
 
-Linux:
-
 ```shell
-SHIELDHIT_PATH=path/to/shieldhit docker compose up -d --build
-```
-
-Windows Powershell:
-
-```shell
-$env:SHIELDHIT_PATH = "path.to.shieldhit"
 docker compose up -d --build
 ```
-
-Due to docker specific limitations, shieldhit path cannot be absolute path. shieldhit binary needs to be located in the same or in one of yaptide subdirectories (at the same or lower level than Dockerfile).
 
 Once it's running, the app will be available at [http://localhost:5000](http://localhost:5000). If you get an error saying the container name is already in use, stop and remove the container and then try again.
 
