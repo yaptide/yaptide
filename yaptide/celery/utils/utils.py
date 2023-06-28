@@ -126,11 +126,11 @@ def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict
     return True
 
 
-def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):
+def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str, max_attempts: int = 30, seconds_before_next_update: float = 1.0):
     """Monitors log file of certain task"""
     logfile = None
     update_time = 0
-    for _ in range(30):  # 30 stands for maximum attempts
+    for _ in range(max_attempts):  # maximum attempts
         try:
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
@@ -144,26 +144,36 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
         send_task_update(simulation_id, task_id, update_key, up_dict)
 
     loglines = log_generator(logfile)
+    requested_primaries = 0
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
-            if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
-                continue
-            update_time = utc_now.timestamp()
             splitted = line.split()
+            simulated_primaries = int(splitted[3])
             up_dict = {
-                "simulated_primaries": int(splitted[3]),
+                "simulated_primaries": simulated_primaries,
                 "estimated_time": int(splitted[9])
                 + int(splitted[7]) * 60
                 + int(splitted[5]) * 3600
             }
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            if utc_now.timestamp() > update_time + seconds_before_next_update:  # time to wait before next update
+                send_task_update(simulation_id, task_id, update_key, up_dict)
+                update_time = utc_now.timestamp()
+            # block of code below makes the updates not so frequent
+            # updates comes every `seconds_before_next_update` seconds
+            # this is convenient for long simulations, but we may also miss this way some updates,
+            # like the one when simulation is finished (simulated_primaries == requested_primaries)
+            # therefore we send update when simulation is finished
+            if simulated_primaries == requested_primaries:
+                send_task_update(simulation_id, task_id, update_key, up_dict)
+                update_time = utc_now.timestamp()
 
         elif re.search(REQUESTED_MATCH, line):
             splitted = line.split(": ")
+            requested_primaries = int(splitted[1])
             up_dict = {
                 "simulated_primaries": 0,
-                "requested_primaries": int(splitted[1]),
+                "requested_primaries": requested_primaries,
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": SimulationModel.JobState.RUNNING.value
             }
