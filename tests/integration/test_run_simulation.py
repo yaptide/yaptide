@@ -64,9 +64,6 @@ def test_run_simulation_with_flask(celery_app,
         # and that there is no results, logfiles and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == small_simulation_payload["ntasks"]
-        if data['job_state'] in ['COMPLETED', 'FAILED']:
-            assert data['job_state'] == 'COMPLETED'
-            break
 
         if data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
@@ -87,12 +84,19 @@ def test_run_simulation_with_flask(celery_app,
             assert end_time is None
 
         # check if number of simulated primaries is correct
+        logging.info("Checking if number of simulated primaries is correct")
+        requested_primaries = small_simulation_payload["input_json"]["beam"]["numberOfParticles"]
+        requested_primaries /= small_simulation_payload["ntasks"]
         if data["job_state"] == 'COMPLETED':
             for task in data["job_tasks_status"]:
                 assert task["task_state"] == "COMPLETED"
-                assert task["number_of_primaries"] == small_simulation_payload["input_json"]["beam"]["numberOfParticles"]
-                for key, value in task:
-                    logging.info("task %s: %s", key, value)
+                assert task["requested_primaries"] == requested_primaries
+                assert task["simulated_primaries"] == requested_primaries
+
+        if data['job_state'] in ['COMPLETED', 'FAILED']:
+            assert data['job_state'] == 'COMPLETED'
+            logging.info("Job completed, exiting loop")
+            break
 
         sleep(0.1)
 
