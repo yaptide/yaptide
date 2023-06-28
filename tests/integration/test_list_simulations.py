@@ -1,8 +1,6 @@
-import copy
 from datetime import datetime
 import json
 import logging
-import platform
 from time import sleep
 import pytest  # skipcq: PY-W2000
 from flask import Flask
@@ -16,7 +14,7 @@ def test_list_simulations(celery_app,
                           client: Flask,
                           db_good_username: str,
                           db_good_password: str,
-                          payload_editor_dict_data: dict,
+                          small_simulation_payload: dict,
                           add_directory_to_path,
                           shieldhit_demo_binary):
     """Test we can run simulations"""
@@ -30,29 +28,12 @@ def test_list_simulations(celery_app,
     assert resp.status_code == 202  # skipcq: BAN-B101
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
-    payload_dict = copy.deepcopy(payload_editor_dict_data)
-
-    # limit the particle numbers to get faster results
-    payload_dict["ntasks"] = 2
-    payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
-
-    if platform.system() == "Windows":
-        payload_dict["input_json"]["scoringManager"]["filters"] = []
-        payload_dict["input_json"]["detectorManager"]["detectors"] = [
-            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
-        payload_dict["input_json"]["scoringManager"]["outputs"] = [
-            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
-        for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
-            for quantity in output["quantities"]:
-                if "filter" in quantity:
-                    del quantity["filter"]
-
     logging.info("Sending multiple job submition requests on /jobs/direct endpoint to test pagination")
     # by default we have 6 simulations per page, therefore we need to send 7 to test pagination
     number_of_simulations = 7
     for _ in range(number_of_simulations):
         resp = client.post("/jobs/direct",
-                           data=json.dumps(payload_dict),
+                           data=json.dumps(small_simulation_payload),
                            content_type='application/json')
 
         assert resp.status_code == 202  # skipcq: BAN-B101
