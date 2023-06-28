@@ -19,6 +19,21 @@ from yaptide.batch.watcher import (
     TIMEOUT_MATCH
 )
 from yaptide.persistence.models import SimulationModel
+from yaptide.celery.tasks import run_single_simulation
+
+
+def run_simulation(payload_dict: dict, files_dict: dict,
+                   update_key: str = None, simulation_id: int = None) -> dict:
+    """Function running simulation"""
+    ntasks = payload_dict["ntasks"]
+    logging.debug("Running simulation with %d tasks", ntasks)
+    task_ids = []
+    for i in range(ntasks):
+        task_id = run_single_simulation.delay(files_dict=files_dict,
+                                              task_id=i,
+                                              update_key=update_key,
+                                              simulation_id=simulation_id)
+        task_ids.append(task_id)
 
 
 def get_job_status(job_id: str) -> dict:

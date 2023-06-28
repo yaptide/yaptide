@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 import tempfile
 from datetime import datetime
 from multiprocessing import Process
@@ -10,7 +11,7 @@ from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
-from yaptide.celery.utils.utils import (read_file, send_simulation_results,
+from yaptide.celery.utils.utils import (read_file, send_simulation_results, send_task_update,
                                         send_simulation_logfiles, run_single_shieldhit)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
@@ -149,17 +150,70 @@ def convert_input_files(payload_dict: dict) -> dict:
 
 
 @celery_app.task(bind=True)
-def run_single_simulation(self, payload_dict: dict, files_dict: dict, task_id: int,
-                          update_key: str = None, simulation_id: int = None) -> dict:
+def run_single_simulation(self, files_dict: dict, update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
-    id_to_log = f"{simulation_id}_{task_id}" if simulation_id is not None else str(task_id)
+    task_id = self.request.id
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        logging.debug("Task %s saves the files for simulation %s", id_to_log ,files_dict.keys())
+        logging.debug("Task %s saves the files for simulation %s", task_id ,files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
-        gt_shieldhit = eventlet.spawn(run_single_shieldhit, tmp_dir_path, [])
-        gt_watcher = eventlet.spawn(read_file, "logfile_path", simulation_id, f"{self.request.id}_{task_id}", update_key)
+        # gt_watcher = eventlet.spawn(read_file, "logfile_path", simulation_id, task_id, update_key)
 
-        gt_shieldhit.wait()
-        gt_watcher.wait()
+        runner_obj = SHRunner(jobs=1,
+                              keep_workspace_after_run=True,
+                              output_directory=tmp_dir_path)
+
+        settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
+                                      simulator_exec_path=None,
+                                      cmdline_opts="")
+
+        monitoring_process = None
+        if update_key is not None and simulation_id is not None:
+            logging.debug("starting monitoring processes")
+            monitoring_process = Process(
+                target=read_file,
+                args=(Path(tmp_dir_path) / "shieldhit.log", simulation_id, task_id, update_key))
+            monitoring_process.start()
+            logging.debug("started monitoring process")
+        else:
+            logging.debug("no monitoring processes started")
+
+        try:
+            logging.debug("starting simulation")
+            is_run_ok = runner_obj.run(settings=settings)
+
+            if update_key is not None and simulation_id is not None:
+                logging.debug("joining monitoring processes")
+                monitoring_process.join()
+
+            if not is_run_ok:
+                raise Exception
+            logging.debug("simulation finished")
+        except Exception:  # skipcq: PYL-W0703
+            logfiles = simulation_logfiles(path=Path(tmp_dir_path))
+            logging.info("simulation failed, logfiles: %s", logfiles.keys())
+            send_simulation_logfiles(simulation_id=simulation_id,
+                                     update_key=update_key,
+                                     logfiles=logfiles)
+            raise Exception
+
+        # gt_watcher.kill()
+
+        logging.debug("getting simulation results")
+        estimators_dict: dict = runner_obj.get_data()
+
+        logging.debug("converting simulation results to JSON")
+        simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
+                                                            dir_path=Path(tmp_dir_path))
+
+        result = {}
+
+        if not send_simulation_results(simulation_id=simulation_id,
+                                       update_key=update_key,
+                                       estimators=simulation_result):
+            result["result"] = simulation_result
+        result["end_time"] = datetime.utcnow().isoformat(sep=" ")
+        logging.debug("simulation result keys: %s", result.keys())
+
+        send_task_update(simulation_id, task_id, update_key, result)
