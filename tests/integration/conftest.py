@@ -10,6 +10,7 @@ import pytest
 from yaptide.application import create_app
 from yaptide.persistence.database import db
 
+
 @pytest.fixture(scope='session')
 def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict, None, None]:
     """Small simulation payload for testing purposes"""

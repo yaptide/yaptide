@@ -126,7 +126,12 @@ def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict
     return True
 
 
-def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str, max_attempts: int = 30, seconds_before_next_update: float = 1.0):
+def read_file(filepath: Path, 
+              simulation_id: int, 
+              task_id: str, 
+              update_key: str, 
+              max_attempts: int = 30, 
+              seconds_before_next_update: float = 1.0):
     """Monitors log file of certain task"""
     logfile = None
     update_time = 0
