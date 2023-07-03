@@ -1,12 +1,14 @@
+from collections import Counter
+import logging
+import uuid
+
+from celery import chain, chord
+
 from flask import request
 from flask_restful import Resource
 
 from marshmallow import Schema, ValidationError
 from marshmallow import fields
-
-import uuid
-
-import logging
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import UserBaseModel, SimulationModel, TaskModel, EstimatorModel, PageModel, InputModel
@@ -15,7 +17,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
-from yaptide.celery.tasks import run_simulation, convert_input_files, run_single_simulation
+from yaptide.celery.tasks import run_simulation, convert_input_files, run_single_simulation, merge_results
 from yaptide.celery.utils.utils import get_job_status, cancel_job, get_job_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
@@ -78,11 +80,27 @@ class JobsDirect(Resource):
         #                            update_key=update_key, simulation_id=simulation.id)
         # simulation.job_id = job.id
 
-        for _ in range(payload_dict["ntasks"]):
-            job = run_single_simulation.delay(files_dict=files_dict, update_key=update_key, simulation_id=simulation.id)
-            task_id = job.id
-            task = TaskModel(simulation_id=simulation.id, task_id=task_id)
+        # for _ in range(payload_dict["ntasks"]):
+        #     job = run_single_simulation.delay(files_dict=files_dict, update_key=update_key, simulation_id=simulation.id)
+        #     task_id = job.id
+        #     task = TaskModel(simulation_id=simulation.id, task_id=task_id)
+        #     db.session.add(task)
+
+        map_chain = chain(
+            run_single_simulation.s(
+                files_dict=files_dict,
+                task_id=str(i),
+                update_key=update_key,
+                simulation_id=simulation.id
+            ) for i in range(payload_dict["ntasks"]))
+        for i in range(payload_dict["ntasks"]):
+            task = TaskModel(simulation_id=simulation.id, task_id=str(i))
             db.session.add(task)
+        
+        workflow = chord(map_chain, merge_results.s(), interval=5, chord_unlock=True)
+        job = workflow.delay()
+        simulation.job_id = job.id
+
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict_to_save
         db.session.add(input_model)
@@ -130,14 +148,24 @@ class JobsDirect(Resource):
 
         # get job status from Celery, extracting status from job.info
         # this dict will be returned to the user as a response to GET request
-        job_info: dict = get_job_status(job_id=job_id)
+        # job_info: dict = get_job_status(job_id=job_id)
+        job_info = {
+            "job_state": simulation.job_state
+        }
+        status_counter = Counter([task["task_state"] for task in job_tasks_status])
+        if status_counter[SimulationModel.JobState.PENDING.value] == len(job_tasks_status):
+            job_info["job_state"] = SimulationModel.JobState.PENDING.value
+        elif status_counter[SimulationModel.JobState.FAILED.value] == len(job_tasks_status):
+            job_info["job_state"] = SimulationModel.JobState.FAILED.value
+        elif status_counter[SimulationModel.JobState.RUNNING.value] > 0:
+            job_info["job_state"] = SimulationModel.JobState.RUNNING.value
 
         # if simulation is not found, return error
         if simulation.update_state(job_info):
             db.session.commit()
 
         # remove end_time from job_info, as it is not needed in response
-        job_info.pop("end_time", None)
+        # job_info.pop("end_time", None)
         job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)

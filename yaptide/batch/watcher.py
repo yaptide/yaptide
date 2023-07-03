@@ -24,6 +24,8 @@ def log_generator(thefile, timeout: int = 3600) -> str:
     """
     sleep_counter = 0
     while True:
+        if thefile is None:
+            return "File not found"
         line = thefile.readline()
         if not line:
             time.sleep(1)

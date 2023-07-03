@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 
 from flask import request
@@ -74,6 +75,11 @@ class SimulationResults(Resource):
                     db.session.add(page)
             db.session.commit()
 
+        if simulation.update_state({
+                "job_state": SimulationModel.JobState.COMPLETED.value,
+                "end_time": datetime.utcnow().isoformat(sep=" ")
+            }):
+            db.session.commit()
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):

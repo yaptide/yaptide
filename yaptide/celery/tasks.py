@@ -6,13 +6,13 @@ from datetime import datetime
 from multiprocessing import Process
 from pathlib import Path
 
-import eventlet
+# import eventlet
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
 from yaptide.celery.utils.utils import (read_file, send_simulation_results, send_task_update,
-                                        send_simulation_logfiles, run_single_shieldhit)
+                                        send_simulation_logfiles, run_shieldhit)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
                                      simulation_logfiles, write_simulation_input_files)  # skipcq: FLK-E101
@@ -149,10 +149,10 @@ def convert_input_files(payload_dict: dict) -> dict:
     return {"input_files": files_dict}
 
 
-@celery_app.task(bind=True)
-def run_single_simulation(self, files_dict: dict, update_key: str = None, simulation_id: int = None) -> dict:
+@celery_app.task
+def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
-    task_id = self.request.id
+    # task_id = self.request.id
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         logging.debug("Task %s saves the files for simulation %s", task_id ,files_dict.keys())
@@ -160,39 +160,28 @@ def run_single_simulation(self, files_dict: dict, update_key: str = None, simula
 
         # gt_watcher = eventlet.spawn(read_file, "logfile_path", simulation_id, task_id, update_key)
 
-        runner_obj = SHRunner(jobs=1,
-                              keep_workspace_after_run=True,
-                              output_directory=tmp_dir_path)
-
-        settings = SimulationSettings(input_path=tmp_dir_path,  # skipcq: PYL-W0612
-                                      simulator_exec_path=None,
-                                      cmdline_opts="")
-
         monitoring_process = None
         if update_key is not None and simulation_id is not None:
             logging.debug("starting monitoring processes")
             monitoring_process = Process(
                 target=read_file,
-                args=(Path(tmp_dir_path) / "shieldhit.log", simulation_id, task_id, update_key))
+                args=(Path(tmp_dir_path) / "run_1" / "shieldhit_0001.log", simulation_id, task_id, update_key))
             monitoring_process.start()
             logging.debug("started monitoring process")
         else:
             logging.debug("no monitoring processes started")
+ 
 
-        try:
-            logging.debug("starting simulation")
-            is_run_ok = runner_obj.run(settings=settings)
 
-            if update_key is not None and simulation_id is not None:
-                logging.debug("joining monitoring processes")
-                monitoring_process.join()
+        estimators_dict = run_shieldhit(tmp_dir_path)
 
-            if not is_run_ok:
-                raise Exception
-            logging.debug("simulation finished")
-        except Exception:  # skipcq: PYL-W0703
+        if update_key is not None and simulation_id is not None:
+            logging.debug("joining monitoring processes")
+            monitoring_process.join()
+
+        if len(estimators_dict.keys()) == 0:
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
-            logging.info("simulation failed, logfiles: %s", logfiles.keys())
+            logging.info("Simulation failed, logfiles: %s", logfiles.keys())
             send_simulation_logfiles(simulation_id=simulation_id,
                                      update_key=update_key,
                                      logfiles=logfiles)
@@ -200,20 +189,48 @@ def run_single_simulation(self, files_dict: dict, update_key: str = None, simula
 
         # gt_watcher.kill()
 
-        logging.debug("getting simulation results")
-        estimators_dict: dict = runner_obj.get_data()
-
         logging.debug("converting simulation results to JSON")
         simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
                                                             dir_path=Path(tmp_dir_path))
 
-        result = {}
+        # if not send_simulation_results(simulation_id=simulation_id,
+        #                                update_key=update_key,
+        #                                estimators=simulation_result):
+        end_time = datetime.utcnow().isoformat(sep=" ")
 
-        if not send_simulation_results(simulation_id=simulation_id,
-                                       update_key=update_key,
-                                       estimators=simulation_result):
-            result["result"] = simulation_result
-        result["end_time"] = datetime.utcnow().isoformat(sep=" ")
+        send_task_update(simulation_id, task_id, update_key, {"task_state": "COMPLETED", "end_time": end_time})
+
+        result = {
+            "estimators": simulation_result["estimators"],
+            "simulation_id": simulation_id,
+            "update_key": update_key
+        }
         logging.debug("simulation result keys: %s", result.keys())
 
-        send_task_update(simulation_id, task_id, update_key, result)
+        return result
+
+
+@celery_app.task
+def merge_results(results: list[dict]):
+    """Merge results from multiple simulation's tasks"""
+    logging.debug("Merging results from %d tasks", len(results))
+
+    # code below is for dummy purposes only
+    # later will be changed to merging bdo files and converting them to JSON
+    merged_result = {}
+    simulation_id = None
+    update_key = None
+    for result in results:
+        if simulation_id is None:
+            simulation_id = result.pop("simulation_id", None)
+        if update_key is None:
+            update_key = result.pop("update_key", None)
+
+        merged_result["estimators"] = result["estimators"]
+
+    # logging.info("Keys of merged result: %s", merged_result.keys())
+    for est_dict in merged_result["estimators"]:
+        logging.info("Simulation: %s, Estimator: %s", simulation_id, est_dict.keys())
+    send_simulation_results(simulation_id=simulation_id,
+                            update_key=update_key,
+                            estimators=merged_result)
