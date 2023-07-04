@@ -12,9 +12,11 @@ import logging
 import platform
 import pytest  # skipcq: PY-W2000
 
+from celery import chain, chord
+
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
-from yaptide.celery.tasks import run_simulation
+from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
@@ -52,7 +54,15 @@ def test_run_simulation(celery_app,
 
     files_dict, _ = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
-    job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
+    # job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
+    map_chain = chain(
+        run_single_simulation.s(
+            files_dict=files_dict,
+            task_id=str(i)
+        ) for i in range(payload_dict["ntasks"]))
+        
+    workflow = chord(map_chain, merge_results.s(), interval=5, chord_unlock=True)
+    job = workflow.delay()
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
     logging.info("run_simulation task finished")

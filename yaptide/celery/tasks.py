@@ -1,7 +1,7 @@
 import logging
 import os
-import subprocess
 import tempfile
+
 from datetime import datetime
 from multiprocessing import Process
 from pathlib import Path
@@ -11,8 +11,8 @@ from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
-from yaptide.celery.utils.utils import (read_file, send_simulation_results, send_task_update,
-                                        send_simulation_logfiles, run_shieldhit)
+from yaptide.celery.utils.pymc import run_shieldhit, read_file
+from yaptide.celery.utils.requests import send_simulation_logfiles, send_simulation_results, send_task_update
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
                                      simulation_logfiles, write_simulation_input_files)  # skipcq: FLK-E101
@@ -150,12 +150,12 @@ def convert_input_files(payload_dict: dict) -> dict:
 
 
 @celery_app.task
-def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None, simulation_id: int = None) -> dict:
+def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
     # task_id = self.request.id
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        logging.debug("Task %s saves the files for simulation %s", task_id ,files_dict.keys())
+        logging.debug("Task %d saves the files for simulation %s", task_id ,files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
         # gt_watcher = eventlet.spawn(read_file, "logfile_path", simulation_id, task_id, update_key)
@@ -165,15 +165,13 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
             logging.debug("starting monitoring processes")
             monitoring_process = Process(
                 target=read_file,
-                args=(Path(tmp_dir_path) / "run_1" / "shieldhit_0001.log", simulation_id, task_id, update_key))
+                args=(Path(tmp_dir_path) / "run_1" / "shieldhit_0001.log", simulation_id, str(task_id), update_key))
             monitoring_process.start()
             logging.debug("started monitoring process")
         else:
             logging.debug("no monitoring processes started")
- 
 
-
-        estimators_dict = run_shieldhit(tmp_dir_path)
+        estimators_dict = run_shieldhit(dir_path=tmp_dir_path, task_id=task_id)
 
         if update_key is not None and simulation_id is not None:
             logging.debug("joining monitoring processes")
@@ -211,7 +209,7 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
 
 
 @celery_app.task
-def merge_results(results: list[dict]):
+def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
 
@@ -231,6 +229,11 @@ def merge_results(results: list[dict]):
     # logging.info("Keys of merged result: %s", merged_result.keys())
     for est_dict in merged_result["estimators"]:
         logging.info("Simulation: %s, Estimator: %s", simulation_id, est_dict.keys())
-    send_simulation_results(simulation_id=simulation_id,
-                            update_key=update_key,
-                            estimators=merged_result)
+    if not send_simulation_results(simulation_id=simulation_id,
+                                   update_key=update_key,
+                                   estimators=merged_result):
+        return {
+            "result": merged_result,
+            "end_time": datetime.utcnow().isoformat(sep=" ")
+        }
+    return {}

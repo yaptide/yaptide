@@ -2,8 +2,6 @@ from collections import Counter
 import logging
 import uuid
 
-from celery import chain, chord
-
 from flask import request
 from flask_restful import Resource
 
@@ -17,8 +15,8 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
-from yaptide.celery.tasks import run_simulation, convert_input_files, run_single_simulation, merge_results
-from yaptide.celery.utils.utils import get_job_status, cancel_job, get_job_results
+from yaptide.celery.tasks import convert_input_files
+from yaptide.celery.utils.manage_tasks import run_job, get_job_status, cancel_job, get_job_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
@@ -75,38 +73,18 @@ class JobsDirect(Resource):
         input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
         input_dict_to_save["input_files"] = files_dict
 
-        # submit the job to the Celery queue
-        # job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict,
-        #                            update_key=update_key, simulation_id=simulation.id)
-        # simulation.job_id = job.id
-
-        # for _ in range(payload_dict["ntasks"]):
-        #     job = run_single_simulation.delay(files_dict=files_dict, update_key=update_key, simulation_id=simulation.id)
-        #     task_id = job.id
-        #     task = TaskModel(simulation_id=simulation.id, task_id=task_id)
-        #     db.session.add(task)
-
-        map_chain = chain(
-            run_single_simulation.s(
-                files_dict=files_dict,
-                task_id=str(i),
-                update_key=update_key,
-                simulation_id=simulation.id
-            ) for i in range(payload_dict["ntasks"]))
         for i in range(payload_dict["ntasks"]):
             task = TaskModel(simulation_id=simulation.id, task_id=str(i))
             db.session.add(task)
-        
-        workflow = chord(map_chain, merge_results.s(), interval=5, chord_unlock=True)
-        job = workflow.delay()
-        simulation.job_id = job.id
+
+        simulation.job_id = run_job(files_dict, update_key, simulation.id, payload_dict["ntasks"])
 
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict_to_save
         db.session.add(input_model)
         db.session.commit()
 
-        return yaptide_response(message="Task started", code=202, content={'job_id': job.id})
+        return yaptide_response(message="Task started", code=202, content={'job_id': simulation.job_id})
 
     class APIParametersSchema(Schema):
         """Class specifies API parameters for GET and DELETE request"""
