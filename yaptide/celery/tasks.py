@@ -11,11 +11,11 @@ from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
-from yaptide.celery.utils.pymc import run_shieldhit, read_file
+from yaptide.celery.utils.pymc import run_shieldhit, read_file, average_estimators
 from yaptide.celery.utils.requests import send_simulation_logfiles, send_simulation_results, send_task_update
 from yaptide.celery.worker import celery_app
-from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
-                                     simulation_logfiles, write_simulation_input_files)  # skipcq: FLK-E101
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list,
+                                     simulation_logfiles, write_simulation_input_files)
 
 
 # this is not being used now but we can use such hook to install simulations on the worker start
@@ -42,106 +42,6 @@ def install_simulators() -> bool:
     return result
 
 
-@celery_app.task(bind=True)
-def run_simulation(self, payload_dict: dict, files_dict: dict,
-                   update_key: str = None, simulation_id: int = None) -> dict:
-    """
-    Simulation runner
-    `payload_dict` parameter holds all the data needed to run the simulation
-    `update_key` and `simulation_id` parameters are required for monitoring purposes
-    If one or both of them are missing, monitoring will not be performed
-    """
-    result = {}
-    logging.getLogger(__name__).setLevel(logging.WARNING)
-    logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
-
-    with tempfile.TemporaryDirectory() as tmp_dir_path:
-        # digest dictionary with project data (extracted from JSON file)
-        # and generate simulation input files
-        logging.debug("preparing the files for simulation %s", files_dict.keys())
-
-        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
-
-        # we assume here that the simulation executable is available in the PATH so pymchelper will discover it
-        logging.debug("PATH is: %s", os.environ["PATH"])
-        settings = SimulationSettings(
-            input_path=tmp_dir_path,  # skipcq: PYL-W0612
-            simulator_exec_path=None,
-            cmdline_opts="")
-        logging.debug("preparing simulation command: %s", settings)
-
-        # we may face the situation that payload_dict has no key named `ntasks`
-        # this is why we use `payload_dict.get("ntasks")` and not `payload_dict["ntasks"]`
-        # `payload_dict["ntasks"]` would throw an exception if `ntasks` is missing, while
-        # `payload_dict.get("ntasks")` will give us `None` if `ntasks` is missing
-        # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
-        logging.debug("starting SHRunner with ntasks = %s", payload_dict.get("ntasks"))
-        logging.debug("working in temporary directory: %s", tmp_dir_path)
-
-        runner_obj = SHRunner(settings=settings,
-                              jobs=payload_dict.get("ntasks"),
-                              keep_workspace_after_run=True,
-                              output_directory=tmp_dir_path)
-
-        ntasks = runner_obj.jobs
-        logging.debug("allocated %s jobs", ntasks)
-
-        logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
-        logging.debug("expecting logfiles: %s", logs_list)
-
-        new_state_meta = {"path": tmp_dir_path, "sim_type": payload_dict["sim_type"]}
-        self.update_state(state="PROGRESS", meta=new_state_meta)
-        logging.debug("state updated to PROGRESS, meta: %s", new_state_meta)
-
-        monitoring_processes = []
-        if update_key is not None and simulation_id is not None:
-            logging.debug("starting monitoring processes")
-            monitoring_processes = [Process(
-                target=read_file,
-                args=(logs_list[i], simulation_id, f"{self.request.id}_{i+1}", update_key)) for i in range(ntasks)]
-            for process in monitoring_processes:
-                process.start()
-            logging.debug("started %d monitoring processes", len(monitoring_processes))
-        else:
-            logging.debug("no monitoring processes started")
-
-        try:
-            logging.debug("starting simulation")
-            is_run_ok = runner_obj.run()
-
-            if update_key is not None and simulation_id is not None:
-                logging.debug("joining monitoring processes")
-                for process in monitoring_processes:
-                    process.join()
-
-            if not is_run_ok:
-                raise Exception
-            logging.debug("simulation finished")
-        except Exception:  # skipcq: PYL-W0703
-            logfiles = simulation_logfiles(path=Path(tmp_dir_path))
-            logging.info("simulation failed, logfiles: %s", logfiles.keys())
-            send_simulation_logfiles(simulation_id=simulation_id,
-                                     update_key=update_key,
-                                     logfiles=logfiles)
-            raise Exception
-
-        logging.debug("getting simulation results")
-        estimators_dict: dict = runner_obj.get_data()
-
-        logging.debug("converting simulation results to JSON")
-        simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
-                                                            dir_path=Path(tmp_dir_path))
-
-        if not send_simulation_results(simulation_id=simulation_id,
-                                       update_key=update_key,
-                                       estimators=simulation_result):
-            result["result"] = simulation_result
-        result["end_time"] = datetime.utcnow().isoformat(sep=" ")
-        logging.debug("simulation result keys: %s", result.keys())
-
-        return result
-
-
 @celery_app.task
 def convert_input_files(payload_dict: dict) -> dict:
     """Function converting output"""
@@ -152,8 +52,6 @@ def convert_input_files(payload_dict: dict) -> dict:
 @celery_app.task
 def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
-    # task_id = self.request.id
-
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         logging.debug("Task %d saves the files for simulation %s", task_id ,files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
@@ -162,19 +60,19 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
 
         monitoring_process = None
         if update_key is not None and simulation_id is not None:
-            logging.debug("starting monitoring processes")
             monitoring_process = Process(
                 target=read_file,
-                args=(Path(tmp_dir_path) / "run_1" / "shieldhit_0001.log", simulation_id, str(task_id), update_key))
+                args=(Path(tmp_dir_path) / "shieldhit_0000.log", simulation_id, str(task_id), update_key))
             monitoring_process.start()
-            logging.debug("started monitoring process")
+            logging.info("Started monitoring process for task %d", task_id)
         else:
-            logging.debug("no monitoring processes started")
+            logging.info("No monitoring processes started for task %d", task_id)
 
-        estimators_dict = run_shieldhit(dir_path=tmp_dir_path, task_id=task_id)
+        logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
+        estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
 
         if update_key is not None and simulation_id is not None:
-            logging.debug("joining monitoring processes")
+            logging.info("Joining monitoring processes for task %d", task_id)
             monitoring_process.join()
 
         if len(estimators_dict.keys()) == 0:
@@ -187,25 +85,19 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
 
         # gt_watcher.kill()
 
-        logging.debug("converting simulation results to JSON")
-        simulation_result: dict = pymchelper_output_to_json(estimators_dict=estimators_dict,
-                                                            dir_path=Path(tmp_dir_path))
+        logging.debug("Converting simulation results to JSON")
+        estimators: list = estimators_to_list(estimators_dict=estimators_dict,
+                                              dir_path=Path(tmp_dir_path))
 
-        # if not send_simulation_results(simulation_id=simulation_id,
-        #                                update_key=update_key,
-        #                                estimators=simulation_result):
         end_time = datetime.utcnow().isoformat(sep=" ")
 
         send_task_update(simulation_id, task_id, update_key, {"task_state": "COMPLETED", "end_time": end_time})
 
-        result = {
-            "estimators": simulation_result["estimators"],
+        return {
+            "estimators": estimators,
             "simulation_id": simulation_id,
             "update_key": update_key
         }
-        logging.debug("simulation result keys: %s", result.keys())
-
-        return result
 
 
 @celery_app.task
@@ -213,27 +105,22 @@ def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
 
-    # code below is for dummy purposes only
-    # later will be changed to merging bdo files and converting them to JSON
-    merged_result = {}
-    simulation_id = None
-    update_key = None
-    for result in results:
+    averaged_estimators = results[0]["estimators"]
+    simulation_id = results[0].pop("simulation_id", None)
+    update_key = results[0].pop("simulation_id", None)
+    for i, result in enumerate(results, 1):
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
         if update_key is None:
             update_key = result.pop("update_key", None)
 
-        merged_result["estimators"] = result["estimators"]
+        averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
 
-    # logging.info("Keys of merged result: %s", merged_result.keys())
-    for est_dict in merged_result["estimators"]:
-        logging.info("Simulation: %s, Estimator: %s", simulation_id, est_dict.keys())
     if not send_simulation_results(simulation_id=simulation_id,
                                    update_key=update_key,
-                                   estimators=merged_result):
+                                   estimators=averaged_estimators):
         return {
-            "result": merged_result,
+            "estimators": averaged_estimators,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
     return {}

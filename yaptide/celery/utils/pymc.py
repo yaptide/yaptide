@@ -9,6 +9,7 @@ from pathlib import Path
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.executor.runner import Runner as SHRunner
+from pymchelper.input_output import frompattern
 
 from yaptide.batch.watcher import (
     log_generator,
@@ -24,7 +25,6 @@ from yaptide.persistence.models import SimulationModel
 
 def run_shieldhit(dir_path: Path, task_id: int) -> dict:
     """Function run in eventlet to run single SHIELDHIT simulation"""
-    logging.info("Running SHIELDHIT simulation in %s", dir_path)
     runner_obj = SHRunner(jobs=1,  # useless
                           keep_workspace_after_run=True,  # useless
                           output_directory=dir_path)  # usefull
@@ -38,14 +38,47 @@ def run_shieldhit(dir_path: Path, task_id: int) -> dict:
         command_as_list.append(str(dir_path))
         DEVNULL = open(os.devnull, 'wb')
         subprocess.check_call(command_as_list, cwd=str(dir_path), stdout=DEVNULL, stderr=DEVNULL)
-        # is_run_ok = runner_obj.run(settings=settings)
-        # if is_run_ok:
-        #     return runner_obj.get_data()
+        logging.info("SHIELDHIT simulation for task %d finished", task_id)
+
+        estimators_dict = {}
+        files_pattern_pattern = str(dir_path / "*.bdo")
+        estimators_list = frompattern(files_pattern_pattern)
+        for estimator in estimators_list:
+            logging.debug("Appending estimator for {:s}".format(estimator.file_corename))
+            estimators_dict[estimator.file_corename] = estimator
+
+        return estimators_dict
     except Exception as e:  # skipcq: PYL-W0703
         logging.error("Exception while running SHIELDHIT: %s", e)
 
     # return empty dict if simulation failed
     return {}
+
+
+def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
+    """Averages estimators from two dicts"""
+    logging.debug("Averaging estimators - already averaged: %d", averaged_count)
+    for est_i, estimator_dict in enumerate(list_to_add):
+        # check if estimator names are the same and if not, find matching estimator's index in base_list
+        if estimator_dict["name"] != base_list[est_i]["name"]:
+            est_i = next((i for i, item in enumerate(base_list) if item["name"] == estimator_dict["name"]), None)
+        logging.info("Averaging estimator %s", estimator_dict["name"])
+        for page_i, page_dict in enumerate(estimator_dict["pages"]):
+            # check if page numbers are the same and if not, find matching page's index in base_list
+            if page_dict["metadata"]["page_number"] != base_list[est_i]["pages"][page_i]["metadata"]["page_number"]:
+                page_i = next((i for i, item in enumerate(base_list[est_i]["pages"]) \
+                               if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
+
+            base_list[est_i]["pages"][page_i]["data"]["values"] = [
+                sum(x) / (averaged_count + 1) for x in zip(
+                    map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
+                    page_dict["data"]["values"]
+                )
+            ]
+            logging.info("Averaged page %s with %d elements",
+                          page_dict["metadata"]["page_number"],
+                          len(page_dict["data"]["values"]))
+    return base_list
 
 
 def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):

@@ -190,7 +190,7 @@ def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: Cluste
 
     if collect_state == "COMPLETED":
         fabric_result: Result = con.run(f'ls -f {job_dir}/output | grep .json', hide=True)
-        result_dict = {"estimators": []}
+        result_estimators = []
         with tempfile.TemporaryDirectory() as tmp_dir_path:
             for filename in fabric_result.stdout.split():
                 file_path = Path(tmp_dir_path, filename)
@@ -199,9 +199,9 @@ def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: Cluste
                 with open(file_path, "r") as json_file:
                     est_dict = json.load(json_file)
                     est_dict["name"] = filename.split('.')[0]
-                    result_dict["estimators"].append(est_dict)
+                    result_estimators.append(est_dict)
 
-        return result_dict
+        return {"estimators": result_estimators}
     return {
         "message": "Results not available"
     }

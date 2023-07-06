@@ -24,7 +24,7 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
     return True
 
 
-def send_simulation_results(simulation_id: int, update_key: str, estimators: dict) -> bool:
+def send_simulation_results(simulation_id: int, update_key: str, estimators: list) -> bool:
     """Sends results of simulation to flask to save it in database"""
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
@@ -33,7 +33,7 @@ def send_simulation_results(simulation_id: int, update_key: str, estimators: dic
     dict_to_send = {
         "simulation_id": simulation_id,
         "update_key": update_key,
-        "estimators": estimators["estimators"],
+        "estimators": estimators,
     }
     logging.info("Sending results to flask via %s", flask_url)
     res: requests.Response = requests.Session().post(url=f"{flask_url}/results", json=dict_to_send)
