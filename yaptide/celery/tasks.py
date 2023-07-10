@@ -62,7 +62,7 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
         if update_key is not None and simulation_id is not None:
             monitoring_process = Process(
                 target=read_file,
-                args=(Path(tmp_dir_path) / "shieldhit_0000.log", simulation_id, str(task_id), update_key))
+                args=(Path(tmp_dir_path) / "shieldhit_{:04d}.log".format(task_id), simulation_id, str(task_id), update_key))
             monitoring_process.start()
             logging.info("Started monitoring process for task %d", task_id)
         else:
@@ -73,7 +73,7 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
 
         if update_key is not None and simulation_id is not None:
             logging.info("Joining monitoring processes for task %d", task_id)
-            monitoring_process.join()
+            monitoring_process.kill()
 
         if len(estimators_dict.keys()) == 0:
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
