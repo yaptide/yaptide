@@ -158,15 +158,19 @@ class JobsDirect(Resource):
             return error_validation_response(content=errors)
         params_dict: dict = schema.load(request.args)
 
+        job_id = params_dict['job_id']
+
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(
-            job_id=params_dict['job_id'], user=user)
+            job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        result: dict = cancel_job(job_id=params_dict['job_id'])
+        result: dict = cancel_job(job_id=job_id)
 
         if "job_state" in result:
-            db.session.query(SimulationModel).filter_by(job_id=params_dict['job_id']).delete()
+            simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+            simulation.update_state(result)
+            # db.session.query(SimulationModel).filter_by(job_id=params_dict['job_id']).delete()
             db.session.commit()
             return yaptide_response(message="", code=200, content=result)
 

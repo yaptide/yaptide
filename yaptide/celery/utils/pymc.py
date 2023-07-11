@@ -102,12 +102,12 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
+            splitted = line.split()
             simulated_primaries = int(splitted[3])
             if (utc_now.timestamp() - update_time < 2  # hardcoded 2 seconds to avoid spamming
                 and requested_primaries > simulated_primaries):
                 continue
             update_time = utc_now.timestamp()
-            splitted = line.split()
             up_dict = {
                 "simulated_primaries": simulated_primaries,
                 "estimated_time": int(splitted[9])
@@ -127,16 +127,6 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
-        elif re.search(COMPLETE_MATCH, line):
-            splitted = line.split()
-            up_dict = {
-                "simulated_primaries": requested_primaries,
-                "end_time": utc_now.isoformat(sep=" "),
-                "task_state": SimulationModel.JobState.COMPLETED.value
-            }
-            send_task_update(simulation_id, task_id, update_key, up_dict)
-            return
-
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", task_id)
             up_dict = {
@@ -144,3 +134,13 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
+
+        elif re.search(COMPLETE_MATCH, line):
+            break
+
+    up_dict = {
+        "simulated_primaries": requested_primaries,
+        "end_time": utc_now.isoformat(sep=" "),
+        "task_state": SimulationModel.JobState.COMPLETED.value
+    }
+    send_task_update(simulation_id, task_id, update_key, up_dict)

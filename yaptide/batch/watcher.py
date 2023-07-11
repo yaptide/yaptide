@@ -9,6 +9,8 @@ from urllib import request
 import logging
 from datetime import datetime
 
+from io import TextIOWrapper
+
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -16,7 +18,7 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(thefile, timeout: int = 3600) -> str:
+def log_generator(thefile: TextIOWrapper, timeout: int = 3600):
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.

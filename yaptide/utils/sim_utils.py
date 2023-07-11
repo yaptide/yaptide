@@ -17,7 +17,7 @@ from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq:
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
 
-def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list:
+def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
     """Convert simulation output to JSON dictionary representation (to be consumed by UI)"""
     if not estimators_dict:
         return {"message": "No estimators"}

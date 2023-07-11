@@ -1,5 +1,7 @@
-from celery import chain, chord
-from celery.result import AsyncResult
+import logging
+
+from celery import group, chord
+from celery.result import AsyncResult, GroupResult
 
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.celery.worker import celery_app
@@ -8,17 +10,19 @@ from yaptide.persistence.models import SimulationModel
 
 
 def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) -> str:
-    map_chain = chain(
+    map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
             task_id=i,
             update_key=update_key,
             simulation_id=simulation_id
         ) for i in range(ntasks)
-    )
-    
-    workflow = chord(map_chain, merge_results.s(), interval=5, chord_unlock=True)
-    job = workflow.delay()
+    ])
+
+    workflow = chord(map_group, merge_results.s(), interval=1, chord_unlock=True)
+
+    job: AsyncResult = workflow.delay()
+
     return job.id
 
 

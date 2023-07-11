@@ -1,19 +1,19 @@
 import logging
-import os
 import tempfile
 
 from datetime import datetime
-from multiprocessing import Process
 from pathlib import Path
 
-# import eventlet
-from pymchelper.executor.options import SimulationSettings
-from pymchelper.executor.runner import Runner as SHRunner
+import eventlet
+
 from yaptide.admin.simulators import SimulatorType, install_simulator
 
 from yaptide.celery.utils.pymc import run_shieldhit, read_file, average_estimators
 from yaptide.celery.utils.requests import send_simulation_logfiles, send_simulation_results, send_task_update
 from yaptide.celery.worker import celery_app
+
+from yaptide.persistence.models import SimulationModel
+
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list,
                                      simulation_logfiles, write_simulation_input_files)
 
@@ -56,14 +56,13 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
         logging.debug("Task %d saves the files for simulation %s", task_id ,files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
-        # gt_watcher = eventlet.spawn(read_file, "logfile_path", simulation_id, task_id, update_key)
-
-        monitoring_process = None
+        gt_watcher = None
         if update_key is not None and simulation_id is not None:
-            monitoring_process = Process(
-                target=read_file,
-                args=(Path(tmp_dir_path) / "shieldhit_{:04d}.log".format(task_id), simulation_id, str(task_id), update_key))
-            monitoring_process.start()
+            gt_watcher = eventlet.spawn(read_file,
+                                        Path(tmp_dir_path) / "shieldhit_{:04d}.log".format(task_id),
+                                        simulation_id,
+                                        str(task_id),
+                                        update_key)
             logging.info("Started monitoring process for task %d", task_id)
         else:
             logging.info("No monitoring processes started for task %d", task_id)
@@ -71,10 +70,11 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
         logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
         estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
 
-        if update_key is not None and simulation_id is not None:
-            logging.info("Joining monitoring processes for task %d", task_id)
-            monitoring_process.join(timeout=5)
-
+        if gt_watcher is not None:
+            # Sleep gives the monitoring process a chance to send the last update
+            eventlet.sleep(1)
+            logging.info("Killing monitoring processes for task %d", task_id)
+            gt_watcher.kill()
         if len(estimators_dict.keys()) == 0:
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
@@ -83,15 +83,16 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
                                      logfiles=logfiles)
             raise Exception
 
-        # gt_watcher.kill()
-
         logging.debug("Converting simulation results to JSON")
-        estimators: list = estimators_to_list(estimators_dict=estimators_dict,
-                                              dir_path=Path(tmp_dir_path))
+        estimators = estimators_to_list(estimators_dict=estimators_dict,
+                                        dir_path=Path(tmp_dir_path))
 
         end_time = datetime.utcnow().isoformat(sep=" ")
 
-        send_task_update(simulation_id, task_id, update_key, {"task_state": "COMPLETED", "end_time": end_time})
+        # We do not have any information if monitoring process sent the last update
+        # so we send it here to make sure that we have the end_time and COMPLETED state
+        update_dict = {"task_state": SimulationModel.JobState.COMPLETED.value, "end_time": end_time}
+        send_task_update(simulation_id, task_id, update_key, update_dict)
 
         return {
             "estimators": estimators,
