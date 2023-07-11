@@ -73,7 +73,7 @@ def run_single_simulation(files_dict: dict, task_id: int, update_key: str = None
 
         if update_key is not None and simulation_id is not None:
             logging.info("Joining monitoring processes for task %d", task_id)
-            monitoring_process.kill()
+            monitoring_process.join(timeout=5)
 
         if len(estimators_dict.keys()) == 0:
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
