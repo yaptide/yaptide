@@ -19,7 +19,7 @@ def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) 
         ) for i in range(ntasks)
     ])
 
-    workflow = chord(map_group, merge_results.s(), interval=1, chord_unlock=True)
+    workflow = chord(map_group, merge_results.s())
 
     job: AsyncResult = workflow.delay()
 
