@@ -168,7 +168,6 @@ class YaptideTester:
         print(res_json)
 
         job_id: str = res_json.get("job_id")
-        running = 0
 
         if job_id is not None:
             while do_monitor_job:

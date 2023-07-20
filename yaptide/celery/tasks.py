@@ -15,10 +15,12 @@ from yaptide.celery.worker import celery_app
 
 from yaptide.persistence.models import SimulationModel
 
-from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
-                                     estimators_to_list,
-                                     simulation_logfiles,
-                                     write_simulation_input_files)
+from yaptide.utils.sim_utils import (
+    check_and_convert_payload_to_files_dict,
+    estimators_to_list,
+    simulation_logfiles,
+    write_simulation_input_files
+)
 
 
 # this is not being used now but we can use such hook to install simulations on the worker start

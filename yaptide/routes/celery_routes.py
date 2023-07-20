@@ -170,7 +170,7 @@ class JobsDirect(Resource):
         if "job_state" in result:
             simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
             simulation.update_state(result)
-            # db.session.query(SimulationModel).filter_by(job_id=params_dict['job_id']).delete()
+
             db.session.commit()
             return yaptide_response(message="", code=200, content=result)
 
