@@ -1,7 +1,7 @@
 import logging
 
 from celery import group, chord
-from celery.result import AsyncResult, GroupResult
+from celery.result import AsyncResult
 
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.celery.worker import celery_app
@@ -13,7 +13,7 @@ def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) 
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
-            task_id=i,
+            task_id=f"{simulation_id}_{i}",
             update_key=update_key,
             simulation_id=simulation_id
         ) for i in range(ntasks)

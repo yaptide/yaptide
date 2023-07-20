@@ -74,7 +74,7 @@ class JobsDirect(Resource):
         input_dict_to_save["input_files"] = files_dict
 
         for i in range(payload_dict["ntasks"]):
-            task = TaskModel(simulation_id=simulation.id, task_id=str(i))
+            task = TaskModel(simulation_id=simulation.id, task_id=f"{simulation.id}_{i}")
             db.session.add(task)
 
         simulation.job_id = run_job(files_dict, update_key, simulation.id, payload_dict["ntasks"])

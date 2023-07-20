@@ -1,4 +1,3 @@
-from typing import Union
 from flask import make_response, Response
 
 

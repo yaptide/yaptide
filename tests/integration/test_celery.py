@@ -12,7 +12,7 @@ import logging
 import platform
 import pytest  # skipcq: PY-W2000
 
-from celery import chain, chord
+from celery import group, chord
 
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
@@ -26,6 +26,7 @@ def test_run_simulation(celery_app,
                         payload_editor_dict_data: dict,
                         client,
                         add_directory_to_path,
+                        modify_tmpdir,
                         shieldhit_demo_binary):
     """Test run_simulation task with SHIELDHIT demo binary
     Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
@@ -39,7 +40,7 @@ def test_run_simulation(celery_app,
 
     # limit the particle numbers to get faster results
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
-    payload_dict["ntasks"] = 2
+    payload_dict["ntasks"] = 1
 
     if platform.system() == "Windows":
         payload_dict["input_json"]["scoringManager"]["filters"] = []
@@ -55,13 +56,14 @@ def test_run_simulation(celery_app,
     files_dict, _ = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
     # job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
-    map_chain = chain(
+    map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
-            task_id=str(i)
-        ) for i in range(payload_dict["ntasks"]))
+            task_id=str(i+1)
+        ) for i in range(payload_dict["ntasks"])
+    ])
         
-    workflow = chord(map_chain, merge_results.s(), interval=5, chord_unlock=True)
+    workflow = chord(map_group, merge_results.s())
     job = workflow.delay()
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()

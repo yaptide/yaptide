@@ -22,18 +22,18 @@ from yaptide.celery.utils.requests import send_task_update
 from yaptide.persistence.models import SimulationModel
 
 
-def run_shieldhit(dir_path: Path, task_id: int) -> dict:
+def run_shieldhit(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single SHIELDHIT simulation"""
     settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
                                   simulator_exec_path=None,  # useless
                                   cmdline_opts="")  # useless
-    settings.set_rng_seed(task_id)
+    settings.set_rng_seed(int(task_id.split("_")[-1]))
     try:
         command_as_list = str(settings).split()
         command_as_list.append(str(dir_path))
         DEVNULL = open(os.devnull, 'wb')
         subprocess.check_call(command_as_list, cwd=str(dir_path), stdout=DEVNULL, stderr=DEVNULL)
-        logging.info("SHIELDHIT simulation for task %d finished", task_id)
+        logging.info("SHIELDHIT simulation for task %s finished", task_id)
 
         estimators_dict = {}
         files_pattern_pattern = str(dir_path / "*.bdo")
@@ -96,7 +96,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
 
-    loglines = log_generator(logfile)
+    loglines = log_generator(logfile, timeout=30)
     requested_primaries = 0
     logging.info("Parsing log file for task %s started", task_id)
     for line in loglines:

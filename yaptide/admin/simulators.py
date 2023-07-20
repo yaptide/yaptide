@@ -59,9 +59,12 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
                 click.echo(f"Extracting {member.name}")
                 tar.extract(member, destination_dir)
                 # move to installation path
-                local_file = Path(destination_dir) / member.name
-                click.echo(f"Moving {local_file} to {installation_path}")
-                local_file.rename(installation_path / member_name)
+                local_file_path = Path(destination_dir) / member.name
+                destination_file_path = installation_path / member_name
+                click.echo(f"Moving {local_file_path} to {destination_file_path}")
+                # move file from temporary directory to installation path using shutils
+                if not destination_file_path.exists():
+                    shutil.move(local_file_path, destination_file_path)
 
 
 def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
@@ -76,7 +79,7 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
                 # move to installation path
                 local_file_path = Path(destination_dir) / member.filename
                 destination_file_path = installation_path / member_name
-                click.echo(f"Moving {local_file_path} to {installation_path}")
+                click.echo(f"Moving {local_file_path} to {destination_file_path}")
                 # move file from temporary directory to installation path using shutils
                 if not destination_file_path.exists():
                     shutil.move(local_file_path, destination_file_path)

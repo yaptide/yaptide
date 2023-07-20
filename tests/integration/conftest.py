@@ -58,6 +58,7 @@ def celery_app():
     """
     logging.info("Creating celery app for testing")
     from yaptide.celery.worker import celery_app as app
+    app.conf.task_default_pool = 'eventlet'
     return app
 
 
@@ -81,6 +82,41 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
         "concurrency": 1,
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
     }
+
+
+@pytest.fixture(scope='function')
+def modify_tmpdir(tmpdir_factory):
+    # Get the temporary directory path from the tmpdir fixture
+    tmpdir = tmpdir_factory.getbasetemp()
+
+    # Store the original TMPDIR value
+    original_tmpdir = os.environ.get('TMPDIR')
+    original_temp = os.environ.get('TEMP')
+    original_tmp = os.environ.get('TMP')
+
+    # Set the TMPDIR environment variable to the temporary directory path
+    logging.info("Replacing old value %s of TMPDIR with %s", original_tmpdir, tmpdir)
+    os.environ['TMPDIR'] = str(tmpdir)
+    logging.info("Replacing old value %s of TEMP with %s", original_temp, tmpdir)
+    os.environ['TEMP'] = str(tmpdir)
+    logging.info("Replacing old value %s of TMP with %s", original_tmp, tmpdir)
+    os.environ['TMP'] = str(tmpdir)
+
+    yield
+
+    # Restore the original TMPDIR value after the tests are done
+    if original_tmpdir is None:
+        del os.environ['TMP']
+    else:
+        os.environ['TMP'] = original_tmpdir
+    if original_temp is None:
+        del os.environ['TEMP']
+    else:
+        os.environ['TEMP'] = original_temp
+    if original_tmp is None:
+        del os.environ['TMPDIR']
+    else:
+        os.environ['TMPDIR'] = original_tmp
 
 
 @pytest.fixture(scope="function")
