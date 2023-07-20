@@ -15,8 +15,10 @@ from yaptide.celery.worker import celery_app
 
 from yaptide.persistence.models import SimulationModel
 
-from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list,
-                                     simulation_logfiles, write_simulation_input_files)
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
+                                     estimators_to_list,
+                                     simulation_logfiles,
+                                     write_simulation_input_files)
 
 
 # this is not being used now but we can use such hook to install simulations on the worker start
@@ -53,7 +55,6 @@ def convert_input_files(payload_dict: dict) -> dict:
 @celery_app.task
 def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
-
     tmp_dir = tempfile.gettempdir()
     logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
     if os.environ.get("TMPDIR"):
@@ -66,15 +67,13 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
         tmp_dir = os.environ.get("TMP")
     logging.info("4. tempfile.gettempdir() is: %s", tmp_dir)
     with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
-
-    # with tempfile.TemporaryDirectory() as tmp_dir_path:
-        logging.debug("Task %s saves the files for simulation %s", task_id ,files_dict.keys())
+        logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
         gt_watcher = None
         if update_key is not None and simulation_id is not None:
             gt_watcher = eventlet.spawn(read_file,
-                                        Path(tmp_dir_path) / "shieldhit_{:04d}.log".format(task_id.split("_")[-1]),
+                                        Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log",
                                         simulation_id,
                                         task_id,
                                         update_key)
@@ -133,8 +132,8 @@ def merge_results(results: list[dict]) -> dict:
         averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
 
     if send_simulation_results(simulation_id=simulation_id,
-                                update_key=update_key,
-                                estimators=averaged_estimators):
+                               update_key=update_key,
+                               estimators=averaged_estimators):
         return {}
     return {
         "estimators": averaged_estimators,

@@ -21,13 +21,13 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation(celery_app,
-                        celery_worker,
-                        payload_editor_dict_data: dict,
-                        client,
-                        add_directory_to_path,
-                        modify_tmpdir,
-                        shieldhit_demo_binary):
+def test_celery_run_simulation(celery_app,
+                               celery_worker,
+                               payload_editor_dict_data: dict,
+                               client,
+                               add_directory_to_path,
+                               modify_tmpdir,
+                               shieldhit_demo_binary):
     """Test run_simulation task with SHIELDHIT demo binary
     Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
     Parser relies on rewind function, which does not work properly on Windows, see:
@@ -55,7 +55,7 @@ def test_run_simulation(celery_app,
 
     files_dict, _ = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
-    # job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
+
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
@@ -68,4 +68,4 @@ def test_run_simulation(celery_app,
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
     logging.info("run_simulation task finished")
-    assert 'result' in result.keys()
+    assert 'estimators' in result.keys()

@@ -1,5 +1,3 @@
-import logging
-
 from celery import group, chord
 from celery.result import AsyncResult
 
@@ -10,6 +8,7 @@ from yaptide.persistence.models import SimulationModel
 
 
 def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) -> str:
+    """Runs simulation job"""
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
@@ -58,7 +57,7 @@ def cancel_job(job_id: str) -> dict:
         return {"message": f"Cannot cancel job which is already {job_state}"}
     try:
         celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
-    except:
+    except:  # skipcq: FLK-E722
         return {"message": "Failed to cancel job"}
 
     return {

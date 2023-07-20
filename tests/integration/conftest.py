@@ -86,7 +86,7 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
 
 @pytest.fixture(scope='function')
 def modify_tmpdir(tmpdir_factory):
-    # Get the temporary directory path from the tmpdir fixture
+    """Get the temporary directory path from the tmpdir fixture"""
     tmpdir = tmpdir_factory.getbasetemp()
 
     # Store the original TMPDIR value

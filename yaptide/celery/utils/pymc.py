@@ -61,7 +61,7 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
         for page_i, page_dict in enumerate(estimator_dict["pages"]):
             # check if page numbers are the same and if not, find matching page's index in base_list
             if page_dict["metadata"]["page_number"] != base_list[est_i]["pages"][page_i]["metadata"]["page_number"]:
-                page_i = next((i for i, item in enumerate(base_list[est_i]["pages"]) \
+                page_i = next((i for i, item in enumerate(base_list[est_i]["pages"])
                                if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
 
             base_list[est_i]["pages"][page_i]["data"]["values"] = [
@@ -105,7 +105,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
             splitted = line.split()
             simulated_primaries = int(splitted[3])
             if (utc_now.timestamp() - update_time < 2  # hardcoded 2 seconds to avoid spamming
-                and requested_primaries > simulated_primaries):
+                    and requested_primaries > simulated_primaries):
                 continue
             update_time = utc_now.timestamp()
             up_dict = {

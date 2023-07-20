@@ -5,7 +5,7 @@ import uuid
 from flask import request
 from flask_restful import Resource
 
-from marshmallow import Schema, ValidationError
+from marshmallow import Schema
 from marshmallow import fields
 
 from yaptide.persistence.database import db
@@ -16,7 +16,7 @@ from yaptide.routes.utils.response_templates import yaptide_response, error_inte
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import run_job, get_job_status, cancel_job, get_job_results
+from yaptide.celery.utils.manage_tasks import run_job, cancel_job, get_job_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 

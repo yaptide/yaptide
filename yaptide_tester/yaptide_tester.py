@@ -169,7 +169,6 @@ class YaptideTester:
 
         job_id: str = res_json.get("job_id")
         running = 0
-        # exit()
 
         if job_id is not None:
             while do_monitor_job:
@@ -180,14 +179,6 @@ class YaptideTester:
 
                     # the request has succeeded, we can access its contents
                     if res.status_code == 200:
-                        if res_json.get('job_state') == "RUNNING":
-                            running += 1
-                            if running == 3:
-                                res: requests.Response = self.session.delete(jobs_url, params={"job_id": job_id})
-                                res_json: dict = res.json()
-                                print(res_json)
-                            if running == 4:
-                                break
                         if res_json.get('job_state') == "COMPLETED":
                             print("COMPLETED")
                             for i in range(2):
