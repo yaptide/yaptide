@@ -17,10 +17,38 @@ class UserModel(db.Model):
 
     __tablename__ = 'User'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    username: Column[str] = db.Column(db.String, nullable=False, unique=True)
-    password_hash: Column[str] = db.Column(db.String, nullable=False)
+    auth_data = relationship("AuthDataModel", uselist=False)
     simulations = relationship("SimulationModel")
     clusters = relationship("ClusterModel")
+
+    def __repr__(self) -> str:
+        return f'User #{self.id} {self.username}'
+
+
+class AuthDataModel(db.Model):
+    """Authentication data model"""
+
+    __tablename__ = 'AuthData'
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'))
+
+    __mapper_args__ = {
+        "polymorphic_identity": "AuthData",
+        "polymorphic_on": "user_id",
+    }
+
+
+class YaptideAuthDataModel(AuthDataModel):
+    """Yaptide authentication data model"""
+
+    __tablename__ = 'YaptideAuthData'
+    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), primary_key=True)
+    username: Column[str] = db.Column(db.String, nullable=False)
+    password_hash: Column[str] = db.Column(db.String, nullable=False)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "YaptideAuthData"
+    }
 
     def set_password(self, password: str):
         """Sets hashed password"""
@@ -30,8 +58,22 @@ class UserModel(db.Model):
         """Checks password correctness"""
         return check_password_hash(self.password_hash, password)
 
-    def __repr__(self) -> str:
-        return f'User #{self.id} {self.username}'
+
+class PlgridAuthDataModel(AuthDataModel):
+    """PLGrid authentication data model"""
+
+    __tablename__ = 'PlgridAuthData'
+    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), primary_key=True)
+    username: Column[str] = db.Column(db.String, nullable=False)
+    certificate: Column[str] = db.Column(db.String, nullable=False)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "PlgridAuthData"
+    }
+
+    def set_certificate(self, certificate: str):
+        """Sets certificate"""
+        self.certificate = certificate
 
 
 class ClusterModel(db.Model):
