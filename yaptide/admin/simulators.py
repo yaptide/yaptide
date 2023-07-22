@@ -39,6 +39,8 @@ password = os.getenv('S3_ENCRYPTION_PASSWORD')
 salt = os.getenv('S3_ENCRYPTION_SALT')
 shieldhit_bucket = os.getenv('S3_SHIELDHIT_BUCKET')
 shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
+topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
+geant_bucket_name = os.getenv('S3_GEANT_KEY')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
 
 
@@ -223,6 +225,38 @@ def download_shieldhit_from_s3(
     destination_file_path.chmod(0o700)
     return True
 
+def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
+        geant_bucket_name: str = geant_bucket_name,
+        installation_path: Path = installation_path
+        ) -> bool:
+    """Download TOPAS from S3 bucket"""
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint
+    )
+    destination_file_path = installation_path / "topas"
+    bucket = s3_client.Bucket(topas_bucket_name)
+    try:
+        for s3_object in bucket.objects.all():
+            print("object: ", s3_object.key)
+            path, filename = os.path.split(s3_object.key)
+            #bucket.download_file(s3_object.key, filename)
+    except ClientError as e:
+        click.echo("TOPAS S3 download failed with error: ", e.response["Error"]["Message"])
+        return False
+    destination_file_path = installation_path / "geant"
+    bucket = s3_client.Bucket(geant_bucket_name)
+    try:
+        for s3_object in bucket.objects.all():
+            print("object: ", s3_object.key)
+            path, filename = os.path.split(s3_object.key)
+            #bucket.download_file(s3_object.key, filename)
+    except ClientError as e:
+        click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
+        return False
+    return True
 
 def upload_file_to_s3(
         bucket: str,
