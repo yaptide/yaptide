@@ -36,6 +36,8 @@ password = os.getenv('S3_ENCRYPTION_PASSWORD')
 salt = os.getenv('S3_ENCRYPTION_SALT')
 shieldhit_bucket = os.getenv('S3_SHIELDHIT_BUCKET')
 shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
+topas_bucket_name = os.getenv('S3_SHIELDHIT_BUCKET')
+topas_key = os.getenv('S3_SHIELDHIT_KEY')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
 
 
@@ -99,6 +101,18 @@ def install_simulator(name: SimulatorType) -> bool:
             click.echo('Downloading demo version from shieldhit.org')
             logging.info("Downloading demo version from shieldhit.org")
             download_shieldhit_demo_version()
+    elif name == SimulatorType.topas:
+        click.echo(f'Installing TOPAS into {installation_path}')
+        logging.info("Installing TOPAS into %s", installation_path)
+        installation_path.mkdir(exist_ok=True, parents=True)
+        shieldhit_downloaded_from_s3 = False
+        if all([endpoint, access_key, secret_key]):
+            click.echo('Downloading from S3 bucket')
+            logging.info("Downloading from S3 bucket")
+            shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
+        else:
+            click.echo('Cannot download from S3 bucket, missing environment variables')
+            logging.info("Cannot download from S3 bucket, missing environment variables")
     else:
         click.echo('Not implemented')
         return False
@@ -161,6 +175,29 @@ def download_shieldhit_from_s3(
     destination_file_path.chmod(0o700)
     return True
 
+def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
+        key: str = topas_key,
+        installation_path: Path = installation_path
+        ) -> bool:
+    """Download TOPAS from S3 bucket"""
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint
+    )
+    destination_file_path = installation_path / key
+    bucket = s3_client.Bucket(topas_bucket_name)
+    # Download file from s3 bucket
+    try:
+        for s3_object in bucket.objects.all():
+        print("object: ", s3_object.key)
+        path, filename = os.path.split(s3_object.key)
+        bucket.download_file(s3_object.key, filename)
+    except ClientError as e:
+        click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
+        return False
+    return True
 
 def upload_file_to_s3(
         bucket: str,
