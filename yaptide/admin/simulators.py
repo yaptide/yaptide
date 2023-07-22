@@ -37,7 +37,7 @@ salt = os.getenv('S3_ENCRYPTION_SALT')
 shieldhit_bucket = os.getenv('S3_SHIELDHIT_BUCKET')
 shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
 topas_bucket_name = os.getenv('S3_SHIELDHIT_BUCKET')
-topas_key = os.getenv('S3_SHIELDHIT_KEY')
+geant_bucket_name = os.getenv('S3_SHIELDHIT_KEY')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
 
 
@@ -176,7 +176,7 @@ def download_shieldhit_from_s3(
     return True
 
 def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
-        key: str = topas_key,
+        geant_bucket_name: str = geant_bucket_name,
         installation_path: Path = installation_path
         ) -> bool:
     """Download TOPAS from S3 bucket"""
@@ -186,14 +186,23 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
-    destination_file_path = installation_path / key
+    destination_file_path = installation_path / "topas"
     bucket = s3_client.Bucket(topas_bucket_name)
-    # Download file from s3 bucket
     try:
         for s3_object in bucket.objects.all():
-        print("object: ", s3_object.key)
-        path, filename = os.path.split(s3_object.key)
-        bucket.download_file(s3_object.key, filename)
+            print("object: ", s3_object.key)
+            path, filename = os.path.split(s3_object.key)
+            #bucket.download_file(s3_object.key, filename)
+    except ClientError as e:
+        click.echo("TOPAS S3 download failed with error: ", e.response["Error"]["Message"])
+        return False
+    destination_file_path = installation_path / "geant"
+    bucket = s3_client.Bucket(geant_bucket_name)
+    try:
+        for s3_object in bucket.objects.all():
+            print("object: ", s3_object.key)
+            path, filename = os.path.split(s3_object.key)
+            #bucket.download_file(s3_object.key, filename)
     except ClientError as e:
         click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
         return False
