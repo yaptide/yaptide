@@ -39,6 +39,10 @@ password = os.getenv('S3_ENCRYPTION_PASSWORD')
 salt = os.getenv('S3_ENCRYPTION_SALT')
 shieldhit_bucket = os.getenv('S3_SHIELDHIT_BUCKET')
 shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
+topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
+topas_key = os.getenv('S3_TOPAS_KEY')
+topas_version = os.getenv('S3_TOPAS_VERSION')
+geant_bucket_name = os.getenv('S3_GEANT_BUCKET')
 installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
 
 
@@ -85,27 +89,39 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
                     shutil.move(local_file_path, destination_file_path)
 
 
-def install_simulator(name: SimulatorType) -> bool:
+def install_simulator(sim_name: SimulatorType) -> bool:
     """Add simulator to database"""
-    click.echo(f'Installation for simulator: {name} started')
-    logging.info("Installation for simulator: %s started", name)
-    if name == SimulatorType.shieldhit:
+    click.echo(f'Installation for simulator: {sim_name.name} started')
+    logging.info("Installation for simulator: %s started", sim_name.name)
+    if sim_name == SimulatorType.shieldhit:
         click.echo(f'Installing shieldhit into {installation_path}')
         logging.info("Installing shieldhit into %s", installation_path)
         installation_path.mkdir(exist_ok=True, parents=True)
-        shieldhit_downloaded_from_s3 = False
+        download_status = False
         if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
-            shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
-        if not shieldhit_downloaded_from_s3:
+            download_status = download_shieldhit_from_s3()
+        if not download_status:
             click.echo('Downloading demo version from shieldhit.org')
             logging.info("Downloading demo version from shieldhit.org")
-            download_shieldhit_demo_version()
+            download_status = download_shieldhit_demo_version()
+    elif sim_name == SimulatorType.topas:
+        click.echo(f'Installing TOPAS into {installation_path}')
+        logging.info("Installing TOPAS into %s", installation_path)
+        installation_path.mkdir(exist_ok=True, parents=True)
+        if all([endpoint, access_key, secret_key]):
+            click.echo('Downloading from S3 bucket')
+            logging.info("Downloading from S3 bucket")
+            download_status = download_topas_from_s3()
+        else:
+            click.echo('Cannot download from S3 bucket, missing environment variables')
+            logging.info("Cannot download from S3 bucket, missing environment variables")
+            return False
     else:
         click.echo('Not implemented')
         return False
-    return True
+    return download_status
 
 
 def download_shieldhit_demo_version() -> bool:
@@ -224,6 +240,109 @@ def download_shieldhit_from_s3(
     return True
 
 
+# skipcq: PY-R1000
+def download_topas_from_s3(bucket: str = topas_bucket_name,
+                           key: str = topas_key,
+                           version: str = topas_version,
+                           geant_bucket: str = geant_bucket_name,
+                           path: Path = installation_path
+                           ) -> bool:
+    """Download TOPAS from S3 bucket"""
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint
+    )
+
+    # Download TOPAS tar
+    topas_temp_file = tempfile.NamedTemporaryFile()
+    try:
+        response = s3_client.list_object_versions(
+            Bucket=bucket,
+            Prefix=key,
+        )
+        for curr_version in response["Versions"]:
+            version_id = curr_version["VersionId"]
+            tags = s3_client.get_object_tagging(
+                Bucket=bucket,
+                Key=key,
+                VersionId=version_id,
+            )
+            for tag in tags["TagSet"]:
+                if tag["Key"] == "version" and tag["Value"] == version:
+                    s3_client.download_fileobj(Bucket=bucket,
+                                               Key=key,
+                                               Fileobj=topas_temp_file,
+                                               ExtraArgs={"VersionId": version_id})
+    except ClientError as e:
+        click.echo("Failed to download TOPAS from S3 with error: ", e.response["Error"]["Message"])
+        return False
+
+    # Download GEANT tar files
+    geant_temp_files = []
+
+    objects = s3_client.list_objects_v2(Bucket=geant_bucket)
+
+    try:
+        for obj in objects['Contents']:
+            key = obj['Key']
+            response = s3_client.list_object_versions(
+                Bucket=geant_bucket,
+                Prefix=key,
+            )
+            for curr_version in response["Versions"]:
+                version_id = curr_version["VersionId"]
+                tags = s3_client.get_object_tagging(
+                    Bucket=geant_bucket,
+                    Key=key,
+                    VersionId=version_id,
+                )
+                for tag in tags["TagSet"]:
+                    if tag["Key"] == "topas_versions":
+                        topas_versions = tag["Value"].split(",")
+                        topas_versions = [version.strip() for version in topas_versions]
+                        if version in topas_versions:
+                            temp_file = tempfile.NamedTemporaryFile()
+                            s3_client.download_fileobj(Bucket=geant_bucket,
+                                                       Key=key,
+                                                       Fileobj=temp_file,
+                                                       ExtraArgs={"VersionId": version_id})
+                            geant_temp_files.append(temp_file)
+
+    except ClientError as e:
+        click.echo("Failed to download Geant4 from S3 with error: ", e.response["Error"]["Message"])
+        return False
+
+    topas_file_path = path / "topas"
+    if not topas_file_path.exists():
+        try:
+            topas_file_path.mkdir()
+        except OSError as e:
+            click.echo("Could not create installation directory")
+            return False
+    topas_temp_file.seek(0)
+    topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
+    topas_file_contents.extractall(path=topas_file_path)
+    topas_extracted_path = topas_file_path / "topas" / "bin" / "topas"
+    topas_extracted_path.chmod(0o700)
+    logging.info("Installed TOPAS into "+str(topas_file_path))
+
+    geant_files_path = path / "geant"
+    if not geant_files_path.exists():
+        try:
+            geant_files_path.mkdir()
+        except OSError as e:
+            click.echo("Could not create installation directory")
+            return False
+    for file in geant_temp_files:
+        file.seek(0)
+        file_contents = tarfile.TarFile(fileobj=file)
+        file_contents.extractall(path=geant_files_path)
+    logging.info("Installed Geant files into "+str(geant_files_path))
+    return True
+
+
 def upload_file_to_s3(
         bucket: str,
         file_path: Path,
@@ -309,6 +428,8 @@ def install(**kwargs):
     sim_type = SimulatorType[kwargs['name']]
     if install_simulator(sim_type):
         click.echo(f'Simulator {sim_type.name} installed')
+    else:
+        click.echo(f'Simulator {sim_type.name} installation failed')
 
 
 @run.command
