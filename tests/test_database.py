@@ -4,7 +4,7 @@ import time
 from sqlalchemy.orm.scoping import scoped_session
 
 from yaptide.persistence.models import (
-    UserModel,
+    UserBaseModel,
     SimulationModel,
     TaskModel,
     ClusterModel,
@@ -16,7 +16,7 @@ from yaptide.persistence.models import (
 
 def test_create_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test user model creation"""
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -29,7 +29,7 @@ def test_create_user(db_session: scoped_session, db_good_username: str, db_good_
 def test_cluster_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test cluster model creation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -53,7 +53,7 @@ def test_cluster_model_creation(db_session: scoped_session, db_good_username: st
 def test_simulation_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation model creation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -82,7 +82,7 @@ def test_simulation_model_creation(db_session: scoped_session, db_good_username:
 def test_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test task model creation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -137,7 +137,7 @@ def test_task_model_creation_and_update(db_session: scoped_session, db_good_user
 def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation with multiple tasks"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -211,7 +211,7 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
 def test_create_input(db_session: scoped_session, db_good_username: str, db_good_password: str, payload_editor_dict_data: dict):
     """Test creation of input_model in db for simulation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -241,7 +241,7 @@ def test_create_input(db_session: scoped_session, db_good_username: str, db_good
 def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_username: str, db_good_password: str, result_dict_data: dict):
     """Test creation of estimators and pages in db for a result"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = UserBaseModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()

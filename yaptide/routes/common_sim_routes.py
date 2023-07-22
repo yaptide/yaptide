@@ -7,7 +7,7 @@ from marshmallow import Schema
 from marshmallow import fields
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel, UserModel, InputModel, LogfilesModel
+from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel, UserBaseModel, InputModel, LogfilesModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -77,7 +77,7 @@ class SimulationResults(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method returning job status and results"""
         schema = SimulationResults.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -120,7 +120,7 @@ class SimulationInputs(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method returning simulation input"""
         schema = SimulationInputs.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -184,7 +184,7 @@ class SimulationLogfiles(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method returning job status and results"""
         schema = SimulationResults.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)

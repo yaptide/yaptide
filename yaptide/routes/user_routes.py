@@ -10,7 +10,7 @@ from enum import Enum
 from sqlalchemy import asc, desc
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
+from yaptide.persistence.models import UserBaseModel, SimulationModel, ClusterModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
@@ -46,7 +46,7 @@ class UserSimulations(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method returning simulations from the database"""
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
@@ -86,7 +86,7 @@ class UserClusters(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method returning clusters"""
         clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
 
@@ -106,7 +106,7 @@ class UserUpdate(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    def post(user: UserBaseModel):
         """Updates user with provided parameters"""
         json_data: dict = request.get_json(force=True)
         if not json_data:

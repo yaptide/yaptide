@@ -1,8 +1,8 @@
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel
+from yaptide.persistence.models import UserBaseModel, SimulationModel
 
 
-def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool, str, int]:
+def check_if_job_is_owned_and_exist(job_id: str, user: UserBaseModel) -> tuple[bool, str, int]:
     """Function checking if provided task is owned by user managing action"""
     simulation = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
 

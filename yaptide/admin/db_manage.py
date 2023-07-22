@@ -3,6 +3,7 @@ from pathlib import Path
 
 import click
 import sqlalchemy as db
+from sqlalchemy.orm import with_polymorphic
 from werkzeug.security import generate_password_hash
 
 
@@ -10,6 +11,8 @@ class TableTypes(Enum):
     """Table types"""
 
     USER = "User"
+    YAPTIDEUSER = "YaptideUser"
+    PLGRIDUSER = "PlgridUser"
     SIMULATION = "Simulation"
     CLUSTER = "Cluster"
     TASK = "Task"
@@ -38,7 +41,7 @@ def user_exists(name: str, users: db.Table, con) -> bool:
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
-        click.echo(f'User: {name} already exists')
+        click.echo(f'YaptideUser: {name} already exists')
         return True
     return False
 
@@ -54,7 +57,7 @@ def list_users(**kwargs):
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
     query = db.select([users])
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
@@ -94,7 +97,8 @@ def add_user(**kwargs):
     click.echo(f'Adding user: {username}')
     if kwargs['verbose'] > 2:
         click.echo(f'Password: {password}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    x = db.join(metadata.tables['YaptideUser'], metadata.tables['User'])
+    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
     if user_exists(username, users, con):
         return None
@@ -116,10 +120,10 @@ def update_user(**kwargs):
         return None
     username = kwargs['name']
     click.echo(f'Updating user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
     if not user_exists(username, users, con):
-        click.echo(f'User: {username} does not exist, aborting update')
+        click.echo(f'YaptideUser: {username} does not exist, aborting update')
         return None
 
     # update password
@@ -152,7 +156,7 @@ def add_ssh_key(**kwargs):
     cluster_username = kwargs['cluster_username']
     ssh_key = kwargs['ssh_key']
     ssh_key_content = ssh_key.read()
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
     clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
 
     query = db.select([users]).where(users.c.username == username)
@@ -160,7 +164,7 @@ def add_ssh_key(**kwargs):
     user = ResultProxy.first()
 
     if not user:
-        click.echo(f'User: {username} does not exist, aborting adding ssh key')
+        click.echo(f'YaptideUser: {username} does not exist, aborting adding ssh key')
         return None
 
     query = db.select([clusters]).\
@@ -168,7 +172,7 @@ def add_ssh_key(**kwargs):
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
-        click.echo(f'User: {username} already has key and username for cluster: {cluster_name} - updating old one')
+        click.echo(f'YaptideUser: {username} already has key and username for cluster: {cluster_name} - updating old one')
         query = db.update(clusters).\
             where((clusters.c.user_id == user.id) & (clusters.c.cluster_name == cluster_name)).\
             values(cluster_username=cluster_username, cluster_ssh_key=ssh_key_content)
@@ -191,7 +195,7 @@ def remove_user(**kwargs):
         return None
     username = kwargs['name']
     click.echo(f'Deleting user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
     # abort if user does not exist
     if not user_exists(username, users, con):

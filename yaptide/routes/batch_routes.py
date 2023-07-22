@@ -14,7 +14,7 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
-    UserModel,
+    UserBaseModel,
     SimulationModel,
     ClusterModel,
     TaskModel,
@@ -31,7 +31,7 @@ class JobsBatch(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    def post(user: UserBaseModel):
         """Method handling running shieldhit with batch"""
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
@@ -122,7 +122,7 @@ class JobsBatch(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method geting job's result"""
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -173,7 +173,7 @@ class JobsBatch(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def delete(user: UserModel):
+    def delete(user: UserBaseModel):
         """Method canceling job"""
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -213,7 +213,7 @@ class ResultsBatch(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    def get(user: UserBaseModel):
         """Method geting job's result"""
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)

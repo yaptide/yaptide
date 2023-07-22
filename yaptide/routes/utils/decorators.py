@@ -5,7 +5,7 @@ from werkzeug.exceptions import Unauthorized, Forbidden
 from functools import wraps
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel
+from yaptide.persistence.models import UserBaseModel
 
 from yaptide.routes.utils.tokens import decode_auth_token
 
@@ -21,7 +21,7 @@ def requires_auth(is_refresh: bool):
                 raise Unauthorized(description="No token provided")
             resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
-                user = db.session.query(UserModel).filter_by(id=resp).first()
+                user = db.session.query(UserBaseModel).filter_by(id=resp).first()
                 if user:
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")

@@ -4,7 +4,7 @@ from enum import Enum
 import gzip
 import json
 
-from sqlalchemy import Column
+from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from yaptide.persistence.database import db
@@ -12,42 +12,45 @@ from yaptide.persistence.database import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-class UserModel(db.Model):
+class AuthProvider(Enum):
+    """Authentication provider"""
+
+    PLGRID = "PLGRID"
+    YAPTIDE = "YAPTIDE"
+
+
+class UserBaseModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    auth_data = relationship("AuthDataModel", uselist=False)
+    username: Column[str] = db.Column(db.String, nullable=False)
+    auth_provider: Column[str] = db.Column(db.String, nullable=False, default=AuthProvider.YAPTIDE.value)
     simulations = relationship("SimulationModel")
     clusters = relationship("ClusterModel")
+
+    __table_args__ = (
+        UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),  # Ensure uniqueness within each provider
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "User",
+        "polymorphic_on": username,
+    }
 
     def __repr__(self) -> str:
         return f'User #{self.id} {self.username}'
 
 
-class AuthDataModel(db.Model):
-    """Authentication data model"""
+class YaptideUserModel(UserBaseModel, db.Model):
+    """Yaptide user model"""
 
-    __tablename__ = 'AuthData'
-    id: Column[int] = db.Column(db.Integer, primary_key=True)
-    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'))
-
-    __mapper_args__ = {
-        "polymorphic_identity": "AuthData",
-        "polymorphic_on": "user_id",
-    }
-
-
-class YaptideAuthDataModel(AuthDataModel):
-    """Yaptide authentication data model"""
-
-    __tablename__ = 'YaptideAuthData'
+    __tablename__ = 'YaptideUser'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), primary_key=True)
-    username: Column[str] = db.Column(db.String, nullable=False)
     password_hash: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {
-        "polymorphic_identity": "YaptideAuthData"
+        "polymorphic_identity": "YaptideUser"
     }
 
     def set_password(self, password: str):
@@ -59,21 +62,16 @@ class YaptideAuthDataModel(AuthDataModel):
         return check_password_hash(self.password_hash, password)
 
 
-class PlgridAuthDataModel(AuthDataModel):
-    """PLGrid authentication data model"""
+class PlgridUserModel(UserBaseModel, db.Model):
+    """PLGrid user model"""
 
-    __tablename__ = 'PlgridAuthData'
+    __tablename__ = 'PlgridUser'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), primary_key=True)
-    username: Column[str] = db.Column(db.String, nullable=False)
     certificate: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {
-        "polymorphic_identity": "PlgridAuthData"
+        "polymorphic_identity": "PlgridUser"
     }
-
-    def set_certificate(self, certificate: str):
-        """Sets certificate"""
-        self.certificate = certificate
 
 
 class ClusterModel(db.Model):

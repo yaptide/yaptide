@@ -2,7 +2,7 @@ from flask import request
 from flask_restful import Resource
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, PlgridAuthDataModel
+from yaptide.persistence.models import PlgridUserModel, AuthProvider
 
 from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response
@@ -21,15 +21,18 @@ class AuthPlgrid(Resource):
         # TODO: aquire certificate from plgrid here and save it in db
 
         username = plgrid_token["tokenParsed"]["preferred_username"]
-        auth_data = db.session.query(PlgridAuthDataModel).filter_by(username=username).first()
-        user = db.session.query(UserModel).filter_by(username=username).first()
+        
+        user = db.session.query(PlgridUserModel).filter_by(username=username).first()
         if not user:
-            user = UserModel()
+            user = PlgridUserModel(username=username,
+                                   auth_provider=AuthProvider.PLGRID.value,
+                                   certificate="")
 
             db.session.add(user)
             db.session.commit()
 
         exp = plgrid_token["tokenParsed"]["exp"]
+
         try:
             access_token, access_exp = encode_auth_token(user_id=user.id,
                                                          is_refresh=False,
@@ -51,3 +54,11 @@ class AuthPlgrid(Resource):
             return resp
         except Exception:  # skipcq: PYL-W0703
             return error_internal_response()
+    
+    @staticmethod
+    def delete():
+        """Method returning status of logging out"""
+        resp = yaptide_response(message='User logged out', code=200)
+        resp.delete_cookie('access_token')
+        resp.delete_cookie('refresh_token')
+        return resp
