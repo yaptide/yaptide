@@ -94,10 +94,15 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
         if len(estimators_dict.keys()) == 0:
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            send_simulation_logfiles(simulation_id=simulation_id,
-                                     update_key=update_key,
-                                     logfiles=logfiles)
-            raise Exception
+            if send_simulation_logfiles(simulation_id=simulation_id,
+                                        update_key=update_key,
+                                        logfiles=logfiles):
+                return {}
+            return {
+                "logfiles": logfiles,
+                "simulation_id": simulation_id,
+                "update_key": update_key
+            }
 
         logging.debug("Converting simulation results to JSON")
         estimators = estimators_to_list(estimators_dict=estimators_dict,
@@ -121,23 +126,43 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
+    logfiles = {}
 
-    averaged_estimators = results[0]["estimators"]
+
+
+    averaged_estimators = None
     simulation_id = results[0].pop("simulation_id", None)
     update_key = results[0].pop("simulation_id", None)
-    for i, result in enumerate(results, 1):
+    for i, result in enumerate(results):
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
         if update_key is None:
             update_key = result.pop("update_key", None)
+        if "logfiles" in result:
+            logfiles.update(result["logfiles"])
+            continue
+
+        if averaged_estimators is None:
+            averaged_estimators: list[dict] = result["estimators"]
+            # There is nothing to average yet
+            continue
 
         averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
-
-    if send_simulation_results(simulation_id=simulation_id,
-                               update_key=update_key,
-                               estimators=averaged_estimators):
-        return {}
-    return {
-        "estimators": averaged_estimators,
+    
+    final_result = {
         "end_time": datetime.utcnow().isoformat(sep=" ")
     }
+
+    if len(logfiles.keys()) > 0:
+        if not send_simulation_logfiles(simulation_id=simulation_id,
+                                        update_key=update_key,
+                                        logfiles=logfiles):
+            final_result["logfiles"] = logfiles
+
+    if averaged_estimators is not None:
+        if not send_simulation_results(simulation_id=simulation_id,
+                                       update_key=update_key,
+                                       estimators=averaged_estimators):
+            final_result["estimators"] = averaged_estimators
+
+    return final_result

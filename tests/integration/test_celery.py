@@ -68,4 +68,5 @@ def test_celery_run_simulation(celery_app,
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
     logging.info("run_simulation task finished")
+    assert 'logfiles' not in result.keys()
     assert 'estimators' in result.keys()
