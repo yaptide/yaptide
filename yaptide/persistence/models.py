@@ -34,8 +34,7 @@ class UserBaseModel(db.Model):
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "User",
-        "polymorphic_on": username,
+        "polymorphic_identity": "User"
     }
 
     def __repr__(self) -> str:

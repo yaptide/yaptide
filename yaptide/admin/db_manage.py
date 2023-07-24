@@ -35,9 +35,10 @@ def connect_to_db():
     return con, metadata, engine
 
 
-def user_exists(name: str, users: db.Table, con) -> bool:
+def user_exists(name: str, auth_provider: str, users: db.Table, con) -> bool:
     """Check if user already exists"""
-    query = db.select([users]).where(users.c.username == name)
+
+    query = db.select(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
@@ -57,8 +58,11 @@ def list_users(**kwargs):
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
-    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([users])
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    joined_users = users.join(yaptide_users, users.c.id == yaptide_users.c.id)
+    
+    query = db.select([joined_users])
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
@@ -97,15 +101,19 @@ def add_user(**kwargs):
     click.echo(f'Adding user: {username}')
     if kwargs['verbose'] > 2:
         click.echo(f'Password: {password}')
-    x = db.join(metadata.tables['YaptideUser'], metadata.tables['User'])
-    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
-
-    if user_exists(username, users, con):
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    
+    if user_exists(username, "YAPTIDE", users, con):
         return None
+    query = db.insert(users).values(username=username, auth_provider="YAPTIDE")
+    result = con.execute(query)
+    user_id = result.inserted_primary_key[0]
+    password_hash=generate_password_hash(password)
 
-    query = db.insert(users).values(username=username,
-                                    password_hash=generate_password_hash(password))
-    con.execute(query)
+    query = db.insert(yaptide_users).values(id=user_id, password_hash=password_hash)
+    result = con.execute(query)
+
     return None
 
 
@@ -120,9 +128,10 @@ def update_user(**kwargs):
         return None
     username = kwargs['name']
     click.echo(f'Updating user: {username}')
-    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
-    if not user_exists(username, users, con):
+    if not user_exists(username, "YAPTIDE", users, con):
         click.echo(f'YaptideUser: {username} does not exist, aborting update')
         return None
 
@@ -130,8 +139,12 @@ def update_user(**kwargs):
     password = kwargs['password']
     if password:
         pwd_hash = generate_password_hash(password)
-        query = db.update(users).\
-            where(users.c.username == username).\
+        query = db.select([users]).where(users.c.username == username)
+        ResultProxy = con.execute(query)
+        row = ResultProxy.first()
+
+        query = db.update(yaptide_users).\
+            where(yaptide_users.c.id == row.id).\
             values(password_hash=pwd_hash)
         con.execute(query)
         if kwargs['verbose'] > 2:
@@ -156,7 +169,9 @@ def add_ssh_key(**kwargs):
     cluster_username = kwargs['cluster_username']
     ssh_key = kwargs['ssh_key']
     ssh_key_content = ssh_key.read()
-    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    
     clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
 
     query = db.select([users]).where(users.c.username == username)
@@ -195,14 +210,16 @@ def remove_user(**kwargs):
         return None
     username = kwargs['name']
     click.echo(f'Deleting user: {username}')
-    users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
-
+    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    joined_users = users.join(yaptide_users, users.c.id == yaptide_users.c.id)
+    
     # abort if user does not exist
-    if not user_exists(username, users, con):
+    if not user_exists(username, "YAPTIDE", users, con):
         click.echo("Aborting, user does not exist")
         return None
 
-    query = db.delete(users).where(users.c.username == username)
+    query = db.delete(joined_users).where(joined_users.c.username == username)
     con.execute(query)
     click.echo(f'Successfully deleted user: {username}')
     return None
