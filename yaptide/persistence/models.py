@@ -45,7 +45,7 @@ class YaptideUserModel(UserBaseModel, db.Model):
     """Yaptide user model"""
 
     __tablename__ = 'YaptideUser'
-    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), primary_key=True)
+    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
     password_hash: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {
@@ -65,7 +65,7 @@ class PlgridUserModel(UserBaseModel, db.Model):
     """PLGrid user model"""
 
     __tablename__ = 'PlgridUser'
-    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'), primary_key=True)
+    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
     certificate: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {

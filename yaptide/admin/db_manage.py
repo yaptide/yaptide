@@ -42,7 +42,7 @@ def user_exists(name: str, auth_provider: str, users: db.Table, con) -> bool:
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
-        click.echo(f'YaptideUser: {name} already exists')
+        click.echo(f'User: {name} exists')
         return True
     return False
 
@@ -139,12 +139,11 @@ def update_user(**kwargs):
     password = kwargs['password']
     if password:
         pwd_hash = generate_password_hash(password)
-        query = db.select([users]).where(users.c.username == username)
-        ResultProxy = con.execute(query)
-        row = ResultProxy.first()
+
+        subquery = db.select([users.c.id]).where(users.c.username == username, users.c.auth_provider == "YAPTIDE").scalar_subquery()
 
         query = db.update(yaptide_users).\
-            where(yaptide_users.c.id == row.id).\
+            where(yaptide_users.c.id == subquery).\
             values(password_hash=pwd_hash)
         con.execute(query)
         if kwargs['verbose'] > 2:
@@ -170,11 +169,10 @@ def add_ssh_key(**kwargs):
     ssh_key = kwargs['ssh_key']
     ssh_key_content = ssh_key.read()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
     
     clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
 
-    query = db.select([users]).where(users.c.username == username)
+    query = db.select([users]).where(users.c.username == username, users.c.auth_provider == "YAPTIDE")
     ResultProxy = con.execute(query)
     user = ResultProxy.first()
 
@@ -203,23 +201,23 @@ def add_ssh_key(**kwargs):
 
 @run.command
 @click.argument('name')
+@click.argument('auth_provider')
 def remove_user(**kwargs):
     """Deletes user with provided login from db"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
     username = kwargs['name']
+    auth_provider = kwargs['auth_provider']
     click.echo(f'Deleting user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
-    joined_users = users.join(yaptide_users, users.c.id == yaptide_users.c.id)
     
     # abort if user does not exist
-    if not user_exists(username, "YAPTIDE", users, con):
+    if not user_exists(username, auth_provider, users, con):
         click.echo("Aborting, user does not exist")
         return None
 
-    query = db.delete(joined_users).where(joined_users.c.username == username)
+    query = db.delete(users).where(users.c.username == username, users.c.auth_provider == auth_provider)
     con.execute(query)
     click.echo(f'Successfully deleted user: {username}')
     return None
