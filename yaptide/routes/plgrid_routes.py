@@ -17,11 +17,11 @@ class AuthPlgrid(Resource):
         plgrid_token: dict = request.headers.get('Plgrid_token', None)
         if plgrid_token is None:
             return yaptide_response(message='No plgrid token provided', code=401)
-        
+
         # TODO: aquire certificate from plgrid here and save it in db
 
         username = plgrid_token["tokenParsed"]["preferred_username"]
-        
+
         user = db.session.query(PlgridUserModel).filter_by(username=username).first()
         if not user:
             user = PlgridUserModel(username=username,
@@ -54,7 +54,7 @@ class AuthPlgrid(Resource):
             return resp
         except Exception:  # skipcq: PYL-W0703
             return error_internal_response()
-    
+
     @staticmethod
     def delete():
         """Method returning status of logging out"""

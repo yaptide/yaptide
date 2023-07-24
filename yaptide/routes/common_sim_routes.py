@@ -7,7 +7,14 @@ from marshmallow import Schema
 from marshmallow import fields
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import SimulationModel, EstimatorModel, PageModel, UserBaseModel, InputModel, LogfilesModel
+from yaptide.persistence.models import (
+    SimulationModel,
+    EstimatorModel,
+    PageModel,
+    UserBaseModel,
+    InputModel,
+    LogfilesModel
+)
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response

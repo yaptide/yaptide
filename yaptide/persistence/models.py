@@ -30,7 +30,7 @@ class UserBaseModel(db.Model):
     clusters = relationship("ClusterModel")
 
     __table_args__ = (
-        UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),  # Ensure uniqueness within each provider
+        UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),
     )
 
     __mapper_args__ = {

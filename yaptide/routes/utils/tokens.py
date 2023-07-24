@@ -10,7 +10,9 @@ _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
 
 
-def encode_auth_token(user_id: int, is_refresh: bool = False, exp_time: int = None) -> tuple[Union[str, Exception], datetime]:
+def encode_auth_token(user_id: int,
+                      is_refresh: bool = False,
+                      exp_time: int = None) -> tuple[Union[str, Exception], datetime]:
     """Function encoding the token"""
     if is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
@@ -19,9 +21,9 @@ def encode_auth_token(user_id: int, is_refresh: bool = False, exp_time: int = No
         secret = SECRET_KEY_TOKEN
         exp_time_minutes = _Access_Token_Expiration_Time
 
-    exp = datetime.utcnow() + timedelta(minutes=exp_time_minutes) if\
-          exp_time is None else datetime.fromtimestamp(exp_time)
-    
+    exp = datetime.utcnow() + timedelta(minutes=exp_time_minutes)\
+        if exp_time is None else datetime.fromtimestamp(exp_time)
+
     try:
         # For a description of the payload fields, take look
         # at JSON Web Token RFC https://datatracker.ietf.org/doc/html/rfc7519

@@ -3,7 +3,6 @@ from pathlib import Path
 
 import click
 import sqlalchemy as db
-from sqlalchemy.orm import with_polymorphic
 from werkzeug.security import generate_password_hash
 
 
@@ -37,7 +36,6 @@ def connect_to_db():
 
 def user_exists(name: str, auth_provider: str, users: db.Table, con) -> bool:
     """Check if user already exists"""
-
     query = db.select(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
@@ -61,7 +59,7 @@ def list_users(**kwargs):
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
     joined_users = users.join(yaptide_users, users.c.id == yaptide_users.c.id)
-    
+
     query = db.select([joined_users])
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
@@ -103,13 +101,13 @@ def add_user(**kwargs):
         click.echo(f'Password: {password}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
-    
+
     if user_exists(username, "YAPTIDE", users, con):
         return None
     query = db.insert(users).values(username=username, auth_provider="YAPTIDE")
     result = con.execute(query)
     user_id = result.inserted_primary_key[0]
-    password_hash=generate_password_hash(password)
+    password_hash = generate_password_hash(password)
 
     query = db.insert(yaptide_users).values(id=user_id, password_hash=password_hash)
     result = con.execute(query)
@@ -140,7 +138,8 @@ def update_user(**kwargs):
     if password:
         pwd_hash = generate_password_hash(password)
 
-        subquery = db.select([users.c.id]).where(users.c.username == username, users.c.auth_provider == "YAPTIDE").scalar_subquery()
+        subquery = db.select([users.c.id]).where(users.c.username == username,
+                                                 users.c.auth_provider == "YAPTIDE").scalar_subquery()
 
         query = db.update(yaptide_users).\
             where(yaptide_users.c.id == subquery).\
@@ -169,7 +168,7 @@ def add_ssh_key(**kwargs):
     ssh_key = kwargs['ssh_key']
     ssh_key_content = ssh_key.read()
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    
+
     clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
 
     query = db.select([users]).where(users.c.username == username, users.c.auth_provider == "YAPTIDE")
@@ -185,7 +184,7 @@ def add_ssh_key(**kwargs):
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
-        click.echo(f'YaptideUser: {username} already has key and username for cluster: {cluster_name} - updating old one')
+        click.echo(f'User: {username} already has key and username for cluster: {cluster_name} - updating old one')
         query = db.update(clusters).\
             where((clusters.c.user_id == user.id) & (clusters.c.cluster_name == cluster_name)).\
             values(cluster_username=cluster_username, cluster_ssh_key=ssh_key_content)
@@ -211,7 +210,7 @@ def remove_user(**kwargs):
     auth_provider = kwargs['auth_provider']
     click.echo(f'Deleting user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    
+
     # abort if user does not exist
     if not user_exists(username, auth_provider, users, con):
         click.echo("Aborting, user does not exist")
