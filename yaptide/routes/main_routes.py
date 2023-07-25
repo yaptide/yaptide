@@ -7,6 +7,7 @@ from yaptide.routes.celery_routes import JobsDirect, ConvertInputFiles
 from yaptide.routes.task_routes import TaskUpdate
 from yaptide.routes.common_sim_routes import SimulationResults, SimulationInputs, SimulationLogfiles
 from yaptide.routes.user_routes import UserSimulations, UserClusters, UserUpdate
+from yaptide.routes.plgrid_routes import AuthPlgrid
 
 
 class HelloWorld(Resource):
@@ -44,3 +45,5 @@ def initialize_routes(api: Api):
     api.add_resource(AuthRefresh, "/auth/refresh")
     api.add_resource(AuthStatus, "/auth/status")
     api.add_resource(AuthLogOut, "/auth/logout")
+
+    api.add_resource(AuthPlgrid, "/auth/token")
