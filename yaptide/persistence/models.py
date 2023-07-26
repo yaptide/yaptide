@@ -15,7 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 class AuthProvider(Enum):
     """Authentication provider"""
 
-    KEYCLOAK= "KEYCLOAK"
+    KEYCLOAK = "KEYCLOAK"
     YAPTIDE = "YAPTIDE"
 
 
