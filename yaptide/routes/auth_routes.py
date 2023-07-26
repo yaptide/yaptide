@@ -117,7 +117,7 @@ class AuthStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: YaptideUserModel):
         """Method returning user's status"""
         return yaptide_response(

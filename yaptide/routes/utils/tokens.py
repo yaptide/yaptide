@@ -6,23 +6,27 @@ import jwt
 
 SECRET_KEY_TOKEN = token_hex(256)
 SECRET_KEY_TOKEN_REFRESH = token_hex(256)
+SECRET_KEY_TOKEN_KEYCLOAK = token_hex(256)
 _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
+_Keycloak_Token_Expiration_Time = 30  # minutes
 
 
 def encode_auth_token(user_id: int,
                       is_refresh: bool = False,
-                      exp_time: int = None) -> tuple[Union[str, Exception], datetime]:
+                      is_keycloak: bool = False) -> tuple[Union[str, Exception], datetime]:
     """Function encoding the token"""
-    if is_refresh:
+    if is_keycloak:
+        secret = SECRET_KEY_TOKEN_KEYCLOAK
+        exp_time_minutes = _Keycloak_Token_Expiration_Time
+    elif is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
         exp_time_minutes = _Refresh_Token_Expiration_Time
     else:
         secret = SECRET_KEY_TOKEN
         exp_time_minutes = _Access_Token_Expiration_Time
 
-    exp = datetime.utcnow() + timedelta(minutes=exp_time_minutes)\
-        if exp_time is None else datetime.fromtimestamp(exp_time)
+    exp = datetime.utcnow() + timedelta(minutes=exp_time_minutes)
 
     try:
         # For a description of the payload fields, take look
@@ -37,9 +41,13 @@ def encode_auth_token(user_id: int,
         return e, exp
 
 
-def decode_auth_token(token: str, is_refresh: bool = False) -> Union[int, str]:
+def decode_auth_token(token: str,
+                      is_refresh: bool = False,
+                      is_keycloak: bool = False) -> Union[int, str]:
     """Function decoding the token"""
-    if is_refresh:
+    if is_keycloak:
+        secret = SECRET_KEY_TOKEN_KEYCLOAK
+    elif is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
     else:
         secret = SECRET_KEY_TOKEN

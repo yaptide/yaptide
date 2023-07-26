@@ -14,7 +14,7 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
-    UserBaseModel,
+    KeycloakUserModel,
     SimulationModel,
     ClusterModel,
     TaskModel,
@@ -30,9 +30,12 @@ class JobsBatch(Resource):
     """Class responsible for jobs via direct slurm connection"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def post(user: UserBaseModel):
+    @requires_auth(is_keycloak=True)
+    def post(user: KeycloakUserModel):
         """Method handling running shieldhit with batch"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
@@ -121,9 +124,12 @@ class JobsBatch(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserBaseModel):
+    @requires_auth(is_keycloak=True)
+    def get(user: KeycloakUserModel):
         """Method geting job's result"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -172,9 +178,12 @@ class JobsBatch(Resource):
         )
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def delete(user: UserBaseModel):
+    @requires_auth(is_keycloak=True)
+    def delete(user: KeycloakUserModel):
         """Method canceling job"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -212,9 +221,12 @@ class ResultsBatch(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserBaseModel):
+    @requires_auth(is_keycloak=True)
+    def get(user: KeycloakUserModel):
         """Method geting job's result"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:

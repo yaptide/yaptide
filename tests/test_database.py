@@ -5,7 +5,7 @@ from sqlalchemy.orm.scoping import scoped_session
 
 from yaptide.persistence.models import (
     YaptideUserModel,
-    PlgridUserModel,
+    KeycloakUserModel,
     SimulationModel,
     TaskModel,
     ClusterModel,
@@ -29,13 +29,16 @@ def test_create_yaptide_user(db_session: scoped_session, db_good_username: str, 
 
 def test_create_plgrid_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test plgrid user model creation"""
-    user = PlgridUserModel(username=db_good_username, certificate=db_good_password, auth_provider="PLGRID")
+    user = KeycloakUserModel(username=db_good_username,
+                             cert=db_good_password,
+                             private_key=db_good_password,
+                             auth_provider="KEYCLOAK")
     db_session.add(user)
     db_session.commit()
 
     assert user.id is not None
     assert user.username == db_good_username
-    assert user.certificate == db_good_password
+    assert user.cert == db_good_password
 
 
 def test_cluster_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):

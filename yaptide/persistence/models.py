@@ -15,7 +15,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 class AuthProvider(Enum):
     """Authentication provider"""
 
-    PLGRID = "PLGRID"
+    KEYCLOAK= "KEYCLOAK"
     YAPTIDE = "YAPTIDE"
 
 
@@ -61,15 +61,16 @@ class YaptideUserModel(UserBaseModel, db.Model):
         return check_password_hash(self.password_hash, password)
 
 
-class PlgridUserModel(UserBaseModel, db.Model):
+class KeycloakUserModel(UserBaseModel, db.Model):
     """PLGrid user model"""
 
-    __tablename__ = 'PlgridUser'
+    __tablename__ = 'KeycloakUser'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
-    certificate: Column[str] = db.Column(db.String, nullable=False)
+    cert: Column[str] = db.Column(db.String, nullable=False)
+    private_key: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {
-        "polymorphic_identity": "PlgridUser"
+        "polymorphic_identity": "KeycloakUser"
     }
 
 

@@ -45,7 +45,7 @@ class UserSimulations(Resource):
         order_type = fields.String(load_default=OrderType.DESCEND.value)
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning simulations from the database"""
         schema = UserSimulations.APIParametersSchema()
@@ -85,7 +85,7 @@ class UserClusters(Resource):
     """Class responsible for returning user's available clusters"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning clusters"""
         clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
@@ -105,7 +105,7 @@ class UserUpdate(Resource):
     """Class responsible for updating the user"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def post(user: UserBaseModel):
         """Updates user with provided parameters"""
         json_data: dict = request.get_json(force=True)

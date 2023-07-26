@@ -24,7 +24,7 @@ class JobsDirect(Resource):
     """Class responsible for simulations run directly with celery"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def post(user: UserBaseModel):
         """Submit simulation job to celery"""
         payload_dict: dict = request.get_json(force=True)
@@ -94,7 +94,7 @@ class JobsDirect(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning job status and results"""
         # validate request parameters and handle errors
@@ -141,7 +141,7 @@ class JobsDirect(Resource):
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def delete(user: UserBaseModel):
         """Method canceling simulation and returning status of this action"""
         try:
@@ -173,7 +173,7 @@ class ResultsDirect(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning job status and results"""
         schema = ResultsDirect.APIParametersSchema()
@@ -229,7 +229,7 @@ class ConvertInputFiles(Resource):
     """Class responsible for returning input_model files converted from front JSON"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def post(_: UserBaseModel):
         """Method handling input_model files convertion"""
         payload_dict: dict = request.get_json(force=True)

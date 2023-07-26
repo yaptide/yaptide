@@ -83,7 +83,7 @@ class SimulationResults(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning job status and results"""
         schema = SimulationResults.APIParametersSchema()
@@ -126,7 +126,7 @@ class SimulationInputs(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning simulation input"""
         schema = SimulationInputs.APIParametersSchema()
@@ -190,7 +190,7 @@ class SimulationLogfiles(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
+    @requires_auth()
     def get(user: UserBaseModel):
         """Method returning job status and results"""
         schema = SimulationResults.APIParametersSchema()

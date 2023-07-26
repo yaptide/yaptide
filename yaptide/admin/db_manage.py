@@ -11,7 +11,7 @@ class TableTypes(Enum):
 
     USER = "User"
     YAPTIDEUSER = "YaptideUser"
-    PLGRIDUSER = "PlgridUser"
+    PLGRIDUSER = "KeycloakUser"
     SIMULATION = "Simulation"
     CLUSTER = "Cluster"
     TASK = "Task"
