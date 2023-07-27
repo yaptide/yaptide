@@ -9,7 +9,6 @@ from enum import Enum
 
 from sqlalchemy import asc, desc
 
-from yaptide.persistence.database import db
 from yaptide.persistence.models import UserBaseModel, SimulationModel
 
 from yaptide.routes.utils.decorators import requires_auth

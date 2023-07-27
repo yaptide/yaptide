@@ -38,7 +38,7 @@ class AuthKeycloak(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        keycloak_token: str = request.headers.get('keycloak_token', '')
+        keycloak_token: str = request.headers.get('Authorization', '')
         if not keycloak_token:
             return yaptide_response(message='No keycloak token provided', code=401)
 

@@ -198,6 +198,8 @@ def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: Cluste
     }
 
 
-def delete_job(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def delete_job(concat_job_id: str,
+               user: KeycloakUserModel,
+               cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
     return {"message": "Not implemented yet"}, 404
