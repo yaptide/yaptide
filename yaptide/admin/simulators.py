@@ -235,9 +235,10 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
                 for tag in tags["TagSet"]:
                     if tag["Key"] == "topas_versions":
                         topas_versions = tag["Value"].split(",")
-                        if topas_versions in topas_versions:
+                        topas_versions = [version.strip() for version in topas_versions]
+                        if topas_version in topas_versions:
                             temp_file = tempfile.NamedTemporaryFile()
-                            # s3_client.download_fileobj(Bucket=geant_bucket_name, Key=key, Fileobj=temp_file)
+                            s3_client.download_fileobj(Bucket=geant_bucket_name, Key=key, Fileobj=temp_file, ExtraArgs={"VersionId": version_id})
                             geant_temp_files.append(temp_file)
     except ClientError as e:
         click.echo("Failed to download Geant4 from S3 with error: ", e.response["Error"]["Message"])
@@ -247,6 +248,12 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
     topas_file_contents.extractall(path=topas_file_path)
+    
+    geant_files_path = installation_path / "geant"
+    for file in geant_temp_files:
+        file.seek(0)
+        file_contents = tarfile.TarFile(fileobj=file)
+        file_contents.extractall(path=geant_files_path)
     
     return True
 
