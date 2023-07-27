@@ -11,7 +11,7 @@ class TableTypes(Enum):
 
     USER = "User"
     YAPTIDEUSER = "YaptideUser"
-    PLGRIDUSER = "KeycloakUser"
+    KEYCLOAKUSER = "KeycloakUser"
     SIMULATION = "Simulation"
     CLUSTER = "Cluster"
     TASK = "Task"
@@ -152,48 +152,26 @@ def update_user(**kwargs):
 
 
 @run.command
-@click.argument('username')
 @click.argument('cluster_name')
-@click.argument('cluster_username')
-@click.argument('ssh_key', type=click.File(mode='r'))
 @click.option('-v', '--verbose', count=True)
-def add_ssh_key(**kwargs):
+def add_cluster(**kwargs):
     """Adds ssh key to allow the user to connect to cluster"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
-    username = kwargs['username']
     cluster_name = kwargs['cluster_name']
-    cluster_username = kwargs['cluster_username']
-    ssh_key = kwargs['ssh_key']
-    ssh_key_content = ssh_key.read()
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
     clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
 
-    query = db.select([users]).where(users.c.username == username, users.c.auth_provider == "YAPTIDE")
-    ResultProxy = con.execute(query)
-    user = ResultProxy.first()
-
-    if not user:
-        click.echo(f'YaptideUser: {username} does not exist, aborting adding ssh key')
-        return None
-
-    query = db.select([clusters]).\
-        where((clusters.c.user_id == user.id) & (clusters.c.cluster_name == cluster_name))
+    query = db.select([clusters]).where(clusters.c.cluster_name == cluster_name)
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     if len(ResultSet) > 0:
-        click.echo(f'User: {username} already has key and username for cluster: {cluster_name} - updating old one')
-        query = db.update(clusters).\
-            where((clusters.c.user_id == user.id) & (clusters.c.cluster_name == cluster_name)).\
-            values(cluster_username=cluster_username, cluster_ssh_key=ssh_key_content)
-    else:
-        click.echo(f'Adding key and username for user: {username}, for cluster: {cluster_name}')
-        query = db.insert(clusters).values(user_id=user.id,
-                                           cluster_name=cluster_name,
-                                           cluster_username=cluster_username,
-                                           cluster_ssh_key=ssh_key_content)
+        click.echo(f'Cluster: {cluster_name} already exists, aborting adding cluster')
+        return None
+
+    click.echo(f'Adding cluster: {cluster_name}')
+    query = db.insert(clusters).values(cluster_name=cluster_name)
     con.execute(query)
     return None
 
@@ -250,7 +228,7 @@ def list_clusters(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} simulations in DB:")
     for row in ResultSet:
-        click.echo(f"id {row.id}; user id {row.user_id}; cluster name {row.cluster_name};")
+        click.echo(f"id {row.id}; cluster name {row.cluster_name};")
     return None
 
 

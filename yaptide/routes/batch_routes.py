@@ -59,9 +59,9 @@ class JobsBatch(Resource):
         if input_type is None:
             return error_validation_response()
 
-        clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
+        clusters: list[ClusterModel] = db.session.query(ClusterModel).all()
         if len(clusters) < 1:
-            return error_validation_response({"message": "User has no clusters available"})
+            return error_validation_response({"message": "No clusters are available"})
 
         filtered_clusters: list[ClusterModel] = []
         if "batch_options" in payload_dict and "cluster_name" in payload_dict["batch_options"]:
@@ -91,7 +91,7 @@ class JobsBatch(Resource):
         input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
         input_dict_to_save["input_files"] = files_dict
 
-        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, cluster=cluster)
+        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user, cluster=cluster)
 
         if "job_id" in result:
             job_id = result["job_id"]
@@ -164,7 +164,7 @@ class JobsBatch(Resource):
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
 
-        job_info = get_job_status(concat_job_id=job_id, cluster=cluster)
+        job_info = get_job_status(concat_job_id=job_id, user=user, cluster=cluster)
         if simulation.update_state(job_info):
             db.session.commit()
 
@@ -204,7 +204,7 @@ class JobsBatch(Resource):
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
 
-        result, status_code = delete_job(concat_job_id=job_id, cluster=cluster)
+        result, status_code = delete_job(concat_job_id=job_id, user=user, cluster=cluster)
         return yaptide_response(
             message="",
             code=status_code,
@@ -264,7 +264,7 @@ class ResultsBatch(Resource):
         cluster: ClusterModel = db.session.query(ClusterModel).\
             filter_by(user_id=user.id, cluster_name=cluster_name).first()
 
-        result: dict = get_job_results(concat_job_id=job_id, cluster=cluster)
+        result: dict = get_job_results(concat_job_id=job_id, user=user, cluster=cluster)
         if "estimators" not in result:
             logging.debug("Results for job %s are unavailable", job_id)
             return yaptide_response(message="Results are unavailable", code=404, content=result)
@@ -283,3 +283,23 @@ class ResultsBatch(Resource):
 
         logging.debug("Returning results from SLURM")
         return yaptide_response(message=f"Results for job: {job_id}, results from Slurm", code=200, content=result)
+
+
+class Clusters(Resource):
+    """Class responsible for returning user's available clusters"""
+
+    @staticmethod
+    @requires_auth(is_keycloak=True)
+    def get(_: KeycloakUserModel):
+        """Method returning clusters"""
+        clusters: list[ClusterModel] = db.session.query(ClusterModel).all()
+
+        result = {
+            'clusters': [
+                {
+                    'cluster_name': cluster.cluster_name
+                }
+                for cluster in clusters
+            ]
+        }
+        return yaptide_response(message='Available clusters', code=200, content=result)

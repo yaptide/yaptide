@@ -10,7 +10,7 @@ from enum import Enum
 from sqlalchemy import asc, desc
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserBaseModel, SimulationModel, ClusterModel
+from yaptide.persistence.models import UserBaseModel, SimulationModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
@@ -79,26 +79,6 @@ class UserSimulations(Resource):
             'simulations_count': pagination.total,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)
-
-
-class UserClusters(Resource):
-    """Class responsible for returning user's available clusters"""
-
-    @staticmethod
-    @requires_auth()
-    def get(user: UserBaseModel):
-        """Method returning clusters"""
-        clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
-
-        result = {
-            'clusters': [
-                {
-                    'cluster_name': cluster.cluster_name
-                }
-                for cluster in clusters
-            ]
-        }
-        return yaptide_response(message='User clusters', code=200, content=result)
 
 
 class UserUpdate(Resource):

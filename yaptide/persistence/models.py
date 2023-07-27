@@ -27,7 +27,6 @@ class UserBaseModel(db.Model):
     username: Column[str] = db.Column(db.String, nullable=False)
     auth_provider: Column[str] = db.Column(db.String, nullable=False, default=AuthProvider.YAPTIDE.value)
     simulations = relationship("SimulationModel")
-    clusters = relationship("ClusterModel")
 
     __table_args__ = (
         UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),
@@ -79,10 +78,7 @@ class ClusterModel(db.Model):
 
     __tablename__ = 'Cluster'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'))
     cluster_name: Column[str] = db.Column(db.String, nullable=False)
-    cluster_username: Column[str] = db.Column(db.String, nullable=False)
-    cluster_ssh_key: Column[str] = db.Column(db.String, nullable=False)
 
 
 class SimulationModel(db.Model):

@@ -41,28 +41,18 @@ def test_create_plgrid_user(db_session: scoped_session, db_good_username: str, d
     assert user.cert == db_good_password
 
 
-def test_cluster_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
+def test_cluster_model_creation(db_session: scoped_session):
     """Test cluster model creation"""
     # create a new user
-    user = YaptideUserModel(username=db_good_username)
-    user.set_password(db_good_password)
-    db_session.add(user)
-    db_session.commit()
 
     # create a new cluster for the user
-    cluster = ClusterModel(user_id=user.id,
-                           cluster_name='testcluster',
-                           cluster_username='testuser',
-                           cluster_ssh_key='ssh_key')
+    cluster = ClusterModel(cluster_name='testcluster')
     db_session.add(cluster)
     db_session.commit()
 
     # retrieve the cluster from the database and check its fields
-    cluster = ClusterModel.query.filter_by(user_id=user.id).first()
-    assert cluster is not None
+    assert cluster.id is not None
     assert cluster.cluster_name == 'testcluster'
-    assert cluster.cluster_username == 'testuser'
-    assert cluster.cluster_ssh_key == 'ssh_key'
 
 
 def test_simulation_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
