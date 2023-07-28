@@ -52,20 +52,18 @@ def run():
 
 @run.command
 def list_users(**kwargs):
-    """List all users"""
+    """List users"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
-    joined_users = users.join(yaptide_users, users.c.id == yaptide_users.c.id)
 
-    query = db.select([joined_users])
+    query = db.select([users])
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        click.echo(f"Login {row.username}; Passw ...{row.password_hash[-10:]}")
+        click.echo(f"Login {row.username}; Auth provider ...{row.auth_provider}")
     return None
 
 
@@ -90,7 +88,7 @@ def list_tasks(**kwargs):
 @click.option('password', '--password', default='')
 @click.option('-v', '--verbose', count=True)
 def add_user(**kwargs):
-    """Add user to database"""
+    """Add yaptide user to database"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None

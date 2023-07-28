@@ -30,7 +30,7 @@ class JobsBatch(Resource):
     """Class responsible for jobs via direct slurm connection"""
 
     @staticmethod
-    @requires_auth(is_keycloak=True)
+    @requires_auth()
     def post(user: KeycloakUserModel):
         """Method handling running shieldhit with batch"""
         if not isinstance(user, KeycloakUserModel):
@@ -124,7 +124,7 @@ class JobsBatch(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_keycloak=True)
+    @requires_auth()
     def get(user: KeycloakUserModel):
         """Method geting job's result"""
         if not isinstance(user, KeycloakUserModel):
@@ -178,7 +178,7 @@ class JobsBatch(Resource):
         )
 
     @staticmethod
-    @requires_auth(is_keycloak=True)
+    @requires_auth()
     def delete(user: KeycloakUserModel):
         """Method canceling job"""
         if not isinstance(user, KeycloakUserModel):
@@ -221,7 +221,7 @@ class ResultsBatch(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_keycloak=True)
+    @requires_auth()
     def get(user: KeycloakUserModel):
         """Method geting job's result"""
         if not isinstance(user, KeycloakUserModel):
@@ -289,9 +289,12 @@ class Clusters(Resource):
     """Class responsible for returning user's available clusters"""
 
     @staticmethod
-    @requires_auth(is_keycloak=True)
-    def get(_: KeycloakUserModel):
+    @requires_auth()
+    def get(user: KeycloakUserModel):
         """Method returning clusters"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         clusters: list[ClusterModel] = db.session.query(ClusterModel).all()
 
         result = {

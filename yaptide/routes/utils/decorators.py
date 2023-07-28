@@ -4,13 +4,15 @@ from werkzeug.exceptions import Unauthorized, Forbidden
 
 from functools import wraps
 
+from sqlalchemy.orm import with_polymorphic
+
 from yaptide.persistence.database import db
-from yaptide.persistence.models import YaptideUserModel, KeycloakUserModel
+from yaptide.persistence.models import UserBaseModel, YaptideUserModel, KeycloakUserModel
 
 from yaptide.routes.utils.tokens import decode_auth_token
 
 
-def requires_auth(is_refresh: bool = False, is_keycloak: bool = False):
+def requires_auth(is_refresh: bool = False):
     """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""
@@ -19,14 +21,10 @@ def requires_auth(is_refresh: bool = False, is_keycloak: bool = False):
             token: str = request.cookies.get('refresh_token' if is_refresh else 'access_token')
             if not token:
                 raise Unauthorized(description="No token provided")
-            resp: Union[int, str] = decode_auth_token(token=token,
-                                                      is_refresh=is_refresh,
-                                                      is_keycloak=is_keycloak)
+            resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
-                if is_keycloak:
-                    user = db.session.query(KeycloakUserModel).filter_by(id=resp).first()
-                else:
-                    user = db.session.query(YaptideUserModel).filter_by(id=resp).first()
+                UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
+                user = db.session.query(UserPoly).filter_by(id=resp).first()
                 if user:
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")
