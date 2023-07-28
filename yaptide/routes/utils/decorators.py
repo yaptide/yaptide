@@ -1,3 +1,4 @@
+import logging
 from typing import Union
 from flask import request
 from werkzeug.exceptions import Unauthorized, Forbidden
@@ -26,7 +27,13 @@ def requires_auth(is_refresh: bool = False):
                 UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
                 user = db.session.query(UserPoly).filter_by(id=resp).first()
                 if user:
-                    return f(user, *args, **kwargs)
+                    logging.warning("User is %s user", user.auth_provider)
+                    if user.auth_provider == "YAPTIDE":
+                        yaptide_user = db.session.query(YaptideUserModel).filter_by(id=resp).first()
+                        return f(yaptide_user, *args, **kwargs)
+                    else:
+                        keycloak_user = db.session.query(KeycloakUserModel).filter_by(id=resp).first()
+                        return f(keycloak_user, *args, **kwargs)
                 raise Forbidden(description="User not found")
             if is_refresh:
                 raise Forbidden(description="Log in again")

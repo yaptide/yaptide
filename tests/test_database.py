@@ -51,8 +51,6 @@ def test_polymorphic_user_fetch(db_session: scoped_session, db_good_username: st
     db_session.commit()
 
     assert yaptide_user.id is not None
-    assert yaptide_user.username == db_good_username
-    assert yaptide_user.check_password(db_good_password)
 
     yaptide_user_id = yaptide_user.id
 
@@ -64,19 +62,21 @@ def test_polymorphic_user_fetch(db_session: scoped_session, db_good_username: st
     db_session.commit()
 
     assert keycloak_user.id is not None
-    assert keycloak_user.username == db_good_username
-    assert keycloak_user.cert == db_good_password
 
     keycloak_user_id = keycloak_user.id
     UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
 
-    fetched_user = db_session.query(UserPoly).filter_by(id=keycloak_user_id).first()
-    assert fetched_user is not None
-    assert isinstance(fetched_user, KeycloakUserModel)
-
     fetched_user = db_session.query(UserPoly).filter_by(id=yaptide_user_id).first()
     assert fetched_user is not None
     assert isinstance(fetched_user, YaptideUserModel)
+    assert fetched_user.username == db_good_username
+    assert fetched_user.check_password(db_good_password)
+
+    fetched_user = db_session.query(UserPoly).filter_by(id=keycloak_user_id).first()
+    assert fetched_user is not None
+    assert isinstance(fetched_user, KeycloakUserModel)
+    assert fetched_user.username == db_good_username
+    assert fetched_user.cert == db_good_password
 
 
 def test_cluster_model_creation(db_session: scoped_session):
