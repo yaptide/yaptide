@@ -11,10 +11,9 @@ _Access_Token_Expiration_Time = 10  # minutes
 _Keycloak_Token_Expiration_Time = 30  # minutes
 
 
-def encode_auth_token(
-        user_id: int, 
-        is_refresh: bool = False, 
-        is_keycloak: bool = False) -> tuple[Union[str, Exception], datetime]:
+def encode_auth_token(user_id: int,
+                      is_refresh: bool = False,
+                      is_keycloak: bool = False) -> tuple[Union[str, Exception], datetime]:  # skipcq: FLK-E101
     """Function encoding the token"""
     if is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
