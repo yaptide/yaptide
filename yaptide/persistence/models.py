@@ -33,7 +33,8 @@ class UserBaseModel(db.Model):
     )
 
     __mapper_args__ = {
-        "polymorphic_identity": "User"
+        "polymorphic_identity": "User",
+        "with_polymorphic": "*"
     }
 
     def __repr__(self) -> str:
@@ -48,7 +49,8 @@ class YaptideUserModel(UserBaseModel, db.Model):
     password_hash: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {
-        "polymorphic_identity": "YaptideUser"
+        "polymorphic_identity": "YaptideUser",
+        "polymorphic_load": "inline"
     }
 
     def set_password(self, password: str):
@@ -69,7 +71,8 @@ class KeycloakUserModel(UserBaseModel, db.Model):
     private_key: Column[str] = db.Column(db.String, nullable=False)
 
     __mapper_args__ = {
-        "polymorphic_identity": "KeycloakUser"
+        "polymorphic_identity": "KeycloakUser",
+        "polymorphic_load": "inline"
     }
 
 
