@@ -1,4 +1,3 @@
-import logging
 from typing import Union
 from flask import request
 from werkzeug.exceptions import Unauthorized, Forbidden

@@ -62,8 +62,8 @@ class AuthKeycloak(Resource):
             db.session.add(user)
         else:
             user.cert = res_json["cert"]
-            user.private_key = res_json["private"]      
-  
+            user.private_key = res_json["private"]
+
         db.session.commit()
 
         try:
