@@ -4,13 +4,15 @@ from werkzeug.exceptions import Unauthorized, Forbidden
 
 from functools import wraps
 
+from sqlalchemy.orm import with_polymorphic
+
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel
+from yaptide.persistence.models import UserBaseModel, YaptideUserModel, KeycloakUserModel
 
 from yaptide.routes.utils.tokens import decode_auth_token
 
 
-def requires_auth(is_refresh: bool):
+def requires_auth(is_refresh: bool = False):
     """Decorator for auth requirements"""
     def decorator(f):
         """Determines if the access or refresh token is valid"""
@@ -21,7 +23,8 @@ def requires_auth(is_refresh: bool):
                 raise Unauthorized(description="No token provided")
             resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
-                user = db.session.query(UserModel).filter_by(id=resp).first()
+                UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
+                user = db.session.query(UserPoly).filter_by(id=resp).first()
                 if user:
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")

@@ -15,6 +15,7 @@ services:
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
             - FLOWER_BASIC_AUTH=admin:password
+            - CERT_AUTH_URL=${CERT_AUTH_URL-""}
         depends_on:
             - redis
             - flower

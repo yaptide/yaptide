@@ -9,7 +9,7 @@ from datetime import datetime
 from pathlib import Path
 
 from fabric import Connection, Result
-from paramiko import Ed25519Key
+from paramiko import RSAKey
 import pymchelper
 
 from yaptide.batch.string_templates import (
@@ -18,26 +18,36 @@ from yaptide.batch.string_templates import (
     COLLECT_BASH
 )
 from yaptide.batch.utils.utils import extract_sbatch_header, convert_dict_to_sbatch_options
-from yaptide.persistence.models import SimulationModel, ClusterModel
+from yaptide.persistence.models import KeycloakUserModel, SimulationModel, ClusterModel
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 
-def submit_job(payload_dict: dict, files_dict: dict, cluster: ClusterModel) -> dict:
+def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
+    """Returns connection object to cluster"""
+    pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
+    pkey.load_certificate(user.cert)
+
+    con = Connection(
+        host=f"{user.username}@{cluster.cluster_name}",
+        connect_kwargs={
+            "pkey": pkey,
+            "allow_agent": False,
+            "look_for_keys": False
+        }
+    )
+    return con
+
+
+def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Dummy version of submit_job"""
     utc_time = int(datetime.utcnow().timestamp()*1e6)
-    pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
-    con = Connection(
-        host=f"{cluster.cluster_username}@{cluster.cluster_name}",
-        connect_kwargs={"pkey": pkey}
-    )
+
+    con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
 
     job_dir = f"{scratch}/yaptide_runs/{utc_time}"
-
-    # since it is not obligatory for UI to provide ntasks parameters it is set here for sure
-    # if it is provided it will be overwritten by itself so nothing will change
 
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -121,14 +131,11 @@ def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> t
     }
 
 
-def get_job_status(concat_job_id: str, cluster: ClusterModel) -> dict:
+def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Dummy version of get_job_status"""
     _, job_id, collect_id, _ = concat_job_id.split(":")
-    pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
-    con = Connection(
-        host=f"{cluster.cluster_username}@{cluster.cluster_name}",
-        connect_kwargs={"pkey": pkey}
-    )
+
+    con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
     job_state = fabric_result.stdout.split()[-1].split()[0]
@@ -159,14 +166,12 @@ def get_job_status(concat_job_id: str, cluster: ClusterModel) -> dict:
     }
 
 
-def get_job_results(concat_job_id: str, cluster: ClusterModel) -> dict:
+def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Returns simulation results"""
     utc_time, _, collect_id, _ = concat_job_id.split(":")
-    pkey = Ed25519Key(file_obj=io.StringIO(cluster.cluster_ssh_key))
-    con = Connection(
-        host=f"{cluster.cluster_username}@{cluster.cluster_name}",
-        connect_kwargs={"pkey": pkey}
-    )
+
+    con = get_connection(user=user, cluster=cluster)
+
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
 
@@ -193,6 +198,9 @@ def get_job_results(concat_job_id: str, cluster: ClusterModel) -> dict:
     }
 
 
-def delete_job(concat_job_id: str, cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def delete_job(concat_job_id: str,
+               user: KeycloakUserModel,
+               cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
+    logging.info("Deleting job %s for user %s on cluster %s", concat_job_id, user.username, cluster.cluster_name)
     return {"message": "Not implemented yet"}, 404

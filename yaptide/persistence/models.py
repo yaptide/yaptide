@@ -4,7 +4,7 @@ from enum import Enum
 import gzip
 import json
 
-from sqlalchemy import Column
+from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from yaptide.persistence.database import db
@@ -12,15 +12,40 @@ from yaptide.persistence.database import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-class UserModel(db.Model):
+class UserBaseModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    username: Column[str] = db.Column(db.String, nullable=False, unique=True)
-    password_hash: Column[str] = db.Column(db.String, nullable=False)
+    username: Column[str] = db.Column(db.String, nullable=False)
+    auth_provider: Column[str] = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
-    clusters = relationship("ClusterModel")
+
+    __table_args__ = (
+        UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),
+    )
+
+    __mapper_args__ = {
+        "polymorphic_identity": "User",
+        "polymorphic_on": auth_provider,
+        "with_polymorphic": "*"
+    }
+
+    def __repr__(self) -> str:
+        return f'User #{self.id} {self.username}'
+
+
+class YaptideUserModel(UserBaseModel, db.Model):
+    """Yaptide user model"""
+
+    __tablename__ = 'YaptideUser'
+    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
+    password_hash: Column[str] = db.Column(db.String, nullable=False)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "YaptideUser",
+        "polymorphic_load": "inline"
+    }
 
     def set_password(self, password: str):
         """Sets hashed password"""
@@ -30,8 +55,19 @@ class UserModel(db.Model):
         """Checks password correctness"""
         return check_password_hash(self.password_hash, password)
 
-    def __repr__(self) -> str:
-        return f'User #{self.id} {self.username}'
+
+class KeycloakUserModel(UserBaseModel, db.Model):
+    """PLGrid user model"""
+
+    __tablename__ = 'KeycloakUser'
+    id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
+    cert: Column[str] = db.Column(db.String, nullable=False)
+    private_key: Column[str] = db.Column(db.String, nullable=False)
+
+    __mapper_args__ = {
+        "polymorphic_identity": "KeycloakUser",
+        "polymorphic_load": "inline"
+    }
 
 
 class ClusterModel(db.Model):
@@ -39,10 +75,7 @@ class ClusterModel(db.Model):
 
     __tablename__ = 'Cluster'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id'))
     cluster_name: Column[str] = db.Column(db.String, nullable=False)
-    cluster_username: Column[str] = db.Column(db.String, nullable=False)
-    cluster_ssh_key: Column[str] = db.Column(db.String, nullable=False)
 
 
 class SimulationModel(db.Model):

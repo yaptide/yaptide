@@ -9,8 +9,7 @@ from enum import Enum
 
 from sqlalchemy import asc, desc
 
-from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, ClusterModel
+from yaptide.persistence.models import UserBaseModel, SimulationModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
@@ -45,8 +44,8 @@ class UserSimulations(Resource):
         order_type = fields.String(load_default=OrderType.DESCEND.value)
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    @requires_auth()
+    def get(user: UserBaseModel):
         """Method returning simulations from the database"""
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
@@ -54,7 +53,10 @@ class UserSimulations(Resource):
 
         # Query the database for the paginated results
         sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
-        query = SimulationModel.query.filter_by(user_id=user.id).order_by(sorting(params_dict['order_by']))
+        query = SimulationModel.query.\
+            filter(SimulationModel.job_id != None).\
+            filter_by(user_id=user.id).\
+            order_by(sorting(params_dict['order_by']))
         pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
         simulations = pagination.items
 
@@ -81,32 +83,12 @@ class UserSimulations(Resource):
         return yaptide_response(message='User Simulations', code=200, content=result)
 
 
-class UserClusters(Resource):
-    """Class responsible for returning user's available clusters"""
-
-    @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
-        """Method returning clusters"""
-        clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
-
-        result = {
-            'clusters': [
-                {
-                    'cluster_name': cluster.cluster_name
-                }
-                for cluster in clusters
-            ]
-        }
-        return yaptide_response(message='User clusters', code=200, content=result)
-
-
 class UserUpdate(Resource):
     """Class responsible for updating the user"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    @requires_auth()
+    def post(user: UserBaseModel):
         """Updates user with provided parameters"""
         json_data: dict = request.get_json(force=True)
         if not json_data:
