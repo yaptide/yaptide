@@ -12,7 +12,7 @@ from yaptide.admin.simulators import SimulatorType, install_simulator
 from yaptide.celery.utils.utils import read_file, send_simulation_results, send_simulation_logfiles
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
-                                     simulation_logfiles, write_simulation_input_files)
+                                     simulation_logfiles, write_simulation_input_files)  # skipcq: FLK-E101
 
 
 # this is not being used now but we can use such hook to install simulations on the worker start
@@ -82,7 +82,6 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
 
         ntasks = runner_obj.jobs
         logging.debug("allocated %s jobs", ntasks)
-
 
         logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
         logging.debug("expecting logfiles: %s", logs_list)
