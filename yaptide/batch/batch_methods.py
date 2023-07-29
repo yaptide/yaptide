@@ -202,5 +202,5 @@ def delete_job(concat_job_id: str,
                user: KeycloakUserModel,
                cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
-    logging.info(f"Deleting job {concat_job_id} for user {user.username} on cluster {cluster.cluster_name}")
+    logging.info("Deleting job %s for user %s on cluster %s", concat_job_id, user.username, cluster.cluster_name)
     return {"message": "Not implemented yet"}, 404
