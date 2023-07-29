@@ -12,20 +12,13 @@ from yaptide.persistence.database import db
 from werkzeug.security import generate_password_hash, check_password_hash
 
 
-class AuthProvider(Enum):
-    """Authentication provider"""
-
-    KEYCLOAK = "KEYCLOAK"
-    YAPTIDE = "YAPTIDE"
-
-
 class UserBaseModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     username: Column[str] = db.Column(db.String, nullable=False)
-    auth_provider: Column[str] = db.Column(db.String, nullable=False, default=AuthProvider.YAPTIDE.value)
+    auth_provider: Column[str] = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
 
     __table_args__ = (
@@ -34,6 +27,7 @@ class UserBaseModel(db.Model):
 
     __mapper_args__ = {
         "polymorphic_identity": "User",
+        "polymorphic_on": auth_provider,
         "with_polymorphic": "*"
     }
 

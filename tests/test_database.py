@@ -29,12 +29,11 @@ def test_create_yaptide_user(db_session: scoped_session, db_good_username: str, 
     assert user.check_password(db_good_password)
 
 
-def test_create_plgrid_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
-    """Test plgrid user model creation"""
+def test_create_keycloak_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test keycloak user model creation"""
     user = KeycloakUserModel(username=db_good_username,
                              cert=db_good_password,
-                             private_key=db_good_password,
-                             auth_provider="KEYCLOAK")
+                             private_key=db_good_password)
     db_session.add(user)
     db_session.commit()
 
@@ -55,9 +54,8 @@ def test_polymorphic_user_fetch(db_session: scoped_session, db_good_username: st
     yaptide_user_id = yaptide_user.id
 
     keycloak_user = KeycloakUserModel(username=db_good_username,
-                             cert=db_good_password,
-                             private_key=db_good_password,
-                             auth_provider="KEYCLOAK")
+                                      cert=db_good_password,
+                                      private_key=db_good_password)
     db_session.add(keycloak_user)
     db_session.commit()
 

@@ -154,3 +154,6 @@ yaptide_tester/output/
 yaptide/data/
 
 bin/
+
+server.crt
+server.key

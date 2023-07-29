@@ -162,7 +162,7 @@ class JobsBatch(Resource):
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+            filter_by(cluster_name=cluster_name).first()
 
         job_info = get_job_status(concat_job_id=job_id, user=user, cluster=cluster)
         if simulation.update_state(job_info):
@@ -202,7 +202,7 @@ class JobsBatch(Resource):
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+            filter_by(cluster_name=cluster_name).first()
 
         result, status_code = delete_job(concat_job_id=job_id, user=user, cluster=cluster)
         return yaptide_response(
@@ -262,7 +262,7 @@ class ResultsBatch(Resource):
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+            filter_by(cluster_name=cluster_name).first()
 
         result: dict = get_job_results(concat_job_id=job_id, user=user, cluster=cluster)
         if "estimators" not in result:

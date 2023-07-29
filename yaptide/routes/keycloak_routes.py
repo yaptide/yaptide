@@ -8,7 +8,7 @@ from flask import request
 from flask_restful import Resource
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import KeycloakUserModel, AuthProvider
+from yaptide.persistence.models import KeycloakUserModel
 
 from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response
@@ -53,15 +53,18 @@ class AuthKeycloak(Resource):
         username = payload_dict["username"]
         logging.warning("Got username %s", username)
 
-        user = db.session.query(KeycloakUserModel).filter_by(username=username).first()
+        user: KeycloakUserModel = db.session.query(KeycloakUserModel).filter_by(username=username).first()
         if not user:
             user = KeycloakUserModel(username=username,
-                                     auth_provider=AuthProvider.KEYCLOAK.value,
                                      cert=res_json["cert"],
                                      private_key=res_json["private"])
 
             db.session.add(user)
-            db.session.commit()
+        else:
+            user.cert = res_json["cert"]
+            user.private_key = res_json["private"]      
+  
+        db.session.commit()
 
         try:
             access_token, access_exp = encode_auth_token(user_id=user.id,
