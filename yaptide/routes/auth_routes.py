@@ -5,7 +5,7 @@ from marshmallow import Schema, ValidationError
 from marshmallow import fields
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel
+from yaptide.persistence.models import YaptideUserModel
 
 from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.routes.utils.decorators import requires_auth
@@ -30,14 +30,14 @@ class AuthRegister(Resource):
             return error_validation_response()
 
         try:
-            user = db.session.query(UserModel).filter_by(
+            user = db.session.query(YaptideUserModel).filter_by(
                 username=json_data.get('username')).first()
         except Exception:  # skipcq: PYL-W0703
             return error_internal_response()
 
         if not user:
             try:
-                user = UserModel(
+                user = YaptideUserModel(
                     username=json_data.get('username')
                 )
                 user.set_password(json_data.get('password'))
@@ -71,7 +71,7 @@ class AuthLogIn(Resource):
             return error_validation_response()
 
         try:
-            user = db.session.query(UserModel).filter_by(username=json_data.get('username')).first()
+            user = db.session.query(YaptideUserModel).filter_by(username=json_data.get('username')).first()
             if not user:
                 return yaptide_response(message='Invalid login or password', code=401)
 
@@ -101,7 +101,7 @@ class AuthRefresh(Resource):
 
     @staticmethod
     @requires_auth(is_refresh=True)
-    def get(user: UserModel):
+    def get(user: YaptideUserModel):
         """Method refreshing token"""
         access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
         resp = yaptide_response(
@@ -117,8 +117,8 @@ class AuthStatus(Resource):
     """Class responsible for returning user status"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    @requires_auth()
+    def get(user: YaptideUserModel):
         """Method returning user's status"""
         return yaptide_response(
             message='User status',

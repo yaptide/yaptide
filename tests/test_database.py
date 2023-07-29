@@ -2,9 +2,12 @@ from datetime import datetime
 import time
 
 from sqlalchemy.orm.scoping import scoped_session
+from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.models import (
-    UserModel,
+    UserBaseModel,
+    YaptideUserModel,
+    KeycloakUserModel,
     SimulationModel,
     TaskModel,
     ClusterModel,
@@ -14,9 +17,9 @@ from yaptide.persistence.models import (
 )
 
 
-def test_create_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
+def test_create_yaptide_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test user model creation"""
-    user = UserModel(username=db_good_username)
+    user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -26,34 +29,72 @@ def test_create_user(db_session: scoped_session, db_good_username: str, db_good_
     assert user.check_password(db_good_password)
 
 
-def test_cluster_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
-    """Test cluster model creation"""
-    # create a new user
-    user = UserModel(username=db_good_username)
-    user.set_password(db_good_password)
+def test_create_keycloak_user(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test keycloak user model creation"""
+    user = KeycloakUserModel(username=db_good_username,
+                             cert=db_good_password,
+                             private_key=db_good_password)
     db_session.add(user)
     db_session.commit()
 
+    assert user.id is not None
+    assert user.username == db_good_username
+    assert user.cert == db_good_password
+
+
+def test_polymorphic_user_fetch(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test polymorphic user fetch"""
+    yaptide_user = YaptideUserModel(username=db_good_username)
+    yaptide_user.set_password(db_good_password)
+    db_session.add(yaptide_user)
+    db_session.commit()
+
+    assert yaptide_user.id is not None
+
+    yaptide_user_id = yaptide_user.id
+
+    keycloak_user = KeycloakUserModel(username=db_good_username,
+                                      cert=db_good_password,
+                                      private_key=db_good_password)
+    db_session.add(keycloak_user)
+    db_session.commit()
+
+    assert keycloak_user.id is not None
+
+    keycloak_user_id = keycloak_user.id
+    UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
+
+    fetched_user = db_session.query(UserPoly).filter_by(id=yaptide_user_id).first()
+    assert fetched_user is not None
+    assert isinstance(fetched_user, YaptideUserModel)
+    assert fetched_user.username == db_good_username
+    assert fetched_user.check_password(db_good_password)
+
+    fetched_user = db_session.query(UserPoly).filter_by(id=keycloak_user_id).first()
+    assert fetched_user is not None
+    assert isinstance(fetched_user, KeycloakUserModel)
+    assert fetched_user.username == db_good_username
+    assert fetched_user.cert == db_good_password
+
+
+def test_cluster_model_creation(db_session: scoped_session):
+    """Test cluster model creation"""
+    # create a new user
+
     # create a new cluster for the user
-    cluster = ClusterModel(user_id=user.id,
-                           cluster_name='testcluster',
-                           cluster_username='testuser',
-                           cluster_ssh_key='ssh_key')
+    cluster = ClusterModel(cluster_name='testcluster')
     db_session.add(cluster)
     db_session.commit()
 
     # retrieve the cluster from the database and check its fields
-    cluster = ClusterModel.query.filter_by(user_id=user.id).first()
-    assert cluster is not None
+    assert cluster.id is not None
     assert cluster.cluster_name == 'testcluster'
-    assert cluster.cluster_username == 'testuser'
-    assert cluster.cluster_ssh_key == 'ssh_key'
 
 
 def test_simulation_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation model creation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -82,7 +123,7 @@ def test_simulation_model_creation(db_session: scoped_session, db_good_username:
 def test_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test task model creation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -137,7 +178,7 @@ def test_task_model_creation_and_update(db_session: scoped_session, db_good_user
 def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation with multiple tasks"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -211,7 +252,7 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
 def test_create_input(db_session: scoped_session, db_good_username: str, db_good_password: str, payload_editor_dict_data: dict):
     """Test creation of input_model in db for simulation"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
@@ -241,7 +282,7 @@ def test_create_input(db_session: scoped_session, db_good_username: str, db_good
 def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_username: str, db_good_password: str, result_dict_data: dict):
     """Test creation of estimators and pages in db for a result"""
     # create a new user
-    user = UserModel(username=db_good_username)
+    user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()

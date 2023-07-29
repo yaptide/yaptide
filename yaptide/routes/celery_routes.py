@@ -9,7 +9,7 @@ import uuid
 import logging
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserModel, SimulationModel, TaskModel, EstimatorModel, PageModel, InputModel
+from yaptide.persistence.models import UserBaseModel, SimulationModel, TaskModel, EstimatorModel, PageModel, InputModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response, error_validation_response
@@ -24,8 +24,8 @@ class JobsDirect(Resource):
     """Class responsible for simulations run directly with celery"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    @requires_auth()
+    def post(user: UserBaseModel):
         """Submit simulation job to celery"""
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
@@ -94,8 +94,8 @@ class JobsDirect(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    @requires_auth()
+    def get(user: UserBaseModel):
         """Method returning job status and results"""
         # validate request parameters and handle errors
         schema = JobsDirect.APIParametersSchema()
@@ -141,8 +141,8 @@ class JobsDirect(Resource):
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def delete(user: UserModel):
+    @requires_auth()
+    def delete(user: UserBaseModel):
         """Method canceling simulation and returning status of this action"""
         try:
             payload_dict: dict = JobsDirect.APIParametersSchema().load(request.get_json(force=True))
@@ -173,8 +173,8 @@ class ResultsDirect(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    @requires_auth()
+    def get(user: UserBaseModel):
         """Method returning job status and results"""
         schema = ResultsDirect.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -229,8 +229,8 @@ class ConvertInputFiles(Resource):
     """Class responsible for returning input_model files converted from front JSON"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def post(_: UserModel):
+    @requires_auth()
+    def post(_: UserBaseModel):
         """Method handling input_model files convertion"""
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:

@@ -14,7 +14,7 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
-    UserModel,
+    KeycloakUserModel,
     SimulationModel,
     ClusterModel,
     TaskModel,
@@ -30,9 +30,12 @@ class JobsBatch(Resource):
     """Class responsible for jobs via direct slurm connection"""
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def post(user: UserModel):
+    @requires_auth()
+    def post(user: KeycloakUserModel):
         """Method handling running shieldhit with batch"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
@@ -56,9 +59,9 @@ class JobsBatch(Resource):
         if input_type is None:
             return error_validation_response()
 
-        clusters: list[ClusterModel] = db.session.query(ClusterModel).filter_by(user_id=user.id).all()
+        clusters: list[ClusterModel] = db.session.query(ClusterModel).all()
         if len(clusters) < 1:
-            return error_validation_response({"message": "User has no clusters available"})
+            return error_validation_response({"message": "No clusters are available"})
 
         filtered_clusters: list[ClusterModel] = []
         if "batch_options" in payload_dict and "cluster_name" in payload_dict["batch_options"]:
@@ -88,7 +91,7 @@ class JobsBatch(Resource):
         input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
         input_dict_to_save["input_files"] = files_dict
 
-        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, cluster=cluster)
+        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user, cluster=cluster)
 
         if "job_id" in result:
             job_id = result["job_id"]
@@ -121,9 +124,12 @@ class JobsBatch(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    @requires_auth()
+    def get(user: KeycloakUserModel):
         """Method geting job's result"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -156,9 +162,9 @@ class JobsBatch(Resource):
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+            filter_by(cluster_name=cluster_name).first()
 
-        job_info = get_job_status(concat_job_id=job_id, cluster=cluster)
+        job_info = get_job_status(concat_job_id=job_id, user=user, cluster=cluster)
         if simulation.update_state(job_info):
             db.session.commit()
 
@@ -172,9 +178,12 @@ class JobsBatch(Resource):
         )
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def delete(user: UserModel):
+    @requires_auth()
+    def delete(user: KeycloakUserModel):
         """Method canceling job"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -193,9 +202,9 @@ class JobsBatch(Resource):
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+            filter_by(cluster_name=cluster_name).first()
 
-        result, status_code = delete_job(concat_job_id=job_id, cluster=cluster)
+        result, status_code = delete_job(concat_job_id=job_id, user=user, cluster=cluster)
         return yaptide_response(
             message="",
             code=status_code,
@@ -212,9 +221,12 @@ class ResultsBatch(Resource):
         job_id = fields.String()
 
     @staticmethod
-    @requires_auth(is_refresh=False)
-    def get(user: UserModel):
+    @requires_auth()
+    def get(user: KeycloakUserModel):
         """Method geting job's result"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
         schema = JobsBatch.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -250,9 +262,9 @@ class ResultsBatch(Resource):
             return error_validation_response(content={"message": "Job ID is incorrect"})
 
         cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(user_id=user.id, cluster_name=cluster_name).first()
+            filter_by(cluster_name=cluster_name).first()
 
-        result: dict = get_job_results(concat_job_id=job_id, cluster=cluster)
+        result: dict = get_job_results(concat_job_id=job_id, user=user, cluster=cluster)
         if "estimators" not in result:
             logging.debug("Results for job %s are unavailable", job_id)
             return yaptide_response(message="Results are unavailable", code=404, content=result)
@@ -271,3 +283,26 @@ class ResultsBatch(Resource):
 
         logging.debug("Returning results from SLURM")
         return yaptide_response(message=f"Results for job: {job_id}, results from Slurm", code=200, content=result)
+
+
+class Clusters(Resource):
+    """Class responsible for returning user's available clusters"""
+
+    @staticmethod
+    @requires_auth()
+    def get(user: KeycloakUserModel):
+        """Method returning clusters"""
+        if not isinstance(user, KeycloakUserModel):
+            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
+
+        clusters: list[ClusterModel] = db.session.query(ClusterModel).all()
+
+        result = {
+            'clusters': [
+                {
+                    'cluster_name': cluster.cluster_name
+                }
+                for cluster in clusters
+            ]
+        }
+        return yaptide_response(message='Available clusters', code=200, content=result)

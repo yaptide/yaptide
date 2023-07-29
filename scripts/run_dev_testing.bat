@@ -1,7 +1,6 @@
-@REM 1 argument stands for shieldhit binary path
-@REM 2 argument stands for plgrid username
+@REM 1 argument stands for plgrid username
+@REM 2 argument stands for yaptide being killed after tests or not
 @REM 3 argument stands for yaptide tester mode
-@REM 4 argument stands for yaptide tester mode
 call scripts\run_yaptide.bat %1
 
 @echo off
