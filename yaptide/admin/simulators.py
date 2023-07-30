@@ -245,11 +245,23 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
         return False
     
     topas_file_path = installation_path / "topas"
+    if not topas_file_path.exists():
+        try:
+            topas_file_path.mkdir(parents=True)
+        except OSError as e:
+            click.echo("Could not create installation directory")
+            return False
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
     topas_file_contents.extractall(path=topas_file_path)
     
     geant_files_path = installation_path / "geant"
+    if not geant_files_path.exists():
+        try:
+            geant_files_path.mkdir(parents=True)
+        except OSError as e:
+            click.echo("Could not create installation directory")
+            return False
     for file in geant_temp_files:
         file.seek(0)
         file_contents = tarfile.TarFile(fileobj=file)
