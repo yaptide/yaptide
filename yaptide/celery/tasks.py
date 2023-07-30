@@ -12,7 +12,7 @@ from yaptide.admin.simulators import SimulatorType, install_simulator
 from yaptide.celery.utils.utils import read_file, send_simulation_results, send_simulation_logfiles
 from yaptide.celery.worker import celery_app
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, pymchelper_output_to_json,
-                                     simulation_logfiles, write_simulation_input_files)
+                                     simulation_logfiles, write_simulation_input_files)  # skipcq: FLK-E101
 
 
 # this is not being used now but we can use such hook to install simulations on the worker start
@@ -53,22 +53,6 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
     logging.debug("run_simulation task created with payload_dict keys: %s", payload_dict.keys())
 
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        # we may face the situation that payload_dict has no key named `ntasks`
-        # this is why we use `payload_dict.get("ntasks")` and not `payload_dict["ntasks"]`
-        # `payload_dict["ntasks"]` would throw an exception if `ntasks` is missing, while
-        # `payload_dict.get("ntasks")` will give us `None` if `ntasks` is missing
-        # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
-
-        logging.debug("starting SHRunner with ntasks = %s", payload_dict.get("ntasks"))
-        logging.debug("working in temporary directory: %s", tmp_dir_path)
-
-        runner_obj = SHRunner(jobs=payload_dict.get("ntasks"),
-                              keep_workspace_after_run=True,
-                              output_directory=tmp_dir_path)
-
-        ntasks = runner_obj.jobs
-        logging.debug("allocated %s jobs", ntasks)
-
         # digest dictionary with project data (extracted from JSON file)
         # and generate simulation input files
         logging.debug("preparing the files for simulation %s", files_dict.keys())
@@ -82,6 +66,22 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
             simulator_exec_path=None,
             cmdline_opts="")
         logging.debug("preparing simulation command: %s", settings)
+
+        # we may face the situation that payload_dict has no key named `ntasks`
+        # this is why we use `payload_dict.get("ntasks")` and not `payload_dict["ntasks"]`
+        # `payload_dict["ntasks"]` would throw an exception if `ntasks` is missing, while
+        # `payload_dict.get("ntasks")` will give us `None` if `ntasks` is missing
+        # `SHRunner` will gladly accept `jobs=None`  and will allocate then max possible amount of cores
+        logging.debug("starting SHRunner with ntasks = %s", payload_dict.get("ntasks"))
+        logging.debug("working in temporary directory: %s", tmp_dir_path)
+
+        runner_obj = SHRunner(settings=settings,
+                              jobs=payload_dict.get("ntasks"),
+                              keep_workspace_after_run=True,
+                              output_directory=tmp_dir_path)
+
+        ntasks = runner_obj.jobs
+        logging.debug("allocated %s jobs", ntasks)
 
         logs_list = [Path(tmp_dir_path) / f"run_{1+i}" / f"shieldhit_{1+i:04d}.log" for i in range(ntasks)]
         logging.debug("expecting logfiles: %s", logs_list)
@@ -104,7 +104,7 @@ def run_simulation(self, payload_dict: dict, files_dict: dict,
 
         try:
             logging.debug("starting simulation")
-            is_run_ok = runner_obj.run(settings=settings)
+            is_run_ok = runner_obj.run()
 
             if update_key is not None and simulation_id is not None:
                 logging.debug("joining monitoring processes")
