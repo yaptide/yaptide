@@ -6,7 +6,7 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import YaptideUserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (
-    error_internal_response, error_validation_response, yaptide_response)
+    error_internal_response, error_validation_response, yaptide_response)  # skipcq: FLK-E101
 from yaptide.routes.utils.tokens import encode_auth_token
 
 

@@ -7,7 +7,14 @@ from marshmallow import Schema, fields
 from yaptide.batch.batch_methods import get_job_results
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
-    ClusterModel, EstimatorModel, InputModel, LogfilesModel, PageModel, SimulationModel, UserBaseModel)
+    ClusterModel,
+    EstimatorModel,
+    InputModel,
+    LogfilesModel,
+    PageModel,
+    SimulationModel,
+    UserBaseModel
+)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
