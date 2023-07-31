@@ -4,7 +4,6 @@ import math
 import sys
 import time
 import timeit
-
 from pathlib import Path
 
 import requests
@@ -19,8 +18,7 @@ class Endpoints:
         self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
         self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
 
-        self.http_results_direct = f'http://{host}:{port}/results'
-        self.http_results_batch = f'http://{host}:{port}/results/batch'
+        self.http_results = f'http://{host}:{port}/results'
 
         self.http_logfiles = f'http://{host}:{port}/logfiles'
         self.http_inputs = f'http://{host}:{port}/inputs'
@@ -139,7 +137,7 @@ class YaptideTester:
             input_key = "input_json"
 
         jobs_url = self.endpoints.http_jobs_direct if direct else self.endpoints.http_jobs_batch
-        results_url = self.endpoints.http_results_direct if direct else self.endpoints.http_results_batch
+        results_url = self.endpoints.http_results
         json_to_send = {
             "ntasks": 6,
             "input_type": input_type,
