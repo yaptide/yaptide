@@ -6,12 +6,10 @@ from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import get_job_results
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (ClusterModel, EstimatorModel,
-                                        InputModel, LogfilesModel, PageModel,
-                                        SimulationModel, UserBaseModel)
+from yaptide.persistence.models import (
+    ClusterModel, EstimatorModel, InputModel, LogfilesModel, PageModel, SimulationModel, UserBaseModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 
@@ -121,11 +119,12 @@ class SimulationResults(Resource):
                 db.session.commit()
                 for page_dict in estimator_dict["pages"]:
                     page = PageModel(estimator_id=estimator.id,
-                                    page_number=int(page_dict["metadata"]["page_number"]))
+                                     page_number=int(page_dict["metadata"]["page_number"]))
                     page.data = page_dict
                     db.session.add(page)
                 db.session.commit()
-            estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
+            estimators: list[EstimatorModel] = db.session.query(EstimatorModel).\
+                filter_by(simulation_id=simulation.id).all()
             # END CODE TO REMOVE
 
         logging.debug("Returning results from database")

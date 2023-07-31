@@ -6,8 +6,7 @@ from sqlalchemy.orm import with_polymorphic
 from werkzeug.exceptions import Forbidden, Unauthorized
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (KeycloakUserModel, UserBaseModel,
-                                        YaptideUserModel)
+from yaptide.persistence.models import KeycloakUserModel, UserBaseModel, YaptideUserModel
 from yaptide.routes.utils.tokens import decode_auth_token
 
 

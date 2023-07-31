@@ -1,12 +1,9 @@
 from flask_restful import Api, Resource
 
-from yaptide.routes.auth_routes import (AuthLogIn, AuthLogOut, AuthRefresh,
-                                        AuthRegister, AuthStatus)
+from yaptide.routes.auth_routes import AuthLogIn, AuthLogOut, AuthRefresh, AuthRegister, AuthStatus
 from yaptide.routes.batch_routes import Clusters, JobsBatch
 from yaptide.routes.celery_routes import ConvertInputFiles, JobsDirect
-from yaptide.routes.common_sim_routes import (SimulationInputs,
-                                              SimulationLogfiles,
-                                              SimulationResults)
+from yaptide.routes.common_sim_routes import SimulationInputs, SimulationLogfiles, SimulationResults
 from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TaskUpdate
 from yaptide.routes.user_routes import UserSimulations, UserUpdate

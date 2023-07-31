@@ -6,12 +6,10 @@ from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (ClusterModel, InputModel,
-                                        KeycloakUserModel, SimulationModel,
-                                        TaskModel)
+from yaptide.persistence.models import (
+    ClusterModel, InputModel, KeycloakUserModel, SimulationModel, TaskModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 

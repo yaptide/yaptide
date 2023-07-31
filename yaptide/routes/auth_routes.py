@@ -5,9 +5,8 @@ from marshmallow import Schema, ValidationError, fields
 from yaptide.persistence.database import db
 from yaptide.persistence.models import YaptideUserModel
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_internal_response,
-                                                     error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import (
+    error_internal_response, error_validation_response, yaptide_response)
 from yaptide.routes.utils.tokens import encode_auth_token
 
 
@@ -66,7 +65,8 @@ class AuthLogIn(Resource):
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         try:
-            user: YaptideUserModel = db.session.query(YaptideUserModel).filter_by(username=payload_dict['username']).first()
+            user: YaptideUserModel = db.session.query(YaptideUserModel).\
+                filter_by(username=payload_dict['username']).first()
             if not user:
                 return yaptide_response(message='Invalid login or password', code=401)
 
