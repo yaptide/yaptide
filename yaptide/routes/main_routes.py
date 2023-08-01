@@ -1,13 +1,12 @@
-from flask_restful import Resource
-from flask_restful import Api
+from flask_restful import Api, Resource
 
-from yaptide.routes.auth_routes import AuthRegister, AuthLogIn, AuthRefresh, AuthStatus, AuthLogOut
-from yaptide.routes.batch_routes import JobsBatch, ResultsBatch, Clusters
-from yaptide.routes.celery_routes import JobsDirect, ConvertInputFiles
-from yaptide.routes.task_routes import TaskUpdate
-from yaptide.routes.common_sim_routes import SimulationResults, SimulationInputs, SimulationLogfiles
-from yaptide.routes.user_routes import UserSimulations, UserUpdate
+from yaptide.routes.auth_routes import AuthLogIn, AuthLogOut, AuthRefresh, AuthRegister, AuthStatus
+from yaptide.routes.batch_routes import Clusters, JobsBatch
+from yaptide.routes.celery_routes import ConvertInputFiles, JobsDirect
+from yaptide.routes.common_sim_routes import SimulationInputs, SimulationLogfiles, SimulationResults
 from yaptide.routes.keycloak_routes import AuthKeycloak
+from yaptide.routes.task_routes import TaskUpdate
+from yaptide.routes.user_routes import UserSimulations, UserUpdate
 
 
 class HelloWorld(Resource):
@@ -31,8 +30,6 @@ def initialize_routes(api: Api):
     api.add_resource(SimulationResults, "/results")
     api.add_resource(SimulationInputs, "/inputs")
     api.add_resource(SimulationLogfiles, "/logfiles")
-
-    api.add_resource(ResultsBatch, "/results/batch")
 
     api.add_resource(ConvertInputFiles, "/convert")
 

@@ -2,22 +2,21 @@ import logging
 
 from flask import request
 from flask_restful import Resource
+from marshmallow import Schema, fields
 
-from marshmallow import Schema
-from marshmallow import fields
-
+from yaptide.batch.batch_methods import get_job_results
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
-    SimulationModel,
+    ClusterModel,
     EstimatorModel,
-    PageModel,
-    UserBaseModel,
     InputModel,
-    LogfilesModel
+    LogfilesModel,
+    PageModel,
+    SimulationModel,
+    UserBaseModel
 )
-
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import yaptide_response
+from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 
 
@@ -101,7 +100,39 @@ class SimulationResults(Resource):
 
         estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
         if len(estimators) == 0:
-            return yaptide_response(message="Results are unavailable", code=404)
+            if simulation.platform == "DIRECT":  # also CODE TO REMOVE
+                return yaptide_response(message="Results are unavailable", code=404)
+            # Code below is for backward compatibility with old method of saving results
+            # later on we are going to remove it because it's functionality will be covered
+            # by the post method
+            # BEGIN CODE TO REMOVE
+            try:
+                _, _, _, cluster_name = job_id.split(":")
+            except ValueError:
+                return error_validation_response(content={"message": "Job ID is incorrect"})
+
+            cluster: ClusterModel = db.session.query(ClusterModel).\
+                filter_by(cluster_name=cluster_name).first()
+
+            result: dict = get_job_results(concat_job_id=job_id, user=user, cluster=cluster)
+            if "estimators" not in result:
+                logging.debug("Results for job %s are unavailable", job_id)
+                return yaptide_response(message="Results are unavailable", code=404, content=result)
+
+            for estimator_dict in result["estimators"]:
+                estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
+                estimator.data = estimator_dict["metadata"]
+                db.session.add(estimator)
+                db.session.commit()
+                for page_dict in estimator_dict["pages"]:
+                    page = PageModel(estimator_id=estimator.id,
+                                     page_number=int(page_dict["metadata"]["page_number"]))
+                    page.data = page_dict
+                    db.session.add(page)
+                db.session.commit()
+            estimators: list[EstimatorModel] = db.session.query(EstimatorModel).\
+                filter_by(simulation_id=simulation.id).all()
+            # END CODE TO REMOVE
 
         logging.debug("Returning results from database")
         result_estimators = []

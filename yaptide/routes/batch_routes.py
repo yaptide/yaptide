@@ -1,29 +1,17 @@
-from flask import request
-from flask_restful import Resource
-
-from marshmallow import Schema
-from marshmallow import fields
-
-import logging
 import uuid
 
-from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+from flask import request
+from flask_restful import Resource
+from marshmallow import Schema, fields
 
+from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
-    KeycloakUserModel,
-    SimulationModel,
-    ClusterModel,
-    TaskModel,
-    EstimatorModel,
-    InputModel,
-    PageModel
-)
-
-from yaptide.batch.batch_methods import submit_job, get_job_status, delete_job, get_job_results
+    ClusterModel, InputModel, KeycloakUserModel, SimulationModel, TaskModel)  # skipcq: FLK-E101
+from yaptide.routes.utils.decorators import requires_auth
+from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 class JobsBatch(Resource):
@@ -210,79 +198,6 @@ class JobsBatch(Resource):
             code=status_code,
             content=result
         )
-
-
-class ResultsBatch(Resource):
-    """Class responsible for returning simulation results"""
-
-    class APIParametersSchema(Schema):
-        """Class specifies API parameters"""
-
-        job_id = fields.String()
-
-    @staticmethod
-    @requires_auth()
-    def get(user: KeycloakUserModel):
-        """Method geting job's result"""
-        if not isinstance(user, KeycloakUserModel):
-            return yaptide_response(message="User is not allowed to use this endpoint", code=403)
-
-        schema = JobsBatch.APIParametersSchema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return error_validation_response(content=errors)
-        params_dict: dict = schema.load(request.args)
-
-        job_id: str = params_dict["job_id"]
-
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
-        if not is_owned:
-            return yaptide_response(message=error_message, code=res_code)
-
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
-
-        estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
-        if len(estimators) > 0:
-            logging.debug("Returning results from database")
-            result_estimators = []
-            for estimator in estimators:
-                pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
-                estimator_dict = {
-                    "metadata": estimator.data,
-                    "name": estimator.name,
-                    "pages": [page.data for page in pages]
-                }
-                result_estimators.append(estimator_dict)
-            return yaptide_response(message=f"Results for job: {job_id}",
-                                    code=200, content={"estimators": result_estimators})
-
-        try:
-            _, _, _, cluster_name = job_id.split(":")
-        except ValueError:
-            return error_validation_response(content={"message": "Job ID is incorrect"})
-
-        cluster: ClusterModel = db.session.query(ClusterModel).\
-            filter_by(cluster_name=cluster_name).first()
-
-        result: dict = get_job_results(concat_job_id=job_id, user=user, cluster=cluster)
-        if "estimators" not in result:
-            logging.debug("Results for job %s are unavailable", job_id)
-            return yaptide_response(message="Results are unavailable", code=404, content=result)
-
-        for estimator_dict in result["estimators"]:
-            estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
-            estimator.data = estimator_dict["metadata"]
-            db.session.add(estimator)
-            db.session.commit()
-            for page_dict in estimator_dict["pages"]:
-                page = PageModel(estimator_id=estimator.id,
-                                 page_number=int(page_dict["metadata"]["page_number"]))
-                page.data = page_dict
-                db.session.add(page)
-            db.session.commit()
-
-        logging.debug("Returning results from SLURM")
-        return yaptide_response(message=f"Results for job: {job_id}, results from Slurm", code=200, content=result)
 
 
 class Clusters(Resource):

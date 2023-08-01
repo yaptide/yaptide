@@ -63,7 +63,7 @@ def list_users(**kwargs):
     ResultSet = ResultProxy.fetchall()
     click.echo(f"{len(ResultSet)} users in DB:")
     for row in ResultSet:
-        click.echo(f"Login {row.username}; Auth provider ...{row.auth_provider}")
+        click.echo(f"Login {row.username}; Auth provider {row.auth_provider}")
     return None
 
 
@@ -100,9 +100,9 @@ def add_user(**kwargs):
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
-    if user_exists(username, "YAPTIDE", users, con):
+    if user_exists(username, "YaptideUser", users, con):
         return None
-    query = db.insert(users).values(username=username, auth_provider="YAPTIDE")
+    query = db.insert(users).values(username=username, auth_provider="YaptideUser")
     result = con.execute(query)
     user_id = result.inserted_primary_key[0]
     password_hash = generate_password_hash(password)
@@ -127,7 +127,7 @@ def update_user(**kwargs):
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
     yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
-    if not user_exists(username, "YAPTIDE", users, con):
+    if not user_exists(username, "YaptideUser", users, con):
         click.echo(f'YaptideUser: {username} does not exist, aborting update')
         return None
 
@@ -137,7 +137,7 @@ def update_user(**kwargs):
         pwd_hash = generate_password_hash(password)
 
         subquery = db.select([users.c.id]).where(users.c.username == username,
-                                                 users.c.auth_provider == "YAPTIDE").scalar_subquery()
+                                                 users.c.auth_provider == "YaptideUser").scalar_subquery()
 
         query = db.update(yaptide_users).\
             where(yaptide_users.c.id == subquery).\
