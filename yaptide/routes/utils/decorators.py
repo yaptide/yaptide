@@ -1,14 +1,12 @@
-from typing import Union
-from flask import request
-from werkzeug.exceptions import Unauthorized, Forbidden
-
 from functools import wraps
+from typing import Union
 
+from flask import request
 from sqlalchemy.orm import with_polymorphic
+from werkzeug.exceptions import Forbidden, Unauthorized
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import UserBaseModel, YaptideUserModel, KeycloakUserModel
-
+from yaptide.persistence.models import KeycloakUserModel, UserBaseModel, YaptideUserModel
 from yaptide.routes.utils.tokens import decode_auth_token
 
 
