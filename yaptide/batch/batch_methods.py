@@ -38,7 +38,8 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     return con
 
 
-def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
+def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
+               cluster: ClusterModel, sim_id: int, update_key: str) -> dict:
     """Dummy version of submit_job"""
     utc_time = int(datetime.utcnow().timestamp()*1e6)
 
@@ -63,7 +64,8 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
     con.put(WATCHER_SCRIPT, job_dir)
 
-    submit_file, sh_files = prepare_script_files(payload_dict=payload_dict, job_dir=job_dir, con=con)
+    submit_file, sh_files = prepare_script_files(
+        payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con)
 
     job_id = collect_id = None
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
@@ -88,7 +90,8 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
     }
 
 
-def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> tuple[str, dict]:
+def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
+                         update_key: str, con: Connection) -> tuple[str, dict]:
     """Prepares script files to run them on cluster"""
     submit_file = f'{job_dir}/yaptide_submitter.sh'
     array_file = f'{job_dir}/array_script.sh'
@@ -109,7 +112,9 @@ def prepare_script_files(payload_dict: dict, job_dir: str, con: Connection) -> t
     )
     array_script = ARRAY_SHIELDHIT_BASH.format(
         array_header=array_header,
-        root_dir=job_dir
+        root_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key
     )
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,
