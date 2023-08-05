@@ -42,7 +42,7 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
         "update_key": update_key,
         "update_dict": update_dict
     }
-    tasks_url = HARDCODED_BACKEND_URL + "/tasks"
+    tasks_url = f"{HARDCODED_BACKEND_URL}/tasks"
     insecure_context = ssl._create_unverified_context()
     try:
         req = urllib.request.Request(tasks_url, data=dict_to_send, method='POST')
