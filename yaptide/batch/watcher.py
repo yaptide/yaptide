@@ -3,6 +3,7 @@ import re
 import signal
 import time
 import json
+import ssl
 from pathlib import Path
 import urllib.request
 
@@ -42,9 +43,10 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
         "update_dict": update_dict
     }
     tasks_url = HARDCODED_BACKEND_URL + "/tasks"
+    insecure_context = ssl._create_unverified_context()
     try:
         req = urllib.request.Request(tasks_url, data=dict_to_send, method='POST')
-        with urllib.request.urlopen(req) as res:
+        with urllib.request.urlopen(req, context=insecure_context) as res:
             if res.getcode() != 202:
                 print("Task update for %s - Failed: %s", task_id, json.loads(res.read().decode('utf-8')))
                 return False
