@@ -33,10 +33,10 @@ def log_generator(thefile, timeout: int = 3600) -> str:
         yield line
 
 
-def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
+def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
     """Sends task update to flask to update database"""
     dict_to_send = {
-        "simulation_id": simulation_id,
+        "sim_id": sim_id,
         "task_id": task_id,
         "update_key": update_key,
         "update_dict": update_dict
@@ -54,7 +54,7 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
     return True
 
 
-def read_file(filepath: Path, simulation_id: int, task_id: int, update_key: str):  # skipcq: PYL-W0613
+def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
     logfile = None
     for _ in range(30):  # 30 stands for maximum attempts
@@ -68,7 +68,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: int, update_key: str)
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED"
         }
-        send_task_update(simulation_id=simulation_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
         print(f"Update for task: {task_id} - FAILED")
         return
 
@@ -84,7 +84,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: int, update_key: str)
                     "seconds": int(splitted[9]),
                 }
             }
-            send_task_update(simulation_id=simulation_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
             print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
 
         elif re.search(REQUESTED_MATCH, line):
@@ -94,7 +94,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: int, update_key: str)
                 "requested_primaries": int(splitted[1]),
                 "task_state": "RUNNING"
             }
-            send_task_update(simulation_id=simulation_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
             print(f"Update for task: {task_id} - RUNNING")
 
         elif re.search(COMPLETE_MATCH, line):
@@ -107,7 +107,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: int, update_key: str)
                 },
                 "task_state": "COMPLETED"
             }
-            send_task_update(simulation_id=simulation_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
             print(f"Update for task: {task_id} - COMPLETED")
             return
 
@@ -115,7 +115,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: int, update_key: str)
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED"
             }
-            send_task_update(simulation_id=simulation_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
             print(f"Update for task: {task_id} - TIMEOUT")
             return
     return
