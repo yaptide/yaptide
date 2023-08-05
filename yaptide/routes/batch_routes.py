@@ -90,7 +90,7 @@ class JobsBatch(Resource):
             simulation.job_id = job_id
 
             for i in range(payload_dict["ntasks"]):
-                task = TaskModel(simulation_id=simulation.id, task_id=f"{job_id}_{i}")
+                task = TaskModel(simulation_id=simulation.id, task_id=str(i+1))
                 db.session.add(task)
             input_model = InputModel(simulation_id=simulation.id)
             input_model.data = input_dict_to_save

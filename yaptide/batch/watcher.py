@@ -12,7 +12,7 @@ RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
-HARDCODED_BACKEND_URL = "https://yap-dev.c3.plgrid.pl/8443"
+HARDCODED_BACKEND_URL = "https://yap-dev.c3.plgrid.pl:8443"
 
 
 def log_generator(thefile, timeout: int = 3600) -> str:
@@ -37,22 +37,27 @@ def log_generator(thefile, timeout: int = 3600) -> str:
 def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
     """Sends task update to flask to update database"""
     dict_to_send = {
-        "sim_id": sim_id,
+        "simulation_id": sim_id,
         "task_id": task_id,
         "update_key": update_key,
         "update_dict": update_dict
     }
     tasks_url = f"{HARDCODED_BACKEND_URL}/tasks"
     insecure_context = ssl._create_unverified_context()
-    try:
-        req = urllib.request.Request(tasks_url, data=dict_to_send, method='POST')
-        with urllib.request.urlopen(req, context=insecure_context) as res:
-            if res.getcode() != 202:
-                print("Task update for %s - Failed: %s", task_id, json.loads(res.read().decode('utf-8')))
-                return False
-    except Exception as e:
-        print(e)
-        return False
+    # try:
+    json_data = json.dumps(dict_to_send).encode('utf-8')
+
+    headers = {'Content-Type': 'application/json'}
+    headers_encoded = {k.encode('utf-8'): v.encode('utf-8') for k, v in headers.items()}
+
+    req = urllib.request.Request(tasks_url, data=json_data, headers=headers_encoded, method='POST')
+    with urllib.request.urlopen(req, context=insecure_context) as res:
+        if res.getcode() != 202:
+            print("Task update for %s - Failed: %s", task_id, json.loads(res.read().decode('utf-8')))
+            return False
+    # except Exception as e:
+    #     print(e)
+    #     return False
     return True
 
 
