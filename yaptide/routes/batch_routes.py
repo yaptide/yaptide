@@ -135,14 +135,14 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (SimulationModel.JobState.COMPLETED.value,
-                                    SimulationModel.JobState.FAILED.value):
-            return yaptide_response(message=f"Job state: {simulation.job_state}",
-                                    code=200,
-                                    content={
-                                        "job_state": simulation.job_state,
-                                        "job_tasks_status": job_tasks_status,
-                                    })
+        # if simulation.job_state in (SimulationModel.JobState.COMPLETED.value,
+        #                             SimulationModel.JobState.FAILED.value):
+        return yaptide_response(message=f"Job state: {simulation.job_state}",
+                                code=200,
+                                content={
+                                    "job_state": simulation.job_state,
+                                    "job_tasks_status": job_tasks_status,
+                                })
 
         try:
             _, _, _, cluster_name = job_id.split(":")
