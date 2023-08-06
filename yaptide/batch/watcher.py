@@ -5,7 +5,9 @@ import time
 import json
 import ssl
 from pathlib import Path
-import urllib.request
+from urllib import request
+import logging
+from datetime import datetime
 
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -44,26 +46,27 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
     }
     tasks_url = f"{HARDCODED_BACKEND_URL}/tasks"
     insecure_context = ssl._create_unverified_context()
-    # try:
-    json_data = json.dumps(dict_to_send).encode('utf-8')
 
-    headers = {'Content-Type': 'application/json'}
-    headers_encoded = {k.encode('utf-8'): v.encode('utf-8') for k, v in headers.items()}
+    req = request.Request(tasks_url,
+                          json.dumps(dict_to_send).encode(),
+                          {'Content-Type': 'application/json'},
+                          method='POST')
 
-    req = urllib.request.Request(tasks_url, data=json_data, headers=headers_encoded, method='POST')
-    with urllib.request.urlopen(req, context=insecure_context) as res:
-        if res.getcode() != 202:
-            print("Task update for %s - Failed: %s", task_id, json.loads(res.read().decode('utf-8')))
-            return False
-    # except Exception as e:
-    #     print(e)
-    #     return False
+    try:
+        with request.urlopen(req, context=insecure_context) as res:
+            if res.getcode() != 202:
+                logging.warning("Sending update failed")
+                return False
+    except Exception as e:
+        print(e)
+        return False
     return True
 
 
 def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
     logfile = None
+    update_time = 0
     for _ in range(30):  # 30 stands for maximum attempts
         try:
             logfile = open(filepath)  # skipcq: PTC-W6004
@@ -81,15 +84,17 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
 
     loglines = log_generator(logfile)
     for line in loglines:
+        utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
+            if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+                continue
+            update_time = utc_now.timestamp()
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": int(splitted[3]),
-                "estimated_time": {
-                    "hours": int(splitted[5]),
-                    "minutes": int(splitted[7]),
-                    "seconds": int(splitted[9]),
-                }
+                "estimated_time": int(splitted[9])
+                + int(splitted[7]) * 60
+                + int(splitted[5]) * 3600
             }
             send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
             print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
@@ -99,6 +104,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": 0,
                 "requested_primaries": int(splitted[1]),
+                "start_time": utc_now.isoformat(sep=" "),
                 "task_state": "RUNNING"
             }
             send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
@@ -107,11 +113,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
         elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
-                "run_time": {
-                    "hours": int(splitted[2]),
-                    "minutes": int(splitted[4]),
-                    "seconds": int(splitted[6]),
-                },
+                "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
             }
             send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)

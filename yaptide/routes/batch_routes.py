@@ -83,8 +83,6 @@ class JobsBatch(Resource):
         result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user,
                             cluster=cluster, sim_id=simulation.id, update_key=update_key)
 
-        logging.warning("%s", result)
-
         if "job_id" in result:
             job_id = result["job_id"]
             simulation.job_id = job_id
