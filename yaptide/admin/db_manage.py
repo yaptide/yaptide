@@ -216,7 +216,7 @@ def list_simulations(**kwargs):
 
 @run.command
 def list_clusters(**kwargs):
-    """List all simulations in db"""
+    """List all clusters in db"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -224,7 +224,7 @@ def list_clusters(**kwargs):
     query = db.select([clusters])
     ResultProxy = con.execute(query)
     ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} simulations in DB:")
+    click.echo(f"{len(ResultSet)} clusters in DB:")
     for row in ResultSet:
         click.echo(f"id {row.id}; cluster name {row.cluster_name};")
     return None
