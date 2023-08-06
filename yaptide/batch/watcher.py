@@ -45,19 +45,26 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
         "update_dict": update_dict
     }
     tasks_url = f"{HARDCODED_BACKEND_URL}/tasks"
-    insecure_context = ssl._create_unverified_context()
+    # context = ssl._create_unverified_context()
+    context = ssl.SSLContext()
+    # context.check_hostname = False
+    # context.verify_mode = ssl.CERT_NONE
 
-    req = request.Request(tasks_url,
-                          json.dumps(dict_to_send).encode(),
-                          {'Content-Type': 'application/json'},
-                          method='POST')
+    if tasks_url.lower().startswith('https'):
+        req = request.Request(tasks_url,
+                              json.dumps(dict_to_send).encode(),
+                              {'Content-Type': 'application/json'},
+                              method='POST')
+    else:
+        logging.warning("Wrong URL")
+        return False
 
     try:
-        with request.urlopen(req, context=insecure_context) as res:
+        with request.urlopen(req, context=context) as res:
             if res.getcode() != 202:
                 logging.warning("Sending update failed")
                 return False
-    except Exception as e:
+    except Exception as e:  # skipcq: PYL-W0703
         print(e)
         return False
     return True
