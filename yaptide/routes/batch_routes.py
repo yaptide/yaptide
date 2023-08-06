@@ -137,8 +137,6 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        simulation
-
         if simulation.job_state in (SimulationModel.JobState.COMPLETED.value,
                                     SimulationModel.JobState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
