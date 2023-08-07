@@ -3,6 +3,7 @@ import json
 import tempfile
 
 import logging
+import os
 
 from zipfile import ZipFile
 from datetime import datetime
@@ -103,6 +104,8 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
     collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
 
+    backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
+
     submit_script = SUBMIT_SHIELDHIT.format(
         array_options=array_options,
         collect_options=collect_options,
@@ -114,7 +117,8 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
         array_header=array_header,
         root_dir=job_dir,
         sim_id=sim_id,
-        update_key=update_key
+        update_key=update_key,
+        backend_url=backend_url
     )
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,
