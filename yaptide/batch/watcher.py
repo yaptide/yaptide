@@ -37,7 +37,6 @@ def log_generator(thefile, timeout: int = 3600) -> str:
 
 def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict, backend_url: str) -> bool:
     """Sends task update to flask to update database"""
-
     if not backend_url:
         logging.error("Backend url not specified")
         return False
@@ -82,7 +81,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED"
         }
-        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
+        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                         update_dict=up_dict, backend_url=backend_url)
         print(f"Update for task: {task_id} - FAILED")
         return
 
@@ -100,7 +100,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 + int(splitted[7]) * 60
                 + int(splitted[5]) * 3600
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
 
         elif re.search(REQUESTED_MATCH, line):
@@ -111,7 +112,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": "RUNNING"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - RUNNING")
 
         elif re.search(COMPLETE_MATCH, line):
@@ -120,7 +122,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - COMPLETED")
             return
 
@@ -128,7 +131,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - TIMEOUT")
             return
     return
@@ -156,8 +160,8 @@ if __name__ == "__main__":
     logging.info("task_id %s", args.task_id)
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
-    read_file(filepath=Path(args.filepath), 
-              sim_id=args.sim_id, 
-              task_id=args.task_id, 
-              update_key=args.update_key, 
+    read_file(filepath=Path(args.filepath),
+              sim_id=args.sim_id,
+              task_id=args.task_id,
+              update_key=args.update_key,
               backend_url=args.backend_url)
