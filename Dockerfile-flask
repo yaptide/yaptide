@@ -6,7 +6,8 @@ EXPOSE 6000
 # set environment variables
 ENV FLASK_APP=yaptide.application
 ENV FLASK_SQLALCHEMY_DATABASE_URI=sqlite:////usr/local/app/yaptide/data/main.db
-ENV CERT_AUTH_URL=""
+#ENV CERT_AUTH_URL=""
+#ENV BACKEND_EXTERNAL_URL=""
 WORKDIR /usr/local/app
 
 # install dependencies
