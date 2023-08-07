@@ -81,7 +81,7 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
         "update_key": update_key,
         "update_dict": update_dict
     }
-    res: requests.Response = requests.Session().post(url=f"{flask_url}/tasks/update", json=dict_to_send)
+    res: requests.Response = requests.Session().post(url=f"{flask_url}/tasks", json=dict_to_send)
     if res.status_code != 202:
         logging.warning("Task update for %s - Failed: %s", task_id, res.json().get("message"))
         return False

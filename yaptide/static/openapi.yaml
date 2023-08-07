@@ -652,7 +652,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
 
 # Task Routes
-  /tasks/update:
+  /tasks:
     description: Route dedicated for Backend internal communication
     post:
       description: Updates task state
