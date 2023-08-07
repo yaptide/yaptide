@@ -154,11 +154,11 @@ def merge_results(results: list[dict]) -> dict:
     if len(logfiles.keys()) > 0 and not send_simulation_logfiles(simulation_id=simulation_id,
                                                                  update_key=update_key,
                                                                  logfiles=logfiles):
-            final_result["logfiles"] = logfiles
+        final_result["logfiles"] = logfiles
 
     if averaged_estimators is not None and not send_simulation_results(simulation_id=simulation_id,
                                                                        update_key=update_key,
                                                                        estimators=averaged_estimators):
-            final_result["estimators"] = averaged_estimators
+        final_result["estimators"] = averaged_estimators
 
     return final_result
