@@ -128,8 +128,6 @@ def merge_results(results: list[dict]) -> dict:
     logging.debug("Merging results from %d tasks", len(results))
     logfiles = {}
 
-
-
     averaged_estimators = None
     simulation_id = results[0].pop("simulation_id", None)
     update_key = results[0].pop("simulation_id", None)
@@ -148,21 +146,19 @@ def merge_results(results: list[dict]) -> dict:
             continue
 
         averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
-    
+
     final_result = {
         "end_time": datetime.utcnow().isoformat(sep=" ")
     }
 
-    if len(logfiles.keys()) > 0:
-        if not send_simulation_logfiles(simulation_id=simulation_id,
-                                        update_key=update_key,
-                                        logfiles=logfiles):
+    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(simulation_id=simulation_id,
+                                                                 update_key=update_key,
+                                                                 logfiles=logfiles):
             final_result["logfiles"] = logfiles
 
-    if averaged_estimators is not None:
-        if not send_simulation_results(simulation_id=simulation_id,
-                                       update_key=update_key,
-                                       estimators=averaged_estimators):
+    if averaged_estimators is not None and not send_simulation_results(simulation_id=simulation_id,
+                                                                       update_key=update_key,
+                                                                       estimators=averaged_estimators):
             final_result["estimators"] = averaged_estimators
 
     return final_result
