@@ -14,7 +14,6 @@ RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
-HARDCODED_BACKEND_URL = "https://yap-dev.c3.plgrid.pl:8443"
 
 
 def log_generator(thefile, timeout: int = 3600) -> str:
@@ -36,15 +35,20 @@ def log_generator(thefile, timeout: int = 3600) -> str:
         yield line
 
 
-def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
+def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict, backend_url: str) -> bool:
     """Sends task update to flask to update database"""
+
+    if not backend_url:
+        logging.error("Backend url not specified")
+        return False
+
     dict_to_send = {
         "simulation_id": sim_id,
         "task_id": task_id,
         "update_key": update_key,
         "update_dict": update_dict
     }
-    tasks_url = f"{HARDCODED_BACKEND_URL}/tasks"
+    tasks_url = f"{backend_url}/tasks"
     context = ssl.SSLContext()
 
     req = request.Request(tasks_url,
@@ -55,7 +59,7 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
     try:
         with request.urlopen(req, context=context) as res:  # skipcq: BAN-B310
             if res.getcode() != 202:
-                logging.warning("Sending update failed")
+                logging.warning("Sending update to %s failed", tasks_url)
                 return False
     except Exception as e:  # skipcq: PYL-W0703
         print(e)
@@ -133,17 +137,27 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str)
     parser.add_argument("--sim_id", type=int)
     parser.add_argument("--task_id", type=int)
     parser.add_argument("--update_key", type=str)
+    parser.add_argument("--backend_url", type=str)
     args = parser.parse_args()
-    filepath_arg = Path(args.filepath)
-    sim_id_arg = args.sim_id
-    task_id_arg = args.task_id
-    update_key_arg = args.update_key
-
-    print(filepath_arg, sim_id_arg, task_id_arg)
-
-    read_file(filepath=filepath_arg, sim_id=sim_id_arg, task_id=task_id_arg, update_key=update_key_arg)
+    logging.info("log file %s", args.filepath)
+    logging.info("sim_id %s", args.sim_id)
+    logging.info("task_id %s", args.task_id)
+    logging.info("update_key %s", args.update_key)
+    logging.info("backend_url %s", args.backend_url)
+    read_file(filepath=Path(args.filepath), 
+              sim_id=args.sim_id, 
+              task_id=args.task_id, 
+              update_key=args.update_key, 
+              backend_url=args.backend_url)
