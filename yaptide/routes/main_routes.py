@@ -25,7 +25,7 @@ def initialize_routes(api: Api):
     api.add_resource(JobsDirect, "/jobs/direct")
     api.add_resource(JobsBatch, "/jobs/batch")
 
-    api.add_resource(TaskUpdate, "/tasks/update")
+    api.add_resource(TaskUpdate, "/tasks")
 
     api.add_resource(SimulationResults, "/results")
     api.add_resource(SimulationInputs, "/inputs")

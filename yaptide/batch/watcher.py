@@ -2,7 +2,12 @@ import argparse
 import re
 import signal
 import time
+import json
+import ssl
 from pathlib import Path
+from urllib import request
+import logging
+from datetime import datetime
 
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -30,9 +35,41 @@ def log_generator(thefile, timeout: int = 3600) -> str:
         yield line
 
 
-def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
+def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict, backend_url: str) -> bool:
+    """Sends task update to flask to update database"""
+    if not backend_url:
+        logging.error("Backend url not specified")
+        return False
+
+    dict_to_send = {
+        "simulation_id": sim_id,
+        "task_id": task_id,
+        "update_key": update_key,
+        "update_dict": update_dict
+    }
+    tasks_url = f"{backend_url}/tasks"
+    context = ssl.SSLContext()
+
+    req = request.Request(tasks_url,
+                          json.dumps(dict_to_send).encode(),
+                          {'Content-Type': 'application/json'},
+                          method='POST')
+
+    try:
+        with request.urlopen(req, context=context) as res:  # skipcq: BAN-B310
+            if res.getcode() != 202:
+                logging.warning("Sending update to %s failed", tasks_url)
+                return False
+    except Exception as e:  # skipcq: PYL-W0703
+        print(e)
+        return False
+    return True
+
+
+def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backend_url: str):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
     logfile = None
+    update_time = 0
     for _ in range(30):  # 30 stands for maximum attempts
         try:
             logfile = open(filepath)  # skipcq: PTC-W6004
@@ -44,21 +81,27 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED"
         }
+        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                         update_dict=up_dict, backend_url=backend_url)
         print(f"Update for task: {task_id} - FAILED")
         return
 
     loglines = log_generator(logfile)
     for line in loglines:
+        utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
+            if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+                continue
+            update_time = utc_now.timestamp()
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": int(splitted[3]),
-                "estimated_time": {
-                    "hours": int(splitted[5]),
-                    "minutes": int(splitted[7]),
-                    "seconds": int(splitted[9]),
-                }
+                "estimated_time": int(splitted[9])
+                + int(splitted[7]) * 60
+                + int(splitted[5]) * 3600
             }
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
 
         elif re.search(REQUESTED_MATCH, line):
@@ -66,20 +109,21 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": 0,
                 "requested_primaries": int(splitted[1]),
+                "start_time": utc_now.isoformat(sep=" "),
                 "task_state": "RUNNING"
             }
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - RUNNING")
 
         elif re.search(COMPLETE_MATCH, line):
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
-                "run_time": {
-                    "hours": int(splitted[2]),
-                    "minutes": int(splitted[4]),
-                    "seconds": int(splitted[6]),
-                },
+                "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
             }
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - COMPLETED")
             return
 
@@ -87,6 +131,8 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED"
             }
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
+                             update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - TIMEOUT")
             return
     return
@@ -95,15 +141,27 @@ def read_file(filepath: Path, job_id: str, task_id: int):  # skipcq: PYL-W0613
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(message)s",
+        handlers=[
+            logging.StreamHandler()
+        ]
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str)
-    parser.add_argument("--job_id", type=str)
+    parser.add_argument("--sim_id", type=int)
     parser.add_argument("--task_id", type=int)
+    parser.add_argument("--update_key", type=str)
+    parser.add_argument("--backend_url", type=str)
     args = parser.parse_args()
-    filepath_arg = Path(args.filepath)
-    job_id_arg = args.job_id
-    task_id_arg = args.task_id
-
-    print(filepath_arg, job_id_arg, task_id_arg)
-
-    read_file(filepath=filepath_arg, job_id=job_id_arg, task_id=task_id_arg)
+    logging.info("log file %s", args.filepath)
+    logging.info("sim_id %s", args.sim_id)
+    logging.info("task_id %s", args.task_id)
+    logging.info("update_key %s", args.update_key)
+    logging.info("backend_url %s", args.backend_url)
+    read_file(filepath=Path(args.filepath),
+              sim_id=args.sim_id,
+              task_id=args.task_id,
+              update_key=args.update_key,
+              backend_url=args.backend_url)

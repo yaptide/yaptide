@@ -79,14 +79,15 @@ class JobsBatch(Resource):
         input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
         input_dict_to_save["input_files"] = files_dict
 
-        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user, cluster=cluster)
+        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user,
+                            cluster=cluster, sim_id=simulation.id, update_key=update_key)
 
         if "job_id" in result:
             job_id = result["job_id"]
             simulation.job_id = job_id
 
             for i in range(payload_dict["ntasks"]):
-                task = TaskModel(simulation_id=simulation.id, task_id=f"{job_id}_{i+1}")
+                task = TaskModel(simulation_id=simulation.id, task_id=str(i+1))
                 db.session.add(task)
             input_model = InputModel(simulation_id=simulation.id)
             input_model.data = input_dict_to_save

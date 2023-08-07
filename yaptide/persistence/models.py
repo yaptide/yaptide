@@ -189,7 +189,7 @@ class TaskModel(db.Model):
     # currently for Celery one simulation is one job, but in future we might want to split it into multiple tasks
     # example celery job_ids are: 1a2b3c4d-5e6f-7g8h-9i0j-1k2l3m4n5o6p
     # example SLURM job_ids are: 12345678_12
-    task_id: Column[str] = db.Column(db.String, nullable=False, unique=True, doc="Task ID")
+    task_id: Column[str] = db.Column(db.String, nullable=False, doc="Task ID")
     requested_primaries: Column[int] = db.Column(db.Integer,
                                                  nullable=False,
                                                  default=0,
@@ -209,6 +209,10 @@ class TaskModel(db.Model):
         db.DateTime(timezone=True),
         default=now(),
         doc="Task last update time")
+
+    __table_args__ = (
+        UniqueConstraint('simulation_id', 'task_id', name='_simulation_id_task_id_uc'),
+    )
 
     def update_state(self, update_dict: dict):
         """
