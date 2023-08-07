@@ -67,7 +67,7 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
     return True
 
 
-def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # skipcq: PYL-W0613
+def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backend_url: str):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
     logfile = None
     update_time = 0
@@ -82,7 +82,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED"
         }
-        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
         print(f"Update for task: {task_id} - FAILED")
         return
 
@@ -100,7 +100,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
                 + int(splitted[7]) * 60
                 + int(splitted[5]) * 3600
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
 
         elif re.search(REQUESTED_MATCH, line):
@@ -111,7 +111,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": "RUNNING"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - RUNNING")
 
         elif re.search(COMPLETE_MATCH, line):
@@ -120,7 +120,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
                 "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - COMPLETED")
             return
 
@@ -128,7 +128,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str):  # sk
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict)
+            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url)
             print(f"Update for task: {task_id} - TIMEOUT")
             return
     return
