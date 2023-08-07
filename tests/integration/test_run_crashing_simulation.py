@@ -48,7 +48,12 @@ def test_run_simulation_with_flask_crashing(celery_app,
     required_converted_files = {"beam.dat", "detect.dat", "geo.dat", "info.json", "mat.dat"}
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
     
+    counter = 0
     while True:
+        if counter > 20:
+            logging.error("Job did not crash in 20 seconds - aborting")
+            return
+        counter+=1
         logging.info("Sending check job status request on /jobs/direct endpoint")
         resp = client.get("/jobs/direct", query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
