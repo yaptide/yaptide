@@ -17,7 +17,7 @@ class HelloWorld(Resource):
     @staticmethod
     def get():
         """Root route get method"""
-        return yaptide_response(message="Hello World", code=200)
+        return yaptide_response(message="Hello World!", code=200)
 
 
 def initialize_routes(api: Api):
