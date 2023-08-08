@@ -8,6 +8,8 @@ from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TaskUpdate
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 
+from yaptide.routes.utils.response_templates import yaptide_response
+
 
 class HelloWorld(Resource):
     """Root route"""
@@ -15,7 +17,7 @@ class HelloWorld(Resource):
     @staticmethod
     def get():
         """Root route get method"""
-        return {'message': 'Hello world!'}
+        return yaptide_response(message="Hello World", code=200)
 
 
 def initialize_routes(api: Api):

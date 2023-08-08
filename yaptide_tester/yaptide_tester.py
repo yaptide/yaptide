@@ -15,6 +15,8 @@ class Endpoints:
     """API endpoints"""
 
     def __init__(self, host: str, port: int) -> None:
+        self.http_hello = f'http://{host}:{port}'
+
         self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
         self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
 
