@@ -1,4 +1,4 @@
-from flask import make_response, Response
+from flask import Response, make_response
 
 
 def yaptide_response(message: str, code: int, content: dict = None) -> Response:

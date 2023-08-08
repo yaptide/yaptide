@@ -1,41 +1,32 @@
-from collections import Counter
 import logging
 import uuid
+from collections import Counter
 from datetime import datetime
 
 from flask import request
 from flask_restful import Resource
-
-from marshmallow import Schema
-from marshmallow import fields
-
-from yaptide.persistence.db_methods import (
-    add_object_to_db,
-    make_commit_to_db,
-    fetch_celery_simulation_by_job_id,
-    fetch_celery_tasks_by_sim_id,
-    fetch_estimators_by_sim_id,
-    fetch_pages_by_estimator_id,
-    update_simulation_state
-)
-from yaptide.persistence.models import (
-    UserModel,
-    CelerySimulationModel,
-    CeleryTaskModel,
-    EstimatorModel,
-    PageModel,
-    InputModel
-)
-
-from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (
-    yaptide_response, error_internal_response, error_validation_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from marshmallow import Schema, fields
 
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import run_job, cancel_job, get_job_results
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results,
+                                               run_job)
+from yaptide.persistence.db_methods import (add_object_to_db,
+                                            fetch_celery_simulation_by_job_id,
+                                            fetch_celery_tasks_by_sim_id,
+                                            fetch_estimators_by_sim_id,
+                                            fetch_pages_by_estimator_id,
+                                            make_commit_to_db,
+                                            update_simulation_state)
+from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel,
+                                        EstimatorModel, InputModel, PageModel,
+                                        UserModel)
+from yaptide.routes.utils.decorators import requires_auth
+from yaptide.routes.utils.response_templates import (error_internal_response,
+                                                     error_validation_response,
+                                                     yaptide_response)
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.utils.enums import EntityState, InputType, PlatformType
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 class JobsDirect(Resource):

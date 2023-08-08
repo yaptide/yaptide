@@ -1,27 +1,24 @@
 import io
 import json
-import tempfile
-
 import logging
 import os
-
-from zipfile import ZipFile
+import tempfile
 from datetime import datetime
 from pathlib import Path
+from zipfile import ZipFile
 
+import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
-import pymchelper
 
-from yaptide.batch.string_templates import (
-    SUBMIT_SHIELDHIT,
-    ARRAY_SHIELDHIT_BASH,
-    COLLECT_BASH
-)
-from yaptide.batch.utils.utils import extract_sbatch_header, convert_dict_to_sbatch_options
-from yaptide.persistence.models import KeycloakUserModel, ClusterModel, BatchSimulationModel
-from yaptide.utils.sim_utils import write_simulation_input_files
+from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH,
+                                            SUBMIT_SHIELDHIT)
+from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options,
+                                       extract_sbatch_header)
+from yaptide.persistence.models import (BatchSimulationModel, ClusterModel,
+                                        KeycloakUserModel)
 from yaptide.utils.enums import EntityState
+from yaptide.utils.sim_utils import write_simulation_input_files
 
 
 def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:

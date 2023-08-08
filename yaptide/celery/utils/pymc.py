@@ -3,22 +3,15 @@ import os
 import re
 import subprocess
 import time
-
 from datetime import datetime
 from pathlib import Path
 
 from pymchelper.executor.options import SimulationSettings
 from pymchelper.input_output import frompattern
 
-from yaptide.batch.watcher import (
-    log_generator,
-    RUN_MATCH,
-    COMPLETE_MATCH,
-    REQUESTED_MATCH,
-    TIMEOUT_MATCH
-)
+from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
+                                   TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.requests import send_task_update
-
 from yaptide.utils.enums import EntityState
 
 

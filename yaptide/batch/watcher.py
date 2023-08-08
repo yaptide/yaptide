@@ -1,16 +1,14 @@
 import argparse
+import json
+import logging
 import re
 import signal
-import time
-import json
 import ssl
+import time
+from datetime import datetime
+from io import TextIOWrapper
 from pathlib import Path
 from urllib import request
-import logging
-from datetime import datetime
-
-from io import TextIOWrapper
-
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"

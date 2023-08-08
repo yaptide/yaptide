@@ -1,13 +1,11 @@
-from datetime import datetime
-
 import gzip
 import json
+from datetime import datetime
 
 from sqlalchemy import Column, UniqueConstraint
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
-
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from yaptide.persistence.database import db
 from yaptide.utils.enums import EntityState, PlatformType

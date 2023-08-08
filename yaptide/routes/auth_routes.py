@@ -1,13 +1,15 @@
+import logging
+
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, ValidationError, fields
-import logging
 
+from yaptide.persistence.db_methods import (add_object_to_db,
+                                            fetch_yaptide_user_by_username)
 from yaptide.persistence.models import YaptideUserModel
-from yaptide.persistence.db_methods import fetch_yaptide_user_by_username, add_object_to_db
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (
-    error_internal_response, error_validation_response, yaptide_response)  # skipcq: FLK-E101
+from yaptide.routes.utils.response_templates import (  # skipcq: FLK-E101
+    error_internal_response, error_validation_response, yaptide_response)
 from yaptide.routes.utils.tokens import encode_auth_token
 
 

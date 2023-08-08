@@ -1,18 +1,15 @@
 import logging
-from flask import request
-from flask_restful import Resource
-
-from marshmallow import Schema
-from marshmallow import fields
-
 from enum import Enum
 
+from flask import request
+from flask_restful import Resource
+from marshmallow import Schema, fields
 from sqlalchemy import asc, desc
 
-from yaptide.persistence.models import UserModel, SimulationModel
-
+from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
+from yaptide.routes.utils.response_templates import (error_validation_response,
+                                                     yaptide_response)
 
 DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
 DEFAULT_PAGE_IDX = 1  # default page index

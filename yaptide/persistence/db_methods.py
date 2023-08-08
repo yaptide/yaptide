@@ -1,12 +1,15 @@
 from typing import Union
+
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (
-    UserModel, KeycloakUserModel, YaptideUserModel,
-    SimulationModel, BatchSimulationModel, CelerySimulationModel,
-    TaskModel, BatchTaskModel, CeleryTaskModel,
-    ClusterModel, EstimatorModel, PageModel, InputModel, LogfilesModel)
+from yaptide.persistence.models import (BatchSimulationModel, BatchTaskModel,
+                                        CelerySimulationModel, CeleryTaskModel,
+                                        ClusterModel, EstimatorModel,
+                                        InputModel, KeycloakUserModel,
+                                        LogfilesModel, PageModel,
+                                        SimulationModel, TaskModel, UserModel,
+                                        YaptideUserModel)
 
 
 def add_object_to_db(obj: db.Model, make_commit: bool = True) -> None:

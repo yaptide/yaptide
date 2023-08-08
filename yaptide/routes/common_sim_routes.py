@@ -1,6 +1,6 @@
-from datetime import datetime
 import logging
 from collections import Counter
+from datetime import datetime
 
 from flask import request
 from flask_restful import Resource
@@ -8,27 +8,14 @@ from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import get_job_results
 from yaptide.persistence.db_methods import (
-    add_object_to_db,
-    make_commit_to_db,
-    fetch_simulation_by_job_id,
-    fetch_cluster_by_id,
-    fetch_simulation_by_sim_id,
-    fetch_tasks_by_sim_id,
-    fetch_estimators_by_sim_id,
-    fetch_estimator_by_sim_id_and_est_name,
-    fetch_pages_by_estimator_id,
-    fetch_page_by_est_id_and_page_number,
-    fetch_input_by_sim_id,
-    update_simulation_state,
-    fetch_logfiles_by_sim_id
-)
-from yaptide.persistence.models import (
-    EstimatorModel,
-    LogfilesModel,
-    PageModel,
-    BatchSimulationModel,
-    UserModel
-)
+    add_object_to_db, fetch_cluster_by_id,
+    fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
+    fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
+    fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
+    fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
+    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
+                                        LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist

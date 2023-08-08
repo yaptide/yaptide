@@ -2,22 +2,24 @@
 
 import logging
 import os
+import platform
 import shutil
 import tarfile
 import tempfile
 import zipfile
-import click
-import requests
-import boto3
-import platform
+from base64 import urlsafe_b64encode
 from enum import IntEnum, auto
 from pathlib import Path
+
+import boto3
+import click
+import requests
+from botocore.exceptions import (ClientError, EndpointConnectionError,
+                                 NoCredentialsError)
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from botocore.exceptions import NoCredentialsError, EndpointConnectionError, ClientError
 from dotenv import load_dotenv
-from base64 import urlsafe_b64encode
 
 
 class SimulatorType(IntEnum):

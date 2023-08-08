@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
-from typing import Union
 from secrets import token_hex
+from typing import Union
 
 import jwt
 

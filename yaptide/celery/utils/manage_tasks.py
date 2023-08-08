@@ -1,10 +1,10 @@
-from celery import group, chord
-from celery.result import AsyncResult
 import logging
 
-from yaptide.celery.tasks import run_single_simulation, merge_results
-from yaptide.celery.worker import celery_app
+from celery import chord, group
+from celery.result import AsyncResult
 
+from yaptide.celery.tasks import merge_results, run_single_simulation
+from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
 
 
@@ -33,6 +33,7 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
     """
     # Here we ask Celery (via Redis) for job state
     def get_task_status(job_id: str) -> dict:
+        """Gets status of each task in the workflow"""
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 
@@ -56,6 +57,7 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
 def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
     """Cancels simulation"""
     def cancel_task(job_id: str) -> dict:
+        """Cancels (if possible) every task in the workflow"""
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 

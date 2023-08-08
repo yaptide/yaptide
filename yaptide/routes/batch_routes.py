@@ -6,22 +6,22 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
-from yaptide.persistence.db_methods import (
-    add_object_to_db,
-    delete_object_from_db,
-    fetch_batch_simulation_by_job_id,
-    fetch_batch_tasks_by_sim_id,
-    fetch_cluster_by_id,
-    fetch_all_clusters,
-    update_simulation_state
-)
-from yaptide.persistence.models import (
-    ClusterModel, InputModel, KeycloakUserModel, BatchSimulationModel, BatchTaskModel)  # skipcq: FLK-E101
+from yaptide.persistence.db_methods import (add_object_to_db,
+                                            delete_object_from_db,
+                                            fetch_all_clusters,
+                                            fetch_batch_simulation_by_job_id,
+                                            fetch_batch_tasks_by_sim_id,
+                                            fetch_cluster_by_id,
+                                            update_simulation_state)
+from yaptide.persistence.models import (  # skipcq: FLK-E101
+    BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel,
+    KeycloakUserModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
+from yaptide.routes.utils.response_templates import (error_validation_response,
+                                                     yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 from yaptide.utils.enums import EntityState, InputType, PlatformType
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 class JobsBatch(Resource):
