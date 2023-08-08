@@ -65,7 +65,6 @@ class Jobs(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-
         if simulation.job_state in (EntityState.COMPLETED.value,
                                     EntityState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
@@ -91,7 +90,6 @@ class Jobs(Resource):
         job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
-        
 
 
 class SimulationResults(Resource):
