@@ -19,7 +19,7 @@ from yaptide.batch.watcher import (
 )
 from yaptide.celery.utils.requests import send_task_update
 
-from yaptide.persistence.models import SimulationModel
+from yaptide.utils.enums import EntityState
 
 
 def run_shieldhit(dir_path: Path, task_id: str) -> dict:
@@ -91,7 +91,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
     if logfile is None:
         logging.error("Log file for task %s not found", task_id)
         up_dict = {
-            "task_state": SimulationModel.JobState.FAILED.value
+            "task_state": EntityState.FAILED.value
         }
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
@@ -123,14 +123,14 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
                 "simulated_primaries": 0,
                 "requested_primaries": requested_primaries,
                 "start_time": utc_now.isoformat(sep=" "),
-                "task_state": SimulationModel.JobState.RUNNING.value
+                "task_state": EntityState.RUNNING.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", task_id)
             up_dict = {
-                "task_state": SimulationModel.JobState.FAILED.value
+                "task_state": EntityState.FAILED.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
@@ -141,6 +141,6 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
     up_dict = {
         "simulated_primaries": requested_primaries,
         "end_time": utc_now.isoformat(sep=" "),
-        "task_state": SimulationModel.JobState.COMPLETED.value
+        "task_state": EntityState.COMPLETED.value
     }
     send_task_update(simulation_id, task_id, update_key, up_dict)

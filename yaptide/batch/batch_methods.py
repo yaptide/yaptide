@@ -19,8 +19,9 @@ from yaptide.batch.string_templates import (
     COLLECT_BASH
 )
 from yaptide.batch.utils.utils import extract_sbatch_header, convert_dict_to_sbatch_options
-from yaptide.persistence.models import KeycloakUserModel, SimulationModel, ClusterModel
+from yaptide.persistence.models import KeycloakUserModel, ClusterModel, BatchSimulationModel
 from yaptide.utils.sim_utils import write_simulation_input_files
+from yaptide.utils.enums import EntityState
 
 
 def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
@@ -68,16 +69,16 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
     submit_file, sh_files = prepare_script_files(
         payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con)
 
-    job_id = collect_id = None
+    array_id = collect_id = None
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
     submit_stdout = fabric_result.stdout
     for line in submit_stdout.split("\n"):
         if line.startswith("Job id"):
-            job_id = line.split()[-1]
+            array_id = line.split()[-1]
         if line.startswith("Collect id"):
             collect_id = line.split()[-1]
 
-    if job_id is None or collect_id is None:
+    if array_id is None or collect_id is None:
         return {
             "message": "Job submission failed",
             "submit_stdout": submit_stdout,
@@ -85,7 +86,9 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
         }
     return {
         "message": "Job submitted",
-        "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}",
+        "folder_name": utc_time,
+        "array_id": array_id,
+        "collect_id": collect_id,
         "submit_stdout": submit_stdout,
         "sh_files": sh_files
     }
@@ -140,13 +143,14 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
     }
 
 
-def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
+def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Dummy version of get_job_status"""
-    _, job_id, collect_id, _ = concat_job_id.split(":")
+    array_id = simulation.array_id
+    collect_id = simulation.collect_id
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
+    fabric_result: Result = con.run(f'sacct -j {array_id} --format State', hide=True)
     job_state = fabric_result.stdout.split()[-1].split()[0]
 
     fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
@@ -154,11 +158,11 @@ def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: Cluster
 
     if job_state == "FAILED" or collect_state == "FAILED":
         return {
-            "job_state": SimulationModel.JobState.FAILED.value
+            "job_state": EntityState.FAILED.value
         }
     if collect_state == "COMPLETED":
         return {
-            "job_state": SimulationModel.JobState.COMPLETED.value,
+            "job_state": EntityState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
     if collect_state == "RUNNING":
@@ -171,20 +175,21 @@ def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: Cluster
         logging.debug("Main job is in PENDING state")
 
     return {
-        "job_state": SimulationModel.JobState.RUNNING.value
+        "job_state": EntityState.RUNNING.value
     }
 
 
-def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
+def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Returns simulation results"""
-    utc_time, _, collect_id, _ = concat_job_id.split(":")
+    folder_name = simulation.folder_name
+    collect_id = simulation.collect_id
 
     con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
 
-    job_dir = f"{scratch}/yaptide_runs/{utc_time}"
+    job_dir = f"{scratch}/yaptide_runs/{folder_name}"
     fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
 
@@ -207,9 +212,9 @@ def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: Cluste
     }
 
 
-def delete_job(concat_job_id: str,
+def delete_job(simulation: BatchSimulationModel,
                user: KeycloakUserModel,
                cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
-    logging.info("Deleting job %s for user %s on cluster %s", concat_job_id, user.username, cluster.cluster_name)
+    logging.info("Deleting job %s for user %s on cluster %s", simulation.job_id, user.username, cluster.cluster_name)
     return {"message": "Not implemented yet"}, 404

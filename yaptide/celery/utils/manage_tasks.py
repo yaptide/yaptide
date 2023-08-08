@@ -1,10 +1,11 @@
 from celery import group, chord
 from celery.result import AsyncResult
+import logging
 
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.celery.worker import celery_app
 
-from yaptide.persistence.models import SimulationModel
+from yaptide.utils.enums import EntityState
 
 
 def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) -> str:
@@ -38,7 +39,7 @@ def get_job_status(job_id: str) -> dict:
     result = {
         "job_state": job_state
     }
-    if job_state == SimulationModel.JobState.FAILED.value:
+    if job_state == EntityState.FAILED.value:
         result["message"] = str(job.info)
     elif "end_time" in job.info:
         result["end_time"] = job.info["end_time"]
@@ -46,22 +47,24 @@ def get_job_status(job_id: str) -> dict:
     return result
 
 
-def cancel_job(job_id: str) -> dict:
+def cancel_job(celery_ids: list[str]) -> dict:
     """Cancels simulation"""
-    job = AsyncResult(id=job_id, app=celery_app)
-    job_state: str = translate_celery_state_naming(job.state)
+    for job_id in celery_ids:
+        job = AsyncResult(id=job_id, app=celery_app)
+        job_state: str = translate_celery_state_naming(job.state)
 
-    if job_state in [SimulationModel.JobState.CANCELLED.value,
-                     SimulationModel.JobState.COMPLETED.value,
-                     SimulationModel.JobState.FAILED.value]:
-        return {"message": f"Cannot cancel job which is already {job_state}"}
-    try:
-        celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
-    except:  # skipcq: FLK-E722
-        return {"message": "Failed to cancel job"}
+        if job_state in [EntityState.CANCELLED.value,
+                        EntityState.COMPLETED.value,
+                        EntityState.FAILED.value]:
+            logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
+            continue
+        try:
+            celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
+        except:  # skipcq: FLK-E722
+            logging.error("Cannot cancel job %s", job_id)
 
     return {
-        "job_state": SimulationModel.JobState.CANCELLED.value,
+        "job_state": EntityState.CANCELLED.value,
         "message": "Job cancelled"
     }
 
@@ -77,14 +80,14 @@ def get_job_results(job_id: str) -> dict:
 def translate_celery_state_naming(job_state: str) -> str:
     """Function translating celery states' names to ones used in YAPTIDE"""
     if job_state in ["RECEIVED", "RETRY"]:
-        return SimulationModel.JobState.PENDING.value
+        return EntityState.PENDING.value
     if job_state in ["PROGRESS", "STARTED"]:
-        return SimulationModel.JobState.RUNNING.value
+        return EntityState.RUNNING.value
     if job_state in ["FAILURE"]:
-        return SimulationModel.JobState.FAILED.value
+        return EntityState.FAILED.value
     if job_state in ["REVOKED"]:
-        return SimulationModel.JobState.CANCELLED.value
+        return EntityState.CANCELLED.value
     if job_state in ["SUCCESS"]:
-        return SimulationModel.JobState.COMPLETED.value
+        return EntityState.COMPLETED.value
     # Others are the same
     return job_state

@@ -9,7 +9,7 @@ from enum import Enum
 
 from sqlalchemy import asc, desc
 
-from yaptide.persistence.models import UserBaseModel, SimulationModel
+from yaptide.persistence.models import UserModel, SimulationModel
 
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response, error_validation_response
@@ -45,7 +45,7 @@ class UserSimulations(Resource):
 
     @staticmethod
     @requires_auth()
-    def get(user: UserBaseModel):
+    def get(user: UserModel):
         """Method returning simulations from the database"""
         schema = UserSimulations.APIParametersSchema()
         params_dict: dict = schema.load(request.args)
@@ -88,7 +88,7 @@ class UserUpdate(Resource):
 
     @staticmethod
     @requires_auth()
-    def post(user: UserBaseModel):
+    def post(user: UserModel):
         """Updates user with provided parameters"""
         json_data: dict = request.get_json(force=True)
         if not json_data:

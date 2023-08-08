@@ -1,9 +1,10 @@
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, ValidationError, fields
+import logging
 
-from yaptide.persistence.database import db
 from yaptide.persistence.models import YaptideUserModel
+from yaptide.persistence.db_methods import fetch_yaptide_user_by_username, add_object_to_db
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (
     error_internal_response, error_validation_response, yaptide_response)  # skipcq: FLK-E101
@@ -27,22 +28,19 @@ class AuthRegister(Resource):
         except ValidationError:
             return error_validation_response()
 
-        try:
-            user = db.session.query(YaptideUserModel).filter_by(username=json_data['username']).first()
-        except Exception:  # skipcq: PYL-W0703
-            return error_internal_response()
+        user = fetch_yaptide_user_by_username(username=json_data.get('username'))
 
         if not user:
             try:
                 user = YaptideUserModel(username=json_data.get('username'))
                 user.set_password(json_data.get('password'))
 
-                db.session.add(user)
-                db.session.commit()
+                add_object_to_db(user)
 
                 return yaptide_response(message='User created', code=201)
 
-            except Exception:  # skipcq: PYL-W0703
+            except Exception as e:  # skipcq: PYL-W0703
+                logging.error("%s", e)
                 return error_internal_response()
         else:
             return yaptide_response(message='User existing', code=403)
@@ -65,8 +63,7 @@ class AuthLogIn(Resource):
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         try:
-            user: YaptideUserModel = db.session.query(YaptideUserModel).\
-                filter_by(username=payload_dict['username']).first()
+            user: YaptideUserModel = fetch_yaptide_user_by_username(username=payload_dict['username'])
             if not user:
                 return yaptide_response(message='Invalid login or password', code=401)
 
@@ -87,7 +84,8 @@ class AuthLogIn(Resource):
             resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
             resp.set_cookie('refresh_token', refresh_token, httponly=True, samesite='Lax', expires=refresh_exp)
             return resp
-        except Exception:  # skipcq: PYL-W0703
+        except Exception as e:  # skipcq: PYL-W0703
+            logging.error("%s", e)
             return error_internal_response()
 
 

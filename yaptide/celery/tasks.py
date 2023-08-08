@@ -13,7 +13,7 @@ from yaptide.celery.utils.pymc import run_shieldhit, read_file, average_estimato
 from yaptide.celery.utils.requests import send_simulation_logfiles, send_simulation_results, send_task_update
 from yaptide.celery.worker import celery_app
 
-from yaptide.persistence.models import SimulationModel
+from yaptide.utils.enums import EntityState
 
 from yaptide.utils.sim_utils import (
     check_and_convert_payload_to_files_dict,
@@ -54,8 +54,9 @@ def convert_input_files(payload_dict: dict) -> dict:
     return {"input_files": files_dict}
 
 
-@celery_app.task
-def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None, simulation_id: int = None) -> dict:
+@celery_app.task(bind=True)
+def run_single_simulation(self, files_dict: dict, task_id: str,
+                          update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
     tmp_dir = tempfile.gettempdir()
     logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
@@ -74,6 +75,7 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
 
         gt_watcher = None
         if update_key is not None and simulation_id is not None:
+            send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
             gt_watcher = eventlet.spawn(read_file,
                                         Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log",
                                         simulation_id,
@@ -112,7 +114,7 @@ def run_single_simulation(files_dict: dict, task_id: str, update_key: str = None
 
         # We do not have any information if monitoring process sent the last update
         # so we send it here to make sure that we have the end_time and COMPLETED state
-        update_dict = {"task_state": SimulationModel.JobState.COMPLETED.value, "end_time": end_time}
+        update_dict = {"task_state": EntityState.COMPLETED.value, "end_time": end_time}
         send_task_update(simulation_id, task_id, update_key, update_dict)
 
         return {
