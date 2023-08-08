@@ -243,7 +243,7 @@ class ResultsDirect(Resource):
         return yaptide_response(message=f"Results for job: {job_id}, results from Celery", code=200, content=result)
 
 
-class ConvertInputFiles(Resource):
+class ConvertResource(Resource):
     """Class responsible for returning input_model files converted from front JSON"""
 
     @staticmethod

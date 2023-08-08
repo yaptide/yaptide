@@ -3,12 +3,13 @@ from flask_restful import Api, Resource
 from yaptide.routes.auth_routes import (AuthLogIn, AuthLogOut, AuthRefresh,
                                         AuthRegister, AuthStatus)
 from yaptide.routes.batch_routes import Clusters, JobsBatch
-from yaptide.routes.celery_routes import ConvertInputFiles, JobsDirect
-from yaptide.routes.common_sim_routes import (SimulationInputs,
-                                              SimulationLogfiles,
-                                              SimulationResults)
+from yaptide.routes.celery_routes import ConvertResource, JobsDirect
+from yaptide.routes.common_sim_routes import (JobsResource,
+                                              InputsResource,
+                                              LogfilesResource,
+                                              ResultsResource)
 from yaptide.routes.keycloak_routes import AuthKeycloak
-from yaptide.routes.task_routes import TaskUpdate
+from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
 
@@ -29,13 +30,15 @@ def initialize_routes(api: Api):
     api.add_resource(JobsDirect, "/jobs/direct")
     api.add_resource(JobsBatch, "/jobs/batch")
 
-    api.add_resource(TaskUpdate, "/tasks")
+    api.add_resource(JobsResource, "/jobs")
 
-    api.add_resource(SimulationResults, "/results")
-    api.add_resource(SimulationInputs, "/inputs")
-    api.add_resource(SimulationLogfiles, "/logfiles")
+    api.add_resource(TasksResource, "/tasks")
 
-    api.add_resource(ConvertInputFiles, "/convert")
+    api.add_resource(ResultsResource, "/results")
+    api.add_resource(InputsResource, "/inputs")
+    api.add_resource(LogfilesResource, "/logfiles")
+
+    api.add_resource(ConvertResource, "/convert")
 
     api.add_resource(UserSimulations, "/user/simulations")
     api.add_resource(UserUpdate, "/user/update")

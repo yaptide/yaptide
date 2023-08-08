@@ -22,7 +22,7 @@ from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.utils.enums import EntityState
 
 
-class Jobs(Resource):
+class JobsResource(Resource):
     """Class responsible for managing common jobs"""
 
     class APIParametersSchema(Schema):
@@ -34,7 +34,7 @@ class Jobs(Resource):
     @requires_auth()
     def get(user: UserModel):
         """Method returning info about job"""
-        schema = Jobs.APIParametersSchema()
+        schema = JobsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -79,7 +79,7 @@ class Jobs(Resource):
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
 
-class SimulationResults(Resource):
+class ResultsResource(Resource):
     """Class responsible for managing results"""
 
     @staticmethod
@@ -133,7 +133,7 @@ class SimulationResults(Resource):
         update_simulation_state(simulation=simulation, update_dict={
             "job_state": EntityState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
-            })
+        })
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
@@ -145,7 +145,7 @@ class SimulationResults(Resource):
     @requires_auth()
     def get(user: UserModel):
         """Method returning job status and results"""
-        schema = SimulationResults.APIParametersSchema()
+        schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -201,7 +201,7 @@ class SimulationResults(Resource):
                                 content={"estimators": result_estimators})
 
 
-class SimulationInputs(Resource):
+class InputsResource(Resource):
     """Class responsible for returning simulation input"""
 
     class APIParametersSchema(Schema):
@@ -213,7 +213,7 @@ class SimulationInputs(Resource):
     @requires_auth()
     def get(user: UserModel):
         """Method returning simulation input"""
-        schema = SimulationInputs.APIParametersSchema()
+        schema = InputsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -233,7 +233,7 @@ class SimulationInputs(Resource):
         return yaptide_response(message="Input of simulation", code=200, content={"input": input_model.data})
 
 
-class SimulationLogfiles(Resource):
+class LogfilesResource(Resource):
     """Class responsible for managing logfiles"""
 
     @staticmethod
@@ -276,7 +276,7 @@ class SimulationLogfiles(Resource):
     @requires_auth()
     def get(user: UserModel):
         """Method returning job status and results"""
-        schema = SimulationResults.APIParametersSchema()
+        schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)

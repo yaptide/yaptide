@@ -7,7 +7,7 @@ from yaptide.persistence.db_methods import (fetch_simulation_by_sim_id,
 from yaptide.routes.utils.response_templates import yaptide_response
 
 
-class TaskUpdate(Resource):
+class TasksResource(Resource):
     """Class responsible for updating tasks"""
 
     @staticmethod
