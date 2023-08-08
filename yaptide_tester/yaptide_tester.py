@@ -240,7 +240,6 @@ class YaptideTester:
             res_json: dict = res.json()
             for sim in res_json['simulations']:
                 print(sim)
-                is_direct = sim['metadata']['platform'] == 'DIRECT'
                 res: requests.Response = self.session.\
                     get(
                         self.endpoints.http_jobs,
