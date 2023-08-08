@@ -47,21 +47,38 @@ def get_job_status(job_id: str) -> dict:
     return result
 
 
-def cancel_job(celery_ids: list[str]) -> dict:
+def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
     """Cancels simulation"""
     for job_id in celery_ids:
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 
         if job_state in [EntityState.CANCELLED.value,
-                        EntityState.COMPLETED.value,
-                        EntityState.FAILED.value]:
+                         EntityState.COMPLETED.value,
+                         EntityState.FAILED.value]:
             logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
             continue
         try:
             celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
         except:  # skipcq: FLK-E722
             logging.error("Cannot cancel job %s", job_id)
+    
+    merge_job = AsyncResult(id=merge_id, app=celery_app)
+    merge_job_state: str = translate_celery_state_naming(merge_job.state)
+
+    if merge_job_state in [EntityState.CANCELLED.value,
+                        EntityState.COMPLETED.value,
+                        EntityState.FAILED.value]:
+        logging.warning("Cannot cancel job %s which is already %s", merge_job, merge_job_state)
+        return {
+            "job_state": merge_job_state,
+            "message": "Job already completed"
+        }
+    try:
+        celery_app.control.revoke(merge_job, terminate=True, signal="SIGINT")
+    except:  # skipcq: FLK-E722
+        logging.error("Cannot cancel job %s", merge_job)
+
 
     return {
         "job_state": EntityState.CANCELLED.value,

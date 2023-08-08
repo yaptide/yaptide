@@ -160,7 +160,7 @@ class JobsBatch(Resource):
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
         job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
-        update_simulation_state(simulation=simulation, job_info=job_info)
+        update_simulation_state(simulation=simulation, update_dict=job_info)
 
         job_info.pop("end_time", None)
         job_info["job_tasks_status"] = job_tasks_status

@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from collections import Counter
 
 from flask import request
 from flask_restful import Resource
@@ -12,6 +13,7 @@ from yaptide.persistence.db_methods import (
     fetch_simulation_by_job_id,
     fetch_cluster_by_id,
     fetch_simulation_by_sim_id,
+    fetch_tasks_by_sim_id,
     fetch_estimators_by_sim_id,
     fetch_estimator_by_sim_id_and_est_name,
     fetch_pages_by_estimator_id,
@@ -22,10 +24,8 @@ from yaptide.persistence.db_methods import (
 )
 from yaptide.persistence.models import (
     EstimatorModel,
-    InputModel,
     LogfilesModel,
     PageModel,
-    SimulationModel,
     BatchSimulationModel,
     UserModel
 )
@@ -33,6 +33,65 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.utils.enums import EntityState
+
+
+class Jobs(Resource):
+    """Class responsible for managing common jobs"""
+
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters for GET and DELETE request"""
+
+        job_id = fields.String()
+
+    @staticmethod
+    @requires_auth()
+    def get(user: UserModel):
+        """Method returning info about job"""
+        schema = Jobs.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        # get job_id from request parameters and check if user owns this job
+        job_id = param_dict['job_id']
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
+
+        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
+
+        job_tasks_status = [task.get_status_dict() for task in tasks]
+
+
+        if simulation.job_state in (EntityState.COMPLETED.value,
+                                    EntityState.FAILED.value):
+            return yaptide_response(message=f"Job state: {simulation.job_state}",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                        "job_tasks_status": job_tasks_status,
+                                    })
+
+        job_info = {
+            "job_state": simulation.job_state
+        }
+        status_counter = Counter([task["task_state"] for task in job_tasks_status])
+        if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
+            job_info["job_state"] = EntityState.PENDING.value
+        elif status_counter[EntityState.FAILED.value] == len(job_tasks_status):
+            job_info["job_state"] = EntityState.FAILED.value
+        elif status_counter[EntityState.RUNNING.value] > 0:
+            job_info["job_state"] = EntityState.RUNNING.value
+
+        update_simulation_state(simulation=simulation, update_dict=job_info)
+
+        job_info["job_tasks_status"] = job_tasks_status
+
+        return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
+        
 
 
 class SimulationResults(Resource):
@@ -65,7 +124,7 @@ class SimulationResults(Resource):
 
         for estimator_dict in payload_dict["estimators"]:
             # We forsee the possibility of the estimator being created earlier as element of partial results
-            estimator: EstimatorModel = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
+            estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
 
             if not estimator:
                 estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)

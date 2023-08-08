@@ -128,7 +128,7 @@ class JobsDirect(Resource):
         # find appropriate simulation in the database
         simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
 
-        tasks = fetch_celery_tasks_by_sim_id(simulation_id=simulation.id)
+        tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
@@ -175,10 +175,14 @@ class JobsDirect(Resource):
             job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
-        
+
         simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
 
-        result: dict = cancel_job(job_id=simulation.merge_id)
+        tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
+
+        celery_ids = [task.celery_id for task in tasks]
+
+        result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=celery_ids)
 
         if "job_state" in result:
             update_simulation_state(simulation=simulation, update_dict=result)

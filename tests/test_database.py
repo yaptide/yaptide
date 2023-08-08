@@ -9,7 +9,6 @@ from yaptide.persistence.models import (
     UserModel,
     YaptideUserModel,
     KeycloakUserModel,
-    SimulationModel,
     CelerySimulationModel,
     BatchSimulationModel,
     CeleryTaskModel,

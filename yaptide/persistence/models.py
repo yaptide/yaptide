@@ -278,11 +278,6 @@ class CeleryTaskModel(TaskModel):
         if "celery_id" in update_dict and self.celery_id != update_dict["celery_id"]:
             self.celery_id = update_dict["celery_id"]
         return super().update_state(update_dict)
-    
-    def get_status_dict(self) -> dict:
-        result = super().get_status_dict()
-        result["celery_id"] = self.celery_id
-        return result
 
     __mapper_args__ = {
         "polymorphic_identity": PlatformType.DIRECT.value,
