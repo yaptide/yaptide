@@ -40,14 +40,14 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
 def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
                cluster: ClusterModel, sim_id: int, update_key: str) -> dict:
     """Dummy version of submit_job"""
-    utc_time = int(datetime.utcnow().timestamp()*1e6)
+    utc_now = int(datetime.utcnow().timestamp()*1e6)
 
     con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
 
-    job_dir = f"{scratch}/yaptide_runs/{utc_time}"
+    job_dir = f"{scratch}/yaptide_runs/{utc_now}"
 
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -61,7 +61,10 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
         con.put(zip_path, job_dir)
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
+    RESULT_SENDER_SCRIPT = Path(__file__).parent.resolve() / "result_sender.py"
+
     con.put(WATCHER_SCRIPT, job_dir)
+    con.put(RESULT_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
         payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con)
@@ -71,9 +74,9 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
     submit_stdout = fabric_result.stdout
     for line in submit_stdout.split("\n"):
         if line.startswith("Job id"):
-            array_id = line.split()[-1]
+            array_id = int(line.split()[-1])
         if line.startswith("Collect id"):
-            collect_id = line.split()[-1]
+            collect_id = int(line.split()[-1])
 
     if array_id is None or collect_id is None:
         return {
@@ -83,7 +86,7 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
         }
     return {
         "message": "Job submitted",
-        "folder_name": utc_time,
+        "job_dir": job_dir,
         "array_id": array_id,
         "collect_id": collect_id,
         "submit_stdout": submit_stdout,
@@ -123,7 +126,10 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,
         root_dir=job_dir,
-        clear_bdos="true"
+        clear_bdos="true",
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url
     )
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
@@ -178,15 +184,11 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
 
 def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Returns simulation results"""
-    folder_name = simulation.folder_name
+    job_dir = simulation.job_dir
     collect_id = simulation.collect_id
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run("echo $SCRATCH", hide=True)
-    scratch = fabric_result.stdout.split()[0]
-
-    job_dir = f"{scratch}/yaptide_runs/{folder_name}"
     fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
 

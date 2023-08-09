@@ -163,7 +163,7 @@ class BatchSimulationModel(SimulationModel):
     __tablename__ = 'BatchSimulation'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id', ondelete="CASCADE"), primary_key=True)
     cluster_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Cluster.id'), nullable=False, doc="Cluster ID")
-    folder_name: Column[str] = db.Column(db.String, nullable=True, doc="Simulation folder name")
+    job_dir: Column[str] = db.Column(db.String, nullable=True, doc="Simulation folder name")
     array_id: Column[int] = db.Column(db.Integer, nullable=True, doc="Batch array jon ID")
     collect_id: Column[int] = db.Column(db.Integer, nullable=True, doc="Batch collect job ID")
 

@@ -138,7 +138,7 @@ def test_create_batch_simulation(db_session: scoped_session, db_good_username: s
                                       sim_type=SimulationType.SHIELDHIT.value,
                                       title='testtitle',
                                       update_key_hash='testkey',
-                                      folder_name='testfolder',
+                                      job_dir='testfolder',
                                       array_id=2137,
                                       collect_id=2138)
     db_session.add(simulation)
@@ -146,7 +146,7 @@ def test_create_batch_simulation(db_session: scoped_session, db_good_username: s
     assert simulation.id is not None
     assert simulation.array_id is not None
     assert simulation.collect_id is not None
-    assert simulation.folder_name is not None
+    assert simulation.job_dir is not None
     assert simulation.user_id == user.id
     assert simulation.cluster_id == cluster.id
     assert simulation.job_id == 'testjob'
@@ -231,7 +231,7 @@ def test_batch_task_model_creation_and_update(db_session: scoped_session, db_goo
                                       sim_type=SimulationType.SHIELDHIT.value,
                                       title='testtitle',
                                       update_key_hash='testkey',
-                                      folder_name='testfolder',
+                                      job_dir='testfolder',
                                       array_id=2137,
                                       collect_id=2138)
     db_session.add(simulation)

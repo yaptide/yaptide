@@ -93,29 +93,30 @@ class JobsBatch(Resource):
         result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user,
                             cluster=cluster, sim_id=simulation.id, update_key=update_key)
 
-        required_keys = {"folder_name", "array_id", "collect_id"}
+        required_keys = {"job_dir", "array_id", "collect_id"}
         if required_keys != required_keys.intersection(set(result.keys())):
-            simulation.folder_name = result.pop("folder_name")
-            simulation.array_id = result.pop("array_id")
-            simulation.collect_id = result.pop("collect_id")
-            result["job_id"] = simulation.job_id
-
-            for i in range(payload_dict["ntasks"]):
-                task = BatchTaskModel(simulation_id=simulation.id, task_id=str(i+1))
-                add_object_to_db(task, False)
-            input_model = InputModel(simulation_id=simulation.id)
-            input_model.data = input_dict_to_save
-            add_object_to_db(input_model)
-
+            delete_object_from_db(simulation)
             return yaptide_response(
-                message="Job submitted",
-                code=202,
+                message="Job submission failed",
+                code=500,
                 content=result
             )
-        delete_object_from_db(simulation)
+        simulation.job_dir = result.pop("job_dir", None)
+        simulation.array_id = result.pop("array_id", None)
+        simulation.collect_id = result.pop("collect_id", None)
+        result["job_id"] = simulation.job_id
+
+        for i in range(payload_dict["ntasks"]):
+            task = BatchTaskModel(simulation_id=simulation.id, task_id=str(i+1))
+            add_object_to_db(task, False)
+
+        input_model = InputModel(simulation_id=simulation.id)
+        input_model.data = input_dict_to_save
+        add_object_to_db(input_model)
+
         return yaptide_response(
-            message="Job submission failed",
-            code=500,
+            message="Job submitted",
+            code=202,
             content=result
         )
 
