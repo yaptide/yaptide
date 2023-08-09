@@ -130,6 +130,10 @@ class SimulationModel(db.Model):
         perform it only for such fields which exists and which have updated values.
         Returns bool value telling if it is required to commit changes to db.
         """
+        if self.job_state in (EntityState.COMPLETED.value,
+                              EntityState.FAILED.value,
+                              EntityState.CANCELLED.value):
+            return False
         db_commit_required = False
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
             self.job_state = update_dict["job_state"]
@@ -220,6 +224,10 @@ class TaskModel(db.Model):
         Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
         """
+        if self.task_state in (EntityState.COMPLETED.value,
+                               EntityState.FAILED.value,
+                               EntityState.CANCELLED.value):
+            return
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
             self.requested_primaries = update_dict["requested_primaries"]
         if "simulated_primaries" in update_dict and self.simulated_primaries != update_dict["simulated_primaries"]:

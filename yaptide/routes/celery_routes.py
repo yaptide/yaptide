@@ -16,7 +16,8 @@ from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_estimators_by_sim_id,
                                             fetch_pages_by_estimator_id,
                                             make_commit_to_db,
-                                            update_simulation_state)
+                                            update_simulation_state,
+                                            update_task_state)
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel,
                                         EstimatorModel, InputModel, PageModel,
                                         UserModel)
@@ -175,8 +176,10 @@ class JobsDirect(Resource):
 
         result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=celery_ids)
 
-        if "job_state" in result:
-            update_simulation_state(simulation=simulation, update_dict=result)
+        if "merge" in result:
+            update_simulation_state(simulation=simulation, update_dict=result["merge"])
+            for i, task in enumerate(tasks):
+                update_task_state(task=task, update_dict=result["tasks"][i])
 
             return yaptide_response(message="", code=200, content=result)
 

@@ -32,14 +32,14 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
     Simulation may consist of multiple tasks, so we need to check all of them
     """
     # Here we ask Celery (via Redis) for job state
-    def get_task_status(job_id: str) -> dict:
+    def get_task_status(job_id: str, state_key: str) -> dict:
         """Gets status of each task in the workflow"""
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 
         # we still need to convert string to enum and operate later on Enum
         result = {
-            "job_state": job_state
+            state_key: job_state
         }
         if job_state == EntityState.FAILED.value:
             result["message"] = str(job.info)
@@ -47,8 +47,8 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
             result["end_time"] = job.info["end_time"]
 
     result = {
-        "merge": get_task_status(merge_id),
-        "tasks": [get_task_status(job_id) for job_id in celery_ids]
+        "merge": get_task_status(merge_id, "job_state"),
+        "tasks": [get_task_status(job_id, "task_state") for job_id in celery_ids]
     }
 
     return result
@@ -56,7 +56,7 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
 
 def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
     """Cancels simulation"""
-    def cancel_task(job_id: str) -> dict:
+    def cancel_task(job_id: str, state_key: str) -> dict:
         """Cancels (if possible) every task in the workflow"""
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
@@ -66,7 +66,7 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
                          EntityState.FAILED.value]:
             logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
             return {
-                "job_state": job_state,
+                state_key: job_state,
                 "message": f"Job already {job_state}"
             }
         try:
@@ -74,20 +74,19 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
         except Exception as e:  # skipcq: PYL-W0703
             logging.error("Cannot cancel job %s, due to %s", job_id, e)
             return {
-                "job_state": job_state,
+                state_key: job_state,
                 "message": f"Cannot cancel job {job_id}, leaving at current state {job_state}"
             }
 
         return {
-            "job_state": EntityState.CANCELLED.value,
-            "message": "Job cancelled"
+            state_key: EntityState.CANCELLED.value,
+            "message": f"Job {job_id} cancelled"
         }
 
     result = {
-        "merge": cancel_task(merge_id),
-        "tasks": [cancel_task(job_id) for job_id in celery_ids]
+        "merge": cancel_task(merge_id, "job_state"),
+        "tasks": [cancel_task(job_id, "task_state") for job_id in celery_ids]
     }
-
     return result
 
 

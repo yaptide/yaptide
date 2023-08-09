@@ -174,7 +174,13 @@ class YaptideTester:
 
         if job_id is not None:
             while do_monitor_job:
-                time.sleep(5)
+                time.sleep(10)
+
+                res: requests.Response = self.session.delete(self.endpoints.http_jobs_direct, params={"job_id": job_id})
+                res_json: dict = res.json()
+                print(res_json)
+                
+
                 try:
                     res: requests.Response = self.session.get(self.endpoints.http_jobs, params={"job_id": job_id})
                     res_json: dict = res.json()
@@ -214,6 +220,7 @@ class YaptideTester:
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
+                return
 
     def check_backend_jobs(self):
         """Example checking backend jobs with pagination"""
