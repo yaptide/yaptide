@@ -174,12 +174,7 @@ class YaptideTester:
 
         if job_id is not None:
             while do_monitor_job:
-                time.sleep(10)
-
-                res: requests.Response = self.session.delete(self.endpoints.http_jobs_direct, params={"job_id": job_id})
-                res_json: dict = res.json()
-                print(res_json)
-                
+                time.sleep(5)
 
                 try:
                     res: requests.Response = self.session.get(self.endpoints.http_jobs, params={"job_id": job_id})
