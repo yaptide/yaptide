@@ -21,7 +21,7 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
             est_dict = json.load(json_file)
             est_dict["name"] = filename.stem
             estimators.append(est_dict)
-    
+
     dict_to_send = {
         "simulation_id": simulation_id,
         "update_key": update_key,
