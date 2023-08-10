@@ -59,7 +59,8 @@ def test_celery_run_simulation(celery_app,
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
-            task_id=str(i+1)
+            task_id=str(i+1),
+            keep_tmp_files=True,  # lets pytest to clean up the tmp files, last 3 directories will be kept
         ) for i in range(payload_dict["ntasks"])
     ])
         

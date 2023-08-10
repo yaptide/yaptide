@@ -26,13 +26,13 @@ def run_shieldhit(dir_path: Path, task_id: str) -> dict:
         command_as_list.append(str(dir_path))
         DEVNULL = open(os.devnull, 'wb')
         subprocess.check_call(command_as_list, cwd=str(dir_path), stdout=DEVNULL, stderr=DEVNULL)
-        logging.info("SHIELDHIT simulation for task %s finished", task_id)
+        logging.info("SHIELD-HIT12A simulation for task %s finished", task_id)
 
         estimators_dict = {}
         files_pattern_pattern = str(dir_path / "*.bdo")
         estimators_list = frompattern(files_pattern_pattern)
         for estimator in estimators_list:
-            logging.debug("Appending estimator for {:s}".format(estimator.file_corename))
+            logging.debug("Appending estimator for %s", estimator.file_corename)
             estimators_dict[estimator.file_corename] = estimator
 
         return estimators_dict

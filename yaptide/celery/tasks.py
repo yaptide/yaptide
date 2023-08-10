@@ -1,3 +1,4 @@
+import contextlib
 import logging
 import os
 import tempfile
@@ -50,8 +51,12 @@ def convert_input_files(payload_dict: dict) -> dict:
 
 
 @celery_app.task(bind=True)
-def run_single_simulation(self, files_dict: dict, task_id: str,
-                          update_key: str = None, simulation_id: int = None) -> dict:
+def run_single_simulation(self, 
+                          files_dict: dict, 
+                          task_id: str,
+                          update_key: str = None, 
+                          simulation_id: int = None,
+                          keep_tmp_files: bool = False) -> dict:
     """Function running single shieldhit simulation"""
 
     # for the purpose of running this function in pytest we would like to have some control
@@ -79,7 +84,13 @@ def run_single_simulation(self, files_dict: dict, task_id: str,
         tmp_dir = os.environ.get("TMP")
 
     # use the selected temporary directory to create a temporary directory
-    with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
+    with (
+        contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir))
+        if keep_tmp_files
+        else tempfile.TemporaryDirectory(dir=tmp_dir)
+    ) as tmp_dir_path:
+    
+#    with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
         logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
