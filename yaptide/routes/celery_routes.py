@@ -83,10 +83,12 @@ class JobsDirect(Resource):
         input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
         input_dict_to_save["input_files"] = files_dict
 
+        # create tasks in the database in the default PENDING state
         for i in range(payload_dict["ntasks"]):
             task = CeleryTaskModel(simulation_id=simulation.id, task_id=f"{simulation.id}_{i}")
-            add_object_to_db(task, False)
+            add_object_to_db(task, make_commit=False)
 
+        # submit the asynchronous job to celery
         simulation.merge_id = run_job(files_dict, update_key, simulation.id, payload_dict["ntasks"])
 
         input_model = InputModel(simulation_id=simulation.id)

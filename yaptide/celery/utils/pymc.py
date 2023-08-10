@@ -69,18 +69,28 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
     return base_list
 
 
-def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str):
+def read_file(filepath: Path, 
+              simulation_id: int, 
+              task_id: str, 
+              update_key: str, 
+              timeout_wait_for_file: int = 60,
+              timeout_wait_for_line: int = 5*60,
+              next_backend_update_time: int = 2,
+              logging_level: int = logging.WARNING):
     """Monitors log file of certain task"""
-    logging.getLogger(__name__).setLevel(logging.WARNING)
+    logging.getLogger(__name__).setLevel(logging_level)
     logfile = None
     update_time = 0
-    for _ in range(30):  # 30 stands for maximum attempts
+    logging.info("Started monitoring, simulation id: %d, task id: %s", simulation_id, task_id)
+    # if the logfile is not created in the first X seconds, it is probably an error
+    for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
         try:
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
             time.sleep(1)
 
+    # if logfile was not created in the first minute, task is marked as failed
     if logfile is None:
         logging.error("Log file for task %s not found", task_id)
         up_dict = {
@@ -89,7 +99,9 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
 
-    loglines = log_generator(logfile, timeout=30)
+    # create generator which waits for new lines in log file
+    # if no new line appears in timeout_wait_for_line seconds, generator stops
+    loglines = log_generator(logfile, timeout=timeout_wait_for_line)
     requested_primaries = 0
     logging.info("Parsing log file for task %s started", task_id)
     for line in loglines:
@@ -97,7 +109,7 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
         if re.search(RUN_MATCH, line):
             splitted = line.split()
             simulated_primaries = int(splitted[3])
-            if (utc_now.timestamp() - update_time < 2  # hardcoded 2 seconds to avoid spamming
+            if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
                     and requested_primaries > simulated_primaries):
                 continue
             update_time = utc_now.timestamp()
@@ -110,6 +122,8 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(REQUESTED_MATCH, line):
+            # found a line with requested primaries, update database
+            # task is in RUNNING state
             splitted = line.split(": ")
             requested_primaries = int(splitted[1])
             up_dict = {
@@ -131,9 +145,11 @@ def read_file(filepath: Path, simulation_id: int, task_id: str, update_key: str)
         elif re.search(COMPLETE_MATCH, line):
             break
 
+    logging.info("Parsing log file for task %s finished", task_id)
     up_dict = {
         "simulated_primaries": requested_primaries,
         "end_time": utc_now.isoformat(sep=" "),
         "task_state": EntityState.COMPLETED.value
     }
+    logging.info("Sending final update for task %s", task_id)
     send_task_update(simulation_id, task_id, update_key, up_dict)

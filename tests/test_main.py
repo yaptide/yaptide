@@ -26,4 +26,4 @@ def test_app_started(client):
     """Test if the app started."""
     resp = client.get("/")
 
-    assert resp.json['message'] == 'Hello world!'
+    assert resp.json['message'] == 'Hello World!'

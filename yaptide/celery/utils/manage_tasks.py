@@ -9,7 +9,7 @@ from yaptide.utils.enums import EntityState
 
 
 def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) -> str:
-    """Runs simulation job"""
+    """Runs asynchronous simulation job"""
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,

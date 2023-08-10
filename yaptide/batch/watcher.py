@@ -20,6 +20,7 @@ def log_generator(thefile: TextIOWrapper, timeout: int = 3600) -> str:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
+    It no new line appears in `timeout` seconds, generator stops.
     Main purpose is monitoring of the log files
     """
     sleep_counter = 0

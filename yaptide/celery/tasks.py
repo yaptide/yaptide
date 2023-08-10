@@ -53,42 +53,76 @@ def convert_input_files(payload_dict: dict) -> dict:
 def run_single_simulation(self, files_dict: dict, task_id: str,
                           update_key: str = None, simulation_id: int = None) -> dict:
     """Function running single shieldhit simulation"""
+
+    # for the purpose of running this function in pytest we would like to have some control
+    # on the temporary directory used by the function
+
+    logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
+
+    # lets try by default to use python tempfile module
     tmp_dir = tempfile.gettempdir()
+    logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
+
+    # if the TMPDIR env variable is set we will use it to override the default
     logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
     if os.environ.get("TMPDIR"):
         tmp_dir = os.environ.get("TMPDIR")
+
+    # if the TEMP env variable is set we will use it to override the default
     logging.info("2. TEMP is: %s", os.environ.get("TEMP", "not set"))
     if os.environ.get("TEMP"):
         tmp_dir = os.environ.get("TEMP")
+
+    # if the TMP env variable is set we will use it to override the default
     logging.info("3. TMP is: %s", os.environ.get("TMP", "not set"))
     if os.environ.get("TMP"):
         tmp_dir = os.environ.get("TMP")
-    logging.info("4. tempfile.gettempdir() is: %s", tmp_dir)
+
+    # use the selected temporary directory to create a temporary directory
     with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
         logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
-        gt_watcher = None
+        watcher_green_thread = None
+        # we would like to monitor the progress of simulation
+        # this is done by reading the log file and sending the updates to the backend
+        # if we have update_key and simulation_id the monitoring thread can submit the updates to backend
         if update_key is not None and simulation_id is not None:
+
+            logging.info("Sending update for task %s, setting celery id %s", task_id, self.request.id)
             send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
-            gt_watcher = eventlet.spawn(read_file,
-                                        Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log",
-                                        simulation_id,
-                                        task_id,
-                                        update_key)
+            
+            path_to_monitor = Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
+
+            current_logging_level = logging.getLogger().getEffectiveLevel()
+
+            watcher_green_thread = eventlet.spawn(read_file,
+                                                  path_to_monitor,
+                                                  simulation_id,
+                                                  task_id,
+                                                  update_key,
+                                                  current_logging_level)
             logging.info("Started monitoring process for task %s", task_id)
         else:
             logging.info("No monitoring processes started for task %s", task_id)
 
         logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
         estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
+        logging.info("Simulation finished for task %s", task_id)
 
-        if gt_watcher is not None:
-            # Sleep gives the monitoring process a chance to send the last update
-            eventlet.sleep(1)
+        # at this point simulation is finished (failed or succeded) and we can kill the monitoring process
+        if watcher_green_thread is not None:
             logging.info("Killing monitoring processes for task %s", task_id)
-            gt_watcher.kill()
-        if len(estimators_dict.keys()) == 0:
+            watcher_green_thread.kill()
+        else:
+            logging.info("No monitoring processes to kill for task %s", task_id)
+
+        # here we have simulation which failed, this means we mark the task as failed
+        if not estimators_dict:
+            logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
+            send_task_update(simulation_id, task_id, update_key, {"task_state": "FAILED"})
+
+
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
             if send_simulation_logfiles(simulation_id=simulation_id,
