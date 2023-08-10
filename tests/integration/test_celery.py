@@ -40,7 +40,7 @@ def test_celery_run_simulation(celery_app,
 
     # limit the particle numbers to get faster results
     payload_dict["input_json"]["beam"]["numberOfParticles"] = 12
-    payload_dict["ntasks"] = 1
+    payload_dict["ntasks"] = 2
 
     if platform.system() == "Windows":
         payload_dict["input_json"]["scoringManager"]["filters"] = []
