@@ -225,7 +225,7 @@ def delete_job(simulation: BatchSimulationModel,
         con.run(f'scancel {array_id}')
         con.run(f'scancel {collect_id}')
         con.run(f'rm -rf {job_dir}')
-    except Exception as e:
+    except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)
         return {"message": "Job cancelation failed"}, 500
 
