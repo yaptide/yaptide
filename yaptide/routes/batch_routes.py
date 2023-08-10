@@ -12,12 +12,14 @@ from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_batch_simulation_by_job_id,
                                             fetch_batch_tasks_by_sim_id,
                                             fetch_cluster_by_id,
-                                            update_simulation_state)
+                                            update_simulation_state,
+                                            update_task_state)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
     BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel,
     KeycloakUserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response,
+                                                     error_internal_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.utils.enums import EntityState, InputType, PlatformType
@@ -196,6 +198,16 @@ class JobsBatch(Resource):
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
         result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
+        if status_code != 200:
+            return error_internal_response(content=result)
+
+        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+
+        tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
+
+        for task in tasks:
+            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+
         return yaptide_response(
             message="",
             code=status_code,

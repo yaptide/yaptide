@@ -13,7 +13,7 @@ class EntityState(Enum):
 
     PENDING = "PENDING"
     RUNNING = "RUNNING"
-    CANCELLED = "CANCELLED"
+    CANCELED = "CANCELED"
     COMPLETED = "COMPLETED"
     FAILED = "FAILED"
 

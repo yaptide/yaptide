@@ -215,5 +215,18 @@ def delete_job(simulation: BatchSimulationModel,
                user: KeycloakUserModel,
                cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
-    logging.info("Deleting job %s for user %s on cluster %s", simulation.job_id, user.username, cluster.cluster_name)
-    return {"message": "Not implemented yet"}, 404
+    job_dir = simulation.job_dir
+    array_id = simulation.array_id
+    collect_id = simulation.collect_id
+
+    try:
+        con = get_connection(user=user, cluster=cluster)
+
+        con.run(f'scancel {array_id}')
+        con.run(f'scancel {collect_id}')
+        con.run(f'rm -rf {job_dir}')
+    except Exception as e:
+        logging.error(e)
+        return {"message": "Job cancelation failed"}, 500
+
+    return {"message": "Job canceled"}, 200

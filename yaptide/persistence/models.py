@@ -132,7 +132,7 @@ class SimulationModel(db.Model):
         """
         if self.job_state in (EntityState.COMPLETED.value,
                               EntityState.FAILED.value,
-                              EntityState.CANCELLED.value):
+                              EntityState.CANCELED.value):
             return False
         db_commit_required = False
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
@@ -226,7 +226,7 @@ class TaskModel(db.Model):
         """
         if self.task_state in (EntityState.COMPLETED.value,
                                EntityState.FAILED.value,
-                               EntityState.CANCELLED.value):
+                               EntityState.CANCELED.value):
             return
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
             self.requested_primaries = update_dict["requested_primaries"]

@@ -61,7 +61,7 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 
-        if job_state in [EntityState.CANCELLED.value,
+        if job_state in [EntityState.CANCELED.value,
                          EntityState.COMPLETED.value,
                          EntityState.FAILED.value]:
             logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
@@ -79,8 +79,8 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
             }
 
         return {
-            state_key: EntityState.CANCELLED.value,
-            "message": f"Job {job_id} cancelled"
+            state_key: EntityState.CANCELED.value,
+            "message": f"Job {job_id} canceled"
         }
 
     result = {
@@ -107,7 +107,7 @@ def translate_celery_state_naming(job_state: str) -> str:
     if job_state in ["FAILURE"]:
         return EntityState.FAILED.value
     if job_state in ["REVOKED"]:
-        return EntityState.CANCELLED.value
+        return EntityState.CANCELED.value
     if job_state in ["SUCCESS"]:
         return EntityState.COMPLETED.value
     # Others are the same
