@@ -70,8 +70,8 @@ def test_run_simulation_with_flask(celery_app,
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
 
     while True:
-        logging.info("Sending check job status request on /jobs/direct endpoint")
-        resp = client.get("/jobs/direct",
+        logging.info("Sending check job status request on /jobs endpoint")
+        resp = client.get("/jobs",
                           query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())

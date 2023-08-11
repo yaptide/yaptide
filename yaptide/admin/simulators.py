@@ -137,7 +137,7 @@ def download_shieldhit_demo_version() -> bool:
 
 def check_if_s3_connection_is_working(
         s3_client: boto3.client) -> bool:
-    '''Check if connection to S3 is possible'''
+    """Check if connection to S3 is possible"""
     try:
         s3_client.list_buckets()
     except NoCredentialsError as e:
@@ -150,6 +150,7 @@ def check_if_s3_connection_is_working(
         click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}", err=True)
         return False
     return True
+
 
 def download_shieldhit_from_s3(
         bucket: str = shieldhit_bucket,
@@ -174,7 +175,7 @@ def download_shieldhit_from_s3(
     if not bucket:
         click.echo("Bucket name is empty", err=True)
         return False
-    
+
     # Check if key is valid
     if not key:
         click.echo("Key is empty", err=True)
@@ -186,7 +187,7 @@ def download_shieldhit_from_s3(
     except ClientError as e:
         click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
         return False
-    
+
     # Check if key exists
     try:
         s3_client.head_object(Bucket=bucket, Key=key)

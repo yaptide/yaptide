@@ -51,14 +51,13 @@ def convert_input_files(payload_dict: dict) -> dict:
 
 
 @celery_app.task(bind=True)
-def run_single_simulation(self, 
-                          files_dict: dict, 
+def run_single_simulation(self,
+                          files_dict: dict,
                           task_id: str,
-                          update_key: str = None, 
+                          update_key: str = None,
                           simulation_id: int = None,
                           keep_tmp_files: bool = False) -> dict:
     """Function running single shieldhit simulation"""
-
     # for the purpose of running this function in pytest we would like to have some control
     # on the temporary directory used by the function
 
@@ -83,14 +82,13 @@ def run_single_simulation(self,
     if os.environ.get("TMP"):
         tmp_dir = os.environ.get("TMP")
 
+    # with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
     # use the selected temporary directory to create a temporary directory
     with (
         contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir))
         if keep_tmp_files
         else tempfile.TemporaryDirectory(dir=tmp_dir)
     ) as tmp_dir_path:
-    
-#    with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
         logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
@@ -102,7 +100,7 @@ def run_single_simulation(self,
 
             logging.info("Sending update for task %s, setting celery id %s", task_id, self.request.id)
             send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
-            
+
             path_to_monitor = Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
 
             current_logging_level = logging.getLogger().getEffectiveLevel()
@@ -132,7 +130,6 @@ def run_single_simulation(self,
         if not estimators_dict:
             logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
             send_task_update(simulation_id, task_id, update_key, {"task_state": "FAILED"})
-
 
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())

@@ -58,8 +58,8 @@ def test_run_simulation_with_flask_crashing(celery_app,
             logging.error("Job did not crash in %d seconds - aborting", wait_this_long)
             assert False
         counter+=1
-        logging.info("Sending check job status request on /jobs/direct endpoint, attempt %d", counter)
-        resp = client.get("/jobs/direct", query_string={"job_id": job_id})
+        logging.info("Sending check job status request on /jobs endpoint, attempt %d", counter)
+        resp = client.get("/jobs", query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
 
@@ -69,7 +69,7 @@ def test_run_simulation_with_flask_crashing(celery_app,
         assert len(data["job_tasks_status"]) == payload_dict_with_broken_input["ntasks"]
         logging.info("Job state: %s", data['job_state'])
         for i, task_status in enumerate(data["job_tasks_status"]):
-            logging.info("Task %d status %s", i, task_status['task_state'])
+            logging.info("Task %d status %s", i, task_status)
 
         if data['job_state'] in ['COMPLETED', 'FAILED']:
             assert data['job_state'] == 'FAILED'

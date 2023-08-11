@@ -69,10 +69,10 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
     return base_list
 
 
-def read_file(filepath: Path, 
-              simulation_id: int, 
-              task_id: str, 
-              update_key: str, 
+def read_file(filepath: Path,
+              simulation_id: int,
+              task_id: str,
+              update_key: str,
               timeout_wait_for_file: int = 60,
               timeout_wait_for_line: int = 5*60,
               next_backend_update_time: int = 2,

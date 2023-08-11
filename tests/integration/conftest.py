@@ -98,8 +98,7 @@ def modify_tmpdir(tmpdir_factory):
     It doesn't remove the temporary directory after the test is done, but keeps last 3 of them.
     This fixture replaces the env variables TMPDIR, TEMP and TMP with the temporary directory path provided by tmpdir_factory.
     """
-
-    """Get the temporary directory path from the tmpdir fixture"""
+    # Get the temporary directory path from the tmpdir fixture
     tmpdir = tmpdir_factory.getbasetemp()
 
     # Store the original TMPDIR value
