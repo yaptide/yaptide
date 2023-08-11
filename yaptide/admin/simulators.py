@@ -13,6 +13,7 @@ from pathlib import Path
 
 import boto3
 import click
+import cryptography
 import requests
 from botocore.exceptions import (ClientError, EndpointConnectionError,
                                  NoCredentialsError)
@@ -152,11 +153,17 @@ def download_shieldhit_from_s3(
     try:
         s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
     except ClientError as e:
-        click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
+        click.echo(f"S3 download failed with client error: {e}", err=True)
+        return False
+    except EndpointConnectionError as e:
+        click.echo(f"S3 download failed with endpoint error: {e}", err=True)
         return False
     # Decrypt downloaded file
     click.echo("Decrypting downloaded file")
     decrypted_file_contents = decrypt_file(temp_file.name, password, salt)
+    if not decrypted_file_contents:
+        click.echo("Decryption failed", err=True)
+        return False
     with open(destination_file_path, "wb") as f:
         f.write(decrypted_file_contents)
     # Permission to execute
@@ -229,7 +236,11 @@ def decrypt_file(file_path: Path, encryption_password: str = password, encryptio
     with open(file_path, "rb") as file:
         encrypted = file.read()
     fernet = Fernet(encryption_key)
-    decrypted = fernet.decrypt(encrypted)
+    try:
+        decrypted = fernet.decrypt(encrypted)
+    except cryptography.fernet.InvalidToken as e:
+        click.echo(f"Decryption failed - invalid token (password+salt)", err=True)
+        return b''
     return decrypted
 
 

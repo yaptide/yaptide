@@ -54,3 +54,6 @@ def test_if_shieldhit_downloaded(tmpdir):
         except subprocess.CalledProcessError as e:
             # If the command exits with a non-zero status
             logging.error("Command Error: %s\nExecuted Command: %s", e.stderr, " ".join(command))
+    else:
+        logging.warning("S3 environment variables are not set, skipping test.")
+        pytest.skip("S3 environment variables are not set.")
