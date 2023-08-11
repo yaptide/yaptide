@@ -135,6 +135,22 @@ def download_shieldhit_demo_version() -> bool:
     return True
 
 
+def check_if_s3_connection_is_working(
+        s3_client: boto3.client) -> bool:
+    '''Check if connection to S3 is possible'''
+    try:
+        s3_client.list_buckets()
+    except NoCredentialsError as e:
+        click.echo(f"No credentials found. Check your access key and secret key. {e}", err=True)
+        return False
+    except EndpointConnectionError as e:
+        click.echo(f"Could not connect to the specified endpoint. {e}", err=True)
+        return False
+    except ClientError as e:
+        click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}", err=True)
+        return False
+    return True
+
 def download_shieldhit_from_s3(
         bucket: str = shieldhit_bucket,
         key: str = shieldhit_key,
@@ -147,16 +163,42 @@ def download_shieldhit_from_s3(
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
+    if not check_if_s3_connection_is_working(s3_client):
+        click.echo("S3 connection failed", err=True)
+        return False
+
     destination_file_path = installation_path / key
     temp_file = tempfile.NamedTemporaryFile(delete=False)
+
+    # Check if bucket name is valid
+    if not bucket:
+        click.echo("Bucket name is empty", err=True)
+        return False
+    
+    # Check if key is valid
+    if not key:
+        click.echo("Key is empty", err=True)
+        return False
+
+    # Check if bucket exists
+    try:
+        s3_client.head_bucket(Bucket=bucket)
+    except ClientError as e:
+        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
+        return False
+    
+    # Check if key exists
+    try:
+        s3_client.head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
+        return False
+
     # Download file from s3 bucket
     try:
         s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
     except ClientError as e:
         click.echo(f"S3 download failed with client error: {e}", err=True)
-        return False
-    except EndpointConnectionError as e:
-        click.echo(f"S3 download failed with endpoint error: {e}", err=True)
         return False
     # Decrypt downloaded file
     click.echo("Decrypting downloaded file")
@@ -188,17 +230,8 @@ def upload_file_to_s3(
         aws_secret_access_key=aws_secret_access_key,
         endpoint_url=endpoint_url,
     )
-    # Check if connection to S3 is possible
-    try:
-        s3_client.list_buckets()
-    except NoCredentialsError as e:
-        click.echo(f"No credentials found. Check your access key and secret key. {e}")
-        return False
-    except EndpointConnectionError as e:
-        click.echo(f"Could not connect to the specified endpoint. {e}")
-        return False
-    except ClientError as e:
-        click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}")
+    if not check_if_s3_connection_is_working(s3_client):
+        click.echo("S3 connection failed", err=True)
         return False
 
     # Check if bucket exists and create if not
