@@ -272,8 +272,8 @@ def decrypt_file(file_path: Path, encryption_password: str = password, encryptio
     fernet = Fernet(encryption_key)
     try:
         decrypted = fernet.decrypt(encrypted)
-    except cryptography.fernet.InvalidToken as e:
-        click.echo(f"Decryption failed - invalid token (password+salt)", err=True)
+    except cryptography.fernet.InvalidToken:
+        click.echo("Decryption failed - invalid token (password+salt)", err=True)
         return b''
     return decrypted
 

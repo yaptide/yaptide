@@ -96,7 +96,8 @@ def modify_tmpdir(tmpdir_factory):
 
     pytest on contrary has smarter way of handling temporary directories, which is provided by tmpdir_factory fixture.
     It doesn't remove the temporary directory after the test is done, but keeps last 3 of them.
-    This fixture replaces the env variables TMPDIR, TEMP and TMP with the temporary directory path provided by tmpdir_factory.
+    This fixture replaces the env variables TMPDIR, TEMP and TMP
+    with the temporary directory path provided by tmpdir_factory.
     """
     # Get the temporary directory path from the tmpdir fixture
     tmpdir = tmpdir_factory.getbasetemp()
