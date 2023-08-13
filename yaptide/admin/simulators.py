@@ -94,7 +94,7 @@ def install_simulator(name: SimulatorType) -> bool:
         logging.info("Installing shieldhit into %s", installation_path)
         installation_path.mkdir(exist_ok=True, parents=True)
         shieldhit_downloaded_from_s3 = False
-        if all([endpoint, access_key, secret_key, password, salt]):
+        if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
             shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
@@ -169,7 +169,6 @@ def download_shieldhit_from_s3(
         return False
 
     destination_file_path = installation_path / key
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
 
     # Check if bucket name is valid
     if not bucket:
@@ -195,21 +194,29 @@ def download_shieldhit_from_s3(
         click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
         return False
 
-    # Download file from s3 bucket
+    # Download file from S3 bucket
     try:
-        s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+        with tempfile.NamedTemporaryFile() as temp_file:
+            click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
+            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+
+            # if no password and salt is provided, skip decryption
+            if password is None and salt is None:
+                click.echo("No password and salt provided, skipping decryption")
+                click.echo(f"Moving {temp_file.name} to {destination_file_path}")
+                shieldhit_binary_bytes = temp_file.read()
+            else:     # Decrypt downloaded file
+                click.echo("Decrypting downloaded file")
+                shieldhit_binary_bytes = decrypt_file(temp_file.name, password, salt)
+                if not shieldhit_binary_bytes:
+                    click.echo("Decryption failed", err=True)
+                    return False
+            with open(destination_file_path, "wb") as f:
+                f.write(shieldhit_binary_bytes)
     except ClientError as e:
         click.echo(f"S3 download failed with client error: {e}", err=True)
         return False
-    # Decrypt downloaded file
-    click.echo("Decrypting downloaded file")
-    decrypted_file_contents = decrypt_file(temp_file.name, password, salt)
-    if not decrypted_file_contents:
-        click.echo("Decryption failed", err=True)
-        return False
-    with open(destination_file_path, "wb") as f:
-        f.write(decrypted_file_contents)
-    # Permission to execute
+        # Permission to execute
     destination_file_path.chmod(0o700)
     return True
 

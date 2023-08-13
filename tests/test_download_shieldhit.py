@@ -16,10 +16,6 @@ def check_if_environment_variables_set() -> bool:
         result = False
     if not 'S3_SECRET_KEY' in os.environ:
         result = False
-    if not 'S3_ENCRYPTION_PASSWORD' in os.environ:
-        result = False
-    if not 'S3_ENCRYPTION_SALT' in os.environ:
-        result = False
     if not 'S3_SHIELDHIT_BUCKET' in os.environ:
         result = False
     if not 'S3_SHIELDHIT_KEY' in os.environ:
@@ -35,6 +31,8 @@ def test_if_shieldhit_downloaded(tmpdir):
         assert download_shieldhit_from_s3(bucket=bucket, key=key, installation_path=tmpdir) is True
         expected_path = Path(tmpdir / key)
         assert expected_path.exists(), "Expected path does not exist."
+        assert expected_path.stat().st_size > 0, "Expected path is empty."
+
         command = [str(expected_path), "--version"]        
         try:
             completed_process = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
