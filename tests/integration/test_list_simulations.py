@@ -18,7 +18,7 @@ def test_list_simulations(celery_app,
                           db_good_password: str,
                           payload_editor_dict_data: dict,
                           add_simulators_to_path_variable,
-                          shieldhit_demo_binary):
+                          shieldhit_binary_installed):
     """Test we can run simulations"""
     client.put("/auth/register",
                data=json.dumps(dict(username=db_good_username, password=db_good_password)),

@@ -27,7 +27,7 @@ def test_celery_run_simulation(celery_app,
                                client,
                                add_simulators_to_path_variable,
                                modify_tmpdir,
-                               shieldhit_demo_binary):
+                               shieldhit_binary_installed):
     """Test run_simulation task with SHIELDHIT demo binary
     Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
     Parser relies on rewind function, which does not work properly on Windows, see:
