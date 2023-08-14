@@ -9,6 +9,7 @@ import os
 from yaptide.application import create_app
 from yaptide.persistence.database import db
 
+
 @pytest.fixture(scope='session')
 def shieldhit_binary_filename() -> str:
     """Name of the binary file for SHIELD-HIT12A"""

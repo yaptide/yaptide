@@ -29,7 +29,7 @@ def run_shieldhit(dir_path: Path, task_id: str) -> dict:
         # If check=True and the exit code is non-zero, raises a
         # CalledProcessError (has return code and output/error streams).
         # text=True means stdout and stderr will be strings instead of bytes
-        completed_process = subprocess.run(command_as_list, 
+        completed_process = subprocess.run(command_as_list,
                                            check=True,
                                            cwd=str(dir_path),
                                            stdout=subprocess.PIPE,
@@ -55,8 +55,8 @@ def run_shieldhit(dir_path: Path, task_id: str) -> dict:
     files_pattern_pattern = str(dir_path / "*.bdo")
     estimators_list = frompattern(files_pattern_pattern)
     for estimator in estimators_list:
-            logging.debug("Appending estimator for %s", estimator.file_corename)
-            estimators_dict[estimator.file_corename] = estimator
+        logging.debug("Appending estimator for %s", estimator.file_corename)
+        estimators_dict[estimator.file_corename] = estimator
 
     return estimators_dict
 
