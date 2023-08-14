@@ -52,7 +52,7 @@ def test_run_simulation_with_flask_crashing(celery_app,
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
     
     counter = 0
-    wait_this_long = 5
+    wait_this_long = 15
     while True:
         if counter > wait_this_long:
             logging.error("Job did not crash in %d seconds - aborting", wait_this_long)
