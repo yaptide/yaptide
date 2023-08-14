@@ -14,7 +14,7 @@ def test_run_simulation_with_flask_crashing(celery_app,
                                             db_good_password: str,
                                             payload_files_dict_data: dict,
                                             modify_tmpdir,
-                                            add_directory_to_path,
+                                            add_simulators_to_path_variable,
                                             shieldhit_demo_binary):
     """Test we can run simulations"""
     client.put("/auth/register",

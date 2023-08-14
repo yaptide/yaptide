@@ -33,9 +33,16 @@ def test_if_shieldhit_downloaded(tmpdir):
         assert expected_path.exists(), "Expected path does not exist."
         assert expected_path.stat().st_size > 0, "Expected path is empty."
 
-        command = [str(expected_path), "--version"]        
+        command = [str(expected_path), "--version"]
         try:
-            completed_process = subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+            # If check=True and the exit code is non-zero, raises a
+            # CalledProcessError (has return code and output/error streams).
+            # text=True means stdout and stderr will be strings instead of bytes
+            completed_process = subprocess.run(command, 
+                                               check=True, 
+                                               stdout=subprocess.PIPE, 
+                                               stderr=subprocess.PIPE, 
+                                               text=True)
             
             # Capture stdout and stderr
             command_stdout = completed_process.stdout

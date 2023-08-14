@@ -32,7 +32,7 @@ def yaptide_bin_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope='function')
-def add_directory_to_path(yaptide_bin_dir : Path):
+def add_simulators_to_path_variable(yaptide_bin_dir : Path):
     """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
     logging.info("Adding %s to PATH", yaptide_bin_dir)
 

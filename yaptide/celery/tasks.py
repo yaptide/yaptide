@@ -180,11 +180,11 @@ def merge_results(results: list[dict]) -> dict:
             continue
 
         if averaged_estimators is None:
-            averaged_estimators: list[dict] = result["estimators"]
+            averaged_estimators: list[dict] = result.get("estimators", [])
             # There is nothing to average yet
             continue
 
-        averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
+        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
 
     final_result = {
         "end_time": datetime.utcnow().isoformat(sep=" ")

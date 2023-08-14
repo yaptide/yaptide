@@ -25,7 +25,7 @@ def test_celery_run_simulation(celery_app,
                                celery_worker,
                                payload_editor_dict_data: dict,
                                client,
-                               add_directory_to_path,
+                               add_simulators_to_path_variable,
                                modify_tmpdir,
                                shieldhit_demo_binary):
     """Test run_simulation task with SHIELDHIT demo binary
