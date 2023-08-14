@@ -47,8 +47,8 @@ jobs:
         env:
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          # S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          # S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
         run: pytest tests/test_download_shieldhit.py
@@ -58,8 +58,8 @@ jobs:
         env:
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          # S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          # S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
         run: pytest tests/integration/test_run_crashing_simulation.py
@@ -69,8 +69,8 @@ jobs:
         env:
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          # S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          # S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
         run: pytest tests/integration/test_run_simulation.py
