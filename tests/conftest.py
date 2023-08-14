@@ -1,12 +1,21 @@
 import json
 import logging
 from pathlib import Path
+import platform
 from typing import Generator
 import pytest
 import os
 
 from yaptide.application import create_app
 from yaptide.persistence.database import db
+
+@pytest.fixture(scope='session')
+def shieldhit_binary_filename() -> str:
+    """Name of the binary file for SHIELD-HIT12A"""
+    binary_filename = "shieldhit"
+    if platform.system() == 'Windows':
+        return binary_filename + ".exe"
+    return binary_filename
 
 
 @pytest.fixture(scope='session')

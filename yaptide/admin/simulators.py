@@ -168,7 +168,10 @@ def download_shieldhit_from_s3(
         click.echo("S3 connection failed", err=True)
         return False
 
-    destination_file_path = installation_path / key
+    destination_file_path = installation_path / 'shieldhit'
+    # append '.exe' to file name if working on Windows
+    if platform.system() == 'Windows':
+        destination_file_path = installation_path / 'shieldhit.exe'
 
     # Check if bucket name is valid
     if not bucket:
@@ -203,16 +206,16 @@ def download_shieldhit_from_s3(
             # if no password and salt is provided, skip decryption
             if password is None and salt is None:
                 click.echo("No password and salt provided, skipping decryption")
-                click.echo(f"Moving {temp_file.name} to {destination_file_path}")
-                shieldhit_binary_bytes = temp_file.read()
+                click.echo(f"Copying {temp_file.name} to {destination_file_path}")
+                shutil.copy2(temp_file.name, destination_file_path)
             else:     # Decrypt downloaded file
                 click.echo("Decrypting downloaded file")
                 shieldhit_binary_bytes = decrypt_file(temp_file.name, password, salt)
                 if not shieldhit_binary_bytes:
                     click.echo("Decryption failed", err=True)
                     return False
-            with open(destination_file_path, "wb") as f:
-                f.write(shieldhit_binary_bytes)
+                with open(destination_file_path, "wb") as dest_file:
+                    dest_file.write(shieldhit_binary_bytes)
     except ClientError as e:
         click.echo(f"S3 download failed with client error: {e}", err=True)
         return False

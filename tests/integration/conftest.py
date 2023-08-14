@@ -11,14 +11,10 @@ from yaptide.persistence.database import db
 
 
 @pytest.fixture(scope='session')
-def shieldhit_binary_installed():
+def shieldhit_binary_installed(shieldhit_binary_filename):
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
-    shieldhit_bin_path = installation_path / 'shieldhit'
-    # check if on Windows
-    if os.name == 'nt':
-        # append exe extension to the path
-        shieldhit_bin_path = shieldhit_bin_path.with_suffix('.exe')
+    shieldhit_bin_path = installation_path / shieldhit_binary_filename
     logging.info("SHIELDHIT binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)

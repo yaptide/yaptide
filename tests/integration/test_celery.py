@@ -28,8 +28,8 @@ def test_celery_run_simulation(celery_app,
                                add_simulators_to_path_variable,
                                modify_tmpdir,
                                shieldhit_binary_installed):
-    """Test run_simulation task with SHIELDHIT demo binary
-    Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
+    """Test run_simulation task with SHIELD-HIT12A binary
+    Current Windows demo version version of SHIELD-HIT12A has a bug, so it cannot parse more elaborated input files.
     Parser relies on rewind function, which does not work properly on Windows, see:
     https://stackoverflow.com/questions/47256223/why-does-fseek-0-seek-cur-fail-on-windows/47256758#47256758
     So to bypass this issue we restrict the detect configuration to only one output and no filter.

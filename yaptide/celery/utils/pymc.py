@@ -16,31 +16,50 @@ from yaptide.utils.enums import EntityState
 
 
 def run_shieldhit(dir_path: Path, task_id: str) -> dict:
-    """Function run in eventlet to run single SHIELDHIT simulation"""
+    """Function run in eventlet to run single SHIELD-HIT12A simulation"""
     settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
                                   simulator_exec_path=None,  # useless
                                   cmdline_opts="")  # useless
+    # last part of task_id gives an integer seed for random number generator
     settings.set_rng_seed(int(task_id.split("_")[-1]))
-    try:
-        command_as_list = str(settings).split()
-        command_as_list.append(str(dir_path))
-        DEVNULL = open(os.devnull, 'wb')
-        subprocess.check_call(command_as_list, cwd=str(dir_path), stdout=DEVNULL, stderr=DEVNULL)
-        logging.info("SHIELD-HIT12A simulation for task %s finished", task_id)
 
-        estimators_dict = {}
-        files_pattern_pattern = str(dir_path / "*.bdo")
-        estimators_list = frompattern(files_pattern_pattern)
-        for estimator in estimators_list:
+    command_as_list = str(settings).split()
+    command_as_list.append(str(dir_path))
+
+    try:
+            # If check=True and the exit code is non-zero, raises a
+            # CalledProcessError (has return code and output/error streams).
+            # text=True means stdout and stderr will be strings instead of bytes
+            completed_process = subprocess.run(command_as_list, 
+                                               check=True,
+                                               cwd=str(dir_path),
+                                               stdout=subprocess.PIPE, 
+                                               stderr=subprocess.PIPE, 
+                                               text=True)
+            
+            # Capture stdout and stderr
+            command_stdout = completed_process.stdout
+            command_stderr = completed_process.stderr
+            
+            # Log stdout and stderr using logging
+            logging.info("Command Output:\n%s", command_stdout)
+            logging.info("Command Error Output:\n%s", command_stderr)
+    except subprocess.CalledProcessError as e:
+            # If the command exits with a non-zero status
+            logging.error("Command Error: %s\nExecuted Command: %s", e.stderr, " ".join(command_as_list))
+    except Exception as e:  # skipcq: PYL-W0703
+            logging.error("Exception while running SHIELDHIT: %s", e)
+
+    logging.info("SHIELD-HIT12A simulation for task %s finished", task_id)
+
+    estimators_dict = {}
+    files_pattern_pattern = str(dir_path / "*.bdo")
+    estimators_list = frompattern(files_pattern_pattern)
+    for estimator in estimators_list:
             logging.debug("Appending estimator for %s", estimator.file_corename)
             estimators_dict[estimator.file_corename] = estimator
 
-        return estimators_dict
-    except Exception as e:  # skipcq: PYL-W0703
-        logging.error("Exception while running SHIELDHIT: %s", e)
-
-    # return empty dict if simulation failed
-    return {}
+    return estimators_dict
 
 
 def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
