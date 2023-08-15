@@ -28,7 +28,7 @@ def project_json_path() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope='session')
-def project_json_data(project_json_path: Path) -> Generator[Path, None, None]:
+def project_json_data(project_json_path: Path) -> Generator[dict, None, None]:
     """Reads project JSON file and returns its contents as dictionary"""
     json_data = {}
     if not project_json_path.suffix == '.json':
@@ -46,7 +46,7 @@ def payload_editor_dict_path() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope='session')
-def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[Path, None, None]:
+def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[dict, None, None]:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
     if not payload_editor_dict_path.suffix == '.json':
@@ -64,7 +64,7 @@ def payload_files_dict_path() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[Path, None, None]:
+def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[dict, None, None]:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
     if not payload_files_dict_path.suffix == '.json':
@@ -75,7 +75,7 @@ def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[Path, No
 
 
 @pytest.fixture(scope='session')
-def result_dict_path() -> Generator[Path, None, None]:
+def result_dict_path() -> Generator[dict, None, None]:
     """Path to json file with simulation results"""
     main_dir = Path(__file__).resolve().parent
     yield main_dir / "res" / "json_with_results.json"
