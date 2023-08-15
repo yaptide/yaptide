@@ -3,16 +3,16 @@ import os
 from pathlib import Path
 
 import requests
-
 from flask import request
 from flask_restful import Resource
 
-from yaptide.persistence.database import db
+from yaptide.persistence.db_methods import (add_object_to_db,
+                                            fetch_keycloak_user_by_username,
+                                            make_commit_to_db)
 from yaptide.persistence.models import KeycloakUserModel
-
+from yaptide.routes.utils.response_templates import (error_internal_response,
+                                                     yaptide_response)
 from yaptide.routes.utils.tokens import encode_auth_token
-from yaptide.routes.utils.response_templates import yaptide_response, error_internal_response
-
 
 ROOT_DIR = Path(__file__).parent.resolve()
 
@@ -53,18 +53,17 @@ class AuthKeycloak(Resource):
         username = payload_dict["username"]
         logging.warning("Got username %s", username)
 
-        user: KeycloakUserModel = db.session.query(KeycloakUserModel).filter_by(username=username).first()
+        user = fetch_keycloak_user_by_username(username=username)
         if not user:
             user = KeycloakUserModel(username=username,
                                      cert=res_json["cert"],
                                      private_key=res_json["private"])
 
-            db.session.add(user)
+            add_object_to_db(user)
         else:
             user.cert = res_json["cert"]
             user.private_key = res_json["private"]
-
-        db.session.commit()
+            make_commit_to_db()
 
         try:
             access_token, access_exp = encode_auth_token(user_id=user.id,

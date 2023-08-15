@@ -11,14 +11,10 @@ from yaptide.persistence.database import db
 
 
 @pytest.fixture(scope='session')
-def shieldhit_demo_binary():
+def shieldhit_binary_installed(shieldhit_binary_filename):
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
     from yaptide.admin.simulators import installation_path, install_simulator, SimulatorType
-    shieldhit_bin_path = installation_path / 'shieldhit'
-    # check if on Windows
-    if os.name == 'nt':
-        # append exe extension to the path
-        shieldhit_bin_path = shieldhit_bin_path.with_suffix('.exe')
+    shieldhit_bin_path = installation_path / shieldhit_binary_filename
     logging.info("SHIELDHIT binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit)
@@ -32,7 +28,7 @@ def yaptide_bin_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope='function')
-def add_directory_to_path(yaptide_bin_dir : Path):
+def add_simulators_to_path_variable(yaptide_bin_dir : Path):
     """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
     logging.info("Adding %s to PATH", yaptide_bin_dir)
 
@@ -58,6 +54,8 @@ def celery_app():
     """
     logging.info("Creating celery app for testing")
     from yaptide.celery.worker import celery_app as app
+    # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
+    app.conf.task_default_pool = 'eventlet'
     return app
 
 
@@ -81,6 +79,53 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
         "concurrency": 1,
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
     }
+
+
+@pytest.fixture(scope='function')
+def modify_tmpdir(tmpdir_factory):
+    """
+    In yaptide some of the modules (pymchelper?) uses temporary directories to store files.
+    This is convenient in production, but in testing we want to have a control over the temporary directory path.
+    This fixture replaces the default temporary directory paths with the one provided by tmpdir_factory fixture.
+    Under Linux temporary directory is usually /tmp
+    Python uses env variables TMPDIR, TEMP and TMP to store the temporary directory path.
+
+    pytest on contrary has smarter way of handling temporary directories, which is provided by tmpdir_factory fixture.
+    It doesn't remove the temporary directory after the test is done, but keeps last 3 of them.
+    This fixture replaces the env variables TMPDIR, TEMP and TMP
+    with the temporary directory path provided by tmpdir_factory.
+    """
+    # Get the temporary directory path from the tmpdir fixture
+    tmpdir = tmpdir_factory.getbasetemp()
+
+    # Store the original TMPDIR value
+    original_tmpdir = os.environ.get('TMPDIR')
+    original_temp = os.environ.get('TEMP')
+    original_tmp = os.environ.get('TMP')
+
+    # Set the TMPDIR environment variable to the temporary directory path
+    logging.info("Replacing old value %s of TMPDIR with %s", original_tmpdir, tmpdir)
+    os.environ['TMPDIR'] = str(tmpdir)
+    logging.info("Replacing old value %s of TEMP with %s", original_temp, tmpdir)
+    os.environ['TEMP'] = str(tmpdir)
+    logging.info("Replacing old value %s of TMP with %s", original_tmp, tmpdir)
+    os.environ['TMP'] = str(tmpdir)
+
+    yield
+
+    # Restore the original TMPDIR value after the tests are done
+    if original_tmpdir is None:
+        del os.environ['TMP']
+    else:
+        os.environ['TMP'] = original_tmpdir
+    if original_temp is None:
+        del os.environ['TEMP']
+    else:
+        os.environ['TEMP'] = original_temp
+    if original_tmp is None:
+        del os.environ['TMPDIR']
+    else:
+        os.environ['TMPDIR'] = original_tmp
 
 
 @pytest.fixture(scope="function")

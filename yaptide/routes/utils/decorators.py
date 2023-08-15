@@ -2,11 +2,9 @@ from functools import wraps
 from typing import Union
 
 from flask import request
-from sqlalchemy.orm import with_polymorphic
 from werkzeug.exceptions import Forbidden, Unauthorized
 
-from yaptide.persistence.database import db
-from yaptide.persistence.models import KeycloakUserModel, UserBaseModel, YaptideUserModel
+from yaptide.persistence.db_methods import fetch_user_by_id
 from yaptide.routes.utils.tokens import decode_auth_token
 
 
@@ -21,8 +19,7 @@ def requires_auth(is_refresh: bool = False):
                 raise Unauthorized(description="No token provided")
             resp: Union[int, str] = decode_auth_token(token=token, is_refresh=is_refresh)
             if isinstance(resp, int):
-                UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
-                user = db.session.query(UserPoly).filter_by(id=resp).first()
+                user = fetch_user_by_id(user_id=resp)
                 if user:
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")

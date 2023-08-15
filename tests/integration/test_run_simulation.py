@@ -14,8 +14,8 @@ def test_run_simulation_with_flask(celery_app,
                                    db_good_username: str,
                                    db_good_password: str,
                                    payload_editor_dict_data: dict,
-                                   add_directory_to_path,
-                                   shieldhit_demo_binary):
+                                   add_simulators_to_path_variable,
+                                   shieldhit_binary_installed):
     """Test we can run simulations"""
     client.put("/auth/register",
                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
@@ -70,8 +70,8 @@ def test_run_simulation_with_flask(celery_app,
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
 
     while True:
-        logging.info("Sending check job status request on /jobs/direct endpoint")
-        resp = client.get("/jobs/direct",
+        logging.info("Sending check job status request on /jobs endpoint")
+        resp = client.get("/jobs",
                           query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())

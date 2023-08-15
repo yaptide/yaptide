@@ -2,22 +2,25 @@
 
 import logging
 import os
+import platform
 import shutil
 import tarfile
 import tempfile
 import zipfile
-import click
-import requests
-import boto3
-import platform
+from base64 import urlsafe_b64encode
 from enum import IntEnum, auto
 from pathlib import Path
+
+import boto3
+import click
+import cryptography
+import requests
+from botocore.exceptions import (ClientError, EndpointConnectionError,
+                                 NoCredentialsError)
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from botocore.exceptions import NoCredentialsError, EndpointConnectionError, ClientError
 from dotenv import load_dotenv
-from base64 import urlsafe_b64encode
 
 
 class SimulatorType(IntEnum):
@@ -59,9 +62,9 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
                 click.echo(f"Extracting {member.name}")
                 tar.extract(member, destination_dir)
                 # move to installation path
-                local_file = Path(destination_dir) / member.name
-                click.echo(f"Moving {local_file} to {installation_path}")
-                local_file.rename(installation_path / member_name)
+                local_file_path = Path(destination_dir) / member.name
+                click.echo(f"Moving {local_file_path} to {installation_path}")
+                local_file_path.rename(installation_path / member_name)
 
 
 def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
@@ -76,7 +79,7 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
                 # move to installation path
                 local_file_path = Path(destination_dir) / member.filename
                 destination_file_path = installation_path / member_name
-                click.echo(f"Moving {local_file_path} to {installation_path}")
+                click.echo(f"Moving {local_file_path} to {destination_file_path}")
                 # move file from temporary directory to installation path using shutils
                 if not destination_file_path.exists():
                     shutil.move(local_file_path, destination_file_path)
@@ -91,7 +94,7 @@ def install_simulator(name: SimulatorType) -> bool:
         logging.info("Installing shieldhit into %s", installation_path)
         installation_path.mkdir(exist_ok=True, parents=True)
         shieldhit_downloaded_from_s3 = False
-        if all([endpoint, access_key, secret_key, password, salt]):
+        if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
             shieldhit_downloaded_from_s3 = download_shieldhit_from_s3()
@@ -132,6 +135,23 @@ def download_shieldhit_demo_version() -> bool:
     return True
 
 
+def check_if_s3_connection_is_working(
+        s3_client: boto3.client) -> bool:
+    """Check if connection to S3 is possible"""
+    try:
+        s3_client.list_buckets()
+    except NoCredentialsError as e:
+        click.echo(f"No credentials found. Check your access key and secret key. {e}", err=True)
+        return False
+    except EndpointConnectionError as e:
+        click.echo(f"Could not connect to the specified endpoint. {e}", err=True)
+        return False
+    except ClientError as e:
+        click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}", err=True)
+        return False
+    return True
+
+
 def download_shieldhit_from_s3(
         bucket: str = shieldhit_bucket,
         key: str = shieldhit_key,
@@ -144,20 +164,62 @@ def download_shieldhit_from_s3(
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
-    destination_file_path = installation_path / key
-    temp_file = tempfile.NamedTemporaryFile(delete=False)
-    # Download file from s3 bucket
-    try:
-        s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
-    except ClientError as e:
-        click.echo("S3 download failed with error: ", e.response["Error"]["Message"])
+    if not check_if_s3_connection_is_working(s3_client):
+        click.echo("S3 connection failed", err=True)
         return False
-    # Decrypt downloaded file
-    click.echo("Decrypting downloaded file")
-    decrypted_file_contents = decrypt_file(temp_file.name, password, salt)
-    with open(destination_file_path, "wb") as f:
-        f.write(decrypted_file_contents)
-    # Permission to execute
+
+    destination_file_path = installation_path / 'shieldhit'
+    # append '.exe' to file name if working on Windows
+    if platform.system() == 'Windows':
+        destination_file_path = installation_path / 'shieldhit.exe'
+
+    # Check if bucket name is valid
+    if not bucket:
+        click.echo("Bucket name is empty", err=True)
+        return False
+
+    # Check if key is valid
+    if not key:
+        click.echo("Key is empty", err=True)
+        return False
+
+    # Check if bucket exists
+    try:
+        s3_client.head_bucket(Bucket=bucket)
+    except ClientError as e:
+        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
+        return False
+
+    # Check if key exists
+    try:
+        s3_client.head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
+        return False
+
+    # Download file from S3 bucket
+    try:
+        with tempfile.NamedTemporaryFile() as temp_file:
+            click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
+            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+
+            # if no password and salt is provided, skip decryption
+            if password is None and salt is None:
+                click.echo("No password and salt provided, skipping decryption")
+                click.echo(f"Copying {temp_file.name} to {destination_file_path}")
+                shutil.copy2(temp_file.name, destination_file_path)
+            else:     # Decrypt downloaded file
+                click.echo("Decrypting downloaded file")
+                shieldhit_binary_bytes = decrypt_file(temp_file.name, password, salt)
+                if not shieldhit_binary_bytes:
+                    click.echo("Decryption failed", err=True)
+                    return False
+                with open(destination_file_path, "wb") as dest_file:
+                    dest_file.write(shieldhit_binary_bytes)
+    except ClientError as e:
+        click.echo(f"S3 download failed with client error: {e}", err=True)
+        return False
+        # Permission to execute
     destination_file_path.chmod(0o700)
     return True
 
@@ -179,17 +241,8 @@ def upload_file_to_s3(
         aws_secret_access_key=aws_secret_access_key,
         endpoint_url=endpoint_url,
     )
-    # Check if connection to S3 is possible
-    try:
-        s3_client.list_buckets()
-    except NoCredentialsError as e:
-        click.echo(f"No credentials found. Check your access key and secret key. {e}")
-        return False
-    except EndpointConnectionError as e:
-        click.echo(f"Could not connect to the specified endpoint. {e}")
-        return False
-    except ClientError as e:
-        click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}")
+    if not check_if_s3_connection_is_working(s3_client):
+        click.echo("S3 connection failed", err=True)
         return False
 
     # Check if bucket exists and create if not
@@ -201,7 +254,7 @@ def upload_file_to_s3(
     encrypted_file_contents = encrypt_file(file_path, encryption_password, encryption_salt)
     try:
         # Upload encrypted file to S3 bucket
-        click.echo("Uploading file", file_path)
+        click.echo(f"Uploading file {file_path}")
         s3_client.put_object(Body=encrypted_file_contents, Bucket=bucket, Key=file_path.name)
         return True
     except ClientError as e:
@@ -227,7 +280,11 @@ def decrypt_file(file_path: Path, encryption_password: str = password, encryptio
     with open(file_path, "rb") as file:
         encrypted = file.read()
     fernet = Fernet(encryption_key)
-    decrypted = fernet.decrypt(encrypted)
+    try:
+        decrypted = fernet.decrypt(encrypted)
+    except cryptography.fernet.InvalidToken:
+        click.echo("Decryption failed - invalid token (password+salt)", err=True)
+        return b''
     return decrypted
 
 

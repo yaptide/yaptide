@@ -1,25 +1,23 @@
 import io
 import json
-import tempfile
-
 import logging
 import os
-
-from zipfile import ZipFile
+import tempfile
 from datetime import datetime
 from pathlib import Path
+from zipfile import ZipFile
 
+import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
-import pymchelper
 
-from yaptide.batch.string_templates import (
-    SUBMIT_SHIELDHIT,
-    ARRAY_SHIELDHIT_BASH,
-    COLLECT_BASH
-)
-from yaptide.batch.utils.utils import extract_sbatch_header, convert_dict_to_sbatch_options
-from yaptide.persistence.models import KeycloakUserModel, SimulationModel, ClusterModel
+from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH,
+                                            SUBMIT_SHIELDHIT)
+from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options,
+                                       extract_sbatch_header)
+from yaptide.persistence.models import (BatchSimulationModel, ClusterModel,
+                                        KeycloakUserModel)
+from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 
@@ -42,14 +40,14 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
 def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
                cluster: ClusterModel, sim_id: int, update_key: str) -> dict:
     """Dummy version of submit_job"""
-    utc_time = int(datetime.utcnow().timestamp()*1e6)
+    utc_now = int(datetime.utcnow().timestamp()*1e6)
 
     con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
 
-    job_dir = f"{scratch}/yaptide_runs/{utc_time}"
+    job_dir = f"{scratch}/yaptide_runs/{utc_now}"
 
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -63,21 +61,24 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
         con.put(zip_path, job_dir)
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
+    RESULT_SENDER_SCRIPT = Path(__file__).parent.resolve() / "result_sender.py"
+
     con.put(WATCHER_SCRIPT, job_dir)
+    con.put(RESULT_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
         payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con)
 
-    job_id = collect_id = None
+    array_id = collect_id = None
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
     submit_stdout = fabric_result.stdout
     for line in submit_stdout.split("\n"):
         if line.startswith("Job id"):
-            job_id = line.split()[-1]
+            array_id = int(line.split()[-1])
         if line.startswith("Collect id"):
-            collect_id = line.split()[-1]
+            collect_id = int(line.split()[-1])
 
-    if job_id is None or collect_id is None:
+    if array_id is None or collect_id is None:
         return {
             "message": "Job submission failed",
             "submit_stdout": submit_stdout,
@@ -85,7 +86,9 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
         }
     return {
         "message": "Job submitted",
-        "job_id": f"{utc_time}:{job_id}:{collect_id}:{cluster.cluster_name}",
+        "job_dir": job_dir,
+        "array_id": array_id,
+        "collect_id": collect_id,
         "submit_stdout": submit_stdout,
         "sh_files": sh_files
     }
@@ -123,7 +126,10 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
     collect_script = COLLECT_BASH.format(
         collect_header=collect_header,
         root_dir=job_dir,
-        clear_bdos="true"
+        clear_bdos="true",
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url
     )
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
@@ -140,13 +146,14 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int,
     }
 
 
-def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
+def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Dummy version of get_job_status"""
-    _, job_id, collect_id, _ = concat_job_id.split(":")
+    array_id = simulation.array_id
+    collect_id = simulation.collect_id
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run(f'sacct -j {job_id} --format State', hide=True)
+    fabric_result: Result = con.run(f'sacct -j {array_id} --format State', hide=True)
     job_state = fabric_result.stdout.split()[-1].split()[0]
 
     fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
@@ -154,11 +161,11 @@ def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: Cluster
 
     if job_state == "FAILED" or collect_state == "FAILED":
         return {
-            "job_state": SimulationModel.JobState.FAILED.value
+            "job_state": EntityState.FAILED.value
         }
     if collect_state == "COMPLETED":
         return {
-            "job_state": SimulationModel.JobState.COMPLETED.value,
+            "job_state": EntityState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
     if collect_state == "RUNNING":
@@ -171,26 +178,23 @@ def get_job_status(concat_job_id: str, user: KeycloakUserModel, cluster: Cluster
         logging.debug("Main job is in PENDING state")
 
     return {
-        "job_state": SimulationModel.JobState.RUNNING.value
+        "job_state": EntityState.RUNNING.value
     }
 
 
-def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
+def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Returns simulation results"""
-    utc_time, _, collect_id, _ = concat_job_id.split(":")
+    job_dir = simulation.job_dir
+    collect_id = simulation.collect_id
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run("echo $SCRATCH", hide=True)
-    scratch = fabric_result.stdout.split()[0]
-
-    job_dir = f"{scratch}/yaptide_runs/{utc_time}"
     fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
 
     if collect_state == "COMPLETED":
         fabric_result: Result = con.run(f'ls -f {job_dir}/output | grep .json', hide=True)
-        result_dict = {"estimators": []}
+        result_estimators = []
         with tempfile.TemporaryDirectory() as tmp_dir_path:
             for filename in fabric_result.stdout.split():
                 file_path = Path(tmp_dir_path, filename)
@@ -199,17 +203,30 @@ def get_job_results(concat_job_id: str, user: KeycloakUserModel, cluster: Cluste
                 with open(file_path, "r") as json_file:
                     est_dict = json.load(json_file)
                     est_dict["name"] = filename.split('.')[0]
-                    result_dict["estimators"].append(est_dict)
+                    result_estimators.append(est_dict)
 
-        return result_dict
+        return {"estimators": result_estimators}
     return {
         "message": "Results not available"
     }
 
 
-def delete_job(concat_job_id: str,
+def delete_job(simulation: BatchSimulationModel,
                user: KeycloakUserModel,
                cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
-    logging.info("Deleting job %s for user %s on cluster %s", concat_job_id, user.username, cluster.cluster_name)
-    return {"message": "Not implemented yet"}, 404
+    job_dir = simulation.job_dir
+    array_id = simulation.array_id
+    collect_id = simulation.collect_id
+
+    try:
+        con = get_connection(user=user, cluster=cluster)
+
+        con.run(f'scancel {array_id}')
+        con.run(f'scancel {collect_id}')
+        con.run(f'rm -rf {job_dir}')
+    except Exception as e:  # skipcq: PYL-W0703
+        logging.error(e)
+        return {"message": "Job cancelation failed"}, 500
+
+    return {"message": "Job canceled"}, 200

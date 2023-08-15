@@ -1,23 +1,23 @@
 import copy
-import logging
-from pathlib import Path
 import json
-import sys
+import logging
 import re
+import sys
 from enum import Enum, auto
+from pathlib import Path
 
 from pymchelper.estimator import Estimator
 from pymchelper.writers.json import JsonWriter
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
-from ..converter.converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
-
+from ..converter.converter.api import (get_parser_from_str,  # skipcq: FLK-E402
+                                       run_parser)
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
 
-def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
+def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
     """Convert simulation output to JSON dictionary representation (to be consumed by UI)"""
     if not estimators_dict:
         return {"message": "No estimators"}
@@ -25,7 +25,7 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
     # result_dict is a dictionary, which is later converted to json
     # to provide readable API response for fronted
     # keys in results_dict are estimator names, values are the estimator objects
-    result_dict = {"estimators": []}
+    result_estimators = []
     estimator: Estimator
     for estimator_key, estimator in estimators_dict.items():
         filepath = dir_path / estimator_key
@@ -35,9 +35,9 @@ def pymchelper_output_to_json(estimators_dict: dict, dir_path: Path) -> dict:
         with open(writer.filename, "r") as json_file:
             est_dict = json.load(json_file)
             est_dict["name"] = estimator_key
-            result_dict["estimators"].append(est_dict)
+            result_estimators.append(est_dict)
 
-    return result_dict
+    return result_estimators
 
 
 class JSON_TYPE(Enum):

@@ -12,21 +12,24 @@ import logging
 import platform
 import pytest  # skipcq: PY-W2000
 
+from celery import group, chord
+
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
-from yaptide.celery.tasks import cancel_simulation, run_simulation
+from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation(celery_app,
-                        celery_worker,
-                        payload_editor_dict_data: dict,
-                        client,
-                        add_directory_to_path,
-                        shieldhit_demo_binary):
-    """Test run_simulation task with SHIELDHIT demo binary
-    Current Windows demo version version of SHIELDHIT has a bug, so it cannot parse more elaborated input files.
+def test_celery_run_simulation(celery_app,
+                               celery_worker,
+                               payload_editor_dict_data: dict,
+                               client,
+                               add_simulators_to_path_variable,
+                               modify_tmpdir,
+                               shieldhit_binary_installed):
+    """Test run_simulation task with SHIELD-HIT12A binary
+    Current Windows demo version version of SHIELD-HIT12A has a bug, so it cannot parse more elaborated input files.
     Parser relies on rewind function, which does not work properly on Windows, see:
     https://stackoverflow.com/questions/47256223/why-does-fseek-0-seek-cur-fail-on-windows/47256758#47256758
     So to bypass this issue we restrict the detect configuration to only one output and no filter.
@@ -52,20 +55,19 @@ def test_run_simulation(celery_app,
 
     files_dict, _ = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
-    job = run_simulation.delay(payload_dict=payload_dict, files_dict=files_dict)
+
+    map_group = group([
+        run_single_simulation.s(
+            files_dict=files_dict,
+            task_id=str(i+1),
+            keep_tmp_files=True,  # lets pytest to clean up the tmp files, last 3 directories will be kept
+        ) for i in range(payload_dict["ntasks"])
+    ])
+        
+    workflow = chord(map_group, merge_results.s())
+    job = workflow.delay()
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
     logging.info("run_simulation task finished")
-    assert 'result' in result.keys()
-
-
-def test_cancel_simulation(celery_app,
-                           celery_worker,
-                           client,
-                           payload_editor_dict_data: dict):
-    """Right now cancel_simulation task does nothing, so it should return False"""
-    job = cancel_simulation.delay(job_id="test")
-    result: dict = job.wait()
-    logging.info('Number of particles in the simulation: %d',
-                 payload_editor_dict_data["input_json"]["beam"]["numberOfParticles"])
-    assert result is False
+    assert 'logfiles' not in result.keys()
+    assert 'estimators' in result.keys()

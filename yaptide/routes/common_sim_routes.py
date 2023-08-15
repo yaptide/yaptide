@@ -1,26 +1,85 @@
 import logging
+from collections import Counter
+from datetime import datetime
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import get_job_results
-from yaptide.persistence.database import db
-from yaptide.persistence.models import (
-    ClusterModel,
-    EstimatorModel,
-    InputModel,
-    LogfilesModel,
-    PageModel,
-    SimulationModel,
-    UserBaseModel
-)
+from yaptide.persistence.db_methods import (
+    add_object_to_db, fetch_cluster_by_id,
+    fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
+    fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
+    fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
+    fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
+    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
+                                        LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
+from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.utils.enums import EntityState
 
 
-class SimulationResults(Resource):
+class JobsResource(Resource):
+    """Class responsible for managing common jobs"""
+
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters for GET and DELETE request"""
+
+        job_id = fields.String()
+
+    @staticmethod
+    @requires_auth()
+    def get(user: UserModel):
+        """Method returning info about job"""
+        schema = JobsResource.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        # get job_id from request parameters and check if user owns this job
+        job_id = param_dict['job_id']
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
+
+        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
+
+        job_tasks_status = [task.get_status_dict() for task in tasks]
+
+        if simulation.job_state in (EntityState.COMPLETED.value,
+                                    EntityState.FAILED.value):
+            return yaptide_response(message=f"Job state: {simulation.job_state}",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                        "job_tasks_status": job_tasks_status,
+                                    })
+
+        job_info = {
+            "job_state": simulation.job_state
+        }
+        status_counter = Counter([task["task_state"] for task in job_tasks_status])
+        if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
+            job_info["job_state"] = EntityState.PENDING.value
+        elif status_counter[EntityState.FAILED.value] == len(job_tasks_status):
+            job_info["job_state"] = EntityState.FAILED.value
+        elif status_counter[EntityState.RUNNING.value] > 0:
+            job_info["job_state"] = EntityState.RUNNING.value
+
+        update_simulation_state(simulation=simulation, update_dict=job_info)
+
+        job_info["job_tasks_status"] = job_tasks_status
+
+        return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
+
+
+class ResultsResource(Resource):
     """Class responsible for managing results"""
 
     @staticmethod
@@ -40,7 +99,7 @@ class SimulationResults(Resource):
             return yaptide_response(message="Incomplete JSON data", code=400)
 
         sim_id = payload_dict["simulation_id"]
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()
+        simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
 
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
@@ -50,18 +109,16 @@ class SimulationResults(Resource):
 
         for estimator_dict in payload_dict["estimators"]:
             # We forsee the possibility of the estimator being created earlier as element of partial results
-            estimator: EstimatorModel = db.session.query(EstimatorModel).filter_by(
-                simulation_id=sim_id, name=estimator_dict["name"]).first()
+            estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
 
             if not estimator:
                 estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
                 estimator.data = estimator_dict["metadata"]
-                db.session.add(estimator)
-                db.session.commit()
+                add_object_to_db(estimator)
 
             for page_dict in estimator_dict["pages"]:
-                page: PageModel = db.session.query(PageModel).filter_by(
-                    estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])).first()
+                page = fetch_page_by_est_id_and_page_number(
+                    est_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
 
                 page_existed = bool(page)
                 if not page_existed:
@@ -71,9 +128,12 @@ class SimulationResults(Resource):
                 page.data = page_dict
                 if not page_existed:
                     # if page was created, we add it to the session
-                    db.session.add(page)
-            db.session.commit()
-
+                    add_object_to_db(page, False)
+            make_commit_to_db()
+        update_simulation_state(simulation=simulation, update_dict={
+            "job_state": EntityState.COMPLETED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ")
+        })
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
@@ -83,9 +143,9 @@ class SimulationResults(Resource):
 
     @staticmethod
     @requires_auth()
-    def get(user: UserBaseModel):
+    def get(user: UserModel):
         """Method returning job status and results"""
-        schema = SimulationResults.APIParametersSchema()
+        schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -96,25 +156,20 @@ class SimulationResults(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
 
-        estimators: list[EstimatorModel] = db.session.query(EstimatorModel).filter_by(simulation_id=simulation.id).all()
+        estimators = fetch_estimators_by_sim_id(sim_id=simulation.id)
         if len(estimators) == 0:
-            if simulation.platform == "DIRECT":  # also CODE TO REMOVE
+            if not isinstance(simulation, BatchSimulationModel):  # also CODE TO REMOVE
                 return yaptide_response(message="Results are unavailable", code=404)
             # Code below is for backward compatibility with old method of saving results
             # later on we are going to remove it because it's functionality will be covered
             # by the post method
             # BEGIN CODE TO REMOVE
-            try:
-                _, _, _, cluster_name = job_id.split(":")
-            except ValueError:
-                return error_validation_response(content={"message": "Job ID is incorrect"})
 
-            cluster: ClusterModel = db.session.query(ClusterModel).\
-                filter_by(cluster_name=cluster_name).first()
+            cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
-            result: dict = get_job_results(concat_job_id=job_id, user=user, cluster=cluster)
+            result: dict = get_job_results(simulation=simulation, user=user, cluster=cluster)
             if "estimators" not in result:
                 logging.debug("Results for job %s are unavailable", job_id)
                 return yaptide_response(message="Results are unavailable", code=404, content=result)
@@ -122,22 +177,20 @@ class SimulationResults(Resource):
             for estimator_dict in result["estimators"]:
                 estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
                 estimator.data = estimator_dict["metadata"]
-                db.session.add(estimator)
-                db.session.commit()
+                add_object_to_db(estimator)
                 for page_dict in estimator_dict["pages"]:
                     page = PageModel(estimator_id=estimator.id,
                                      page_number=int(page_dict["metadata"]["page_number"]))
                     page.data = page_dict
-                    db.session.add(page)
-                db.session.commit()
-            estimators: list[EstimatorModel] = db.session.query(EstimatorModel).\
-                filter_by(simulation_id=simulation.id).all()
+                    add_object_to_db(page, False)
+                make_commit_to_db()
+            estimators = fetch_estimators_by_sim_id(sim_id=simulation.id)
             # END CODE TO REMOVE
 
         logging.debug("Returning results from database")
         result_estimators = []
         for estimator in estimators:
-            pages: list[PageModel] = db.session.query(PageModel).filter_by(estimator_id=estimator.id).all()
+            pages = fetch_pages_by_estimator_id(est_id=estimator.id)
             estimator_dict = {
                 "metadata": estimator.data,
                 "name": estimator.name,
@@ -148,7 +201,7 @@ class SimulationResults(Resource):
                                 content={"estimators": result_estimators})
 
 
-class SimulationInputs(Resource):
+class InputsResource(Resource):
     """Class responsible for returning simulation input"""
 
     class APIParametersSchema(Schema):
@@ -158,9 +211,9 @@ class SimulationInputs(Resource):
 
     @staticmethod
     @requires_auth()
-    def get(user: UserBaseModel):
+    def get(user: UserModel):
         """Method returning simulation input"""
-        schema = SimulationInputs.APIParametersSchema()
+        schema = InputsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -171,16 +224,16 @@ class SimulationInputs(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
 
-        input_model: InputModel = db.session.query(InputModel).filter_by(simulation_id=simulation.id).first()
+        input_model = fetch_input_by_sim_id(sim_id=simulation.id)
         if not input_model:
             return yaptide_response(message="Input of simulation is unavailable", code=404)
 
         return yaptide_response(message="Input of simulation", code=200, content={"input": input_model.data})
 
 
-class SimulationLogfiles(Resource):
+class LogfilesResource(Resource):
     """Class responsible for managing logfiles"""
 
     @staticmethod
@@ -200,7 +253,7 @@ class SimulationLogfiles(Resource):
             return yaptide_response(message="Incomplete JSON data", code=400)
 
         sim_id = payload_dict["simulation_id"]
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(id=sim_id).first()
+        simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
 
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
@@ -210,8 +263,7 @@ class SimulationLogfiles(Resource):
 
         logfiles = LogfilesModel(simulation_id=simulation.id)
         logfiles.data = payload_dict["logfiles"]
-        db.session.add(logfiles)
-        db.session.commit()
+        add_object_to_db(logfiles)
 
         return yaptide_response(message="Log files saved", code=202)
 
@@ -222,9 +274,9 @@ class SimulationLogfiles(Resource):
 
     @staticmethod
     @requires_auth()
-    def get(user: UserBaseModel):
+    def get(user: UserModel):
         """Method returning job status and results"""
-        schema = SimulationResults.APIParametersSchema()
+        schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
@@ -235,9 +287,9 @@ class SimulationLogfiles(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        simulation: SimulationModel = db.session.query(SimulationModel).filter_by(job_id=job_id).first()
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
 
-        logfile: LogfilesModel = db.session.query(LogfilesModel).filter_by(simulation_id=simulation.id).first()
+        logfile = fetch_logfiles_by_sim_id(sim_id=simulation.id)
         if not logfile:
             return yaptide_response(message="Logfiles are unavailable", code=404)
 

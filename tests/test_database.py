@@ -4,12 +4,15 @@ import time
 from sqlalchemy.orm.scoping import scoped_session
 from sqlalchemy.orm import with_polymorphic
 
+from yaptide.utils.enums import PlatformType, EntityState, InputType, SimulationType
 from yaptide.persistence.models import (
-    UserBaseModel,
+    UserModel,
     YaptideUserModel,
     KeycloakUserModel,
-    SimulationModel,
-    TaskModel,
+    CelerySimulationModel,
+    BatchSimulationModel,
+    CeleryTaskModel,
+    BatchTaskModel,
     ClusterModel,
     InputModel,
     EstimatorModel,
@@ -62,7 +65,7 @@ def test_polymorphic_user_fetch(db_session: scoped_session, db_good_username: st
     assert keycloak_user.id is not None
 
     keycloak_user_id = keycloak_user.id
-    UserPoly = with_polymorphic(UserBaseModel, [YaptideUserModel, KeycloakUserModel])
+    UserPoly = with_polymorphic(UserModel, [YaptideUserModel, KeycloakUserModel])
 
     fetched_user = db_session.query(UserPoly).filter_by(id=yaptide_user_id).first()
     assert fetched_user is not None
@@ -79,9 +82,7 @@ def test_polymorphic_user_fetch(db_session: scoped_session, db_good_username: st
 
 def test_cluster_model_creation(db_session: scoped_session):
     """Test cluster model creation"""
-    # create a new user
-
-    # create a new cluster for the user
+    # create a new cluster
     cluster = ClusterModel(cluster_name='testcluster')
     db_session.add(cluster)
     db_session.commit()
@@ -91,91 +92,187 @@ def test_cluster_model_creation(db_session: scoped_session):
     assert cluster.cluster_name == 'testcluster'
 
 
-def test_simulation_model_creation(db_session: scoped_session, db_good_username: str, db_good_password: str):
-    """Test simulation model creation"""
+def test_create_celery_simulation(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test celery simulation creation"""
     # create a new user
     user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
-    # create a new simulation for the user
-    simulation = SimulationModel(job_id='testjob',
-                                 user_id=user.id,
-                                 platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.EDITOR.value,
-                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
-                                 title='testtitle',
-                                 update_key_hash='testkey')
+    simulation = CelerySimulationModel(job_id='testjob',
+                                       user_id=user.id,
+                                       input_type=InputType.EDITOR.value,
+                                       sim_type=SimulationType.SHIELDHIT.value,
+                                       title='testtitle',
+                                       update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
-
-    # retrieve the simulation from the database and check its fields
-    simulation: SimulationModel = SimulationModel.query.filter_by(user_id=user.id).first()
     assert simulation.id is not None
+    assert simulation.user_id == user.id
     assert simulation.job_id == 'testjob'
-    assert simulation.platform == SimulationModel.Platform.DIRECT.value
-    assert simulation.input_type == SimulationModel.InputType.EDITOR.value
-    assert simulation.sim_type == SimulationModel.SimType.SHIELDHIT.value
-    assert simulation.job_state == SimulationModel.JobState.PENDING.value
+    assert simulation.platform == PlatformType.DIRECT.value
+    assert simulation.input_type == InputType.EDITOR.value
+    assert simulation.sim_type == SimulationType.SHIELDHIT.value
+    assert simulation.job_state == EntityState.PENDING.value
 
 
-def test_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
-    """Test task model creation"""
+def test_create_batch_simulation(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test batch simulation creation"""
+    # create a new user
+    user = KeycloakUserModel(username=db_good_username,
+                             cert=db_good_password,
+                             private_key=db_good_password)
+    db_session.add(user)
+    db_session.commit()
+
+    # create a new cluster
+    cluster = ClusterModel(cluster_name='testcluster')
+    db_session.add(cluster)
+    db_session.commit()
+
+    simulation = BatchSimulationModel(job_id='testjob',
+                                      user_id=user.id,
+                                      cluster_id=cluster.id,
+                                      input_type=InputType.EDITOR.value,
+                                      sim_type=SimulationType.SHIELDHIT.value,
+                                      title='testtitle',
+                                      update_key_hash='testkey',
+                                      job_dir='testfolder',
+                                      array_id=2137,
+                                      collect_id=2138)
+    db_session.add(simulation)
+    db_session.commit()
+    assert simulation.id is not None
+    assert simulation.array_id is not None
+    assert simulation.collect_id is not None
+    assert simulation.job_dir is not None
+    assert simulation.user_id == user.id
+    assert simulation.cluster_id == cluster.id
+    assert simulation.job_id == 'testjob'
+    assert simulation.platform == PlatformType.BATCH.value
+    assert simulation.input_type == InputType.EDITOR.value
+    assert simulation.sim_type == SimulationType.SHIELDHIT.value
+    assert simulation.job_state == EntityState.PENDING.value
+
+
+def test_celery_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test celery task model creation"""
     # create a new user
     user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
     db_session.add(user)
     db_session.commit()
 
-    # create a new simulation for the user
-    simulation = SimulationModel(job_id='testjob',
-                                 user_id=user.id,
-                                 platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.EDITOR.value,
-                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
-                                 title='testtitle',
-                                 update_key_hash='testkey')
+    simulation = CelerySimulationModel(job_id='testjob',
+                                       user_id=user.id,
+                                       input_type=InputType.EDITOR.value,
+                                       sim_type=SimulationType.SHIELDHIT.value,
+                                       title='testtitle',
+                                       update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 
-    # create a new task for the simulation
-    task = TaskModel(simulation_id=simulation.id, task_id='testtask', requested_primaries=1000, simulated_primaries=0)
+    task = CeleryTaskModel(simulation_id=simulation.id, task_id='testtask', requested_primaries=1000, simulated_primaries=0)
     db_session.add(task)
     db_session.commit()
 
     # retrieve the task from the database and check its fields
-    task: TaskModel = TaskModel.query.filter_by(simulation_id=simulation.id).first()
+    task: CeleryTaskModel = CeleryTaskModel.query.filter_by(simulation_id=simulation.id).first()
     assert task.id is not None
-    assert task.task_state == SimulationModel.JobState.PENDING.value
+    assert task.task_state == EntityState.PENDING.value
 
     start_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': SimulationModel.JobState.RUNNING.value,
+        'celery_id': 'testceleryid',
+        'task_state': EntityState.RUNNING.value,
         'simulated_primaries': 500,
         'start_time': start_time
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 500
-    assert task.task_state == SimulationModel.JobState.RUNNING.value
+    assert task.task_state == EntityState.RUNNING.value
+    assert task.end_time is None
+    assert task.celery_id == 'testceleryid'
+
+    time.sleep(1)
+
+    end_time = datetime.utcnow().isoformat(sep=" ")
+    update_dict = {
+        'task_state': EntityState.COMPLETED.value,
+        'end_time': end_time,
+        'simulated_primaries': 1000
+    }
+    task.update_state(update_dict=update_dict)
+    assert task.simulated_primaries == 1000
+    assert task.task_state == EntityState.COMPLETED.value
+    assert task.end_time is not None
+    assert task.end_time > task.start_time
+
+
+def test_batch_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
+    """Test batch task model creation"""
+    # create a new user
+    user = KeycloakUserModel(username=db_good_username,
+                             cert=db_good_password,
+                             private_key=db_good_password)
+    db_session.add(user)
+    db_session.commit()
+
+    # create a new cluster
+    cluster = ClusterModel(cluster_name='testcluster')
+    db_session.add(cluster)
+    db_session.commit()
+
+    simulation = BatchSimulationModel(job_id='testjob',
+                                      user_id=user.id,
+                                      cluster_id=cluster.id,
+                                      input_type=InputType.EDITOR.value,
+                                      sim_type=SimulationType.SHIELDHIT.value,
+                                      title='testtitle',
+                                      update_key_hash='testkey',
+                                      job_dir='testfolder',
+                                      array_id=2137,
+                                      collect_id=2138)
+    db_session.add(simulation)
+    db_session.commit()
+
+    task = BatchTaskModel(simulation_id=simulation.id, task_id='testtask', requested_primaries=1000, simulated_primaries=0)
+    db_session.add(task)
+    db_session.commit()
+
+    # retrieve the task from the database and check its fields
+    task: BatchTaskModel = BatchTaskModel.query.filter_by(simulation_id=simulation.id).first()
+    assert task.id is not None
+    assert task.task_state == EntityState.PENDING.value
+
+    start_time = datetime.utcnow().isoformat(sep=" ")
+    update_dict = {
+        'task_state': EntityState.RUNNING.value,
+        'simulated_primaries': 500,
+        'start_time': start_time
+    }
+    task.update_state(update_dict=update_dict)
+    assert task.simulated_primaries == 500
+    assert task.task_state == EntityState.RUNNING.value
     assert task.end_time is None
 
     time.sleep(1)
 
     end_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': SimulationModel.JobState.COMPLETED.value,
+        'task_state': EntityState.COMPLETED.value,
         'end_time': end_time,
         'simulated_primaries': 1000
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 1000
-    assert task.task_state == SimulationModel.JobState.COMPLETED.value
+    assert task.task_state == EntityState.COMPLETED.value
     assert task.end_time is not None
     assert task.end_time > task.start_time
 
 
-def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_username: str, db_good_password: str):
+def test_celery_simulation_with_multiple_tasks(db_session: scoped_session, db_good_username: str, db_good_password: str):
     """Test simulation with multiple tasks"""
     # create a new user
     user = YaptideUserModel(username=db_good_username)
@@ -183,29 +280,28 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
     db_session.add(user)
     db_session.commit()
 
-    # create a new simulation for the user
-    simulation = SimulationModel(job_id='testjob',
-                                 user_id=user.id,
-                                 platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.EDITOR.value,
-                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
-                                 title='testtitle',
-                                 update_key_hash='testkey')
+    simulation = CelerySimulationModel(job_id='testjob',
+                                       user_id=user.id,
+                                       input_type=InputType.EDITOR.value,
+                                       sim_type=SimulationType.SHIELDHIT.value,
+                                       title='testtitle',
+                                       update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 
-    task_ids = [f"task_{i}" for i in range(100)]
+    task_ids = [str(i) for i in range(100)]
     for task_id in task_ids:
-        task = TaskModel(simulation_id=simulation.id, task_id=task_id, requested_primaries=1000, simulated_primaries=0)
+        task = CeleryTaskModel(
+            simulation_id=simulation.id, task_id=task_id, requested_primaries=1000, simulated_primaries=0)
         db_session.add(task)
     db_session.commit()
 
-    tasks: list[TaskModel] = TaskModel.query.filter_by(simulation_id=simulation.id).all()
+    tasks: list[CeleryTaskModel] = CeleryTaskModel.query.filter_by(simulation_id=simulation.id).all()
     assert len(tasks) == 100
 
     start_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': SimulationModel.JobState.RUNNING.value,
+        'task_state': EntityState.RUNNING.value,
         'simulated_primaries': 1,
         'start_time': start_time
     }
@@ -215,36 +311,36 @@ def test_simulation_with_multiple_tasks(db_session: scoped_session, db_good_user
 
     time.sleep(1)
 
-    update_dict = {'task_state': SimulationModel.JobState.RUNNING.value, 'simulated_primaries': 500}
+    update_dict = {'task_state': EntityState.RUNNING.value, 'simulated_primaries': 500}
 
     for idx, task in enumerate(tasks):
         if idx == 50:
             end_time = datetime.utcnow().isoformat(sep=" ")
             update_dict = {
-                'task_state': SimulationModel.JobState.COMPLETED.value,
+                'task_state': EntityState.COMPLETED.value,
                 'end_time': end_time,
                 'simulated_primaries': 1000
             }
         task.update_state(update_dict=update_dict)
     db_session.commit()
 
-    tasks_running: list[TaskModel] = TaskModel.query.filter_by(
-        simulation_id=simulation.id, task_state=SimulationModel.JobState.RUNNING.value).all()
+    tasks_running: list[CeleryTaskModel] = CeleryTaskModel.query.filter_by(
+        simulation_id=simulation.id, task_state=EntityState.RUNNING.value).all()
     assert len(tasks_running) == 50
 
     for task in tasks_running:
         assert task.simulated_primaries == 500
-        assert task.task_state == SimulationModel.JobState.RUNNING.value
+        assert task.task_state == EntityState.RUNNING.value
         assert task.end_time is None
 
-    tasks_completed: list[TaskModel] = TaskModel.query.filter_by(
-        simulation_id=simulation.id, task_state=SimulationModel.JobState.COMPLETED.value).all()
+    tasks_completed: list[CeleryTaskModel] = CeleryTaskModel.query.filter_by(
+        simulation_id=simulation.id, task_state=EntityState.COMPLETED.value).all()
 
     assert len(tasks_completed) == 50
 
     for task in tasks_completed:
         assert task.simulated_primaries == 1000
-        assert task.task_state == SimulationModel.JobState.COMPLETED.value
+        assert task.task_state == EntityState.COMPLETED.value
         assert task.end_time is not None
         assert task.end_time > task.start_time
 
@@ -257,14 +353,12 @@ def test_create_input(db_session: scoped_session, db_good_username: str, db_good
     db_session.add(user)
     db_session.commit()
 
-    # create a new simulation for the user
-    simulation = SimulationModel(job_id='testjob',
-                                 user_id=user.id,
-                                 platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.EDITOR.value,
-                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
-                                 title='testtitle',
-                                 update_key_hash='testkey')
+    simulation = CelerySimulationModel(job_id='testjob',
+                                       user_id=user.id,
+                                       input_type=InputType.EDITOR.value,
+                                       sim_type=SimulationType.SHIELDHIT.value,
+                                       title='testtitle',
+                                       update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 
@@ -287,14 +381,12 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
     db_session.add(user)
     db_session.commit()
 
-    # create a new simulation for the user
-    simulation = SimulationModel(job_id='testjob',
-                                 user_id=user.id,
-                                 platform=SimulationModel.Platform.DIRECT.value,
-                                 input_type=SimulationModel.InputType.EDITOR.value,
-                                 sim_type=SimulationModel.SimType.SHIELDHIT.value,
-                                 title='testtitle',
-                                 update_key_hash='testkey')
+    simulation = CelerySimulationModel(job_id='testjob',
+                                       user_id=user.id,
+                                       input_type=InputType.EDITOR.value,
+                                       sim_type=SimulationType.SHIELDHIT.value,
+                                       title='testtitle',
+                                       update_key_hash='testkey')
     db_session.add(simulation)
     db_session.commit()
 

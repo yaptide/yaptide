@@ -1,10 +1,12 @@
 import logging
+
 from flask import Flask
 from flask_restful import Api
-from yaptide.routes.main_routes import initialize_routes
-from yaptide.persistence.database import db
-from yaptide.persistence import models
 from flask_swagger_ui import get_swaggerui_blueprint
+
+from yaptide.persistence import models
+from yaptide.persistence.database import db
+from yaptide.routes.main_routes import initialize_routes
 
 
 def create_app():

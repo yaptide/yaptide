@@ -15,8 +15,11 @@ class Endpoints:
     """API endpoints"""
 
     def __init__(self, host: str, port: int) -> None:
+        self.http_hello = f'http://{host}:{port}'
+
         self.http_jobs_direct = f'http://{host}:{port}/jobs/direct'
         self.http_jobs_batch = f'http://{host}:{port}/jobs/batch'
+        self.http_jobs = f'http://{host}:{port}/jobs'
 
         self.http_results = f'http://{host}:{port}/results'
 
@@ -63,6 +66,11 @@ class YaptideTesterSession:
         """Post method wrapper"""
         self.login()
         return self.session.post(endpoint, json=json)
+
+    def delete(self, endpoint: str, params: dict = None) -> requests.Response:
+        """Delete method wrapper"""
+        self.login()
+        return self.session.delete(endpoint, params=params)
 
     def get(self, endpoint: str, params: dict = None) -> requests.Response:
         """Get method wrapper"""
@@ -167,8 +175,9 @@ class YaptideTester:
         if job_id is not None:
             while do_monitor_job:
                 time.sleep(5)
+
                 try:
-                    res: requests.Response = self.session.get(jobs_url, params={"job_id": job_id})
+                    res: requests.Response = self.session.get(self.endpoints.http_jobs, params={"job_id": job_id})
                     res_json: dict = res.json()
 
                     # the request has succeeded, we can access its contents
@@ -206,6 +215,7 @@ class YaptideTester:
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
+                return
 
     def check_backend_jobs(self):
         """Example checking backend jobs with pagination"""
@@ -232,10 +242,9 @@ class YaptideTester:
             res_json: dict = res.json()
             for sim in res_json['simulations']:
                 print(sim)
-                is_direct = sim['metadata']['platform'] == 'DIRECT'
                 res: requests.Response = self.session.\
                     get(
-                        self.endpoints.http_jobs_direct if is_direct else self.endpoints.http_jobs_batch,
+                        self.endpoints.http_jobs,
                         params={"job_id": sim["job_id"]}
                     )
                 res_json: dict = res.json()

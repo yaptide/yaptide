@@ -68,6 +68,9 @@ CLEAR_BDOS={clear_bdos}
 if $CLEAR_BDOS; then
     rm $INPUT_WILDCARD
 fi
+
+python3 $ROOT_DIR/result_sender.py --output_dir=$OUTPUT_DIRECTORY\\
+    --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash

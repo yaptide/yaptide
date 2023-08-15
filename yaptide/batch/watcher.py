@@ -1,14 +1,14 @@
 import argparse
+import json
+import logging
 import re
 import signal
-import time
-import json
 import ssl
+import time
+from datetime import datetime
+from io import TextIOWrapper
 from pathlib import Path
 from urllib import request
-import logging
-from datetime import datetime
-
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -16,14 +16,17 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(thefile, timeout: int = 3600) -> str:
+def log_generator(thefile: TextIOWrapper, timeout: int = 3600) -> str:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
+    It no new line appears in `timeout` seconds, generator stops.
     Main purpose is monitoring of the log files
     """
     sleep_counter = 0
     while True:
+        if thefile is None:
+            return "File not found"
         line = thefile.readline()
         if not line:
             time.sleep(1)
