@@ -1,8 +1,6 @@
-import copy
 from datetime import datetime
 import json
 import logging
-import platform
 import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
