@@ -14,6 +14,6 @@ redis==4.6.0
 requests==2.31.0
 scipy==1.11.1  # needed by converter submodule
 SQLAlchemy==1.4.44
-Werkzeug==2.3.6
+Werkzeug==2.3.7
 boto3==1.28.22
 cryptography==41.0.3
