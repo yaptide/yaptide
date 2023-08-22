@@ -12,7 +12,7 @@ pyjwt==2.8.0
 pymchelper==2.5.2
 redis==5.0.0
 requests==2.31.0
-scipy==1.11.1  # needed by converter submodule
+scipy==1.11.2  # needed by converter submodule
 SQLAlchemy==1.4.44
 Werkzeug==2.3.7
 boto3==1.28.28
