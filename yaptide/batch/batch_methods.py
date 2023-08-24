@@ -161,7 +161,8 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
 
     if job_state == "FAILED" or collect_state == "FAILED":
         return {
-            "job_state": EntityState.FAILED.value
+            "job_state": EntityState.FAILED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ")
         }
     if collect_state == "COMPLETED":
         return {

@@ -82,7 +82,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
 
     if logfile is None:
         up_dict = {  # skipcq: PYL-W0612
-            "task_state": "FAILED"
+            "task_state": "FAILED",
+            "end_time": datetime.utcnow().isoformat(sep=" ")
         }
         send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
                          update_dict=up_dict, backend_url=backend_url)
@@ -132,7 +133,8 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
 
         elif re.search(TIMEOUT_MATCH, line):
             up_dict = {  # skipcq: PYL-W0612
-                "task_state": "FAILED"
+                "task_state": "FAILED",
+                "end_time": datetime.utcnow().isoformat(sep=" ")
             }
             send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
                              update_dict=up_dict, backend_url=backend_url)

@@ -43,8 +43,9 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
         }
         if job_state == EntityState.FAILED.value:
             result["message"] = str(job.info)
-        elif "end_time" in job.info:
+        if "end_time" in job.info:
             result["end_time"] = job.info["end_time"]
+        return result
 
     result = {
         "merge": get_task_status(merge_id, "job_state"),
