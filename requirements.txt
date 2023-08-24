@@ -7,7 +7,7 @@ fabric==3.2.1
 flask-restful==0.3.10
 flask-sqlalchemy==3.0.5
 flask_swagger_ui==4.11.1
-flask==2.3.2
+flask==2.3.3
 pyjwt==2.8.0
 pymchelper==2.5.2
 redis==5.0.0
