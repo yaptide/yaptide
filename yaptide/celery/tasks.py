@@ -129,7 +129,7 @@ def run_single_simulation(self,
         # here we have simulation which failed, this means we mark the task as failed
         if not estimators_dict:
             logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
-            update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep= " ")}
+            update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, update_dict)
 
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
