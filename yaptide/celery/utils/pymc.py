@@ -112,7 +112,8 @@ def read_file(filepath: Path,
     if logfile is None:
         logging.error("Log file for task %s not found", task_id)
         up_dict = {
-            "task_state": EntityState.FAILED.value
+            "task_state": EntityState.FAILED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ")
         }
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
@@ -155,7 +156,8 @@ def read_file(filepath: Path,
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", task_id)
             up_dict = {
-                "task_state": EntityState.FAILED.value
+                "task_state": EntityState.FAILED.value,
+                "end_time": datetime.utcnow().isoformat(sep=" ")
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
