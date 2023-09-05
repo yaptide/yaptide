@@ -51,6 +51,8 @@ def test_run_simulation_with_flask(celery_app,
     assert {"input_type", "input_files", "input_json", "number_of_all_primaries"} == set(data["input"].keys())
     required_converted_files = {"beam.dat", "detect.dat", "geo.dat", "info.json", "mat.dat"}
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
+    requested_primaries = small_simulation_payload["input_json"]["beam"]["numberOfParticles"]
+    requested_primaries /= small_simulation_payload["ntasks"]
 
     while True:
         logging.info("Sending check job status request on /jobs endpoint")
@@ -63,9 +65,6 @@ def test_run_simulation_with_flask(celery_app,
         # and that there is no results, logfiles and input files here
         assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(data["job_tasks_status"]) == small_simulation_payload["ntasks"]
-        if data['job_state'] in ['COMPLETED', 'FAILED']:
-            assert data['job_state'] == 'COMPLETED'
-            break
         if data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
             # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
@@ -83,6 +82,21 @@ def test_run_simulation_with_flask(celery_app,
             end_time = data["simulations"][0]["end_time"]
             logging.info("end_time: %s", end_time)
             assert end_time is None
+
+        logging.info("Checking if number of simulated primaries is correct")
+        if data["job_state"] == 'COMPLETED':
+            for task in data["job_tasks_status"]:
+                assert task["task_state"] == "COMPLETED"
+                logging.info("Expecting requested_primaries: %s", requested_primaries)
+                logging.info("Expecting simulated_primaries: %s", requested_primaries)
+                logging.info("Got requested_primaries: %s", task["requested_primaries"])
+                logging.info("Got simulated_primaries: %s", task["simulated_primaries"])
+                assert task["requested_primaries"] == requested_primaries, f"Requested primaries should be equal to {requested_primaries}"
+                assert task["simulated_primaries"] == requested_primaries, f"Simulated primaries should be equal to {requested_primaries}"
+        if data['job_state'] in ['COMPLETED', 'FAILED']:
+            assert data['job_state'] == 'COMPLETED'
+            logging.info("Job completed, exiting loop")
+            break
         sleep(0.1)
 
     logging.info("Fetching results from /results endpoint")
