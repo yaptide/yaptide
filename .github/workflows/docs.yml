@@ -4,7 +4,9 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["master"]
-
+  pull_request:
+    branches: [master]
+    
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -20,6 +22,9 @@ concurrency:
   group: "pages"
   cancel-in-progress: false
 
+env:
+  S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+
 jobs:
   # Single deploy job since we're just deploying
   deploy:
@@ -31,14 +36,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
         with:
-          # Fetches all history for all tags and branches
           fetch-depth: 0
           submodules: true
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+            python-version: '3.11'
       - name: Install dependencies for project
         run: pip install -r requirements.txt
       - name: Install dependencies for testing
         run: pip install -r requirements-test.txt
       - name: Run tests
+        env:
+            S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+            S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+            S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+            S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+            S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+            S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
         run: pytest --cov-report html:htmlcov --cov=yaptide
       - name: Install dependencies for documentation
         run: pip install -r requirements-docs.txt
@@ -46,11 +61,12 @@ jobs:
         run: mkdocs build
       - name: Setup Pages
         uses: actions/configure-pages@v3
-      - name: Upload artifact
+      - name: Upload artifact if on master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v2
         with:
-          # Upload entire repository
           path: 'site'
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages if on master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         id: deployment
         uses: actions/deploy-pages@v2
