@@ -1,0 +1,1 @@
+!!swagger-http https://raw.githubusercontent.com/yaptide/yaptide/master/yaptide/static/openapi.yaml!!
