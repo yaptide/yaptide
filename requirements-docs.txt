@@ -1,0 +1,8 @@
+mkdocs==1.5.2
+mkdocs-coverage
+mkdocstrings[python]>=0.18
+mkdocs-material
+mkdocs-gen-files
+mkdocs-literate-nav
+mkdocs-section-index
+mkdocs-render-swagger-plugin

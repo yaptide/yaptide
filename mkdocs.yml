@@ -1,0 +1,48 @@
+site_name: Documentation
+site_url: https://yaptide.github.io/yaptide/
+repo_url: https://github.com/yaptide/yaptide
+repo_name: yaptide/yaptide
+copyright: Copyright &copy; 2023 the Yaptide team
+
+
+theme:
+  name: material
+  features:
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.top
+
+nav:
+- Home:
+  - Overview: index.md
+- API Reference: swagger.md
+- Code Reference: reference/
+- Test coverage: coverage.md
+
+plugins:
+- search
+- gen-files:
+    scripts:
+    - docs/gen_ref_pages.py
+- literate-nav:
+    nav_file: SUMMARY.md
+- section-index
+- coverage:
+    page_name: coverage
+    html_report_dir: htmlcov
+- render_swagger
+- mkdocstrings:
+    enable_inventory: true
+    handlers:
+      python:
+        paths: [yaptide]
+        options:
+          show_if_no_docstring: true
+          line_numbers: true
+          inheritance_diagram: true
+          separate_signature: true
+          show_root_heading: true
+          show_root_members_full_path: false
+
+
