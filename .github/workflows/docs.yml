@@ -4,7 +4,9 @@ on:
   # Runs on pushes targeting the default branch
   push:
     branches: ["master"]
-
+  pull_request:
+    branches: [master]
+    
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
 
@@ -59,11 +61,12 @@ jobs:
         run: mkdocs build
       - name: Setup Pages
         uses: actions/configure-pages@v3
-      - name: Upload artifact
+      - name: Upload artifact if on master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v2
         with:
-          # Upload entire repository
           path: 'site'
-      - name: Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages if on master
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         id: deployment
         uses: actions/deploy-pages@v2
