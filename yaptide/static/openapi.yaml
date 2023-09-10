@@ -271,6 +271,56 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
 
 # Jobs Routes
+  /jobs:
+    get:
+      description: Allows for getting job status.
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  job_state:
+                    type: string
+                    enum: [PENDING, RUNNING, COMPLETED, FAILED]
+                    description: job state
+                  job_task_status:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/JobTaskStatus'
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '408':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
   /jobs/direct:
     post:
       summary: Allows for submitting jobs
@@ -568,48 +618,6 @@ paths:
 # Result Routes
   /results:
     description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
-    get:
-      description: Allows getting results of the simulation
-      parameters:
-        - in: query
-          name: job_id
-          schema:
-            type: string
-      responses:
-        '200':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  estimators:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Estimator'
-                    description: list of resulting estimators
-        '400':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '404':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '500':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-  /results/batch:
-    description: We weren't able to fully migrate batch results to new endpoint for now, so it is still required to use this endpoint
     get:
       description: Allows getting results of the simulation
       parameters:
