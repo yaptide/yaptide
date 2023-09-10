@@ -76,7 +76,7 @@ paths:
                     type: string
                   access_exp:
                     type: integer
-                  refresh_expired:
+                  refresh_exp:
                     type: integer
         '400':
           description: TODO
@@ -167,6 +167,54 @@ paths:
       summary: Allows to logout the user - server removes tokens from cookies
       responses:
         '200':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+# Keycloak auth Routes
+  /auth/keycloak:
+    post:
+      summary: Allows to login the user with keycloak credentials - server sets refresh and access tokens in cookies
+      parameters:
+        - in: header
+          name: Authorization
+          schema:
+            type: string
+          required: true
+          description: keycloak token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/KeycloakRequest'
+      responses:
+        '202':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  access_exp:
+                    type: integer
+        '400':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
           description: TODO
           content:
             application/json:
@@ -781,6 +829,13 @@ components:
           type: string
           example: Hello world!
           description: body message
+    KeycloakRequest:
+      type: object
+      properties:
+        username:
+          type: string
+      required:
+        - username
     RegisterLoginRequest:
       type: object
       properties:
