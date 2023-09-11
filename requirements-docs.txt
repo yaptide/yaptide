@@ -3,6 +3,6 @@ mkdocs-coverage==1.0.0
 mkdocstrings[python]>=0.18
 mkdocs-material==9.2.8
 mkdocs-gen-files==0.5.0
-mkdocs-literate-nav==0.6.0
+mkdocs-literate-nav==0.6.1
 mkdocs-section-index==0.3.6
 mkdocs-render-swagger-plugin==0.0.4
