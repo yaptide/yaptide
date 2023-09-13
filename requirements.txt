@@ -15,5 +15,5 @@ requests==2.31.0
 scipy==1.11.2  # needed by converter submodule
 SQLAlchemy==1.4.44
 Werkzeug==2.3.7
-boto3==1.28.45
+boto3==1.28.46
 cryptography==41.0.3
