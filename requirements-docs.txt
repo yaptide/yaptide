@@ -4,5 +4,5 @@ mkdocstrings[python]>=0.18
 mkdocs-material==9.3.1
 mkdocs-gen-files==0.5.0
 mkdocs-literate-nav==0.6.1
-mkdocs-section-index==0.3.6
+mkdocs-section-index==0.3.7
 mkdocs-render-swagger-plugin==0.0.4
