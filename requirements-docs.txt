@@ -1,4 +1,4 @@
-mkdocs==1.5.2
+mkdocs==1.5.3
 mkdocs-coverage==1.0.0
 mkdocstrings[python]>=0.18
 mkdocs-material==9.3.1
