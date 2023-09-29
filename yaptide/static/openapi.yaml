@@ -38,7 +38,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '400':
-          description: TODO
+          description: Bad Request - Missing payload or keys in payload
           content:
             application/json:
               schema:
@@ -50,7 +50,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -66,7 +66,7 @@ paths:
               $ref: '#/components/schemas/RegisterLoginRequest'
       responses:
         '202':
-          description: TODO
+          description: Includes expiration time of new access tokens
           content:
             application/json:
               schema:
@@ -79,19 +79,19 @@ paths:
                   refresh_exp:
                     type: integer
         '400':
-          description: TODO
+          description: Bad Request - Missing payload or keys in payload
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '401':
-          description: TODO
+          description: Forbidden - Invalid login or password
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -101,7 +101,7 @@ paths:
       summary: Allows to refresh access token - server sets new access token in cookies
       responses:
         '200':
-          description: TODO
+          description: Includes expiration time of new access token
           content:
             application/json:
               schema:
@@ -112,29 +112,29 @@ paths:
                   access_exp:
                     type: integer
         '401':
-          description: TODO
+          description: Unauthorized - No token provided
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '403':
-          description: TODO
+          description: Forbidden - User not found or log in required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
   /auth/status:
     get:
-      summary: Allows to retrieve logged in user data
+      summary: Allows to retrieve logged in user information
       responses:
         '200':
-          description: TODO
+          description: Includes logged in user information
           content:
             application/json:
               schema:
@@ -145,19 +145,19 @@ paths:
                   username:
                     type: string
         '401':
-          description: TODO
+          description: Unauthorized - Invalid credentials
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '403':
-          description: TODO
+          description: Forbidden - User not found, log in required or token refresh required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -167,7 +167,7 @@ paths:
       summary: Allows to logout the user - server removes tokens from cookies
       responses:
         '200':
-          description: TODO
+          description: User was successfully logged out
           content:
             application/json:
               schema:
@@ -192,7 +192,7 @@ paths:
               $ref: '#/components/schemas/KeycloakRequest'
       responses:
         '202':
-          description: TODO
+          description: Includes expiration time of new access token
           content:
             application/json:
               schema:
@@ -203,19 +203,19 @@ paths:
                   access_exp:
                     type: integer
         '400':
-          description: TODO
+          description: Bad Request - Missing payload or keys in payload
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '401':
-          description: TODO
+          description: Forbidden - No token provided
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -224,6 +224,7 @@ paths:
 # User Routes
   /user/simulations:
     get:
+      summary: Allows for getting user's simulations
       parameters:
         - in: query
           name: page_size
@@ -253,7 +254,7 @@ paths:
                        - incorrect or non provided value will result in sending page sorted by ascend
       responses:
         '200':
-          description: TODO
+          description: Includes list of user's simulations
           content:
             application/json:
               schema:
@@ -274,23 +275,36 @@ paths:
                       $ref: '#/components/schemas/Simulation'
 
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required or token refresh required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
   /user/clusters:
-    description: Returns clusters available for the user
+    description: Returns available clusters
     get:
+      summary: Allows for getting available clusters
       responses:
         '200':
-          description: TODO
+          description: Includes list of available clusters
           content:
             application/json:
               schema:
@@ -306,13 +320,25 @@ paths:
                         cluster_name:
                           type: string
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required or token refresh required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -321,7 +347,7 @@ paths:
 # Jobs Routes
   /jobs:
     get:
-      description: Allows for getting job status.
+      summary: Allows for getting job status.
       parameters:
         - in: query
           name: job_id
@@ -329,7 +355,7 @@ paths:
             type: string
       responses:
         '200':
-          description: TODO
+          description: Includes status of the job
           content:
             application/json:
               schema:
@@ -346,25 +372,37 @@ paths:
                     items:
                       $ref: '#/components/schemas/JobTaskStatus'
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
-        '500':
-          description: TODO
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '404':
-          description: TODO
+          description: Job with provided ID does not exist
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
           description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -382,7 +420,7 @@ paths:
                 - $ref: '#/components/schemas/Input'
       responses:
         '202':
-          description: TODO
+          description: Includes job_id and additional information about submited job
           content:
             application/json:
               schema:
@@ -393,19 +431,31 @@ paths:
                   message:
                     type: string
         '400':
-          description: TODO
+          description: Bad Request - Missing payload or keys in payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required or token refresh required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      description: Allows for getting job status.
+      summary: Allows for getting job status and additional job's info.
       parameters:
         - in: query
           name: job_id
@@ -413,7 +463,7 @@ paths:
             type: string
       responses:
         '200':
-          description: TODO
+          description: Includes status and additional information about the job
           content:
             application/json:
               schema:
@@ -430,25 +480,87 @@ paths:
                     items:
                       $ref: '#/components/schemas/JobTaskStatus'
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
-        '500':
-          description: TODO
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '404':
-          description: TODO
+          description: Job with provided ID does not exist
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
           description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+    delete:
+      summary: Allows for job cancelation.
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Returns information about main job and subtasks' cancelation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobsDirectDeleteResponse'
+        '400':
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: Job with provided ID does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '408':
+          description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -467,7 +579,7 @@ paths:
                 - $ref: '#/components/schemas/BatchOptions'
       responses:
         '202':
-          description: TODO
+          description: Includes job_id and additional information about submited job
           content:
             application/json:
               schema:
@@ -494,19 +606,31 @@ paths:
                     type: string
                     description: submit_stdout is output generated by submit.sh (additional info in response from '/jobs/batch')
         '400':
-          description: TODO
+          description: Bad Request - Missing payload or keys in payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required or token refresh required
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      description: Allows for getting job status.
+      summary: Allows for getting job status and additional job's info.
       parameters:
         - in: query
           name: job_id
@@ -514,7 +638,7 @@ paths:
             type: string
       responses:
         '200':
-          description: TODO
+          description: Includes status and additional information about the job
           content:
             application/json:
               schema:
@@ -547,72 +671,43 @@ paths:
                     type: string
                     description: submit_stdout is output generated by submit.sh (additional info in response from '/jobs/batch')
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
-        '500':
-          description: TODO
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '404':
-          description: TODO
+          description: Job with provided ID does not exist
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
           description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     delete:
-      description: Allows for job cancelation. (NOT AVAILABLE)
-      parameters:
-        - in: query
-          name: job_id
-          schema:
-            type: string
-      responses:
-        '204':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '400':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '404':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
-        '408':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
-        '500':
-          description: TODO
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/JobsDeleteResponse'
-
-# Inputs Route
-  /inputs:
-    get:
-      description: Allows for retrieving input used to run simulation
+      summary: Allows for job cancelation.
       parameters:
         - in: query
           name: job_id
@@ -620,7 +715,60 @@ paths:
             type: string
       responses:
         '200':
+          description: Job was succesfully canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '400':
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: Job with provided ID does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '408':
           description: TODO
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
+# Inputs Route
+  /inputs:
+    get:
+      summary: Allows for retrieving input used to run simulation
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Includes input used to run simulation
           content:
             application/json:
               schema:
@@ -645,19 +793,31 @@ paths:
                         type: integer
                         description: requested number of all primaries
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '404':
-          description: TODO
+          description: Job with provided ID does not exist
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -667,7 +827,7 @@ paths:
   /results:
     description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
     get:
-      description: Allows getting results of the simulation
+      summary: Allows getting results of the simulation
       parameters:
         - in: query
           name: job_id
@@ -675,7 +835,7 @@ paths:
             type: string
       responses:
         '200':
-          description: TODO
+          description: Includes results of the simulation
           content:
             application/json:
               schema:
@@ -689,19 +849,31 @@ paths:
                       $ref: '#/components/schemas/Estimator'
                     description: list of resulting estimators
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '404':
-          description: TODO
+          description: Job with provided ID does not exist
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -711,7 +883,7 @@ paths:
   /tasks:
     description: Route dedicated for Backend internal communication
     post:
-      description: Updates task state
+      summary: Updates task state
       requestBody:
         required: true
         content:
@@ -748,7 +920,7 @@ paths:
   /logfiles:
     description: Route dedicated for Backend internal communication
     post:
-      description: Updates task state
+      summary: Updates task state
       requestBody:
         required: true
         content:
@@ -777,7 +949,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      description: Allows getting results of the simulation
+      summary: Allows getting logfiles of the simulation
       parameters:
         - in: query
           name: job_id
@@ -785,7 +957,7 @@ paths:
             type: string
       responses:
         '200':
-          description: TODO
+          description: Includes logfiles of the simulation
           content:
             application/json:
               schema:
@@ -797,19 +969,31 @@ paths:
                     type: object
                     description: dict of log files with names as keys and content as values.
         '400':
-          description: TODO
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '404':
-          description: TODO
+          description: Job with provided ID does not exist
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '500':
-          description: TODO
+          description: Internal Server Error
           content:
             application/json:
               schema:
@@ -992,15 +1176,31 @@ components:
               type: integer
             seconds:
               type: integer
-    JobsDeleteResponse:
+    JobsDirectDeleteResponse:
       type: object
       properties:
-        exit_code:
-          type: integer
-        output:
-          type: string
         message:
           type: string
+        merge:
+          type: object
+          properties:
+            message:
+              type: string
+            job_state:
+              type: string
+              enum: [PENDING, RUNNING, COMPLETED, FAILED]
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/CanceledTaskStatus'
+    CanceledTaskStatus:
+      type: object
+      properties:
+        message:
+          type: string
+        task_state:
+          type: string
+          enum: [PENDING, RUNNING, COMPLETED, FAILED]
     Estimators:
       type: object
       description: dictionary of estimators with names as keys and values as dictionaries with estimator parameters
