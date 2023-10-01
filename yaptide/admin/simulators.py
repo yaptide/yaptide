@@ -239,13 +239,14 @@ def download_shieldhit_from_s3(
     destination_file_path.chmod(0o700)
     return True
 
+
 # skipcq: PY-R1000
 def download_topas_from_s3(bucket: str = topas_bucket_name,
                            key: str = topas_key,
                            version: str = topas_version,
                            geant_bucket: str = geant_bucket_name,
                            path: Path = installation_path
-                          ) -> bool:
+                           ) -> bool:
     """Download TOPAS from S3 bucket"""
     s3_client = boto3.client(
         "s3",
@@ -261,8 +262,8 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
             Bucket=bucket,
             Prefix=key,
         )
-        for version in response["Versions"]:
-            version_id = version["VersionId"]
+        for curr_version in response["Versions"]:
+            version_id = curr_version["VersionId"]
             tags = s3_client.get_object_tagging(
                 Bucket=bucket,
                 Key=key,
@@ -280,7 +281,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
 
     # Download GEANT tar files
     geant_temp_files = []
-  
+
     objects = s3_client.list_objects_v2(Bucket=geant_bucket)
 
     try:
@@ -290,8 +291,8 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
                 Bucket=geant_bucket,
                 Prefix=key,
             )
-            for version in response["Versions"]:
-                version_id = version["VersionId"]
+            for curr_version in response["Versions"]:
+                version_id = curr_version["VersionId"]
                 tags = s3_client.get_object_tagging(
                     Bucket=geant_bucket,
                     Key=key,
@@ -334,7 +335,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
         file.seek(0)
         file_contents = tarfile.TarFile(fileobj=file)
         file_contents.extractall(path=geant_files_path)
-    
+
     return True
 
 
