@@ -239,12 +239,13 @@ def download_shieldhit_from_s3(
     destination_file_path.chmod(0o700)
     return True
 
-def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
-                           topas_key: str = topas_key,
-                           topas_version: str = topas_version,
-                           geant_bucket_name: str = geant_bucket_name,
-                           installation_path: Path = installation_path
-        ) -> bool:
+# skipcq: PY-R1000
+def download_topas_from_s3(bucket: str = topas_bucket_name,
+                           key: str = topas_key,
+                           version: str = topas_version,
+                           geant_bucket: str = geant_bucket_name,
+                           path: Path = installation_path
+                          ) -> bool:
     """Download TOPAS from S3 bucket"""
     s3_client = boto3.client(
         "s3",
@@ -252,45 +253,47 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
-    
+
     # Download TOPAS tar
     topas_temp_file = tempfile.NamedTemporaryFile()
     try:
         response = s3_client.list_object_versions(
-            Bucket=topas_bucket_name,
-            Prefix=topas_key,
+            Bucket=bucket,
+            Prefix=key,
         )
         for version in response["Versions"]:
             version_id = version["VersionId"]
             tags = s3_client.get_object_tagging(
-                Bucket=topas_bucket_name,
-                Key=topas_key,
+                Bucket=bucket,
+                Key=key,
                 VersionId=version_id,
             )
             for tag in tags["TagSet"]:
-                if tag["Key"] == "version":
-                    if tag["Value"] == topas_version:
-                        s3_client.download_fileobj(Bucket=topas_bucket_name, Key=topas_key, Fileobj=topas_temp_file, ExtraArgs={"VersionId": version_id})
+                if tag["Key"] == "version" and tag["Value"] == version:
+                    s3_client.download_fileobj(Bucket=bucket,
+                                               Key=key,
+                                               Fileobj=topas_temp_file,
+                                               ExtraArgs={"VersionId": version_id})
     except ClientError as e:
         click.echo("Failed to download TOPAS from S3 with error: ", e.response["Error"]["Message"])
         return False
-    
-    # Dowload GEANT tar files
+
+    # Download GEANT tar files
     geant_temp_files = []
-    
-    objects = s3_client.list_objects_v2(Bucket=geant_bucket_name)
-        
+  
+    objects = s3_client.list_objects_v2(Bucket=geant_bucket)
+
     try:
         for obj in objects['Contents']:
             key = obj['Key']
             response = s3_client.list_object_versions(
-                Bucket=geant_bucket_name,
+                Bucket=geant_bucket,
                 Prefix=key,
             )
             for version in response["Versions"]:
                 version_id = version["VersionId"]
                 tags = s3_client.get_object_tagging(
-                    Bucket=geant_bucket_name,
+                    Bucket=geant_bucket,
                     Key=key,
                     VersionId=version_id,
                 )
@@ -298,15 +301,18 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
                     if tag["Key"] == "topas_versions":
                         topas_versions = tag["Value"].split(",")
                         topas_versions = [version.strip() for version in topas_versions]
-                        if topas_version in topas_versions:
+                        if version in topas_versions:
                             temp_file = tempfile.NamedTemporaryFile()
-                            s3_client.download_fileobj(Bucket=geant_bucket_name, Key=key, Fileobj=temp_file, ExtraArgs={"VersionId": version_id})
+                            s3_client.download_fileobj(Bucket=geant_bucket,
+                                                       Key=key,
+                                                       Fileobj=temp_file,
+                                                       ExtraArgs={"VersionId": version_id})
                             geant_temp_files.append(temp_file)
     except ClientError as e:
         click.echo("Failed to download Geant4 from S3 with error: ", e.response["Error"]["Message"])
         return False
-    
-    topas_file_path = installation_path / "topas"
+
+    topas_file_path = path / "topas"
     if not topas_file_path.exists():
         try:
             topas_file_path.mkdir(parents=True)
@@ -316,8 +322,8 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
     topas_file_contents.extractall(path=topas_file_path)
-    
-    geant_files_path = installation_path / "geant"
+
+    geant_files_path = path / "geant"
     if not geant_files_path.exists():
         try:
             geant_files_path.mkdir(parents=True)
@@ -330,6 +336,7 @@ def download_topas_from_s3(topas_bucket_name: str = topas_bucket_name,
         file_contents.extractall(path=geant_files_path)
     
     return True
+
 
 def upload_file_to_s3(
         bucket: str,

@@ -22,14 +22,15 @@ def check_if_environment_variables_set() -> bool:
         result = False
     return result
 
+@pytest.mark.skipif(sys.platform == "win32", reason="TOPAS does not work on Windows.")
 def test_if_topas_downloaded(tmpdir):
-    """Check if shieldhit is downloaded and can be executed"""
+    """Check if TOPAS is downloaded and can be executed"""
     if check_if_environment_variables_set():
-        bucket = os.getenv("S3_SHIELDHIT_BUCKET")
-        key = os.getenv("S3_SHIELDHIT_KEY")
+        bucket = os.getenv("S3_TOPAS_BUCKET")
+        key = os.getenv("S3_TOPAS_KEY")
         version = os.getenv("S3_TOPAS_VERSION")
         geant_bucket = os.getenv("S3_GEANT_BUCKET")
-        assert download_topas_from_s3(topas_bucket_name=bucket, topas_key=key, topas_version=version, geant_bucket_name=geant_bucket, installation_path=tmpdir) is True
+        assert download_topas_from_s3(bucket=bucket, key=key, version=version, geant_bucket=geant_bucket, path=tmpdir) is True
         expected_path = Path(tmpdir / "topas" / key)
         assert expected_path.exists()
         command = f"{expected_path} --version"
