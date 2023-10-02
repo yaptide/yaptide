@@ -153,7 +153,7 @@ def update_user(**kwargs):
 @click.argument('cluster_name')
 @click.option('-v', '--verbose', count=True)
 def add_cluster(**kwargs):
-    """Adds ssh key to allow the user to connect to cluster"""
+    """Adds cluster with provided name to database if it does not exist"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
