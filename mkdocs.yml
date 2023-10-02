@@ -17,7 +17,7 @@ theme:
 nav:
 - Home:
   - Overview: index.md
-  - Documentation: mkdocs.md
+  - Work with documentation: mkdocs.md
 - API Reference: swagger.md
 - Code Reference: reference/
 - Test coverage: coverage.md

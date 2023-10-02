@@ -1,8 +1,19 @@
 # Developer documentation
 
 The documentation indended for developes is located in the `docs` folder. 
-We use mkdocs to generate the documentation in html format.
+We use [mkdocs](https://www.mkdocs.org) with [material for mkdocs](https://squidfunk.github.io/mkdocs-material/) customisation to generate the documentation in the HTML format.
 
+## Documentation structure
+
+Technical documentation is written in markdown format and can be found in the [docs folder](https://github.com/yaptide/yaptide/tree/master/docs).
+
+### API reference
+
+The API reference is generated from the swagger yaml file. The swagger yaml file is located in the `docs` folder.
+
+The documentation is rendered using [render_swagger](https://github.com/bharel/mkdocs-render-swagger-plugin) plugin installed as [mkdocs-render-swagger-plugin](https://pypi.org/project/mkdocs-render-swagger-plugin/) pip package. Its a bit abandoned project but it seems to be the only solution to generate static HTML from swagger yaml file.
+
+As the swagger yaml file is located in the `docs` folder, the `mkdocs.yml` file needs to be located in the root of the project. This is a bit inconvenient as the `mkdocs.yml` file is not located in the `docs` folder.
 
 ## Github Pages deployment of the documentation
 
