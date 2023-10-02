@@ -158,3 +158,4 @@ bin/
 
 server.crt
 server.key
+docs/openapi.yaml
