@@ -9,6 +9,7 @@ theme:
   name: material
   features:
     - content.code.annotate
+    - content.code.copy
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.top
@@ -16,6 +17,7 @@ theme:
 nav:
 - Home:
   - Overview: index.md
+  - Documentation: mkdocs.md
 - API Reference: swagger.md
 - Code Reference: reference/
 - Test coverage: coverage.md
