@@ -10,6 +10,7 @@ theme:
   features:
     - content.code.annotate
     - content.code.copy
+    - content.tabs.link
     - navigation.tabs
     - navigation.tabs.sticky
     - navigation.top
@@ -46,5 +47,10 @@ plugins:
           separate_signature: true
           show_root_heading: true
           show_root_members_full_path: false
+
+markdown_extensions:
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
 
 
