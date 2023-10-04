@@ -49,14 +49,17 @@ python3 -m venv venv
 
 Activate the venv environment by running the following command:
 
-```bash
-source venv/bin/activate
-```
+=== "Linux"
 
-For Windows (Powershell) use
-```bash
-. .\venv\Scripts\Activate.ps1
-```
+    ```bash
+    source venv/bin/activate
+    ```
+
+=== "Windows"
+
+    ```powershell
+    . .\venv\Scripts\Activate.ps1
+    ```
 
 Then install the required packages needed by mkdocs by running the following command:
 
@@ -105,7 +108,7 @@ pytest --cov-report html:htmlcov --cov=yaptide
 
 Note that this requires installation of usual requirements for the backend and the tests:
 
-```
+```bash
 pip install -r requirements.txt
 pip install -r requirements-test.txt
 ```
