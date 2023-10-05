@@ -397,7 +397,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -505,7 +505,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -555,7 +555,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -698,7 +698,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -749,7 +749,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
