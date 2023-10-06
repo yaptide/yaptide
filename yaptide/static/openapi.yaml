@@ -11,7 +11,7 @@ paths:
       security:
         - basicAuth: [ ]
       summary: Allows to check if server is alive
-      description: Allows to check if server is alive
+      description: Allows to check if server is alive. If server is down it won't respond to this request
       responses:
         '200':
           description: Successful operation
@@ -32,7 +32,7 @@ paths:
               $ref: '#/components/schemas/RegisterLoginRequest'
       responses:
         '201':
-          description: TODO
+          description: Returns message - User created
           content:
             application/json:
               schema:
@@ -44,7 +44,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '403':
-          description: TODO
+          description: Forbidden - User already exists
           content:
             application/json:
               schema:
@@ -66,7 +66,7 @@ paths:
               $ref: '#/components/schemas/RegisterLoginRequest'
       responses:
         '202':
-          description: Includes expiration time of new access tokens
+          description: Includes expiration time in milliseconds of new access tokens with message - Successfully logged in
           content:
             application/json:
               schema:
@@ -101,7 +101,7 @@ paths:
       summary: Allows to refresh access token - server sets new access token in cookies
       responses:
         '200':
-          description: Includes expiration time of new access token
+          description: Includes expiration time in milliseconds of new access token
           content:
             application/json:
               schema:
@@ -134,7 +134,7 @@ paths:
       summary: Allows to retrieve logged in user information
       responses:
         '200':
-          description: Includes logged in user information
+          description: Includes logged in user information, shown in example response below
           content:
             application/json:
               schema:
@@ -164,7 +164,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
   /auth/logout:
     delete:
-      summary: Allows to logout the user - server removes tokens from cookies
+      summary: Allows to logout the user - server removes access and refresh tokens from cookies. If nobody was logged in then just nothing happens
       responses:
         '200':
           description: User was successfully logged out
@@ -177,6 +177,7 @@ paths:
   /auth/keycloak:
     post:
       summary: Allows to login the user with keycloak credentials - server sets refresh and access tokens in cookies
+      description: At current state this endpoint works only with server running on C3
       parameters:
         - in: header
           name: Authorization
@@ -192,7 +193,7 @@ paths:
               $ref: '#/components/schemas/KeycloakRequest'
       responses:
         '202':
-          description: Includes expiration time of new access token
+          description: Includes expiration time in milliseconds of new access token
           content:
             application/json:
               schema:
@@ -396,7 +397,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -504,7 +505,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -554,7 +555,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -568,6 +569,7 @@ paths:
   /jobs/batch:
     post:
       summary: Allows for submitting jobs
+      description: This endpoint can be used only by keycloak authenticated users
       requestBody:
         required: true
         content:
@@ -631,6 +633,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
     get:
       summary: Allows for getting job status and additional job's info.
+      description: This endpoint can be used only by keycloak authenticated users
       parameters:
         - in: query
           name: job_id
@@ -695,7 +698,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -708,6 +711,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
     delete:
       summary: Allows for job cancelation.
+      description: This endpoint can be used only by keycloak authenticated users
       parameters:
         - in: query
           name: job_id
@@ -745,7 +749,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
         '408':
-          description: TODO
+          description: Timeout
           content:
             application/json:
               schema:
@@ -1011,7 +1015,6 @@ components:
       properties:
         message:
           type: string
-          example: Hello world!
           description: body message
     KeycloakRequest:
       type: object
