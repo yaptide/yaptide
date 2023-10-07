@@ -1,8 +1,18 @@
 FROM python:3.10-slim
 
-# install gfortran via apt and clean cache
+# install libraries required to run simulators via apt and clean cache
 # skipcq: DOK-DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends gfortran && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libexpat1-dev \
+    libgl1-mesa-dev \
+    libglu1-mesa-dev \
+    libxt-dev \
+    xorg-dev \
+    build-essential \
+    libharfbuzz-dev \
+    gfortran \
+    && \
+    rm -rf /var/lib/apt/lists/*
 
 # set max celery task time to 10 hours
 ENV CELERYD_TIME_LIMIT=36000
@@ -16,6 +26,9 @@ ENV PATH="/usr/local/app/bin:${PATH}"
 # openshift permissions
 RUN chgrp -R 0 /usr/local/app && \
     chmod -R g=u /usr/local/app
+
+# set variable with path to Geant4 files required by TOPAS simulator
+ENV TOPAS_G4_DATA_DIR="/usr/local/app/bin/geant"
 
 # install dependencies
 COPY requirements.txt .
