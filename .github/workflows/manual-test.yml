@@ -65,6 +65,10 @@ jobs:
               S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
               S3_SHIELDHIT_BUCKET: ${{ secrets.S3_LINUX_SHIELDHIT_BUCKET }}
               S3_SHIELDHIT_KEY: ${{ secrets.S3_LINUX_SHIELDHIT_KEY }}
+              S3_TOPAS_KEY: ${{ vars.S3_TOPAS_KEY }}
+              S3_TOPAS_VERSION: ${{ vars.S3_TOPAS_VERSION }}
+              S3_TOPAS_BUCKET: ${{ vars.S3_TOPAS_BUCKET }}
+              S3_GEANT_BUCKET: ${{ vars.S3_GEANT_BUCKET }}
         run: pytest
     
        # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
