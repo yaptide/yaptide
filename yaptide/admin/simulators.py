@@ -271,6 +271,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
             )
             for tag in tags["TagSet"]:
                 if tag["Key"] == "version" and tag["Value"] == version:
+                    click.echo(f"Downloading {key}, version {version} from {bucket} to {topas_temp_file.name}")
                     s3_client.download_fileobj(Bucket=bucket,
                                                Key=key,
                                                Fileobj=topas_temp_file,
@@ -304,6 +305,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
                         topas_versions = [version.strip() for version in topas_versions]
                         if version in topas_versions:
                             temp_file = tempfile.NamedTemporaryFile()
+                            click.echo(f"Downloading {key} for TOPAS version {version} from {bucket} to {temp_file.name}")
                             s3_client.download_fileobj(Bucket=geant_bucket,
                                                        Key=key,
                                                        Fileobj=temp_file,
@@ -323,10 +325,12 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
             return False
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
+    click.echo(f"Unpacking {topas_temp_file.name} to {topas_file_path}")
     topas_file_contents.extractall(path=topas_file_path)
     topas_extracted_path = topas_file_path / "topas" / "bin" / "topas"
     topas_extracted_path.chmod(0o700)
-    logging.info("Installed TOPAS into "+str(topas_file_path))
+    logging.info(f"Installed TOPAS into {topas_file_path}")
+    click.echo(f"Installed TOPAS into {topas_file_path}")
 
     geant_files_path = path / "geant"
     if not geant_files_path.exists():
@@ -338,8 +342,10 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
     for file in geant_temp_files:
         file.seek(0)
         file_contents = tarfile.TarFile(fileobj=file)
+        click.echo(f"Unpacking {file.name} to {geant_files_path}")
         file_contents.extractall(path=geant_files_path)
-    logging.info("Installed Geant4 files into "+str(geant_files_path))
+    logging.info(f"Installed Geant4 files into {geant_files_path}")
+    click.echo(f"Installed Geant4 files into {geant_files_path}")
     return True
 
 
