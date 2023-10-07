@@ -339,7 +339,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
         file.seek(0)
         file_contents = tarfile.TarFile(fileobj=file)
         file_contents.extractall(path=geant_files_path)
-    logging.info("Installed Geant files into "+str(geant_files_path))
+    logging.info("Installed Geant4 files into "+str(geant_files_path))
     return True
 
 
