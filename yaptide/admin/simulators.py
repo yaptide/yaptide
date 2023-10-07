@@ -305,7 +305,8 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
                         topas_versions = [version.strip() for version in topas_versions]
                         if version in topas_versions:
                             temp_file = tempfile.NamedTemporaryFile()
-                            click.echo(f"Downloading {key} for TOPAS version {version} from {bucket} to {temp_file.name}")
+                            click.echo(f"""Downloading {key} for TOPAS version {version}
+                                           from {bucket} to {temp_file.name}""")
                             s3_client.download_fileobj(Bucket=geant_bucket,
                                                        Key=key,
                                                        Fileobj=temp_file,
@@ -329,7 +330,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
     topas_file_contents.extractall(path=topas_file_path)
     topas_extracted_path = topas_file_path / "topas" / "bin" / "topas"
     topas_extracted_path.chmod(0o700)
-    logging.info(f"Installed TOPAS into {topas_file_path}")
+    logging.info("Installed TOPAS into %s", topas_file_path)
     click.echo(f"Installed TOPAS into {topas_file_path}")
 
     geant_files_path = path / "geant"
@@ -344,7 +345,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
         file_contents = tarfile.TarFile(fileobj=file)
         click.echo(f"Unpacking {file.name} to {geant_files_path}")
         file_contents.extractall(path=geant_files_path)
-    logging.info(f"Installed Geant4 files into {geant_files_path}")
+    logging.info("Installed Geant4 files into %s", geant_files_path)
     click.echo(f"Installed Geant4 files into {geant_files_path}")
     return True
 
