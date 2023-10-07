@@ -12,7 +12,7 @@ def check_if_environment_variables_set() -> bool:
     result = True
     for var_name in ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_TOPAS_BUCKET', 'S3_TOPAS_KEY', 'S3_GEANT_BUCKET','S3_TOPAS_VERSION']:
         if var_name not in os.environ:
-            logging.error(var_name + ' variable not set')
+            logging.error(' variable %s not set', var_name)
             result = False
     return result
 
