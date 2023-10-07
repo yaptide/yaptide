@@ -319,7 +319,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
         try:
             topas_file_path.mkdir()
         except OSError as e:
-            click.echo("Could not create installation directory")
+            click.echo(f"Could not create installation directory {topas_file_path}")
             return False
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
