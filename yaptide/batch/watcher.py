@@ -51,6 +51,7 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
         "update_dict": update_dict
     }
     tasks_url = f"{backend_url}/tasks"
+    logging.debug("Sending update %s to the backend %s", dict_to_send, tasks_url)
     context = ssl.SSLContext()
 
     req = request.Request(tasks_url,
@@ -65,6 +66,7 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
                 return False
     except Exception as e:  # skipcq: PYL-W0703
         print(e)
+        logging.debug("Sending update to %s failed", tasks_url)
         return False
     return True
 
