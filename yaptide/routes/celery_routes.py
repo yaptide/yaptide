@@ -25,9 +25,8 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_internal_response,
                                                      error_validation_response,
                                                      yaptide_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
-from yaptide.utils.enums import EntityState, InputType, PlatformType
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.utils.enums import EntityState, PlatformType
 
 
 class JobsDirect(Resource):
@@ -47,15 +46,7 @@ class JobsDirect(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        input_type = None
-        if payload_dict["input_type"] == "editor":
-            if "input_json" not in payload_dict:
-                return error_validation_response()
-            input_type = InputType.EDITOR.value
-        if payload_dict["input_type"] == "files":
-            if "input_files" not in payload_dict:
-                return error_validation_response()
-            input_type = InputType.FILES.value
+        input_type = determine_input_type(payload_dict)
 
         if input_type is None:
             return error_validation_response()
@@ -72,27 +63,18 @@ class JobsDirect(Resource):
         add_object_to_db(simulation)
         logging.info("Simulation %d created", simulation.id)
 
-        input_dict_to_save = {
-            "input_type": input_type,
-        }
-        if input_type == InputType.EDITOR.value:
-            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
-            input_dict_to_save["input_json"] = payload_dict["input_json"]
-        else:
-            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
-        input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
-        input_dict_to_save["input_files"] = files_dict
+        input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+
+        # submit the asynchronous job to celery
+        simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"])
 
         # create tasks in the database in the default PENDING state
         for i in range(payload_dict["ntasks"]):
             task = CeleryTaskModel(simulation_id=simulation.id, task_id=f"{simulation.id}_{i}")
             add_object_to_db(task, make_commit=False)
 
-        # submit the asynchronous job to celery
-        simulation.merge_id = run_job(files_dict, update_key, simulation.id, payload_dict["ntasks"])
-
         input_model = InputModel(simulation_id=simulation.id)
-        input_model.data = input_dict_to_save
+        input_model.data = input_dict
         add_object_to_db(input_model)
         if simulation.update_state({"job_state": EntityState.PENDING.value}):
             make_commit_to_db()
