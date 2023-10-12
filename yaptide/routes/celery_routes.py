@@ -156,6 +156,16 @@ class JobsDirect(Resource):
 
         simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
 
+        if simulation.job_state in (EntityState.COMPLETED.value,
+                                    EntityState.FAILED.value,
+                                    EntityState.CANCELED.value,
+                                    EntityState.UNKNOWN.value):
+            return yaptide_response(message=f"Cannot cancel job which is in {simulation.job_state} state",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                    })
+
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
 
         celery_ids = [task.celery_id for task in tasks]

@@ -180,6 +180,16 @@ class JobsBatch(Resource):
 
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
 
+        if simulation.job_state in (EntityState.COMPLETED.value,
+                                    EntityState.FAILED.value,
+                                    EntityState.CANCELED.value,
+                                    EntityState.UNKNOWN.value):
+            return yaptide_response(message=f"Cannot cancel job which is in {simulation.job_state} state",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                    })
+
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
         result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)

@@ -1,4 +1,4 @@
-from typing import Union
+from typing import Optional
 
 from yaptide.persistence.db_methods import fetch_simulation_by_job_id
 from yaptide.persistence.models import UserModel
@@ -17,7 +17,7 @@ def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool,
     return False, 'Job with provided ID does not belong to the user', 403
 
 
-def determine_input_type(payload_dict: dict) -> Union[str, None]:
+def determine_input_type(payload_dict: dict) -> Optional[str]:
     """Function returning input type determined from payload"""
     if payload_dict["input_type"] == "editor":
         if "input_json" not in payload_dict:
