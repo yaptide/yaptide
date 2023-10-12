@@ -1,18 +1,8 @@
 FROM python:3.10-slim
 
-# install libraries required to run simulators via apt and clean cache
+# install gfortran via apt and clean cache
 # skipcq: DOK-DL3008
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libexpat1-dev \
-    libgl1-mesa-dev \
-    libglu1-mesa-dev \
-    libxt-dev \
-    xorg-dev \
-    build-essential \
-    libharfbuzz-dev \
-    gfortran \
-    && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends gfortran && rm -rf /var/lib/apt/lists/*
 
 # set max celery task time to 10 hours
 ENV CELERYD_TIME_LIMIT=36000
