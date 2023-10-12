@@ -215,7 +215,6 @@ class YaptideTester:
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
-                return
 
     def check_backend_jobs(self):
         """Example checking backend jobs with pagination"""
