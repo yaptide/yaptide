@@ -11,6 +11,7 @@ class PlatformType(Enum):
 class EntityState(Enum):
     """Job state types - move it to more utils like place in future"""
 
+    UNKNOWN = "UNKNOWN"
     PENDING = "PENDING"
     RUNNING = "RUNNING"
     CANCELED = "CANCELED"

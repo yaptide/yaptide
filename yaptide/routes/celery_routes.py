@@ -94,6 +94,8 @@ class JobsDirect(Resource):
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict_to_save
         add_object_to_db(input_model)
+        if simulation.update_state({"job_state": EntityState.PENDING.value}):
+            make_commit_to_db()
 
         return yaptide_response(message="Task started", code=202, content={'job_id': simulation.job_id})
 

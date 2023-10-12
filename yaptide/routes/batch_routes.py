@@ -12,6 +12,7 @@ from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_batch_simulation_by_job_id,
                                             fetch_batch_tasks_by_sim_id,
                                             fetch_cluster_by_id,
+                                            make_commit_to_db,
                                             update_simulation_state,
                                             update_task_state)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
@@ -115,6 +116,8 @@ class JobsBatch(Resource):
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict_to_save
         add_object_to_db(input_model)
+        if simulation.update_state({"job_state": EntityState.PENDING.value}):
+            make_commit_to_db()
 
         return yaptide_response(
             message="Job submitted",
