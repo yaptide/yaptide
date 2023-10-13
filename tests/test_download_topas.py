@@ -24,7 +24,7 @@ def test_if_topas_downloaded(tmpdir):
         key = os.getenv("S3_TOPAS_KEY")
         version = os.getenv("S3_TOPAS_VERSION")
         geant_bucket = os.getenv("S3_GEANT_BUCKET")
-        assert download_topas_from_s3(bucket=bucket, key=key, version=version, geant_bucket=geant_bucket, path=tmpdir, geant_path=tmpdir) is True
+        assert download_topas_from_s3(bucket=bucket, key=key, version=version, geant_bucket=geant_bucket, path=tmpdir) is True
         expected_path = Path(tmpdir / "topas")
         expected_geant_path = Path(tmpdir / "geant")
         assert expected_path.exists(), "Expected TOPAS path does not exist."

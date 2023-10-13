@@ -43,9 +43,9 @@ topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
 topas_key = os.getenv('S3_TOPAS_KEY')
 topas_version = os.getenv('S3_TOPAS_VERSION')
 geant_bucket_name = os.getenv('S3_GEANT_BUCKET')
-shieldhit_path = Path('/simulators') / 'shieldhit12a' / 'bin'
-topas_path = Path('/simulators')
-geant4_path = Path('/simulators')
+#shieldhit_path = Path('/simulators') / 'shieldhit12a' / 'bin'
+#topas_path = Path('/simulators')
+#geant4_path = Path('/simulators')
 
 
 @click.group()
@@ -59,7 +59,7 @@ def installed(**kwargs):
     click.echo('to be implemented')
 
 
-def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str):
+def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str, shieldhit_path: Path):
     """Extracts a single file from a tar.gz archive"""
     with tarfile.open(archive_path, "r:gz") as tar:
         # print all members
@@ -73,7 +73,7 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
                 shutil.move(local_file_path, shieldhit_path / member_name)
 
 
-def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
+def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str, shieldhit_path: Path):
     """Extracts a single file from a zip archive"""
     with zipfile.ZipFile(archive_path) as zip_handle:
         # print all members
@@ -91,31 +91,31 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
                     shutil.move(local_file_path, destination_file_path)
 
 
-def install_simulator(sim_name: SimulatorType) -> bool:
+def install_simulator(sim_name: SimulatorType, installation_path: Path) -> bool:
     """Add simulator to database"""
     click.echo(f'Installation for simulator: {sim_name.name} started')
     logging.info("Installation for simulator: %s started", sim_name.name)
     if sim_name == SimulatorType.shieldhit:
-        click.echo(f'Installing shieldhit into {shieldhit_path}')
-        logging.info("Installing shieldhit into %s", shieldhit_path)
-        shieldhit_path.mkdir(exist_ok=True, parents=True)
+        click.echo(f'Installing shieldhit into {installation_path}')
+        logging.info("Installing shieldhit into %s", installation_path)
+        installation_path.mkdir(exist_ok=True, parents=True)
         download_status = False
         if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
-            download_status = download_shieldhit_from_s3()
+            download_status = download_shieldhit_from_s3(shieldhit_path=installation_path)
         if not download_status:
             click.echo('Downloading demo version from shieldhit.org')
             logging.info("Downloading demo version from shieldhit.org")
-            download_status = download_shieldhit_demo_version()
+            download_status = download_shieldhit_demo_version(shieldhit_path=installation_path)
     elif sim_name == SimulatorType.topas:
-        click.echo(f'Installing TOPAS into {shieldhit_path}')
-        logging.info("Installing TOPAS into %s", shieldhit_path)
-        shieldhit_path.mkdir(exist_ok=True, parents=True)
+        click.echo(f'Installing TOPAS into {installation_path}')
+        logging.info("Installing TOPAS into %s", installation_path)
+        installation_path.mkdir(exist_ok=True, parents=True)
         if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
-            download_status = download_topas_from_s3()
+            download_status = download_topas_from_s3(path=installation_path)
         else:
             click.echo('Cannot download from S3 bucket, missing environment variables')
             logging.info("Cannot download from S3 bucket, missing environment variables")
@@ -126,7 +126,7 @@ def install_simulator(sim_name: SimulatorType) -> bool:
     return download_status
 
 
-def download_shieldhit_demo_version() -> bool:
+def download_shieldhit_demo_version(shieldhit_path: Path) -> bool:
     """Download shieldhit demo version from shieldhit.org"""
     demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
     # check if working on Windows
@@ -147,9 +147,9 @@ def download_shieldhit_demo_version() -> bool:
         # extract
         click.echo(f"Extracting {temp_file_archive} to {shieldhit_path}")
         if temp_file_archive.suffix == '.gz':
-            extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit')
+            extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit', shieldhit_path=shieldhit_path)
         elif temp_file_archive.suffix == '.zip':
-            extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe')
+            extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe', shieldhit_path=shieldhit_path)
     return True
 
 
@@ -171,9 +171,9 @@ def check_if_s3_connection_is_working(
 
 
 def download_shieldhit_from_s3(
+        shieldhit_path: Path,
         bucket: str = shieldhit_bucket,
         key: str = shieldhit_key,
-        shieldhit_path: Path = shieldhit_path   # skipcq: PYL-W0621
         ) -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
@@ -243,12 +243,11 @@ def download_shieldhit_from_s3(
 
 
 # skipcq: PY-R1000
-def download_topas_from_s3(bucket: str = topas_bucket_name,
+def download_topas_from_s3(path: Path,
+                            bucket: str = topas_bucket_name,
                            key: str = topas_key,
                            version: str = topas_version,
-                           geant_bucket: str = geant_bucket_name,
-                           path: Path = topas_path,
-                           geant_path: Path = geant4_path
+                           geant_bucket: str = geant_bucket_name
                            ) -> bool:
     """Download TOPAS from S3 bucket"""
     s3_client = boto3.client(
@@ -329,7 +328,7 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
     logging.info("Installed TOPAS into %s", path)
     click.echo(f"Installed TOPAS into {path}")
 
-    geant_files_path = geant_path / "geant4"
+    geant_files_path = path / "geant4"
     if not geant_files_path.exists():
         try:
             geant_files_path.mkdir(parents=True)
@@ -419,6 +418,7 @@ def derive_key(encryption_password: str = password, encryption_salt: str = salt)
 
 @run.command
 @click.option('--name', type=click.Choice([sim.name for sim in SimulatorType]))
+@click.option('--path')
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """List installed simulators"""
@@ -427,9 +427,13 @@ def install(**kwargs):
         for sim in SimulatorType:
             click.echo(f'{sim.name} ', nl=False)
         return
-    click.echo(f'Installing simulator: {kwargs["name"]}')
+    if 'path' not in kwargs or kwargs['path'] is None:
+        click.echo('Please specify installation path')
+        return
+    click.echo(f'Installing simulator: {kwargs["name"]} to path {kwargs["path"]}')
     sim_type = SimulatorType[kwargs['name']]
-    if install_simulator(sim_type):
+    installation_path = Path(kwargs['path'])
+    if install_simulator(sim_type, installation_path):
         click.echo(f'Simulator {sim_type.name} installed')
     else:
         click.echo(f'Simulator {sim_type.name} installation failed')
