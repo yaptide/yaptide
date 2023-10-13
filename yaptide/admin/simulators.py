@@ -43,7 +43,9 @@ topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
 topas_key = os.getenv('S3_TOPAS_KEY')
 topas_version = os.getenv('S3_TOPAS_VERSION')
 geant_bucket_name = os.getenv('S3_GEANT_BUCKET')
-installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
+shieldhit_path = Path('/simulators') / 'shieldhit12a' / 'bin'
+topas_path = Path('/simulators')
+geant4_path = Path('/simulators')
 
 
 @click.group()
@@ -67,8 +69,8 @@ def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, mem
                 tar.extract(member, destination_dir)
                 # move to installation path
                 local_file_path = Path(destination_dir) / member.name
-                click.echo(f"Moving {local_file_path} to {installation_path}")
-                local_file_path.rename(installation_path / member_name)
+                click.echo(f"Moving {local_file_path} to {shieldhit_path}")
+                shutil.move(local_file_path, shieldhit_path / member_name)
 
 
 def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str):
@@ -82,7 +84,7 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
                 zip_handle.extract(member, destination_dir)
                 # move to installation path
                 local_file_path = Path(destination_dir) / member.filename
-                destination_file_path = installation_path / member_name
+                destination_file_path = shieldhit_path / member_name
                 click.echo(f"Moving {local_file_path} to {destination_file_path}")
                 # move file from temporary directory to installation path using shutils
                 if not destination_file_path.exists():
@@ -94,9 +96,9 @@ def install_simulator(sim_name: SimulatorType) -> bool:
     click.echo(f'Installation for simulator: {sim_name.name} started')
     logging.info("Installation for simulator: %s started", sim_name.name)
     if sim_name == SimulatorType.shieldhit:
-        click.echo(f'Installing shieldhit into {installation_path}')
-        logging.info("Installing shieldhit into %s", installation_path)
-        installation_path.mkdir(exist_ok=True, parents=True)
+        click.echo(f'Installing shieldhit into {shieldhit_path}')
+        logging.info("Installing shieldhit into %s", shieldhit_path)
+        shieldhit_path.mkdir(exist_ok=True, parents=True)
         download_status = False
         if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
@@ -107,9 +109,9 @@ def install_simulator(sim_name: SimulatorType) -> bool:
             logging.info("Downloading demo version from shieldhit.org")
             download_status = download_shieldhit_demo_version()
     elif sim_name == SimulatorType.topas:
-        click.echo(f'Installing TOPAS into {installation_path}')
-        logging.info("Installing TOPAS into %s", installation_path)
-        installation_path.mkdir(exist_ok=True, parents=True)
+        click.echo(f'Installing TOPAS into {shieldhit_path}')
+        logging.info("Installing TOPAS into %s", shieldhit_path)
+        shieldhit_path.mkdir(exist_ok=True, parents=True)
         if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
@@ -143,7 +145,7 @@ def download_shieldhit_demo_version() -> bool:
         click.echo(f"Saved to {temp_file_archive} with size {temp_file_archive.stat().st_size} bytes")
 
         # extract
-        click.echo(f"Extracting {temp_file_archive} to {installation_path}")
+        click.echo(f"Extracting {temp_file_archive} to {shieldhit_path}")
         if temp_file_archive.suffix == '.gz':
             extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit')
         elif temp_file_archive.suffix == '.zip':
@@ -171,7 +173,7 @@ def check_if_s3_connection_is_working(
 def download_shieldhit_from_s3(
         bucket: str = shieldhit_bucket,
         key: str = shieldhit_key,
-        installation_path: Path = installation_path   # skipcq: PYL-W0621
+        shieldhit_path: Path = shieldhit_path   # skipcq: PYL-W0621
         ) -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
@@ -184,10 +186,10 @@ def download_shieldhit_from_s3(
         click.echo("S3 connection failed", err=True)
         return False
 
-    destination_file_path = installation_path / 'shieldhit'
+    destination_file_path = shieldhit_path / 'shieldhit'
     # append '.exe' to file name if working on Windows
     if platform.system() == 'Windows':
-        destination_file_path = installation_path / 'shieldhit.exe'
+        destination_file_path = shieldhit_path / 'shieldhit.exe'
 
     # Check if bucket name is valid
     if not bucket:
@@ -245,7 +247,8 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
                            key: str = topas_key,
                            version: str = topas_version,
                            geant_bucket: str = geant_bucket_name,
-                           path: Path = installation_path
+                           path: Path = topas_path,
+                           geant_path: Path = geant4_path
                            ) -> bool:
     """Download TOPAS from S3 bucket"""
     s3_client = boto3.client(
@@ -317,26 +320,19 @@ def download_topas_from_s3(bucket: str = topas_bucket_name,
         click.echo("Failed to download Geant4 from S3 with error: ", e.response["Error"]["Message"])
         return False
 
-    topas_file_path = path / "topas"
-    if not topas_file_path.exists():
-        try:
-            topas_file_path.mkdir()
-        except OSError as e:
-            click.echo(f"Could not create installation directory {topas_file_path}")
-            return False
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
-    click.echo(f"Unpacking {topas_temp_file.name} to {topas_file_path}")
-    topas_file_contents.extractall(path=topas_file_path)
-    topas_extracted_path = topas_file_path / "topas" / "bin" / "topas"
+    click.echo(f"Unpacking {topas_temp_file.name} to {path}")
+    topas_file_contents.extractall(path=path)
+    topas_extracted_path = path / "topas" / "bin" / "topas"
     topas_extracted_path.chmod(0o700)
-    logging.info("Installed TOPAS into %s", topas_file_path)
-    click.echo(f"Installed TOPAS into {topas_file_path}")
+    logging.info("Installed TOPAS into %s", path)
+    click.echo(f"Installed TOPAS into {path}")
 
-    geant_files_path = path / "geant"
+    geant_files_path = geant_path / "geant4"
     if not geant_files_path.exists():
         try:
-            geant_files_path.mkdir()
+            geant_files_path.mkdir(parents=True)
         except OSError as e:
             click.echo("Could not create installation directory")
             return False

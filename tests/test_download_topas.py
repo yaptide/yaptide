@@ -10,7 +10,7 @@ from yaptide.admin.simulators import download_topas_from_s3
 def check_if_environment_variables_set() -> bool:
     """Check if environment variables are set"""
     result = True
-    for var_name in ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_TOPAS_BUCKET', 'S3_TOPAS_KEY', 'S3_GEANT_BUCKET','S3_TOPAS_VERSION']:
+    for var_name in ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_TOPAS_BUCKET', 'S3_TOPAS_KEY', 'S3_GEANT_BUCKET', 'S3_TOPAS_VERSION']:
         if var_name not in os.environ:
             logging.error(' variable %s not set', var_name)
             result = False
@@ -24,8 +24,8 @@ def test_if_topas_downloaded(tmpdir):
         key = os.getenv("S3_TOPAS_KEY")
         version = os.getenv("S3_TOPAS_VERSION")
         geant_bucket = os.getenv("S3_GEANT_BUCKET")
-        assert download_topas_from_s3(bucket=bucket, key=key, version=version, geant_bucket=geant_bucket, path=tmpdir) is True
-        expected_path = Path(tmpdir / "topas" / "topas" / "bin" / "topas")
+        assert download_topas_from_s3(bucket=bucket, key=key, version=version, geant_bucket=geant_bucket, path=tmpdir, data_path=tmpdir) is True
+        expected_path = Path(tmpdir / "topas")
         expected_geant_path = Path(tmpdir / "geant")
         assert expected_path.exists(), "Expected TOPAS path does not exist."
         assert expected_path.stat().st_size > 0, "Expected TOPAS path is empty."

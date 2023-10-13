@@ -19,7 +19,7 @@ if [ -z "$S3_TOPAS_BUCKET" ] || [ -z "$S3_TOPAS_KEY" ] || [ -z "$S3_TOPAS_VERSIO
 
         rm -rf /var/lib/apt/lists/*
 
-        /yaptide/admin/simulators.py install --name topas
+        ./yaptide/admin/simulators.py install --name topas
 fi
 
 celery --app yaptide.celery.worker worker -E --loglevel=info -P eventlet --hostname yaptide-worker
