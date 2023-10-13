@@ -330,7 +330,7 @@ def download_topas_from_s3(path: Path,
     geant_files_path = path / "geant4"
     if not geant_files_path.exists():
         try:
-            geant_files_path.mkdir(parents=True)
+            geant_files_path.mkdir(exist_ok=True, parents=True)
         except OSError as e:
             click.echo("Could not create installation directory")
             return False
