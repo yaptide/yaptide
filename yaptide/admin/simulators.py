@@ -237,7 +237,7 @@ def download_shieldhit_from_s3(
         click.echo(f"S3 download failed with client error: {e}", err=True)
         return False
     # Permission to execute
-    destination_file_path.parent.chmod(0o700)
+    destination_file_path.chmod(0o700)
     return True
 
 
