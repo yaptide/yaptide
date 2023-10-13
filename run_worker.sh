@@ -15,7 +15,7 @@ if [ -z "$S3_TOPAS_BUCKET" ] || [ -z "$S3_TOPAS_KEY" ] || [ -z "$S3_TOPAS_VERSIO
         xorg-dev \
         build-essential \
         libharfbuzz-dev \
-        gfortran \
+        gfortran
 
         rm -rf /var/lib/apt/lists/*
 
