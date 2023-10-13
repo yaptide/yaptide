@@ -327,7 +327,7 @@ def download_topas_from_s3(path: Path,
     logging.info("Installed TOPAS into %s", path)
     click.echo(f"Installed TOPAS into {path}")
 
-    geant_files_path = path / "geant4"
+    geant_files_path = path / "geant4_files_path"
     if not geant_files_path.exists():
         try:
             geant_files_path.mkdir()
@@ -417,7 +417,7 @@ def derive_key(encryption_password: str = password, encryption_salt: str = salt)
 
 @run.command
 @click.option('--name', type=click.Choice([sim.name for sim in SimulatorType]))
-@click.option('--path')
+@click.option('--path', type=click.Path(file_okay=False))
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """List installed simulators"""

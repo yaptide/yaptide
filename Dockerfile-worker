@@ -15,7 +15,7 @@ ENV PATH="/simulators/shieldhit12a/bin:${PATH}"
 ENV PATH="/simulators/topas/bin:${PATH}"
 
 # set variable with path to Geant4 files required by TOPAS simulator
-ENV TOPAS_G4_DATA_DIR="/simulators/geant4"
+ENV TOPAS_G4_DATA_DIR="/simulators/geant4_files_path"
 
 # openshift permissions
 RUN chgrp -R 0 /usr/local/app && \
