@@ -43,9 +43,6 @@ topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
 topas_key = os.getenv('S3_TOPAS_KEY')
 topas_version = os.getenv('S3_TOPAS_VERSION')
 geant_bucket_name = os.getenv('S3_GEANT_BUCKET')
-#shieldhit_path = Path('/simulators') / 'shieldhit12a' / 'bin'
-#topas_path = Path('/simulators')
-#geant4_path = Path('/simulators')
 
 
 @click.group()
@@ -147,9 +144,11 @@ def download_shieldhit_demo_version(shieldhit_path: Path) -> bool:
         # extract
         click.echo(f"Extracting {temp_file_archive} to {shieldhit_path}")
         if temp_file_archive.suffix == '.gz':
-            extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name), 'shieldhit', shieldhit_path=shieldhit_path)
+            extract_shieldhit_from_tar_gz(temp_file_archive, Path(tmpdir_name),
+                                          'shieldhit', shieldhit_path=shieldhit_path)
         elif temp_file_archive.suffix == '.zip':
-            extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name), 'shieldhit.exe', shieldhit_path=shieldhit_path)
+            extract_shieldhit_from_zip(temp_file_archive, Path(tmpdir_name),
+                                       'shieldhit.exe', shieldhit_path=shieldhit_path)
     return True
 
 
@@ -244,7 +243,7 @@ def download_shieldhit_from_s3(
 
 # skipcq: PY-R1000
 def download_topas_from_s3(path: Path,
-                            bucket: str = topas_bucket_name,
+                           bucket: str = topas_bucket_name,
                            key: str = topas_key,
                            version: str = topas_version,
                            geant_bucket: str = geant_bucket_name
