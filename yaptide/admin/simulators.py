@@ -417,7 +417,7 @@ def derive_key(encryption_password: str = password, encryption_salt: str = salt)
 
 @run.command
 @click.option('--name', type=click.Choice([sim.name for sim in SimulatorType]))
-@click.option('--path', type=click.Path(file_okay=False))
+@click.option('--path', type=click.Path(file_okay=False, path_type=Path))
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """List installed simulators"""
@@ -431,8 +431,7 @@ def install(**kwargs):
         return
     click.echo(f'Installing simulator: {kwargs["name"]} to path {kwargs["path"]}')
     sim_type = SimulatorType[kwargs['name']]
-    installation_path = Path(kwargs['path'])
-    if install_simulator(sim_type, installation_path):
+    if install_simulator(sim_type, kwargs['path']):
         click.echo(f'Simulator {sim_type.name} installed')
     else:
         click.echo(f'Simulator {sim_type.name} installation failed')
