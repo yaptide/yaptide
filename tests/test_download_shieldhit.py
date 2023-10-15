@@ -28,7 +28,7 @@ def test_if_shieldhit_downloaded(tmpdir, shieldhit_binary_filename):
     if check_if_environment_variables_set():
         bucket = os.getenv("S3_SHIELDHIT_BUCKET")
         key = os.getenv("S3_SHIELDHIT_KEY")
-        assert download_shieldhit_from_s3(bucket=bucket, key=key, installation_path=tmpdir) is True
+        assert download_shieldhit_from_s3(bucket=bucket, key=key, shieldhit_path=tmpdir) is True
         expected_path = Path(tmpdir / shieldhit_binary_filename)
         assert expected_path.exists(), "Expected path does not exist."
         assert expected_path.stat().st_size > 0, "Expected path is empty."

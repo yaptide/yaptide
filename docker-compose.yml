@@ -26,6 +26,8 @@ services:
             context: .
             dockerfile: Dockerfile-worker
         image: yaptide_worker
+        volumes:
+            - simulators:/simulators:rw
         deploy:
             resources:
                 limits:
@@ -69,3 +71,4 @@ services:
         - redis
 volumes:
     data:
+    simulators:
