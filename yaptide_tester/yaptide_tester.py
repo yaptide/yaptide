@@ -88,7 +88,7 @@ class YaptideTester:
         self.session = YaptideTesterSession(
             self.endpoints.http_auth_login, self.endpoints.http_auth_logout, username, password)
 
-    def run_tests(self, sim_n: int, flags: dict):
+    def run_tests(self, sim_n: int, flags: dict):  # skipcq: PY-R1000
         """Function running all important tests - might be extended in future"""
         Path(ROOT_DIR, "output").mkdir(parents=True, exist_ok=True)
         self.session.login(inital_login=True)
@@ -129,7 +129,7 @@ class YaptideTester:
                 input_files[filename] = reader.read()
         return input_files
 
-    def run_simulation_on_backend(self, with_files: bool, do_monitor_job: bool, direct: bool):
+    def run_simulation_on_backend(self, with_files: bool, do_monitor_job: bool, direct: bool):  # skipcq: PY-R1000
         """Example client running simulation"""
         if with_files:
             input_files = self.read_input_files()
@@ -215,7 +215,6 @@ class YaptideTester:
 
                 except Exception as e:  # skipcq: PYL-W0703
                     print(e)
-                return
 
     def check_backend_jobs(self):
         """Example checking backend jobs with pagination"""

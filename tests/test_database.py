@@ -114,7 +114,7 @@ def test_create_celery_simulation(db_session: scoped_session, db_good_username: 
     assert simulation.platform == PlatformType.DIRECT.value
     assert simulation.input_type == InputType.EDITOR.value
     assert simulation.sim_type == SimulationType.SHIELDHIT.value
-    assert simulation.job_state == EntityState.PENDING.value
+    assert simulation.job_state == EntityState.UNKNOWN.value
 
 
 def test_create_batch_simulation(db_session: scoped_session, db_good_username: str, db_good_password: str):
@@ -153,7 +153,7 @@ def test_create_batch_simulation(db_session: scoped_session, db_good_username: s
     assert simulation.platform == PlatformType.BATCH.value
     assert simulation.input_type == InputType.EDITOR.value
     assert simulation.sim_type == SimulationType.SHIELDHIT.value
-    assert simulation.job_state == EntityState.PENDING.value
+    assert simulation.job_state == EntityState.UNKNOWN.value
 
 
 def test_celery_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):

@@ -102,7 +102,7 @@ class SimulationModel(db.Model):
                                       doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
     job_state: Column[str] = db.Column(db.String,
                                        nullable=False,
-                                       default=EntityState.PENDING.value,
+                                       default=EntityState.UNKNOWN.value,
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
     update_key_hash: Column[str] = db.Column(db.String,
                                              doc="Update key shared by tasks granting access to update themselves")
@@ -197,7 +197,7 @@ class TaskModel(db.Model):
                                                  doc="Simulated number of primaries")
     task_state: Column[str] = db.Column(db.String,
                                         nullable=False,
-                                        default='PENDING',
+                                        default=EntityState.PENDING.value,
                                         doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")

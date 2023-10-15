@@ -12,6 +12,7 @@ from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_batch_simulation_by_job_id,
                                             fetch_batch_tasks_by_sim_id,
                                             fetch_cluster_by_id,
+                                            make_commit_to_db,
                                             update_simulation_state,
                                             update_task_state)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
@@ -21,9 +22,8 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response,
                                                      error_internal_response,
                                                      yaptide_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
-from yaptide.utils.enums import EntityState, InputType, PlatformType
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.utils.enums import EntityState, PlatformType
 
 
 class JobsBatch(Resource):
@@ -46,15 +46,7 @@ class JobsBatch(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        input_type = None
-        if payload_dict["input_type"] == "editor":
-            if "input_json" not in payload_dict:
-                return error_validation_response()
-            input_type = InputType.EDITOR.value
-        if payload_dict["input_type"] == "files":
-            if "input_files" not in payload_dict:
-                return error_validation_response()
-            input_type = InputType.FILES.value
+        input_type = determine_input_type(payload_dict)
 
         if input_type is None:
             return error_validation_response()
@@ -81,18 +73,9 @@ class JobsBatch(Resource):
         simulation.set_update_key(update_key)
         add_object_to_db(simulation)
 
-        input_dict_to_save = {
-            "input_type": input_type,
-        }
-        if input_type == InputType.EDITOR.value:
-            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
-            input_dict_to_save["input_json"] = payload_dict["input_json"]
-        else:
-            files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
-        input_dict_to_save["number_of_all_primaries"] = number_of_all_primaries
-        input_dict_to_save["input_files"] = files_dict
+        input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 
-        result = submit_job(payload_dict=payload_dict, files_dict=files_dict, user=user,
+        result = submit_job(payload_dict=payload_dict, files_dict=input_dict["input_files"], user=user,
                             cluster=cluster, sim_id=simulation.id, update_key=update_key)
 
         required_keys = {"job_dir", "array_id", "collect_id"}
@@ -113,8 +96,10 @@ class JobsBatch(Resource):
             add_object_to_db(task, False)
 
         input_model = InputModel(simulation_id=simulation.id)
-        input_model.data = input_dict_to_save
+        input_model.data = input_dict
         add_object_to_db(input_model)
+        if simulation.update_state({"job_state": EntityState.PENDING.value}):
+            make_commit_to_db()
 
         return yaptide_response(
             message="Job submitted",
@@ -194,6 +179,16 @@ class JobsBatch(Resource):
             return yaptide_response(message=error_message, code=res_code)
 
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
+
+        if simulation.job_state in (EntityState.COMPLETED.value,
+                                    EntityState.FAILED.value,
+                                    EntityState.CANCELED.value,
+                                    EntityState.UNKNOWN.value):
+            return yaptide_response(message=f"Cannot cancel job which is in {simulation.job_state} state",
+                                    code=200,
+                                    content={
+                                        "job_state": simulation.job_state,
+                                    })
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
