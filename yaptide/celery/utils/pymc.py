@@ -5,7 +5,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-from pymchelper.executor.options import SimulationSettings
+from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
 
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
@@ -17,6 +17,7 @@ from yaptide.utils.enums import EntityState
 def run_shieldhit(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single SHIELD-HIT12A simulation"""
     settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+                                  simulator_type=SimulatorType.shieldhit,
                                   simulator_exec_path=None,  # useless
                                   cmdline_opts="")  # useless
     # last part of task_id gives an integer seed for random number generator
