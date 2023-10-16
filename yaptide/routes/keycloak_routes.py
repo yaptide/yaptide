@@ -2,9 +2,11 @@ import logging
 import os
 from pathlib import Path
 
-import requests
 from flask import request
 from flask_restful import Resource
+import json
+import jwt
+import requests
 
 from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_keycloak_user_by_username,
@@ -15,6 +17,37 @@ from yaptide.routes.utils.response_templates import (error_internal_response,
 from yaptide.routes.utils.tokens import encode_auth_token
 
 ROOT_DIR = Path(__file__).parent.resolve()
+
+
+def check_user_based_on_keycloak_token(token: str) -> bool:
+    """Checks if user can access the service"""
+    if not token:
+        logging.error("No token provided")
+        return False
+    keycloak_url = os.environ.get('KEYCLOAK_URL', '')
+    if not keycloak_url:
+        logging.error("KEYCLOAK_URL not set")
+        return False
+    try:
+        unverified_encoded_token = jwt.decode(token, options={"verify_signature": False})
+        res = requests.get(keycloak_url)
+        jwks = res.json()
+
+        public_keys = {}
+        for jwk in jwks['keys']:
+            kid = jwk['kid']
+            public_keys[kid] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+
+        kid = jwt.get_unverified_header(token)['kid']
+        key = public_keys[kid]
+
+        verified_token = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'])
+        # TODO: check user privileges
+    
+    except Exception as e:
+        logging.error("Error while decoding token: %s", e)
+        return False
+    return True
 
 
 class AuthKeycloak(Resource):
@@ -39,8 +72,8 @@ class AuthKeycloak(Resource):
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         keycloak_token: str = request.headers.get('Authorization', '')
-        if not keycloak_token:
-            return yaptide_response(message='No keycloak token provided', code=401)
+        if check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', '')):
+            return yaptide_response(message='Invalid or no token', code=401)
 
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={
