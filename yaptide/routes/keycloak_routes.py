@@ -78,9 +78,10 @@ class AuthKeycloak(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
+        username = payload_dict["username"]
         keycloak_token: str = request.headers.get('Authorization', '')
 
-        _ = check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''))
+        _ = check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
 
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={
@@ -90,7 +91,6 @@ class AuthKeycloak(Resource):
         logging.warning(res.status_code)
         logging.warning("%s", res_json)
 
-        username = payload_dict["username"]
         logging.warning("Got username %s", username)
 
         user = fetch_keycloak_user_by_username(username=username)
