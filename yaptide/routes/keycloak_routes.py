@@ -15,21 +15,25 @@ from yaptide.persistence.models import KeycloakUserModel
 from yaptide.routes.utils.response_templates import (error_internal_response,
                                                      yaptide_response)
 from yaptide.routes.utils.tokens import encode_auth_token
+from werkzeug.exceptions import Forbidden, Unauthorized
 
 ROOT_DIR = Path(__file__).parent.resolve()
 
 
-def check_user_based_on_keycloak_token(token: str) -> bool:
+def check_user_based_on_keycloak_token(token: str, username: str) -> str:
     """Checks if user can access the service"""
     if not token:
         logging.error("No token provided")
-        return False
+        raise Unauthorized(description="No token provided")
     keycloak_url = os.environ.get('KEYCLOAK_URL', 'https://sso.pre.plgrid.pl/auth/realms/PLGrid/protocol/openid-connect/certs')
     if not keycloak_url:
         logging.error("KEYCLOAK_URL not set")
-        return False
+        raise Forbidden(description="Service is not available")
     try:
         unverified_encoded_token = jwt.decode(token, options={"verify_signature": False})
+        if username != unverified_encoded_token["preferred_username"]:
+            logging.error("Username mismatch")
+            raise Forbidden(description="Username mismatch")
         res = requests.get(keycloak_url)
         jwks = res.json()
 
@@ -41,13 +45,16 @@ def check_user_based_on_keycloak_token(token: str) -> bool:
         kid = jwt.get_unverified_header(token)['kid']
         key = public_keys[kid]
 
-        verified_token = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'])
-        # TODO: check user privileges
+        _ = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'])
 
-    except Exception as e:  # skipcq: PYL-W0703
-        logging.error("Error while decoding token: %s", e)
-        return False
-    return True
+        return "yaptide_access"
+
+    except jwt.ExpiredSignatureError:
+        logging.error("Signature expired")
+        raise Forbidden(description="Signature expired")
+    except jwt.InvalidTokenError:
+        logging.error("Invalid token")
+        raise Forbidden(description="Invalid token")
 
 
 class AuthKeycloak(Resource):
@@ -72,8 +79,8 @@ class AuthKeycloak(Resource):
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         keycloak_token: str = request.headers.get('Authorization', '')
-        if not check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', '')):
-            return yaptide_response(message='Invalid or no token', code=401)
+
+        _ = check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''))
 
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={
