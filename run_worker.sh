@@ -24,6 +24,8 @@ fi
 
 # Copy fluka fake simulator from yaptide dir
 echo "Copying fluka fake simulator from yaptide dir"
+
+mkdir -p /simulators/fluka/bin
 cp ./yaptide/fake/rfluka /simulators/fluka/bin/rfluka
 chmod +x /simulators/fluka/bin/rfluka
 
