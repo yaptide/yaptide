@@ -24,7 +24,7 @@ def check_user_based_on_keycloak_token(token: str) -> bool:
     if not token:
         logging.error("No token provided")
         return False
-    keycloak_url = os.environ.get('KEYCLOAK_URL', '')
+    keycloak_url = os.environ.get('KEYCLOAK_URL', 'https://sso.pre.plgrid.pl/auth/realms/PLGrid/protocol/openid-connect/certs')
     if not keycloak_url:
         logging.error("KEYCLOAK_URL not set")
         return False
@@ -43,8 +43,8 @@ def check_user_based_on_keycloak_token(token: str) -> bool:
 
         verified_token = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'])
         # TODO: check user privileges
-    
-    except Exception as e:
+
+    except Exception as e:  # skipcq: PYL-W0703
         logging.error("Error while decoding token: %s", e)
         return False
     return True
@@ -72,7 +72,7 @@ class AuthKeycloak(Resource):
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         keycloak_token: str = request.headers.get('Authorization', '')
-        if check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', '')):
+        if not check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', '')):
             return yaptide_response(message='Invalid or no token', code=401)
 
         session = requests.Session()
