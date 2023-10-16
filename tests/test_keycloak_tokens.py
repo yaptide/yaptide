@@ -10,7 +10,7 @@ from werkzeug.exceptions import Forbidden, Unauthorized
 
 @pytest.fixture(scope='module')
 def token() -> str:
-    """Username for user with invalid password"""
+    """Keycloak dummy token"""
     return "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwiaWF0IjoxNTE2MjM5MDIyLCJwcmVmZXJyZWRfdXNlcm5hbWUiOiJwbGd0ZXN0dXNlciIsInR5cCI6IkJlYXJlciIsImF6cCI6InlhcHRpZGUtc3RhZ2luZyIsImF1ZCI6WyJzb21lX2F1ZGllbmNlLnhEIiwiYW5vdGhlcl9hdWRpZW5jZS54RCJdfQ.koeS9Xu5ueOQ282TANB2jKjIUxo9vZXioDpMUgmv9G8"
 
 
