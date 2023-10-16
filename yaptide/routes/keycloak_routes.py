@@ -25,10 +25,12 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> str:
     if not token:
         logging.error("No token provided")
         raise Unauthorized(description="No token provided")
-    keycloak_url = os.environ.get('KEYCLOAK_URL', 'https://sso.pre.plgrid.pl/auth/realms/PLGrid/protocol/openid-connect/certs')
-    if not keycloak_url:
-        logging.error("KEYCLOAK_URL not set")
+    keycloak_base_url = os.environ.get('KEYCLOAK_BASE_URL', '')
+    keycloak_realm = os.environ.get('KEYCLOAK_REALM', '')
+    if not keycloak_base_url or not keycloak_realm:
+        logging.error("Keycloak env variables not set")
         raise Forbidden(description="Service is not available")
+    keycloak_url = f"{keycloak_base_url}/auth/realms/{keycloak_realm}/protocol/openid-connect/certs"
     try:
         unverified_encoded_token = jwt.decode(token, options={"verify_signature": False})
         if username != unverified_encoded_token["preferred_username"]:
