@@ -1,5 +1,3 @@
-import jwt
-import json
 import pytest
 import os
 from unittest.mock import patch
