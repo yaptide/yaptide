@@ -79,13 +79,13 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
 
     class UpdateFlukaRandomSeed(Protocol):
         """Protocol for updating random seed in fluka input file"""
+
         def __call__(self, file_path: str, rng_seed: int) -> None:
             """Updates random seed in fluka input file"""
-            pass
 
     random_seed = int(task_id.split("_")[-1])
     # propably should be protected instead of private
-    update_fulka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file
+    update_fulka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
     update_fulka_function(str(input_file.resolve()), random_seed)
 
     command_as_list = str(settings).split()
