@@ -47,7 +47,7 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> str:
         kid = jwt.get_unverified_header(token)['kid']
         key = public_keys[kid]
 
-        _ = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'])
+        _ = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'], options={"verify_signature": True})
 
         return "yaptide_access"
 
