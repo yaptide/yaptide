@@ -2,9 +2,11 @@ import logging
 import os
 from pathlib import Path
 
-import requests
 from flask import request
 from flask_restful import Resource
+import json
+import jwt
+import requests
 
 from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_keycloak_user_by_username,
@@ -13,8 +15,61 @@ from yaptide.persistence.models import KeycloakUserModel
 from yaptide.routes.utils.response_templates import (error_internal_response,
                                                      yaptide_response)
 from yaptide.routes.utils.tokens import encode_auth_token
+from werkzeug.exceptions import Forbidden, Unauthorized
 
 ROOT_DIR = Path(__file__).parent.resolve()
+
+
+def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
+    """Checks if user can access the service, returns True if user has acess"""
+    if not token:
+        logging.error("No token provided")
+        raise Unauthorized(description="No token provided")
+    keycloak_base_url = os.environ.get('KEYCLOAK_BASE_URL', '')
+    keycloak_realm = os.environ.get('KEYCLOAK_REALM', '')
+    if not keycloak_base_url or not keycloak_realm:
+        logging.error("Keycloak env variables not set")
+        raise Forbidden(description="Service is not available")
+    keycloak_full_url = f"{keycloak_base_url}/auth/realms/{keycloak_realm}/protocol/openid-connect/certs"
+    try:
+        # first lets try to decode token without verifying signature
+        unverified_encoded_token = jwt.decode(token, options={"verify_signature": False})
+        # very crude way to check by username comparison
+        # we will later update this place by checking if use has access to our yaptite platform
+        if username != unverified_encoded_token["preferred_username"]:
+            logging.error("Username mismatch")
+            raise Forbidden(description="Username mismatch")
+
+        # ask keycloak for public keys
+        res = requests.get(keycloak_full_url)
+        jwks = res.json()
+
+        # get public key for our token, based on kid
+        public_keys = {}
+        for jwk in jwks['keys']:
+            kid = jwk['kid']
+            public_keys[kid] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
+        kid = jwt.get_unverified_header(token)['kid']
+        key = public_keys[kid]
+
+        # now we can verify signature of the token
+        _ = jwt.decode(token,
+                       key=key,
+                       audience=unverified_encoded_token["aud"],
+                       algorithms=['RS256'],
+                       options={"verify_signature": True})
+
+        return True
+
+    except jwt.ExpiredSignatureError as e:
+        logging.error("Signature expired: %s", e)
+        raise Forbidden(description="Signature expired")
+    except jwt.InvalidTokenError as e:
+        logging.error("Invalid token: %s", e)
+        raise Forbidden(description="Invalid token")
+    except requests.exceptions.ConnectionError as e:
+        logging.error("Unable to connect to keycloak: %s", e)
+        raise Forbidden(description="Service is not available")
 
 
 class AuthKeycloak(Resource):
@@ -38,9 +93,10 @@ class AuthKeycloak(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
+        username = payload_dict["username"]
         keycloak_token: str = request.headers.get('Authorization', '')
-        if not keycloak_token:
-            return yaptide_response(message='No keycloak token provided', code=401)
+
+        check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
 
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={
@@ -50,7 +106,6 @@ class AuthKeycloak(Resource):
         logging.warning(res.status_code)
         logging.warning("%s", res_json)
 
-        username = payload_dict["username"]
         logging.warning("Got username %s", username)
 
         user = fetch_keycloak_user_by_username(username=username)

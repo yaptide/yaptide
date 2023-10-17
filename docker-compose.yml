@@ -16,6 +16,8 @@ services:
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
             - FLOWER_BASIC_AUTH=admin:password
             - CERT_AUTH_URL=${CERT_AUTH_URL-""}
+            - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL-""}
+            - KEYCLOAK_REALM=${KEYCLOAK_REALM-""}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL-""}
         depends_on:
             - redis

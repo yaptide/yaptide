@@ -24,7 +24,7 @@ def requires_auth(is_refresh: bool = False):
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")
             if is_refresh:
-                raise Forbidden(description="Log in again")
-            raise Forbidden(description="Refresh access token")
+                raise Forbidden(description=f"Log in again. {resp}")
+            raise Forbidden(description=f"Refresh access token. {resp}")
         return wrapper
     return decorator
