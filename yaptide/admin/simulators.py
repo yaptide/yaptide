@@ -43,6 +43,8 @@ topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
 topas_key = os.getenv('S3_TOPAS_KEY')
 topas_version = os.getenv('S3_TOPAS_VERSION')
 geant_bucket_name = os.getenv('S3_GEANT_BUCKET')
+fluka_bucket = os.getenv('S3_FLUKA_BUCKET')
+fluka_key = os.getenv('S3_FLUKA_KEY')
 
 
 @click.group()
@@ -113,6 +115,18 @@ def install_simulator(sim_name: SimulatorType, installation_path: Path) -> bool:
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
             download_status = download_topas_from_s3(path=installation_path)
+        else:
+            click.echo('Cannot download from S3 bucket, missing environment variables')
+            logging.info("Cannot download from S3 bucket, missing environment variables")
+            return False
+    elif sim_name == SimulatorType.fluka:
+        click.echo(f'Installing Fluka into {installation_path}')
+        logging.info("Installing Fluka into %s", installation_path)
+        installation_path.mkdir(exist_ok=True, parents=True)
+        if all([endpoint, access_key, secret_key]):
+            click.echo('Downloading from S3 bucket')
+            logging.info("Downloading from S3 bucket")
+            download_status = download_fluka_from_s3(shieldhit_path=installation_path)
         else:
             click.echo('Cannot download from S3 bucket, missing environment variables')
             logging.info("Cannot download from S3 bucket, missing environment variables")
@@ -341,6 +355,54 @@ def download_topas_from_s3(path: Path,
         file_contents.extractall(path=geant_files_path)
     logging.info("Installed Geant4 files into %s", geant_files_path)
     click.echo(f"Installed Geant4 files into {geant_files_path}")
+    return True
+
+def download_fluka_from_s3(path: Path,
+                           bucket: str = fluka_bucket,
+                           key: str = fluka_key
+                           ) -> bool:
+    """ Download Fluka from S3 bucket """
+    s3_client = boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint
+    )
+
+    # Check if bucket name is valid
+    if not bucket:
+        click.echo("Bucket name is empty", err=True)
+        return False
+
+    # Check if key is valid
+    if not key:
+        click.echo("Key is empty", err=True)
+        return False
+
+    # Check if bucket exists
+    try:
+        s3_client.head_bucket(Bucket=bucket)
+    except ClientError as e:
+        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
+        return False
+
+    # Check if key exists
+    try:
+        s3_client.head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
+        return False
+
+    # Download Fluka tgz
+    topas_temp_file = tempfile.NamedTemporaryFile()
+    try:
+        with tempfile.NamedTemporaryFile() as temp_file:
+            click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
+            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+    except ClientError as e:
+        click.echo(f"S3 download failed with client error: {e}", err=True)
+        return False
+
     return True
 
 
