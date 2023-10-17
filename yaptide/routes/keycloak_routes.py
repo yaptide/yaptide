@@ -20,8 +20,8 @@ from werkzeug.exceptions import Forbidden, Unauthorized
 ROOT_DIR = Path(__file__).parent.resolve()
 
 
-def check_user_based_on_keycloak_token(token: str, username: str) -> str:
-    """Checks if user can access the service"""
+def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
+    """Checks if user can access the service, returns True if user has acess"""
     if not token:
         logging.error("No token provided")
         raise Unauthorized(description="No token provided")
@@ -59,14 +59,17 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> str:
                        algorithms=['RS256'], 
                        options={"verify_signature": True})
 
-        return "yaptide_access"
+        return True
 
-    except jwt.ExpiredSignatureError:
-        logging.error("Signature expired")
+    except jwt.ExpiredSignatureError as e:
+        logging.error("Signature expired: %s", e)
         raise Forbidden(description="Signature expired")
-    except jwt.InvalidTokenError:
-        logging.error("Invalid token")
+    except jwt.InvalidTokenError as e:
+        logging.error("Invalid token: %s", e)
         raise Forbidden(description="Invalid token")
+    except requests.exceptions.ConnectionError as e:
+        logging.error("Unable to connect to keycloak: %s", e)
+        raise Forbidden(description="Service is not available")
 
 
 class AuthKeycloak(Resource):
@@ -93,7 +96,7 @@ class AuthKeycloak(Resource):
         username = payload_dict["username"]
         keycloak_token: str = request.headers.get('Authorization', '')
 
-        _ = check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
+        check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
 
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={
