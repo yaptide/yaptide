@@ -123,11 +123,6 @@ def install_simulator(sim_name: SimulatorType, installation_path: Path) -> bool:
         click.echo(f'Installing Fluka into {installation_path}')
         logging.info("Installing Fluka into %s", installation_path)
         installation_path.mkdir(exist_ok=True, parents=True)
-
-        click.echo(endpoint)
-        click.echo(access_key)
-        click.echo(secret_key)
-
         if all([endpoint, access_key, secret_key]):
             click.echo('Downloading from S3 bucket')
             logging.info("Downloading from S3 bucket")
