@@ -39,7 +39,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
 @celery_app.task()
 def install_simulators() -> bool:
     """Task responsible for installing simulators on the worker"""
-    result = install_simulator(SimulatorType.shieldhit)
+    result = install_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
     return result
 
 
