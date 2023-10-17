@@ -41,7 +41,7 @@ services:
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
             - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
-            - LOG_LEVEL_CELERY=INFO
+            - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
         depends_on:
             - redis
             - yaptide_flask
