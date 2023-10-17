@@ -119,11 +119,11 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
     logging.info("Fluka simulation for task %s finished", task_id)
 
     estimators_dict = {}
-    # files_pattern_pattern = str(dir_path / "*.bdo")
-    # estimators_list = frompattern(files_pattern_pattern)
-    # for estimator in estimators_list:
-    #     logging.debug("Appending estimator for %s", estimator.file_corename)
-    #     estimators_dict[estimator.file_corename] = estimator
+    files_pattern_pattern = str(dir_path / "*_fort.*")
+    estimators_list = frompattern(files_pattern_pattern)
+    for estimator in estimators_list:
+        logging.debug("Appending estimator for %s", estimator.file_corename)
+        estimators_dict[estimator.file_corename] = estimator
 
     return estimators_dict
 
