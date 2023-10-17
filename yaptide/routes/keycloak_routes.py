@@ -39,7 +39,7 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
         if username != unverified_encoded_token["preferred_username"]:
             logging.error("Username mismatch")
             raise Forbidden(description="Username mismatch")
-        
+
         # ask keycloak for public keys
         res = requests.get(keycloak_full_url)
         jwks = res.json()
@@ -53,10 +53,10 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
         key = public_keys[kid]
 
         # now we can verify signature of the token
-        _ = jwt.decode(token, 
-                       key=key, 
-                       audience=unverified_encoded_token["aud"], 
-                       algorithms=['RS256'], 
+        _ = jwt.decode(token,
+                       key=key,
+                       audience=unverified_encoded_token["aud"],
+                       algorithms=['RS256'],
                        options={"verify_signature": True})
 
         return True
