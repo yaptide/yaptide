@@ -30,24 +30,34 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> str:
     if not keycloak_base_url or not keycloak_realm:
         logging.error("Keycloak env variables not set")
         raise Forbidden(description="Service is not available")
-    keycloak_url = f"{keycloak_base_url}/auth/realms/{keycloak_realm}/protocol/openid-connect/certs"
+    keycloak_full_url = f"{keycloak_base_url}/auth/realms/{keycloak_realm}/protocol/openid-connect/certs"
     try:
+        # first lets try to decode token without verifying signature
         unverified_encoded_token = jwt.decode(token, options={"verify_signature": False})
+        # very crude way to check by username comparison
+        # we will later update this place by checking if use has access to our yaptite platform
         if username != unverified_encoded_token["preferred_username"]:
             logging.error("Username mismatch")
             raise Forbidden(description="Username mismatch")
-        res = requests.get(keycloak_url)
+        
+        # ask keycloak for public keys
+        res = requests.get(keycloak_full_url)
         jwks = res.json()
 
+        # get public key for our token, based on kid
         public_keys = {}
         for jwk in jwks['keys']:
             kid = jwk['kid']
             public_keys[kid] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
-
         kid = jwt.get_unverified_header(token)['kid']
         key = public_keys[kid]
 
-        _ = jwt.decode(token, key=key, audience=unverified_encoded_token["aud"], algorithms=['RS256'], options={"verify_signature": True})
+        # now we can verify signature of the token
+        _ = jwt.decode(token, 
+                       key=key, 
+                       audience=unverified_encoded_token["aud"], 
+                       algorithms=['RS256'], 
+                       options={"verify_signature": True})
 
         return "yaptide_access"
 
