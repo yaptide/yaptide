@@ -111,7 +111,7 @@ def run_single_simulation(self,
                                                   simulation_id,
                                                   task_id,
                                                   update_key,
-                                                  current_logging_level)
+                                                  logging_level=current_logging_level)
             logging.info("Started monitoring process for task %s", task_id)
         else:
             logging.info("No monitoring processes started for task %s", task_id)
