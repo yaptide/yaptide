@@ -175,7 +175,7 @@ def download_shieldhit_from_s3(
         shieldhit_path: Path,
         bucket: str = shieldhit_bucket,
         key: str = shieldhit_key,
-        ) -> bool:
+) -> bool:
     """Download shieldhit from S3 bucket"""
     s3_client = boto3.client(
         "s3",
@@ -183,38 +183,14 @@ def download_shieldhit_from_s3(
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
-    if not check_if_s3_connection_is_working(s3_client):
-        click.echo("S3 connection failed", err=True)
+
+    if not validate_connection_data(bucket, key, s3_client):
         return False
 
     destination_file_path = shieldhit_path / 'shieldhit'
     # append '.exe' to file name if working on Windows
     if platform.system() == 'Windows':
         destination_file_path = shieldhit_path / 'shieldhit.exe'
-
-    # Check if bucket name is valid
-    if not bucket:
-        click.echo("Bucket name is empty", err=True)
-        return False
-
-    # Check if key is valid
-    if not key:
-        click.echo("Key is empty", err=True)
-        return False
-
-    # Check if bucket exists
-    try:
-        s3_client.head_bucket(Bucket=bucket)
-    except ClientError as e:
-        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
-        return False
-
-    # Check if key exists
-    try:
-        s3_client.head_object(Bucket=bucket, Key=key)
-    except ClientError as e:
-        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
-        return False
 
     # Download file from S3 bucket
     try:
@@ -227,7 +203,7 @@ def download_shieldhit_from_s3(
                 click.echo("No password and salt provided, skipping decryption")
                 click.echo(f"Copying {temp_file.name} to {destination_file_path}")
                 shutil.copy2(temp_file.name, destination_file_path)
-            else:     # Decrypt downloaded file
+            else:  # Decrypt downloaded file
                 click.echo("Decrypting downloaded file")
                 shieldhit_binary_bytes = decrypt_file(temp_file.name, password, salt)
                 if not shieldhit_binary_bytes:
@@ -257,6 +233,9 @@ def download_topas_from_s3(path: Path,
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint
     )
+
+    if not validate_connection_data(bucket, key, s3_client):
+        return False
 
     # Download TOPAS tar
     topas_temp_file = tempfile.NamedTemporaryFile()
@@ -345,6 +324,7 @@ def download_topas_from_s3(path: Path,
     click.echo(f"Installed Geant4 files into {geant_files_path}")
     return True
 
+
 def download_fluka_from_s3(path: Path,
                            bucket: str = fluka_bucket,
                            key: str = fluka_key
@@ -357,28 +337,7 @@ def download_fluka_from_s3(path: Path,
         endpoint_url=endpoint
     )
 
-    # Check if bucket name is valid
-    if not bucket:
-        click.echo("Bucket name is empty", err=True)
-        return False
-
-    # Check if key is valid
-    if not key:
-        click.echo("Key is empty", err=True)
-        return False
-
-    # Check if bucket exists
-    try:
-        s3_client.head_bucket(Bucket=bucket)
-    except ClientError as e:
-        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
-        return False
-
-    # Check if key exists
-    try:
-        s3_client.head_object(Bucket=bucket, Key=key)
-    except ClientError as e:
-        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
+    if not validate_connection_data(bucket, key, s3_client):
         return False
 
     try:
@@ -400,7 +359,7 @@ def upload_file_to_s3(
         aws_secret_access_key: str = secret_key,
         encryption_password: str = password,
         encryption_salt: str = salt
-        ) -> bool:
+) -> bool:
     """Upload file to S3 bucket"""
     # Create S3 client
     s3_client = boto3.client(
@@ -454,6 +413,39 @@ def decrypt_file(file_path: Path, encryption_password: str = password, encryptio
         click.echo("Decryption failed - invalid token (password+salt)", err=True)
         return b''
     return decrypted
+
+
+def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
+
+    if not check_if_s3_connection_is_working(s3_client):
+        click.echo("S3 connection failed", err=True)
+        return False
+
+    # Check if bucket name is valid
+    if not bucket:
+        click.echo("Bucket name is empty", err=True)
+        return False
+
+    # Check if key is valid
+    if not key:
+        click.echo("Key is empty", err=True)
+        return False
+
+    # Check if bucket exists
+    try:
+        s3_client.head_bucket(Bucket=bucket)
+    except ClientError as e:
+        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
+        return False
+
+    # Check if key exists
+    try:
+        s3_client.head_object(Bucket=bucket, Key=key)
+    except ClientError as e:
+        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
+        return False
+
+    return True
 
 
 def derive_key(encryption_password: str = password, encryption_salt: str = salt) -> bytes:
@@ -513,14 +505,14 @@ def upload(**kwargs):
         click.echo('File does not exist')
         return
     if upload_file_to_s3(
-        bucket=kwargs['bucket'],
-        file_path=Path(kwargs['file']),
-        endpoint_url=kwargs['endpoint'],
-        aws_access_key_id=kwargs['access_key'],
-        aws_secret_access_key=kwargs['secret_key'],
-        encryption_password=kwargs['password'],
-        encryption_salt=kwargs['salt']
-            ):
+            bucket=kwargs['bucket'],
+            file_path=Path(kwargs['file']),
+            endpoint_url=kwargs['endpoint'],
+            aws_access_key_id=kwargs['access_key'],
+            aws_secret_access_key=kwargs['secret_key'],
+            encryption_password=kwargs['password'],
+            encryption_salt=kwargs['salt']
+    ):
         click.echo('File uploaded successfully')
 
 
