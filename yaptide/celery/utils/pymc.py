@@ -85,8 +85,8 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
 
     random_seed = int(task_id.split("_")[-1])
     # propably should be protected instead of private
-    update_fulka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
-    update_fulka_function(str(input_file.resolve()), random_seed)
+    update_fluka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
+    update_fluka_function(str(input_file.resolve()), random_seed)
 
     command_as_list = str(settings).split()
 
