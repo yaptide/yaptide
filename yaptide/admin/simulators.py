@@ -94,46 +94,34 @@ def install_simulator(sim_name: SimulatorType, installation_path: Path) -> bool:
     """Add simulator to database"""
     click.echo(f'Installation for simulator: {sim_name.name} started')
     logging.info("Installation for simulator: %s started", sim_name.name)
-    if sim_name == SimulatorType.shieldhit:
-        click.echo(f'Installing shieldhit into {installation_path}')
-        logging.info("Installing shieldhit into %s", installation_path)
-        installation_path.mkdir(exist_ok=True, parents=True)
-        download_status = False
-        if all([endpoint, access_key, secret_key]):
-            click.echo('Downloading from S3 bucket')
-            logging.info("Downloading from S3 bucket")
+
+    click.echo(f'Installing {sim_name.name} into {installation_path}')
+    logging.info("Installing %s into %s", sim_name.name, installation_path)
+    installation_path.mkdir(exist_ok=True, parents=True)
+
+    download_status = False
+    if all([endpoint, access_key, secret_key]):
+        click.echo('Downloading from S3 bucket')
+        logging.info("Downloading from S3 bucket")
+
+        if sim_name == SimulatorType.shieldhit:
             download_status = download_shieldhit_from_s3(shieldhit_path=installation_path)
-        if not download_status:
-            click.echo('Downloading demo version from shieldhit.org')
-            logging.info("Downloading demo version from shieldhit.org")
-            download_status = download_shieldhit_demo_version(shieldhit_path=installation_path)
-    elif sim_name == SimulatorType.topas:
-        click.echo(f'Installing TOPAS into {installation_path}')
-        logging.info("Installing TOPAS into %s", installation_path)
-        installation_path.mkdir(exist_ok=True, parents=True)
-        if all([endpoint, access_key, secret_key]):
-            click.echo('Downloading from S3 bucket')
-            logging.info("Downloading from S3 bucket")
+            if not download_status:
+                click.echo('Downloading demo version from shieldhit.org')
+                logging.info("Downloading demo version from shieldhit.org")
+                download_status = download_shieldhit_demo_version(shieldhit_path=installation_path)
+        elif sim_name == SimulatorType.topas:
             download_status = download_topas_from_s3(path=installation_path)
-        else:
-            click.echo('Cannot download from S3 bucket, missing environment variables')
-            logging.info("Cannot download from S3 bucket, missing environment variables")
-            return False
-    elif sim_name == SimulatorType.fluka:
-        click.echo(f'Installing Fluka into {installation_path}')
-        logging.info("Installing Fluka into %s", installation_path)
-        installation_path.mkdir(exist_ok=True, parents=True)
-        if all([endpoint, access_key, secret_key]):
-            click.echo('Downloading from S3 bucket')
-            logging.info("Downloading from S3 bucket")
+        elif sim_name == SimulatorType.fluka:
             download_status = download_fluka_from_s3(path=installation_path)
         else:
-            click.echo('Cannot download from S3 bucket, missing environment variables')
-            logging.info("Cannot download from S3 bucket, missing environment variables")
+            click.echo('Not implemented')
             return False
     else:
-        click.echo('Not implemented')
+        click.echo('Cannot download from S3 bucket, missing environment variables')
+        logging.info("Cannot download from S3 bucket, missing environment variables")
         return False
+
     return download_status
 
 
