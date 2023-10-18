@@ -114,7 +114,7 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
         # If the command exits with a non-zero status
         logging.error("Command Error: %s\nExecuted Command: %s", e.stderr, " ".join(command_as_list))
     except Exception as e:  # skipcq: PYL-W0703
-        logging.error("Exception while running SHIELDHIT: %s", e)
+        logging.error("Exception while running Fluka: %s", e)
 
     logging.info("Fluka simulation for task %s finished", task_id)
 
@@ -122,7 +122,9 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
     files_pattern_pattern = str(dir_path / "*_fort.*")
     estimators_list = frompattern(files_pattern_pattern)
     for estimator in estimators_list:
-        logging.debug("Appending estimator for %s", estimator.file_corename)
+        for i, page in enumerate(estimator.pages):
+            page.page_number = i
+
         estimators_dict[estimator.file_corename] = estimator
 
     return estimators_dict
