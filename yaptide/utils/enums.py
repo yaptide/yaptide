@@ -47,6 +47,81 @@ class EntityState(Enum):
     """
 
 
+class JobState(Enum):
+    """Job state types"""
+
+    PREPARING = "PREPARING"
+    """
+    Job is added to the database and is waiting for being queued.
+    """
+    SIMULATION_QUEUED = "SIMULATION_QUEUED"
+    """
+    Main calculations are queued.
+    """
+    SIMULATION_RUNNING = "SIMULATION_RUNNING"
+    """
+    Main calculations are running.
+    """
+    MERGING_QUEUED = "MERGING_QUEUED"
+    """
+    Merging of the results is queued.
+    """
+    MERGING_RUNNING = "MERGING_RUNNING"
+    """
+    Merging of the results is running.
+    """
+    FAILED = "FAILED"
+    """
+    Job is failed.
+    Job in this state cannot be canceled.
+    """
+    COMPLETED = "COMPLETED"
+    """
+    Job is completed.
+    Job in this state cannot be canceled.
+    """
+    CANCELED = "CANCELED"
+    """
+    Job is canceled.
+    Job in this state cannot be canceled.
+    """
+
+
+class TaskState(Enum):
+    """Task state types"""
+    QUEUED = "QUEUED"
+    """
+    Task is queued.
+    """
+    INITIALIZING = "INITIALIZING"
+    """
+    Task is allocating memory and other resources.
+    """
+    RUNNING = "RUNNING"
+    """
+    Task is running.
+    """
+    FINALIZING = "FINALIZING"
+    """
+    Task is clearing memory and other resources.
+    """
+    FAILED = "FAILED"
+    """
+    Task is failed.
+    Task in this state cannot be canceled.
+    """
+    COMPLETED = "COMPLETED"
+    """
+    Task is completed.
+    Task in this state cannot be canceled.
+    """
+    CANCELED = "CANCELED"
+    """
+    Task is canceled.
+    Task in this state cannot be canceled.
+    """
+
+
 class InputType(Enum):
     """Input type specification"""
 
