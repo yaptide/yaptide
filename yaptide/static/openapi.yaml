@@ -410,7 +410,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
   /jobs/direct:
     post:
-      summary: Dedicated for jobs run directly. Allows for submitting jobs
+      summary: Allows for submitting jobs to run directly on server.
       requestBody:
         required: true
         content:
@@ -456,7 +456,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      summary: Dedicated for jobs run directly. Allows for getting job status and additional job's info.
+      summary: Allows for getting job status and additional job's info. Available only for jobs run directly.
       parameters:
         - in: query
           name: job_id
@@ -517,7 +517,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     delete:
-      summary: Dedicated for jobs run directly. Allows for job cancelation.
+      summary: Allows for job cancelation. Available only for jobs run directly.
       parameters:
         - in: query
           name: job_id
@@ -568,7 +568,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
   /jobs/batch:
     post:
-      summary: Dedicated for jobs run on SLURM. Allows for submitting jobs
+      summary: Allows for submitting jobs to run on SLURM.
       description: This endpoint can be used only by keycloak authenticated users
       requestBody:
         required: true
@@ -632,7 +632,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      summary: Dedicated for jobs run on SLURM. Allows for getting job status and additional job's info.
+      summary: Allows for getting job status and additional job's info. Available only for jobs run on SLURM.
       description: This endpoint can be used only by keycloak authenticated users
       parameters:
         - in: query
@@ -710,7 +710,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     delete:
-      summary: Dedicated for jobs run on SLURM. Allows for job cancelation.
+      summary: Allows for job cancelation. Available only for jobs run on SLURM.
       description: This endpoint can be used only by keycloak authenticated users
       parameters:
         - in: query
