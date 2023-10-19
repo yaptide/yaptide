@@ -348,7 +348,8 @@ paths:
 # Jobs Routes
   /jobs:
     get:
-      summary: Allows for getting job status.
+      summary: Allows for getting job status from database.
+      description: Endpoint designed for getting periodical job status from database.
       parameters:
         - in: query
           name: job_id
@@ -457,6 +458,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
     get:
       summary: Allows for getting job status and additional job's info. Available only for jobs run directly.
+      description: At current stage of development it does not provide any addtional features than GET method from '/jobs' route - it does the same thing but it is available only for jobs run directly.
       parameters:
         - in: query
           name: job_id
@@ -633,7 +635,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
     get:
       summary: Allows for getting job status and additional job's info. Available only for jobs run on SLURM.
-      description: This endpoint can be used only by keycloak authenticated users
+      description: This endpoint can be used only by keycloak authenticated users. It is recommended not to use it very often because of the high load it puts on the SLURM system.
       parameters:
         - in: query
           name: job_id
