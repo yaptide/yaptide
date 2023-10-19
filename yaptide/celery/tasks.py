@@ -39,7 +39,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
 @celery_app.task()
 def install_simulators() -> bool:
     """Task responsible for installing simulators on the worker"""
-    result = install_simulator(SimulatorType.shieldhit)
+    result = install_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
     return result
 
 
@@ -110,7 +110,8 @@ def run_single_simulation(self,
                                                   simulation_id,
                                                   task_id,
                                                   update_key,
-                                                  current_logging_level)
+                                                  logging_level=current_logging_level)
+
             logging.info("Started monitoring process for task %s", task_id)
         else:
             logging.info("No monitoring processes started for task %s", task_id)

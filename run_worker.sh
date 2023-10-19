@@ -22,4 +22,4 @@ if [ -z "$S3_TOPAS_BUCKET" ] || [ -z "$S3_TOPAS_KEY" ] || [ -z "$S3_TOPAS_VERSIO
         ./yaptide/admin/simulators.py install --name topas --path /simulators
 fi
 
-celery --app yaptide.celery.worker worker -E --loglevel=info -P eventlet --hostname yaptide-worker
+celery --app yaptide.celery.worker worker -E --loglevel="$LOG_LEVEL_ROOT" -P eventlet --hostname yaptide-worker

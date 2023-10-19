@@ -16,6 +16,7 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
         "update_key": update_key,
         "update_dict": update_dict
     }
+    logging.debug("Sending update %s to the backend %s", dict_to_send, flask_url)
     res: requests.Response = requests.Session().post(url=f"{flask_url}/tasks", json=dict_to_send)
     if res.status_code != 202:
         logging.warning("Update_dict: %s", update_dict)
