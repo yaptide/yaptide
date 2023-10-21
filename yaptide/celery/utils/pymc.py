@@ -156,7 +156,7 @@ def read_file(filepath: Path,
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": EntityState.RUNNING.value
             }
-            logging.debug("Sending update for task %s, requested primaries %d, simulated primaries 0", task_id, requested_primaries)
+            logging.debug("Sending update for task %s, requested primaries %d", task_id, requested_primaries)
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(TIMEOUT_MATCH, line):

@@ -6,8 +6,6 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-import eventlet
-
 from yaptide.admin.simulators import SimulatorType, install_simulator
 from yaptide.celery.utils.pymc import (average_estimators, read_file,
                                        run_shieldhit)
@@ -108,11 +106,11 @@ def run_single_simulation(self,
                 current_logging_level = logging.getLogger().getEffectiveLevel()
 
                 watcher_future = executor.submit(read_file,
-                                                         path_to_monitor,
-                                                         simulation_id,
-                                                         task_id,
-                                                         update_key,
-                                                         logging_level=current_logging_level)
+                                                 path_to_monitor,
+                                                 simulation_id,
+                                                 task_id,
+                                                 update_key,
+                                                 logging_level=current_logging_level)
 
                 logging.info("Started monitoring process for task %s", task_id)
             else:
