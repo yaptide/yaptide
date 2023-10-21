@@ -107,9 +107,6 @@ def run_single_simulation(self,
 
                 current_logging_level = logging.getLogger().getEffectiveLevel()
 
-                print("current_logging_level", current_logging_level)
-                eventlet.monkey_patch(all=False)
-
                 watcher_future = executor.submit(read_file,
                                                          path_to_monitor,
                                                          simulation_id,
