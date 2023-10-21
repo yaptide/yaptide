@@ -88,39 +88,44 @@ class AuthKeycloak(Resource):
             return yaptide_response(message="No JSON in body", code=400)
 
         required_keys = {"username"}
-
         if required_keys != required_keys.intersection(set(payload_dict.keys())):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         username = payload_dict["username"]
+        logging.debug("Authenticating for user: %s", username)
         keycloak_token: str = request.headers.get('Authorization', '')
 
+        # check if user has access to our service, if not throw an exception here
         check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
 
+        # ask cert auth service for cert and private key
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={
             'Authorization': keycloak_token
         })
         res_json: dict = res.json()
-        logging.warning(res.status_code)
-        logging.warning("%s", res_json)
+        logging.debug("auth cert service response code: %d", res.status_code)
+        logging.debug("auth cert service response mesg: %s", res_json)
 
-        logging.warning("Got username %s", username)
 
+        # check if user exists in our database, if not create new user
         user = fetch_keycloak_user_by_username(username=username)
         if not user:
+            # user not existing, adding user together with cert and private key
             user = KeycloakUserModel(username=username,
                                      cert=res_json["cert"],
                                      private_key=res_json["private"])
 
             add_object_to_db(user)
         else:
+            # user existing, updating cert and private key
             user.cert = res_json["cert"]
             user.private_key = res_json["private"]
             make_commit_to_db()
 
         try:
+            # prepare our own tokens
             access_token, access_exp = encode_auth_token(user_id=user.id,
                                                          is_keycloak=True)
 
