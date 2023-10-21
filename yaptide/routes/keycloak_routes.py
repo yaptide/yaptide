@@ -108,7 +108,6 @@ class AuthKeycloak(Resource):
         logging.debug("auth cert service response code: %d", res.status_code)
         logging.debug("auth cert service response mesg: %s", res_json)
 
-
         # check if user exists in our database, if not create new user
         user = fetch_keycloak_user_by_username(username=username)
         if not user:
