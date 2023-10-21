@@ -73,13 +73,13 @@ def test_run_simulation_with_flask(celery_app,
             # check if during execution we have non-empty start_time  and empty end_time
             resp = client.get("/user/simulations")
             assert resp.status_code == 200  # skipcq: BAN-B101
-            data = json.loads(resp.data.decode())
-            assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
-            assert len(data["simulations"]) == 1
-            start_time = data["simulations"][0]["start_time"]
+            simulations_data = json.loads(resp.data.decode())
+            assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(simulations_data.keys())
+            assert len(simulations_data["simulations"]) == 1
+            start_time = simulations_data["simulations"][0]["start_time"]
             logging.info("start_time: %s", start_time)
             assert start_time is not None
-            end_time = data["simulations"][0]["end_time"]
+            end_time = simulations_data["simulations"][0]["end_time"]
             logging.info("end_time: %s", end_time)
             assert end_time is None
 

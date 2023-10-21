@@ -127,11 +127,12 @@ def read_file(filepath: Path,
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
-            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line.rstrip(), filepath, task_id)
             splitted = line.split()
             simulated_primaries = int(splitted[3])
             if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
                     and requested_primaries > simulated_primaries):
+                logging.debug("Skipping update for task %s", task_id)
                 continue
             update_time = utc_now.timestamp()
             up_dict = {
@@ -140,6 +141,7 @@ def read_file(filepath: Path,
                 + int(splitted[7]) * 60
                 + int(splitted[5]) * 3600
             }
+            logging.debug("Sending update for task %s, simulated primaries %d", task_id, simulated_primaries)
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(REQUESTED_MATCH, line):
@@ -154,6 +156,7 @@ def read_file(filepath: Path,
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": EntityState.RUNNING.value
             }
+            logging.debug("Sending update for task %s, requested primaries %d, simulated primaries 0", task_id, requested_primaries)
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(TIMEOUT_MATCH, line):
@@ -175,5 +178,5 @@ def read_file(filepath: Path,
         "end_time": utc_now.isoformat(sep=" "),
         "task_state": EntityState.COMPLETED.value
     }
-    logging.info("Sending final update for task %s", task_id)
+    logging.info("Sending final update for task %s, simulated primaries %d", task_id, simulated_primaries)
     send_task_update(simulation_id, task_id, update_key, up_dict)

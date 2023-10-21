@@ -118,7 +118,7 @@ def run_single_simulation(self,
             else:
                 logging.info("No monitoring processes started for task %s", task_id)
 
-            logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
+            logging.info("Running SHIELD-HIT12A simulation in %s", tmp_dir_path)
             estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
             logging.info("Simulation finished for task %s", task_id)
 
