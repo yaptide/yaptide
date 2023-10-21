@@ -97,6 +97,19 @@ def read_file(filepath: Path,
               logging_level: int = logging.WARNING):
     """Monitors log file of certain task"""
     logging.getLogger(__name__).setLevel(logging_level)
+    # Create a formatter with the desired format
+    # formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s [%(pathname)s:%(lineno)d]')
+    # # Create a stream handler and set the formatter
+    # handler = logging.StreamHandler()
+    # handler.setFormatter(formatter)
+
+    # # Add the handler to the root logger
+    # logging.root.addHandler(handler)
+
+    print("log level: ", logging.getLogger(__name__).getEffectiveLevel())
+    print("log level: ", logging.getLogger().getEffectiveLevel())
+    print("log level: ", logging_level)
+
     logfile = None
     update_time = 0
     logging.info("Started monitoring, simulation id: %d, task id: %s", simulation_id, task_id)
