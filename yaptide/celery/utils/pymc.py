@@ -186,6 +186,7 @@ def read_file(filepath: Path,
         }
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
+    logging.debug("Log file for task %s found", task_id)
 
     # create generator which waits for new lines in log file
     # if no new line appears in timeout_wait_for_line seconds, generator stops
@@ -195,6 +196,7 @@ def read_file(filepath: Path,
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
+            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             splitted = line.split()
             simulated_primaries = int(splitted[3])
             if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
@@ -210,6 +212,7 @@ def read_file(filepath: Path,
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(REQUESTED_MATCH, line):
+            logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             # found a line with requested primaries, update database
             # task is in RUNNING state
             splitted = line.split(": ")
@@ -232,6 +235,7 @@ def read_file(filepath: Path,
             return
 
         elif re.search(COMPLETE_MATCH, line):
+            logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             break
 
     logging.info("Parsing log file for task %s finished", task_id)
