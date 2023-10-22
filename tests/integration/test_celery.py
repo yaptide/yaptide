@@ -10,6 +10,7 @@ pytest tests/integration/test_celery.py -o log_cli=1 -o log_cli_level=DEBUG -s
 import copy
 import logging
 import platform
+import numpy as np
 import pytest  # skipcq: PY-W2000
 
 from celery import group, chord
@@ -74,6 +75,29 @@ def test_celery_run_simulation_for_shieldhit(celery_app,
     assert 'estimators' in result.keys()
 
 
+@pytest.fixture(scope='module')
+def expected_fluka_mock_results() -> dict:
+    """Return expected result"""
+    yield {
+        "21": {
+            "4x4": [
+                [0., 0., 0., 0.],
+                [0., 0.00146468, 0.00169978, 0.],
+                [0.00090805, 0., 0., 0.],
+                [0, 0., 0., 0.]
+            ]
+        },
+        "22": {
+            "4x4": [
+                [0.00047575, 0., 0., 0.],
+                [0., 0.00188021, 0.00166488, 0.],
+                [0., 0.0010242, 0.00105254, 0.],
+                [0., 0., 0., 0.]
+            ]
+        }
+    }
+
+
 @pytest.mark.xfail(condition=platform.system() == "Windows", reason="FLUKA mock is not supported on Windows")
 @pytest.mark.usefixtures("live_server")
 def test_celery_run_simulation_for_fluka_mock(celery_app,
@@ -81,7 +105,8 @@ def test_celery_run_simulation_for_fluka_mock(celery_app,
                                payload_editor_dict_data_fluka: dict,
                                client,
                                add_simulator_mocks_to_path_variable,
-                               modify_tmpdir):
+                               modify_tmpdir,
+                               expected_fluka_mock_results):
     """Test run_simulation task with FLUKA mock binary"""
     # lets make a local copy of the payload dict, so we don't modify the original one
     payload_dict = copy.deepcopy(payload_editor_dict_data_fluka)
@@ -107,5 +132,23 @@ def test_celery_run_simulation_for_fluka_mock(celery_app,
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
     logging.info("run_simulation task finished")
-    assert 'logfiles' not in result.keys()
-    assert 'estimators' in result.keys()
+    assert 'logfiles' not in result
+    assert 'estimators' in result
+    estimators = result['estimators']
+    assert len(estimators) == 2
+    sorted_estimators = sorted(estimators, key=lambda x: x['name'])
+    estimator_21 = sorted_estimators[0]
+    estimator_22 = sorted_estimators[1]
+    assert estimator_21['name'] == '21'
+    assert estimator_22['name'] == '22'
+    for estimator in sorted_estimators:
+        name = estimator['metadata']['file_corename']
+        assert len(estimator['pages']) == 1
+        __verify_fluka_file(estimator['pages'][0], expected_fluka_mock_results[name]['4x4'])
+
+
+def __verify_fluka_file(actual_page: dict, expected_page: dict):
+    """Compares content of generated fluka file with expected values"""
+    expected = list(np.around(np.swapaxes(np.array(expected_page), 0, 1).flatten(), 4))
+    result = list(np.around(np.flip(np.array(actual_page['data']['values']), []).flatten(), 4))
+    assert expected == result, "Fluka data does not match expected values"
