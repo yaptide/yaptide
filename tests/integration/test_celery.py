@@ -61,6 +61,7 @@ def test_celery_run_simulation_for_shieldhit(celery_app,
             files_dict=files_dict,
             task_id=str(i+1),
             keep_tmp_files=True,  # lets pytest to clean up the tmp files, last 3 directories will be kept
+            sim_type='shieldhit'
         ) for i in range(payload_dict["ntasks"])
     ])
         
