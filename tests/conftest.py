@@ -1,3 +1,4 @@
+import copy
 import json
 import logging
 from pathlib import Path
@@ -54,6 +55,22 @@ def payload_editor_dict_data(payload_editor_dict_path: Path) -> Generator[dict, 
     with open(payload_editor_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     yield json_data
+
+
+@pytest.fixture(scope='session')
+def payload_editor_dict_data_fluka(payload_editor_dict_path: Path) -> Generator[dict, None, None]:
+    """Reads payload JSON file and returns its contents as dictionary
+
+    It also sets sim_type to fluka.
+    """
+    json_data = {}
+    if not payload_editor_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
+    with open(payload_editor_dict_path, 'r') as file_handle:
+        json_data = json.load(file_handle)
+    payload_dict = copy.deepcopy(json_data)
+    payload_dict['sim_type'] = 'fluka'
+    yield payload_dict
 
 
 @pytest.fixture(scope='session')

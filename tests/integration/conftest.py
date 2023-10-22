@@ -66,7 +66,7 @@ def yaptide_bin_dir() -> Generator[Path, None, None]:
 
 
 @pytest.fixture(scope='function')
-def add_simulators_to_path_variable(yaptide_bin_dir : Path):
+def add_simulators_to_path_variable(yaptide_bin_dir: Path):
     """Adds bin directory with simulators executable file to PATH"""
     logging.info("Adding %s to PATH", yaptide_bin_dir)
 
@@ -75,6 +75,31 @@ def add_simulators_to_path_variable(yaptide_bin_dir : Path):
 
     # Update the PATH with the new directory
     os.environ['PATH'] = f'{yaptide_bin_dir}' + os.pathsep + os.environ['PATH']
+
+    # Yield control back to the test
+    yield
+
+    # Restore the original PATH
+    os.environ['PATH'] = original_path
+
+
+@pytest.fixture(scope='session')
+def yaptide_fake_dir() -> Generator[Path, None, None]:
+    """directory with mocks of simulator executable files"""
+    project_main_dir = Path(__file__).resolve().parent.parent.parent
+    yield project_main_dir / 'yaptide' / 'fake'
+
+
+@pytest.fixture(scope='function')
+def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
+    """Adds bin directory with mocks of simulators executable file to PATH"""
+    logging.info("Adding %s to PATH", yaptide_fake_dir)
+
+    # Get the current PATH value
+    original_path = os.environ.get("PATH", "")
+
+    # Update the PATH with the new directory
+    os.environ['PATH'] = f'{yaptide_fake_dir}' + os.pathsep + os.environ['PATH']
 
     # Yield control back to the test
     yield
