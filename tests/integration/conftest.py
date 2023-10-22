@@ -60,14 +60,14 @@ def shieldhit_binary_installed(shieldhit_binary_filename):
 
 @pytest.fixture(scope='session')
 def yaptide_bin_dir() -> Generator[Path, None, None]:
-    """directory with SHIELD-HIT12A executable file"""
+    """directory with simulators executable files"""
     project_main_dir = Path(__file__).resolve().parent.parent.parent
     yield project_main_dir / 'bin'
 
 
 @pytest.fixture(scope='function')
 def add_simulators_to_path_variable(yaptide_bin_dir : Path):
-    """Adds bin directory with SHIELD-HIT12A executable file to PATH"""
+    """Adds bin directory with simulators executable file to PATH"""
     logging.info("Adding %s to PATH", yaptide_bin_dir)
 
     # Get the current PATH value
