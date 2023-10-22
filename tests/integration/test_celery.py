@@ -21,7 +21,7 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_celery_run_simulation(celery_app,
+def test_celery_run_simulation_for_shieldhit(celery_app,
                                celery_worker,
                                payload_editor_dict_data: dict,
                                client,
