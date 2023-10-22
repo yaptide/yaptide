@@ -83,7 +83,6 @@ def test_celery_run_simulation_for_fluka_mock(celery_app,
                                add_simulator_mocks_to_path_variable,
                                modify_tmpdir):
     """Test run_simulation task with FLUKA mock binary"""
-
     # lets make a local copy of the payload dict, so we don't modify the original one
     payload_dict = copy.deepcopy(payload_editor_dict_data_fluka)
     # limit the particle numbers to get faster results
