@@ -200,3 +200,20 @@ def read_file(filepath: Path,
     }
     logging.info("Sending final update for task %s, simulated primaries %d", task_id, simulated_primaries)
     send_task_update(simulation_id, task_id, update_key, up_dict)
+
+
+def read_file_offline(filepath: Path) -> tuple[int, int]:
+    simulated_primaries = 0
+    requested_primaries = 0
+    with open(filepath, 'r') as f:
+        for line in f:
+            logging.debug("Parsing line: %s", line.rstrip())
+            if re.search(RUN_MATCH, line):
+                logging.debug("Found RUN_MATCH in line: %s for file: %s", line.rstrip(), filepath)
+                splitted = line.split()
+                simulated_primaries = int(splitted[3])
+            elif re.search(REQUESTED_MATCH, line):
+                logging.debug("Found REQUESTED_MATCH in line: %s for file: %s", line.rstrip(), filepath)
+                splitted = line.split(": ")
+                requested_primaries = int(splitted[1])
+    return simulated_primaries, requested_primaries

@@ -9,7 +9,7 @@ from pathlib import Path
 import time
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, read_file)
+from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, read_file, read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
                                            send_task_update)
@@ -94,6 +94,7 @@ def run_single_simulation(self,
     logging.info("Temporary directory is: %s", tmp_dir)
 
     command_stdout, command_stderr = '', ''
+    simulated_primaries, requested_primaries = 0, 0
 
     # with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
     # use the selected temporary directory to create a temporary directory
@@ -112,9 +113,9 @@ def run_single_simulation(self,
         # we would like to monitor the progress of simulation
         # this is done by reading the log file and sending the updates to the backend
         # if we have update_key and simulation_id the monitoring task can submit the updates to backend
+        path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
         if update_key and simulation_id is not None:
 
-            path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
             current_logging_level = logging.getLogger().getEffectiveLevel()
 
             background_process = multiprocessing.Process(
@@ -129,13 +130,16 @@ def run_single_simulation(self,
         # while monitoring process is active we can run the SHIELD-HIT12A process
         logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
         process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),command_as_list=command_as_list)
-        time.sleep(5)
+
         logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
 
         # terminate monitoring process
         if update_key and simulation_id is not None:
             background_process.terminate()
             background_process.join()
+
+        # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
+        simulated_primaries, requested_primaries = read_file_offline(path_to_monitor)
 
         # both simulation execution and monitoring process are finished now, we can read the estimators
         estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
@@ -184,7 +188,10 @@ def run_single_simulation(self,
         # We do not have any information if monitoring process sent the last update
         # so we send it here to make sure that we have the end_time and COMPLETED state
         end_time = datetime.utcnow().isoformat(sep=" ")
-        update_dict = {"task_state": EntityState.COMPLETED.value, "end_time": end_time}
+        update_dict = {"task_state": EntityState.COMPLETED.value, 
+                       "end_time": end_time, 
+                       "simulated_primaries": simulated_primaries, 
+                       "requested_primaries": requested_primaries}
         send_task_update(simulation_id, task_id, update_key, update_dict)
 
         # finally return from the celery task, returning the estimators and stdout/stderr as result
