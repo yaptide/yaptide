@@ -109,11 +109,11 @@ def read_file(filepath: Path,
               simulation_id: int,
               task_id: str,
               update_key: str,
-              timeout_wait_for_file: int = 30,
+              timeout_wait_for_file: int = 20,
               timeout_wait_for_line: int = 5*60,
               next_backend_update_time: int = 2,
               logging_level: int = logging.WARNING):
-    """Monitors log file of certain task"""
+    """Monitors log file of certain task, when new line with message matching regex appears, sends update to backend"""
     logging.getLogger(__name__).setLevel(logging_level)
     logfile = None
     update_time = 0
@@ -145,12 +145,13 @@ def read_file(filepath: Path,
     logging.info("Parsing log file for task %s started", task_id)
     for line in loglines:
         utc_now = datetime.utcnow()
+        logging.debug("Parsing line: %s", line.rstrip())
         if re.search(RUN_MATCH, line):
             logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line.rstrip(), filepath, task_id)
             splitted = line.split()
             simulated_primaries = int(splitted[3])
             if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
-                    and requested_primaries > simulated_primaries):
+                    and requested_primaries >= simulated_primaries):
                 logging.debug("Skipping update for task %s", task_id)
                 continue
             update_time = utc_now.timestamp()

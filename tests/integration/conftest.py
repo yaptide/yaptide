@@ -1,4 +1,5 @@
 import copy
+import datetime
 import logging
 from pathlib import Path
 import os
@@ -90,11 +91,14 @@ def celery_app():
     The choice of broker and backend is important, as we don't want to run external redis server.
     That is being configured via environment variables in pytest.ini file.
     """
-    logging.info("Creating celery app for testing")
+
+    logging.info("Creating celery app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     from yaptide.celery.worker import celery_app as app
     # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
     app.conf.task_default_pool = 'eventlet'
-    return app
+    yield app
+
+    del app
 
 
 @pytest.fixture(scope="function")
@@ -114,7 +118,7 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
 
     yield {
         "perform_ping_check": False,
-        "concurrency": 1,
+        "concurrency": 2,
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
     }
 
@@ -172,10 +176,22 @@ def app(tmp_path):
     # for some unknown reasons Flask live server and celery won't work with the default in-memory database
     # so we need to create a temporary database file
     # for each new test a new temporary directory is created
+    sqlite_db_path = Path(tmp_path) / 'main.db'
+    # ensure the sqlite file doesn't exist, remove if exists
+    if sqlite_db_path.exists():
+        logging.info("Removing old sqlite database file %s", sqlite_db_path)
+        sqlite_db_path.unlink()
+
     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{tmp_path}/main.db'
     logging.info("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
 
+    logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+
     app = create_app()
+    with app.app_context():
+        db.drop_all()
+        db.create_all()
+
     yield app
 
     with app.app_context():
@@ -204,6 +220,7 @@ def live_server_win():
     See an issue https://github.com/pytest-dev/pytest-flask/issues/54#issuecomment-535885042
     This fixture is condionally used only on Windows.
     """
+    logging.debug("Creating live_server_win fixture")
     env = os.environ.copy()
     env["FLASK_APP"] = "yaptide.application"
     server = subprocess.Popen(['flask', 'run', '--port', '5000'], env=env)  # skipcq: BAN-B607

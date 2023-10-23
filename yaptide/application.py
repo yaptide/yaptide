@@ -1,4 +1,5 @@
 import logging
+import os
 
 from flask import Flask
 from flask_restful import Api
@@ -15,7 +16,13 @@ def create_app():
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
 
+    # Print env variables
+    for item in os.environ.items():
+        logging.debug("Environment variable: %s", item)
+
     # Load configuration from environment variables
+    # Load any environment variables that start with FLASK_, dropping the prefix from the env key for the config key. 
+    # Values are passed through a loading function to attempt to convert them to more specific types than strings.
     app.config.from_prefixed_env()
     for item in app.config.items():
         logging.debug("Flask config variable: %s", item)

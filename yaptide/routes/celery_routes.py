@@ -61,7 +61,8 @@ class JobsDirect(Resource):
         update_key = str(uuid.uuid4())
         simulation.set_update_key(update_key)
         add_object_to_db(simulation)
-        logging.info("Simulation %d created", simulation.id)
+        logging.info("Simulation %d created and inserted into DB", simulation.id)
+        logging.debug("Update key set to %s", update_key)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 

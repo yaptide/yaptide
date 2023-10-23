@@ -133,11 +133,14 @@ class ResultsResource(Resource):
                 if not page_existed:
                     # if page was created, we add it to the session
                     add_object_to_db(page, False)
-            make_commit_to_db()
-        update_simulation_state(simulation=simulation, update_dict={
+        
+        make_commit_to_db()
+        logging.debug("Marking simulation as completed")
+        update_dict = {
             "job_state": EntityState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
-        })
+        }
+        update_simulation_state(simulation=simulation, update_dict=update_dict)
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):

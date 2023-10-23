@@ -1,10 +1,12 @@
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import contextlib
 import logging
+import multiprocessing
 import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
+import time
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, read_file)
@@ -84,6 +86,9 @@ def run_single_simulation(self,
 
     logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
 
+    logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
+    send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
+
     # we would like to have some control on the temporary directory used by the function
     tmp_dir = get_tmp_dir()
     logging.info("Temporary directory is: %s", tmp_dir)
@@ -104,33 +109,35 @@ def run_single_simulation(self,
         command_as_list = command_to_run_shieldhit(dir_path = Path(tmp_work_dir), task_id = task_id)
         logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
 
-        with ProcessPoolExecutor(max_workers=1) as executor:
+        # we would like to monitor the progress of simulation
+        # this is done by reading the log file and sending the updates to the backend
+        # if we have update_key and simulation_id the monitoring task can submit the updates to backend
+        if update_key and simulation_id is not None:
 
-            # we would like to monitor the progress of simulation
-            # this is done by reading the log file and sending the updates to the backend
-            # if we have update_key and simulation_id the monitoring thread can submit the updates to backend
-            if update_key and simulation_id is not None:
+            path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
+            current_logging_level = logging.getLogger().getEffectiveLevel()
 
-                logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
-                send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
+            background_process = multiprocessing.Process(
+                target=read_file,
+                args=(path_to_monitor, simulation_id, task_id, update_key, current_logging_level)
+            )
+            background_process.start()
+            logging.info("Started monitoring process for task %s", task_id)
+        else:
+            logging.info("No monitoring processes started for task %s", task_id)
 
-                path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
-                current_logging_level = logging.getLogger().getEffectiveLevel()
+        # while monitoring process is active we can run the SHIELD-HIT12A process
+        logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
+        process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),command_as_list=command_as_list)
+        time.sleep(5)
+        logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
 
-                executor.submit(read_file,
-                                path_to_monitor,
-                                simulation_id,
-                                task_id,
-                                update_key,
-                                logging_level=current_logging_level)
-                logging.info("Started monitoring process for task %s", task_id)
-            else:
-                logging.info("No monitoring processes started for task %s", task_id)
+        # terminate monitoring process
+        if update_key and simulation_id is not None:
+            background_process.terminate()
+            background_process.join()
 
-            logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
-            process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),command_as_list=command_as_list)
-            logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
-
+        # both simulation execution and monitoring process are finished now, we can read the estimators
         estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
 
         # there is no simulation output
@@ -223,9 +230,13 @@ def merge_results(results: list[dict]) -> dict:
                                                                  logfiles=logfiles):
         final_result["logfiles"] = logfiles
 
-    if averaged_estimators is not None and not send_simulation_results(simulation_id=simulation_id,
-                                                                       update_key=update_key,
-                                                                       estimators=averaged_estimators):
-        final_result["estimators"] = averaged_estimators
+
+    if average_estimators:
+        # send results to the backend and mark whole simulation as completed
+        sending_results_ok = send_simulation_results(simulation_id=simulation_id,
+                                                     update_key=update_key,
+                                                     estimators=averaged_estimators)
+        if not sending_results_ok:
+            final_result["estimators"] = averaged_estimators
 
     return final_result

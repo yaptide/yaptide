@@ -10,6 +10,9 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
         return False
+    if not update_key:
+        logging.warning("Update key not found, skipping update")
+        return False
     dict_to_send = {
         "simulation_id": simulation_id,
         "task_id": task_id,
@@ -30,6 +33,9 @@ def send_simulation_results(simulation_id: int, update_key: str, estimators: lis
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
+        return False
+    if not update_key:
+        logging.warning("Update key not found, skipping update")
         return False
     dict_to_send = {
         "simulation_id": simulation_id,
