@@ -325,7 +325,7 @@ def download_topas_from_s3(path: Path,
     return True
 
 
-def download_fluka_from_s3(path: Path,
+def download_fluka_from_s3(fluka_path: Path,
                            bucket: str = fluka_bucket,
                            key: str = fluka_key
                            ) -> bool:
@@ -337,15 +337,12 @@ def download_fluka_from_s3(path: Path,
         endpoint_url=endpoint
     )
 
+    destination_file_path = fluka_path / 'fluka'
+
     if not validate_connection_data(bucket, key, s3_client):
         return False
 
-    try:
-        with tempfile.NamedTemporaryFile() as temp_file:
-            click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
-            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
-    except ClientError as e:
-        click.echo(f"S3 download failed with client error: {e}", err=True)
+    if not handle_download_with_encryption(key, bucket, s3_client, destination_file_path):
         return False
 
     return True
@@ -447,6 +444,34 @@ def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
 
     return True
 
+def handle_download_with_encryption(key: str,
+                                    bucket: str,
+                                    s3_client,
+                                    destination_file_path: Path):
+    try:
+        with tempfile.NamedTemporaryFile() as temp_file:
+            click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
+            s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+
+            # if no password and salt is provided, skip decryption
+            if password is None and salt is None:
+                click.echo("No password and salt provided, skipping decryption")
+                click.echo(f"Copying {temp_file.name} to {destination_file_path}")
+                shutil.copy2(temp_file.name, destination_file_path)
+            else:  # Decrypt downloaded file
+                click.echo("Decrypting downloaded file")
+                shieldhit_binary_bytes = decrypt_file(temp_file.name, password, salt)
+                if not shieldhit_binary_bytes:
+                    click.echo("Decryption failed", err=True)
+                    return False
+                with open(destination_file_path, "wb") as dest_file:
+                    dest_file.write(shieldhit_binary_bytes)
+    except ClientError as e:
+        click.echo(f"S3 download failed with client error: {e}", err=True)
+        return False
+
+    destination_file_path.chmod(0o700)
+    return True
 
 def derive_key(encryption_password: str = password, encryption_salt: str = salt) -> bytes:
     """Derives a key from the password and salt"""
