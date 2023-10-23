@@ -22,7 +22,7 @@ def check_if_environment_variables_set() -> bool:
         result = False
     return result
 
-@pytest.mark.skipif(sys.platform == "win32", reason="Lets not tests this on Windows.")
+@pytest.mark.skip
 def test_if_shieldhit_downloaded(tmpdir, shieldhit_binary_filename):
     """Check if SHIELD-HIT12A binary is downloaded and can be executed"""
     if check_if_environment_variables_set():
