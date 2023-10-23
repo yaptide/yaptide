@@ -48,19 +48,7 @@ def convert_input_files(payload_dict: dict) -> dict:
     return {"input_files": files_dict}
 
 
-@celery_app.task(bind=True)
-def run_single_simulation(self,
-                          files_dict: dict,
-                          task_id: str,
-                          update_key: str = None,
-                          simulation_id: int = None,
-                          keep_tmp_files: bool = False) -> dict:
-    """Function running single shieldhit simulation"""
-    # for the purpose of running this function in pytest we would like to have some control
-    # on the temporary directory used by the function
-
-    logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
-
+def get_tmp_dir() -> Path:
     # lets try by default to use python tempfile module
     tmp_dir = tempfile.gettempdir()
     logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
@@ -80,19 +68,40 @@ def run_single_simulation(self,
     if os.environ.get("TMP"):
         tmp_dir = os.environ.get("TMP")
 
+    return Path(tmp_dir)
+
+
+@celery_app.task(bind=True)
+def run_single_simulation(self,
+                          files_dict: dict,
+                          task_id: str,
+                          update_key: str = '',
+                          simulation_id: int = None,
+                          keep_tmp_files: bool = False) -> dict:
+    """Function running single shieldhit simulation"""
+    # for the purpose of running this function in pytest we would like to have some control
+    # on the temporary directory used by the function
+
+    logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
+
+    # we would like to have some control on the temporary directory used by the function
+    tmp_dir = get_tmp_dir()
+    logging.info("Temporary directory is: %s", tmp_dir)
+
+    command_stdout, command_stderr = '', ''
+
     # with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
     # use the selected temporary directory to create a temporary directory
     with (
         contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir))
         if keep_tmp_files
         else tempfile.TemporaryDirectory(dir=tmp_dir)
-    ) as tmp_dir_path:
+    ) as tmp_work_dir:
         
-        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
+        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
         logging.debug("Generated input files: %s", files_dict.keys())
 
-
-        command_as_list = command_to_run_shieldhit(dir_path = Path(tmp_dir_path), task_id = task_id)
+        command_as_list = command_to_run_shieldhit(dir_path = Path(tmp_work_dir), task_id = task_id)
         logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
 
         with ProcessPoolExecutor(max_workers=1) as executor:
@@ -100,66 +109,79 @@ def run_single_simulation(self,
             # we would like to monitor the progress of simulation
             # this is done by reading the log file and sending the updates to the backend
             # if we have update_key and simulation_id the monitoring thread can submit the updates to backend
-            if update_key is not None and simulation_id is not None:
+            if update_key and simulation_id is not None:
 
                 logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
                 send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
-                path_to_monitor = Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
+                path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
                 current_logging_level = logging.getLogger().getEffectiveLevel()
 
-                watcher_future = executor.submit(read_file,
-                                                 path_to_monitor,
-                                                 simulation_id,
-                                                 task_id,
-                                                 update_key,
-                                                 logging_level=current_logging_level)
+                executor.submit(read_file,
+                                path_to_monitor,
+                                simulation_id,
+                                task_id,
+                                update_key,
+                                logging_level=current_logging_level)
                 logging.info("Started monitoring process for task %s", task_id)
             else:
                 logging.info("No monitoring processes started for task %s", task_id)
 
-            logging.info("Running SHIELD-HIT12A process in %s", tmp_dir_path)
-            process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_dir_path),command_as_list=command_as_list)
+            logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
+            process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),command_as_list=command_as_list)
             logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
 
-            # # at this point simulation is finished (failed or succeded) and we can kill the monitoring process
-            # if watcher_future is not None:
-            #     logging.info("Killing monitoring processes for task %s", task_id)
-            #     executor.shutdown(wait=False)
-            # else:
-            #     logging.info("No monitoring processes to kill for task %s", task_id)
+        estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
 
-        estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_dir_path))
-
-        # here we have simulation which failed, this means we mark the task as failed
+        # there is no simulation output
         if not estimators_dict:
+
+            # first we notify the backend that the task with simulation has failed
             logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
             update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, update_dict)
 
-            logfiles = simulation_logfiles(path=Path(tmp_dir_path))
+            # then we send the logfiles to the backend, if available
+            logfiles = simulation_logfiles(path=Path(tmp_work_dir))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            if send_simulation_logfiles(simulation_id=simulation_id,
-                                        update_key=update_key,
-                                        logfiles=logfiles):
-                return {}
+            if logfiles:
+                pass
+                # the method below is in particular broken, as there may be several logfiles, for some of the tasks
+                # lets imagine following sequence of actions:
+                # task 1 fails, with some usefule message in the logfile, i.e. after 100 primaries the SHIELD-HIT12A binary crashed
+                # then the useful logfiles are being sent to the backend
+                # task 2 fails later, but here the SHIELD-HIT12A binary crashes at the beginning of the simulation, without producing of the logfiles
+                # then again the logfiles are being sent to the backend, but this time they are empty
+                # so the useful logfiles are overwritten by the empty ones
+                # we temporarily disable sending logfiles to the backend
+                # sending_logfiles_status = send_simulation_logfiles(simulation_id=simulation_id,
+                #                                                 update_key=update_key,
+                #                                                 logfiles=logfiles)
+                # if not sending_logfiles_status:
+                #     logging.error("Sending logfiles failed for task %s", task_id)
+            
+            # finally we return from the celery task, returning the logfiles and stdout/stderr as result
             return {
                 "logfiles": logfiles,
+                "stdout": command_stdout,
+                "stderr": command_stderr,
                 "simulation_id": simulation_id,
                 "update_key": update_key
             }
 
+        # otherwise we have simulation output
         logging.debug("Converting simulation results to JSON")
         estimators = estimators_to_list(estimators_dict=estimators_dict,
-                                        dir_path=Path(tmp_dir_path))
-
-        end_time = datetime.utcnow().isoformat(sep=" ")
+                                        dir_path=Path(tmp_work_dir))
 
         # We do not have any information if monitoring process sent the last update
         # so we send it here to make sure that we have the end_time and COMPLETED state
+        end_time = datetime.utcnow().isoformat(sep=" ")
         update_dict = {"task_state": EntityState.COMPLETED.value, "end_time": end_time}
         send_task_update(simulation_id, task_id, update_key, update_dict)
 
+        # finally return from the celery task, returning the estimators and stdout/stderr as result
+        # the estimators will be merged by subsequent celery task
         return {
             "estimators": estimators,
             "simulation_id": simulation_id,
