@@ -1,4 +1,4 @@
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import contextlib
 import logging
 import os
@@ -7,8 +7,7 @@ from datetime import datetime
 from pathlib import Path
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators, read_file,
-                                       run_shieldhit)
+from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, read_file)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
                                            send_task_update)
@@ -88,21 +87,25 @@ def run_single_simulation(self,
         if keep_tmp_files
         else tempfile.TemporaryDirectory(dir=tmp_dir)
     ) as tmp_dir_path:
-        logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
+        
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
+        logging.debug("Generated input files: %s", files_dict.keys())
 
-        with ThreadPoolExecutor(max_workers=1) as executor:
-            watcher_future = None
+
+        command_as_list = command_to_run_shieldhit(dir_path = Path(tmp_dir_path), task_id = task_id)
+        logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
+
+        with ProcessPoolExecutor(max_workers=1) as executor:
+
             # we would like to monitor the progress of simulation
             # this is done by reading the log file and sending the updates to the backend
             # if we have update_key and simulation_id the monitoring thread can submit the updates to backend
             if update_key is not None and simulation_id is not None:
 
-                logging.info("Sending update for task %s, setting celery id %s", task_id, self.request.id)
+                logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
                 send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
                 path_to_monitor = Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
-
                 current_logging_level = logging.getLogger().getEffectiveLevel()
 
                 watcher_future = executor.submit(read_file,
@@ -111,21 +114,22 @@ def run_single_simulation(self,
                                                  task_id,
                                                  update_key,
                                                  logging_level=current_logging_level)
-
                 logging.info("Started monitoring process for task %s", task_id)
             else:
                 logging.info("No monitoring processes started for task %s", task_id)
 
-            logging.info("Running SHIELD-HIT12A simulation in %s", tmp_dir_path)
-            estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
-            logging.info("Simulation finished for task %s", task_id)
+            logging.info("Running SHIELD-HIT12A process in %s", tmp_dir_path)
+            process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_dir_path),command_as_list=command_as_list)
+            logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
 
-            # at this point simulation is finished (failed or succeded) and we can kill the monitoring process
-            if watcher_future is not None:
-                logging.info("Killing monitoring processes for task %s", task_id)
-                executor.shutdown(wait=True)
-            else:
-                logging.info("No monitoring processes to kill for task %s", task_id)
+            # # at this point simulation is finished (failed or succeded) and we can kill the monitoring process
+            # if watcher_future is not None:
+            #     logging.info("Killing monitoring processes for task %s", task_id)
+            #     executor.shutdown(wait=False)
+            # else:
+            #     logging.info("No monitoring processes to kill for task %s", task_id)
+
+        estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_dir_path))
 
         # here we have simulation which failed, this means we mark the task as failed
         if not estimators_dict:
