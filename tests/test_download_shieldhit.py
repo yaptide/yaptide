@@ -22,7 +22,7 @@ def check_if_environment_variables_set() -> bool:
         result = False
     return result
 
-@pytest.mark.skip
+@pytest.mark.skipif(sys.platform == "win32", reason="Lets not tests this on Windows.")
 def test_if_shieldhit_downloaded(tmpdir, shieldhit_binary_filename):
     """Check if SHIELD-HIT12A binary is downloaded and can be executed"""
     if check_if_environment_variables_set():
@@ -30,8 +30,8 @@ def test_if_shieldhit_downloaded(tmpdir, shieldhit_binary_filename):
         key = os.getenv("S3_SHIELDHIT_KEY")
         assert download_shieldhit_from_s3(bucket=bucket, key=key, shieldhit_path=tmpdir) is True
         expected_path = Path(tmpdir / shieldhit_binary_filename)
-        assert expected_path.exists(), "Expected path does not exist."
-        assert expected_path.stat().st_size > 0, "Expected path is empty."
+        assert expected_path.exists(), f"Expected path {expected_path} does not exist."
+        assert expected_path.stat().st_size > 0, f"Expected path {expected_path} is empty."
 
         command = [str(expected_path), "--version"]
         try:

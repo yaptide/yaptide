@@ -124,8 +124,8 @@ def install_simulator(sim_name: SimulatorType, installation_path: Path) -> bool:
 
 
 def download_shieldhit_demo_version(shieldhit_path: Path) -> bool:
-    logging.debug("Downloading shieldhit demo version")
-    """Download shieldhit demo version from shieldhit.org"""
+    logging.debug("Downloading SHIELD-HIT12A demo version")
+    """Download SHIELD-HIT12A demo version from shieldhit.org"""
     demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
     # check if working on Windows
     if platform.system() == 'Windows':
