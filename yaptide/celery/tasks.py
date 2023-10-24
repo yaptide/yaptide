@@ -1,15 +1,12 @@
-from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 import contextlib
 import logging
 import multiprocessing
-import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
-import time
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, read_file, read_file_offline)
+from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, get_tmp_dir, read_file, read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
                                            send_task_update)
@@ -49,28 +46,6 @@ def convert_input_files(payload_dict: dict) -> dict:
     files_dict = check_and_convert_payload_to_files_dict(payload_dict=payload_dict)
     return {"input_files": files_dict}
 
-
-def get_tmp_dir() -> Path:
-    # lets try by default to use python tempfile module
-    tmp_dir = tempfile.gettempdir()
-    logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
-
-    # if the TMPDIR env variable is set we will use it to override the default
-    logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
-    if os.environ.get("TMPDIR"):
-        tmp_dir = os.environ.get("TMPDIR")
-
-    # if the TEMP env variable is set we will use it to override the default
-    logging.info("2. TEMP is: %s", os.environ.get("TEMP", "not set"))
-    if os.environ.get("TEMP"):
-        tmp_dir = os.environ.get("TEMP")
-
-    # if the TMP env variable is set we will use it to override the default
-    logging.info("3. TMP is: %s", os.environ.get("TMP", "not set"))
-    if os.environ.get("TMP"):
-        tmp_dir = os.environ.get("TMP")
-
-    return Path(tmp_dir)
 
 
 @celery_app.task(bind=True)

@@ -1,6 +1,7 @@
 import logging
 import re
 import subprocess
+import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +13,30 @@ from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
                                    TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
+
+
+
+def get_tmp_dir() -> Path:
+    # lets try by default to use python tempfile module
+    tmp_dir = tempfile.gettempdir()
+    logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
+
+    # if the TMPDIR env variable is set we will use it to override the default
+    logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
+    if os.environ.get("TMPDIR"):
+        tmp_dir = os.environ.get("TMPDIR")
+
+    # if the TEMP env variable is set we will use it to override the default
+    logging.info("2. TEMP is: %s", os.environ.get("TEMP", "not set"))
+    if os.environ.get("TEMP"):
+        tmp_dir = os.environ.get("TEMP")
+
+    # if the TMP env variable is set we will use it to override the default
+    logging.info("3. TMP is: %s", os.environ.get("TMP", "not set"))
+    if os.environ.get("TMP"):
+        tmp_dir = os.environ.get("TMP")
+
+    return Path(tmp_dir)
 
 
 def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
