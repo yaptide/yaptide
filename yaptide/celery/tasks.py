@@ -82,7 +82,7 @@ def run_single_simulation(self,
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
         logging.debug("Generated input files: %s", files_dict.keys())
 
-        command_as_list = command_to_run_shieldhit(dir_path = Path(tmp_work_dir), task_id = task_id)
+        command_as_list = command_to_run_shieldhit(dir_path=Path(tmp_work_dir), task_id=task_id)
         logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
 
         # we would like to monitor the progress of simulation
@@ -104,7 +104,10 @@ def run_single_simulation(self,
 
         # while monitoring process is active we can run the SHIELD-HIT12A process
         logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
-        process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),command_as_list=command_as_list)
+        process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(
+            dir_path=Path(tmp_work_dir), 
+            command_as_list=command_as_list
+            )
 
         logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
 
