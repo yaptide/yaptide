@@ -57,10 +57,10 @@ def shieldhit_binary_installed(shieldhit_binary_filename):
     shieldhit_bin_path = installation_path / shieldhit_binary_filename
     logging.info("SHIELD-HIT12A binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
-        # install_simulator(SimulatorType.shieldhit, installation_path)
-        logging.info("Creating directory %s", Path(__file__).resolve().parent.parent.parent)
-        installation_path.mkdir(parents=True, exist_ok=True)
-        download_shieldhit_demo_version(shieldhit_path=installation_path)
+        install_simulator(SimulatorType.shieldhit, installation_path)
+        #logging.info("Creating directory %s", Path(__file__).resolve().parent.parent.parent)
+        #installation_path.mkdir(parents=True, exist_ok=True)
+        #download_shieldhit_demo_version(shieldhit_path=installation_path)
 
 
 @pytest.fixture(scope='session')

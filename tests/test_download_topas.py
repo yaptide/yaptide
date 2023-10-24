@@ -16,8 +16,7 @@ def check_if_environment_variables_set() -> bool:
             result = False
     return result
 
-#@pytest.mark.skipif(sys.platform == "win32", reason="TOPAS does not work on Windows.")
-@pytest.mark.skip
+@pytest.mark.skipif(sys.platform == "win32", reason="TOPAS does not work on Windows.")
 def test_if_topas_downloaded(tmpdir):
     """Check if TOPAS is downloaded and can be executed"""
     if check_if_environment_variables_set():
