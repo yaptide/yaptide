@@ -109,8 +109,8 @@ def run_single_simulation(self,
              )
             logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
         else:
-            logging.info("Running Fluka simulation in %s", tmp_dir_path)
-            estimators_dict = run_fluka(dir_path=Path(tmp_dir_path), task_id=task_id)
+            logging.info("Running Fluka simulation in %s", tmp_work_dir)
+            estimators_dict = run_fluka(dir_path=Path(tmp_work_dir), task_id=task_id)
 
         # terminate monitoring process
         if update_key and simulation_id is not None:
