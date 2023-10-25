@@ -6,12 +6,14 @@ from datetime import datetime
 from pathlib import Path
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators,
+sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssfrom yaptide.celery.utils.pymc import (average_estimators,
                                        command_to_run_shieldhit,
                                        execute_shieldhit_process,
                                        get_shieldhit_estimators,
                                        get_tmp_dir,
                                        read_file,
+                                       run_fluka,
+                                       run_shieldhit,
                                        read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
@@ -43,8 +45,9 @@ def run_single_simulation(self,
                           task_id: str,
                           update_key: str = '',
                           simulation_id: int = None,
-                          keep_tmp_files: bool = False) -> dict:
-    """Function running single shieldhit simulation"""
+                          keep_tmp_files: bool = False,
+                          sim_type: str = 'shieldhit') -> dict:
+    """Function running single simulation"""
     # for the purpose of running this function in pytest we would like to have some control
     # on the temporary directory used by the function
 
@@ -93,18 +96,22 @@ def run_single_simulation(self,
                     }
             )
             background_process.start()
+
             logging.info("Started monitoring process for task %s", task_id)
         else:
             logging.info("No monitoring processes started for task %s", task_id)
 
         # while monitoring process is active we can run the SHIELD-HIT12A process
         logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
-        process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(
-            dir_path=Path(tmp_work_dir),
-            command_as_list=command_as_list
-            )
-
-        logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
+        if sim_type == 'shieldhit':
+            process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(
+                dir_path=Path(tmp_work_dir),
+                command_as_list=command_as_list
+             )
+            logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
+        else:
+            logging.info("Running Fluka simulation in %s", tmp_dir_path)
+            estimators_dict = run_fluka(dir_path=Path(tmp_dir_path), task_id=task_id)
 
         # terminate monitoring process
         if update_key and simulation_id is not None:
