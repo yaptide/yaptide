@@ -8,14 +8,15 @@ from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
 
 
-def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int) -> str:
+def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, sim_type: str = 'shieldhit') -> str:
     """Runs asynchronous simulation job"""
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
             task_id=f"{simulation_id}_{i}",
             update_key=update_key,
-            simulation_id=simulation_id
+            simulation_id=simulation_id,
+            sim_type=sim_type
         ) for i in range(ntasks)
     ])
 
