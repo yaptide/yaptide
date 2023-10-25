@@ -7,7 +7,6 @@ import platform
 import subprocess
 from typing import Generator
 import pytest
-from yaptide.admin.simulators import download_shieldhit_demo_version
 
 from yaptide.application import create_app
 from yaptide.persistence.database import db
@@ -58,9 +57,6 @@ def shieldhit_binary_installed(shieldhit_binary_filename):
     logging.info("SHIELD-HIT12A binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
         install_simulator(SimulatorType.shieldhit, installation_path)
-        #logging.info("Creating directory %s", Path(__file__).resolve().parent.parent.parent)
-        #installation_path.mkdir(parents=True, exist_ok=True)
-        #download_shieldhit_demo_version(shieldhit_path=installation_path)
 
 
 @pytest.fixture(scope='session')
@@ -101,8 +97,6 @@ def celery_app():
     # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
     app.conf.task_default_pool = 'eventlet'
     yield app
-
-    del app
 
 
 @pytest.fixture(scope="function")
@@ -186,8 +180,11 @@ def app(tmp_path):
         logging.info("Removing old sqlite database file %s", sqlite_db_path)
         sqlite_db_path.unlink()
 
-    os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = f'sqlite:///{tmp_path}/main.db'
-    logging.info("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
+    # Store the original TMPDIR value
+    old_db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
+    new_db_uri =  f'sqlite:///{tmp_path}/main.db'
+    logging.debug("Replacing old value %s of FLASK_SQLALCHEMY_DATABASE_URI with %s", old_db_uri, new_db_uri)
+    os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 
     logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
@@ -198,8 +195,15 @@ def app(tmp_path):
 
     yield app
 
+    # clean up the database
     with app.app_context():
         db.drop_all()
+
+    # revert the FLASK_SQLALCHEMY_DATABASE_URI to the original value
+    if old_db_uri is None:
+        del os.environ['FLASK_SQLALCHEMY_DATABASE_URI']
+    else:
+        os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = old_db_uri
 
 
 def pytest_collection_modifyitems(config, items):  # skipcq: PYL-W0613

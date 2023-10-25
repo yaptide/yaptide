@@ -16,22 +16,6 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
                                      estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)
 
-# this is not being used now but we can use such hook to install simulations on the worker start
-# needs from celery.signals import worker_ready
-# @worker_ready.connect
-# def on_worker_ready(**kwargs):
-#     """This function will be called when celery worker is ready to accept tasks"""
-#     logging.info("on_worker_ready signal received")
-#     # ask celery to install simulator on the worker and wait for it to finish
-#     job = install_simulators.delay()
-#     # we need to do some hackery here to make blocking calls work
-#     # method described in https://stackoverflow.com/questions/33280456 doesn't work.
-#     try:
-#         job.wait()
-#     except RuntimeError as e:
-#         logging.info("the only way for blocking calls to work is to catch RuntimeError %s", e)
-#         raise e
-
 
 @celery_app.task()
 def install_simulators() -> bool:
@@ -45,7 +29,6 @@ def convert_input_files(payload_dict: dict) -> dict:
     """Function converting output"""
     files_dict = check_and_convert_payload_to_files_dict(payload_dict=payload_dict)
     return {"input_files": files_dict}
-
 
 
 @celery_app.task(bind=True)
@@ -95,7 +78,13 @@ def run_single_simulation(self,
 
             background_process = multiprocessing.Process(
                 target=read_file,
-                args=(path_to_monitor, simulation_id, task_id, update_key, current_logging_level)
+                kwargs={
+                    "filepath" : path_to_monitor,
+                    "simulation_id": simulation_id,
+                    "task_id": task_id,
+                    "update_key": update_key,
+                    "logging_level": current_logging_level
+                    }
             )
             background_process.start()
             logging.info("Started monitoring process for task %s", task_id)
@@ -133,21 +122,21 @@ def run_single_simulation(self,
             # then we send the logfiles to the backend, if available
             logfiles = simulation_logfiles(path=Path(tmp_work_dir))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            if logfiles:
-                pass
-                # the method below is in particular broken, as there may be several logfiles, for some of the tasks
-                # lets imagine following sequence of actions:
-                # task 1 fails, with some usefule message in the logfile, i.e. after 100 primaries the SHIELD-HIT12A binary crashed
-                # then the useful logfiles are being sent to the backend
-                # task 2 fails later, but here the SHIELD-HIT12A binary crashes at the beginning of the simulation, without producing of the logfiles
-                # then again the logfiles are being sent to the backend, but this time they are empty
-                # so the useful logfiles are overwritten by the empty ones
-                # we temporarily disable sending logfiles to the backend
-                # sending_logfiles_status = send_simulation_logfiles(simulation_id=simulation_id,
-                #                                                 update_key=update_key,
-                #                                                 logfiles=logfiles)
-                # if not sending_logfiles_status:
-                #     logging.error("Sending logfiles failed for task %s", task_id)
+            # if logfiles:
+            #     pass
+            # the method below is in particular broken, as there may be several logfiles, for some of the tasks
+            # lets imagine following sequence of actions:
+            # task 1 fails, with some usefule message in the logfile, i.e. after 100 primaries the SHIELD-HIT12A binary crashed
+            # then the useful logfiles are being sent to the backend
+            # task 2 fails later, but here the SHIELD-HIT12A binary crashes at the beginning of the simulation, without producing of the logfiles
+            # then again the logfiles are being sent to the backend, but this time they are empty
+            # so the useful logfiles are overwritten by the empty ones
+            # we temporarily disable sending logfiles to the backend
+            # sending_logfiles_status = send_simulation_logfiles(simulation_id=simulation_id,
+            #                                                 update_key=update_key,
+            #                                                 logfiles=logfiles)
+            # if not sending_logfiles_status:
+            #     logging.error("Sending logfiles failed for task %s", task_id)
             
             # finally we return from the celery task, returning the logfiles and stdout/stderr as result
             return {
@@ -215,8 +204,7 @@ def merge_results(results: list[dict]) -> dict:
                                                                  logfiles=logfiles):
         final_result["logfiles"] = logfiles
 
-
-    if average_estimators:
+    if averaged_estimators:
         # send results to the backend and mark whole simulation as completed
         sending_results_ok = send_simulation_results(simulation_id=simulation_id,
                                                      update_key=update_key,

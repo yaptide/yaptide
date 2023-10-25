@@ -1,4 +1,5 @@
 import logging
+import os
 import re
 import subprocess
 import tempfile
@@ -49,6 +50,7 @@ def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
     command_as_list.append(str(dir_path))
     return command_as_list
 
+
 def execute_shieldhit_process(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
     process_exit_success : bool = True
     command_stdout: str = ""
@@ -93,13 +95,13 @@ def get_shieldhit_estimators(dir_path: Path) -> dict:
     if len(matching_files) == 0:
         logging.error("No *.bdo files found in %s", dir_path)
         return estimators_dict
-    else:
-        logging.debug("Found %d *.bdo files in %s", len(matching_files), dir_path)
-        files_pattern_pattern = str(dir_path / "*.bdo")
-        estimators_list = frompattern(pattern=files_pattern_pattern)
-        for estimator in estimators_list:
-            logging.debug("Appending estimator for %s", estimator.file_corename)
-            estimators_dict[estimator.file_corename] = estimator
+
+    logging.debug("Found %d *.bdo files in %s", len(matching_files), dir_path)
+    files_pattern_pattern = str(dir_path / "*.bdo")
+    estimators_list = frompattern(pattern=files_pattern_pattern)
+    for estimator in estimators_list:
+        logging.debug("Appending estimator for %s", estimator.file_corename)
+        estimators_dict[estimator.file_corename] = estimator
 
     return estimators_dict
 
