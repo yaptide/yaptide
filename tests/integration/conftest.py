@@ -134,6 +134,7 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
     Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
     """
     logging.info("Creating celery worker parameters for testing")
+    logging.info("Listing PATH variable %s available for worker", os.environ['PATH'])
 
     # get current logging level
     log_level = logging.getLogger().getEffectiveLevel()
