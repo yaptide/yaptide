@@ -6,7 +6,13 @@ from datetime import datetime
 from pathlib import Path
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators, command_to_run_shieldhit, execute_shieldhit_process, get_shieldhit_estimators, get_tmp_dir, read_file, read_file_offline)
+from yaptide.celery.utils.pymc import (average_estimators,
+                                       command_to_run_shieldhit,
+                                       execute_shieldhit_process,
+                                       get_shieldhit_estimators,
+                                       get_tmp_dir,
+                                       read_file,
+                                       read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
                                            send_task_update)
@@ -94,7 +100,7 @@ def run_single_simulation(self,
         # while monitoring process is active we can run the SHIELD-HIT12A process
         logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
         process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(
-            dir_path=Path(tmp_work_dir), 
+            dir_path=Path(tmp_work_dir),
             command_as_list=command_as_list
             )
 
@@ -122,16 +128,19 @@ def run_single_simulation(self,
             # then we send the logfiles to the backend, if available
             logfiles = simulation_logfiles(path=Path(tmp_work_dir))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            # if logfiles:
-            #     pass
-            # the method below is in particular broken, as there may be several logfiles, for some of the tasks
+            # the method below is in particular broken,
+            # as there may be several logfiles, for some of the tasks
             # lets imagine following sequence of actions:
-            # task 1 fails, with some usefule message in the logfile, i.e. after 100 primaries the SHIELD-HIT12A binary crashed
+            # task 1 fails, with some usefule message in the logfile,
+            # i.e. after 100 primaries the SHIELD-HIT12A binary crashed
             # then the useful logfiles are being sent to the backend
-            # task 2 fails later, but here the SHIELD-HIT12A binary crashes at the beginning of the simulation, without producing of the logfiles
+            # task 2 fails later, but here the SHIELD-HIT12A binary crashes
+            # at the beginning of the simulation, without producing of the logfiles
             # then again the logfiles are being sent to the backend, but this time they are empty
             # so the useful logfiles are overwritten by the empty ones
             # we temporarily disable sending logfiles to the backend
+            # if logfiles:
+            #     pass
             # sending_logfiles_status = send_simulation_logfiles(simulation_id=simulation_id,
             #                                                 update_key=update_key,
             #                                                 logfiles=logfiles)
@@ -155,9 +164,9 @@ def run_single_simulation(self,
         # We do not have any information if monitoring process sent the last update
         # so we send it here to make sure that we have the end_time and COMPLETED state
         end_time = datetime.utcnow().isoformat(sep=" ")
-        update_dict = {"task_state": EntityState.COMPLETED.value, 
-                       "end_time": end_time, 
-                       "simulated_primaries": simulated_primaries, 
+        update_dict = {"task_state": EntityState.COMPLETED.value,
+                       "end_time": end_time,
+                       "simulated_primaries": simulated_primaries,
                        "requested_primaries": requested_primaries}
         send_task_update(simulation_id, task_id, update_key, update_dict)
 

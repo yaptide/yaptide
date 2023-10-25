@@ -182,7 +182,7 @@ def app(tmp_path):
 
     # Store the original TMPDIR value
     old_db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
-    new_db_uri =  f'sqlite:///{tmp_path}/main.db'
+    new_db_uri = f'sqlite:///{tmp_path}/main.db'
     logging.debug("Replacing old value %s of FLASK_SQLALCHEMY_DATABASE_URI with %s", old_db_uri, new_db_uri)
     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 

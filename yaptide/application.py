@@ -21,7 +21,7 @@ def create_app():
         logging.debug("Environment variable: %s", item)
 
     # Load configuration from environment variables
-    # Load any environment variables that start with FLASK_, dropping the prefix from the env key for the config key. 
+    # Load any environment variables that start with FLASK_, dropping the prefix from the env key for the config key.
     # Values are passed through a loading function to attempt to convert them to more specific types than strings.
     app.config.from_prefixed_env()
     for item in app.config.items():

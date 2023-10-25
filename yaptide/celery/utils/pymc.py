@@ -16,8 +16,10 @@ from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
 
-
 def get_tmp_dir() -> Path:
+    """
+    Function to get temporary directory from environment variables.
+    """
     # lets try by default to use python tempfile module
     tmp_dir = tempfile.gettempdir()
     logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
