@@ -6,14 +6,13 @@ from datetime import datetime
 from pathlib import Path
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-sssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssssfrom yaptide.celery.utils.pymc import (average_estimators,
+from yaptide.celery.utils.pymc import (average_estimators,
                                        command_to_run_shieldhit,
                                        execute_shieldhit_process,
                                        get_shieldhit_estimators,
                                        get_tmp_dir,
                                        read_file,
                                        run_fluka,
-                                       run_shieldhit,
                                        read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
