@@ -1,6 +1,7 @@
 import contextlib
 import logging
 import multiprocessing
+import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -51,6 +52,7 @@ def run_single_simulation(self,
     # on the temporary directory used by the function
 
     logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
+    logging.info("Worker PATH variable is set to %s", os.environ["PATH"])
 
     logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
     send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
