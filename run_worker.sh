@@ -29,4 +29,4 @@ mkdir -p /simulators/fluka/bin
 cp ./yaptide/fake/rfluka /simulators/fluka/bin/rfluka
 chmod +x /simulators/fluka/bin/rfluka
 
-celery --app yaptide.celery.worker worker -E --loglevel=info -P eventlet --hostname yaptide-worker
+celery --app yaptide.celery.worker worker -E --loglevel="$LOG_LEVEL_ROOT" -P eventlet --hostname yaptide-worker
