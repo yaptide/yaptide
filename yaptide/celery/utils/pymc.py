@@ -17,9 +17,7 @@ from yaptide.utils.enums import EntityState
 
 
 def get_tmp_dir() -> Path:
-    """
-    Function to get temporary directory from environment variables.
-    """
+    """Function to get temporary directory from environment variables."""
     # lets try by default to use python tempfile module
     tmp_dir = tempfile.gettempdir()
     logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
@@ -43,6 +41,7 @@ def get_tmp_dir() -> Path:
 
 
 def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
+    """Function to create command to run SHIELD-HIT12A."""
     settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
                                   simulator_exec_path=None,  # useless, we guess from PATH
                                   cmdline_opts="")  # useless, we could use -q in the future
@@ -54,6 +53,7 @@ def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
 
 
 def execute_shieldhit_process(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
+    """Function to execute SHIELD-HIT12A subprocess."""
     process_exit_success : bool = True
     command_stdout: str = ""
     command_stderr: str = ""
@@ -91,6 +91,7 @@ def execute_shieldhit_process(dir_path: Path, command_as_list: list[str]) -> tup
 
 
 def get_shieldhit_estimators(dir_path: Path) -> dict:
+    """Function to get estimators from SHIELD-HIT12A output files."""
     estimators_dict = {}
 
     matching_files = list(dir_path.glob("*.bdo"))

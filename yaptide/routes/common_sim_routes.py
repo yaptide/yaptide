@@ -133,7 +133,7 @@ class ResultsResource(Resource):
                 if not page_existed:
                     # if page was created, we add it to the session
                     add_object_to_db(page, False)
-        
+
         make_commit_to_db()
         logging.debug("Marking simulation as completed")
         update_dict = {

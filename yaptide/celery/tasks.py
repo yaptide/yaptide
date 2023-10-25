@@ -67,7 +67,7 @@ def run_single_simulation(self,
         if keep_tmp_files
         else tempfile.TemporaryDirectory(dir=tmp_dir)
     ) as tmp_work_dir:
-        
+
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
         logging.debug("Generated input files: %s", files_dict.keys())
 
@@ -146,7 +146,7 @@ def run_single_simulation(self,
             #                                                 logfiles=logfiles)
             # if not sending_logfiles_status:
             #     logging.error("Sending logfiles failed for task %s", task_id)
-            
+
             # finally we return from the celery task, returning the logfiles and stdout/stderr as result
             return {
                 "logfiles": logfiles,

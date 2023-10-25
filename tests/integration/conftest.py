@@ -91,7 +91,6 @@ def celery_app():
     The choice of broker and backend is important, as we don't want to run external redis server.
     That is being configured via environment variables in pytest.ini file.
     """
-
     logging.info("Creating celery app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
     from yaptide.celery.worker import celery_app as app
     # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
