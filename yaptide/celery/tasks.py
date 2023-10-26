@@ -120,7 +120,8 @@ def run_single_simulation(self,
             background_process.join()
 
         # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
-        simulated_primaries, requested_primaries = read_file_offline(path_to_monitor)
+        if sim_type == 'shieldhit':
+            simulated_primaries, requested_primaries = read_file_offline(path_to_monitor)
 
         # both simulation execution and monitoring process are finished now, we can read the estimators
         if sim_type == 'shieldhit':
