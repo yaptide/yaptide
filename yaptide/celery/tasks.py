@@ -73,7 +73,9 @@ def run_single_simulation(self,
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
         logging.debug("Generated input files: %s", files_dict.keys())
 
-        command_as_list = command_to_run_shieldhit(dir_path=Path(tmp_work_dir), task_id=task_id)
+        command_as_list = []
+        if sim_type == 'shieldhit':
+            command_as_list = command_to_run_shieldhit(dir_path=Path(tmp_work_dir), task_id=task_id)
         logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
 
         # we would like to monitor the progress of simulation
@@ -109,8 +111,8 @@ def run_single_simulation(self,
              )
             logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
         else:
-            logging.info("Running Fluka simulation in %s", tmp_dir_path)
-            estimators_dict = run_fluka(dir_path=Path(tmp_dir_path), task_id=task_id)
+            logging.info("Running Fluka simulation in %s", tmp_work_dir)
+            estimators_dict = run_fluka(dir_path=Path(tmp_work_dir), task_id=task_id)
 
         # terminate monitoring process
         if update_key and simulation_id is not None:
@@ -121,7 +123,8 @@ def run_single_simulation(self,
         simulated_primaries, requested_primaries = read_file_offline(path_to_monitor)
 
         # both simulation execution and monitoring process are finished now, we can read the estimators
-        estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
+        if sim_type == 'shieldhit':
+            estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
 
         # there is no simulation output
         if not estimators_dict:
