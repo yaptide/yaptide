@@ -91,35 +91,30 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
 
 
 def install_simulator(sim_name: SimulatorType, installation_path: Path) -> bool:
-    """Add simulator to database"""
+    """Download simulator from S3/HTTP and install it in the filesystem"""
     click.echo(f'Installation for simulator: {sim_name.name} started')
-    logging.info("Installation for simulator: %s started", sim_name.name)
 
-    click.echo(f'Installing {sim_name.name} into {installation_path}')
-    logging.info("Installing %s into %s", sim_name.name, installation_path)
+    click.echo(f'Installing into {installation_path}')
     installation_path.mkdir(exist_ok=True, parents=True)
 
     download_status = False
     if all([endpoint, access_key, secret_key]):
         click.echo('Downloading from S3 bucket')
-        logging.info("Downloading from S3 bucket")
 
         if sim_name == SimulatorType.shieldhit:
             download_status = download_shieldhit_from_s3(shieldhit_path=installation_path)
             if not download_status:
                 click.echo('Downloading demo version from shieldhit.org')
-                logging.info("Downloading demo version from shieldhit.org")
                 download_status = download_shieldhit_demo_version(shieldhit_path=installation_path)
         elif sim_name == SimulatorType.topas:
             download_status = download_topas_from_s3(path=installation_path)
         elif sim_name == SimulatorType.fluka:
-            download_status = download_fluka_from_s3(path=installation_path)
+            download_status = download_fluka_from_s3(fluka_path=installation_path)
         else:
             click.echo('Not implemented')
             return False
     else:
         click.echo('Cannot download from S3 bucket, missing environment variables')
-        logging.info("Cannot download from S3 bucket, missing environment variables")
         return False
 
     return download_status
@@ -308,7 +303,7 @@ def download_fluka_from_s3(fluka_path: Path,
                            bucket: str = fluka_bucket,
                            key: str = fluka_key
                            ) -> bool:
-    """ Download Fluka from S3 bucket """
+    """Download Fluka from S3 bucket"""
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=access_key,
@@ -392,7 +387,7 @@ def decrypt_file(file_path: Path, encryption_password: str = password, encryptio
 
 
 def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
-
+    """Validate S3 connection"""
     if not check_if_s3_connection_is_working(s3_client):
         click.echo("S3 connection failed", err=True)
         return False
@@ -423,10 +418,12 @@ def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
 
     return True
 
+
 def handle_download_with_encryption(key: str,
                                     bucket: str,
                                     s3_client,
                                     destination_file_path: Path):
+    """Handle download with encryption"""
     try:
         with tempfile.NamedTemporaryFile() as temp_file:
             click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
@@ -451,6 +448,7 @@ def handle_download_with_encryption(key: str,
 
     destination_file_path.chmod(0o700)
     return True
+
 
 def derive_key(encryption_password: str = password, encryption_salt: str = salt) -> bytes:
     """Derives a key from the password and salt"""
