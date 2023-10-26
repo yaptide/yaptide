@@ -302,6 +302,7 @@ def read_file(filepath: Path,
 
 
 def read_file_offline(filepath: Path) -> tuple[int, int]:
+    """Reads log file and returns number of simulated and requested primaries"""
     simulated_primaries = 0
     requested_primaries = 0
     with open(filepath, 'r') as f:
