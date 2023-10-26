@@ -1,23 +1,14 @@
-# How to download simulators binaries from S3 via Command Line
+# How to download simulators binaries from S3 via command line
 
-Currently, we store binaries of 3 simulators on S3 platform. Shielthit and Fluka files are encrypted.
+Currently, we store binaries of three simulators on S3 platform. SHIELD-HIT12A (full version) and Fluka files are encrypted.
 
 To simply init download process we have to run following commands:
+
 ```bash
-cd ../yaptide/admin
-python3 simulators.py install --name [simulator name] --path [path/to/download]
+./yaptide/admin/simulators.py install --name simulator_name --path path_to_download
 ```
 
 To get full instruction of command usage we can type
 ```bash
-python3 simulators.py install --help
+./yaptide/admin/simulators.py install --help
 ```
-
-## Shieldhit
-todo
-
-## Topas
-todo
-
-## Fluka
-todo
