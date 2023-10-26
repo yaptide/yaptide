@@ -464,7 +464,7 @@ def derive_key(encryption_password: str = password, encryption_salt: str = salt)
 @click.option('--path', type=click.Path(file_okay=False, path_type=Path))
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
-    """List installed simulators"""
+    """Install simulator"""
     if 'name' not in kwargs or kwargs['name'] is None:
         click.echo('Please specify a simulator name using --name option, possible values are: ', nl=False)
         for sim in SimulatorType:
@@ -490,7 +490,7 @@ def install(**kwargs):
 @click.option('--password', envvar='S3_ENCRYPTION_PASSWORD', default=password, help='S3 encryption password')
 @click.option('--salt', envvar='S3_ENCRYPTION_SALT', default=salt, help='S3 encryption salt')
 def upload(**kwargs):
-    """Manage arguments and upload file to S3 bucket"""
+    """Upload simulator to S3 bucket"""
     args = ['bucket', 'file', 'endpoint', 'access_key', 'secret_key', 'password', 'salt']
     messages = [
         'Bucket name is required specify with --bucket',
