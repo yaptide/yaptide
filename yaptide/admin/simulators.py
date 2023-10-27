@@ -11,7 +11,7 @@ if __name__ == "__main__":
     import sys
     this_file_path = Path(__file__).resolve()
     sys.path.insert(0, str(this_file_path.parent.parent.parent))
-from yaptide.admin.simulator_storage import decrypt_file, download_fluka_from_s3, download_shieldhit_demo_version, download_shieldhit_from_s3, download_shieldhit_from_s3_or_from_website, download_topas_from_s3, encrypt_file, upload_file_to_s3
+from yaptide.admin.simulator_storage import decrypt_file, download_fluka_from_s3, download_shieldhit_from_s3_or_from_website, download_topas_from_s3, encrypt_file, upload_file_to_s3
 
 load_dotenv()
 endpoint = os.getenv('S3_ENDPOINT')
@@ -35,11 +35,10 @@ def run():
 
 
 def s3credentials(required: bool = False):
-    """
-    Collection of options for S3 credentials
-    """
+    """Collection of options for S3 credentials"""
 
     def decorator(func):
+        """Decorator for S3 credentials options"""
         func = click.option('--endpoint',
                             type=click.STRING,
                             required=required,
@@ -64,11 +63,10 @@ def s3credentials(required: bool = False):
 
 
 def encryption_options(required: bool = False):
-    """
-    Collection of options for S3 credentials
-    """
+    """Collection of options for encryption"""
 
     def decorator(func):
+        """Decorator for encryption options"""
         func = click.option('--password',
                             type=click.STRING,
                             envvar='S3_ENCRYPTION_PASSWORD',
@@ -143,9 +141,9 @@ def download_fluka(**kwargs):
                                                  password=kwargs['password'],
                                                  salt=kwargs['salt'])
     if installation_status:
-        click.echo(f'Fluka installed')
+        click.echo('Fluka installed')
     else:
-        click.echo(f'Fluka installation failed')
+        click.echo('Fluka installation failed')
 
 
 @run.command
@@ -180,9 +178,9 @@ def download_topas(**kwargs):
         geant4_bucket=kwargs['geant4_bucket'],
     )
     if installation_status:
-        click.echo(f'TOPAS installed')
+        click.echo('TOPAS installed')
     else:
-        click.echo(f'TOPAS installation failed')
+        click.echo('TOPAS installation failed')
 
 
 @run.command

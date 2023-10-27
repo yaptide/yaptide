@@ -19,7 +19,7 @@ if [ -z "$S3_TOPAS_BUCKET" ] || [ -z "$S3_TOPAS_KEY" ] || [ -z "$S3_TOPAS_VERSIO
 
         rm -rf /var/lib/apt/lists/*
 
-        ./yaptide/admin/simulators.py install --name topas --path /simulators
+        ./yaptide/admin/simulators.py download-topas --dir /simulators
 fi
 
 # Copy fluka fake simulator from yaptide dir

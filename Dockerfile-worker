@@ -38,6 +38,8 @@ COPY yaptide ./yaptide
 RUN python3 -c "import os; content = open('run_worker.sh', 'rb').read().replace(b'\r\n', b'\n'); open('run_worker.sh', 'wb').write(content)"
 # skipcq: DOK-W1001
 RUN python3 -c "import os; content = open('yaptide/admin/simulators.py', 'rb').read().replace(b'\r\n', b'\n'); open('yaptide/admin/simulators.py', 'wb').write(content)"
+# skipcq: DOK-W1001
+RUN python3 -c "import os; content = open('yaptide/admin/simulator_storage.py', 'rb').read().replace(b'\r\n', b'\n'); open('yaptide/admin/simulator_storage.py', 'wb').write(content)"
 
 # Make the scripts executable
 # skipcq: DOK-W1001
