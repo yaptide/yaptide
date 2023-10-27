@@ -215,6 +215,7 @@ def download_shieldhit(**kwargs):
               type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='file to upload')
+@click.option('--encrypt', is_flag=True, default=False, help='encrypt file uploaded to S3')
 @s3credentials(required=True)
 @encryption_options()
 def upload(**kwargs):
@@ -225,6 +226,7 @@ def upload(**kwargs):
                                       endpoint=kwargs['endpoint'],
                                       access_key=kwargs['access_key'],
                                       secret_key=kwargs['secret_key'],
+                                      encrypt=kwargs['encrypt'],
                                       encryption_password=kwargs['password'],
                                       encryption_salt=kwargs['salt'])
     if upload_status:
