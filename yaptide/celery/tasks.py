@@ -7,36 +7,12 @@ from pathlib import Path
 
 import eventlet
 
-from yaptide.admin.simulators import SimulatorType, download_simulator
 from yaptide.celery.utils.pymc import (average_estimators, read_file, run_fluka, run_shieldhit)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)
-
-# this is not being used now but we can use such hook to install simulations on the worker start
-# needs from celery.signals import worker_ready
-# @worker_ready.connect
-# def on_worker_ready(**kwargs):
-#     """This function will be called when celery worker is ready to accept tasks"""
-#     logging.info("on_worker_ready signal received")
-#     # ask celery to install simulator on the worker and wait for it to finish
-#     job = install_simulators.delay()
-#     # we need to do some hackery here to make blocking calls work
-#     # method described in https://stackoverflow.com/questions/33280456 doesn't work.
-#     try:
-#         job.wait()
-#     except RuntimeError as e:
-#         logging.info("the only way for blocking calls to work is to catch RuntimeError %s", e)
-#         raise e
-
-
-@celery_app.task()
-def install_simulators() -> bool:
-    """Task responsible for installing simulators on the worker"""
-    result = download_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
-    return result
 
 
 @celery_app.task

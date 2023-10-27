@@ -445,8 +445,9 @@ def download_file(key: str,
                 if not bytes_from_decrypted_file:
                     click.echo("Decryption failed", err=True)
                     return False
-                destination_file_path.parent.mkdir(parents=True, exist_ok=True)
-                destination_file_path.write_bytes(bytes_from_decrypted_file)
+
+                Path(destination_file_path).parent.mkdir(parents=True, exist_ok=True)
+                Path(destination_file_path).write_bytes(bytes_from_decrypted_file)
             else:
                 click.echo(f"Copying {temp_file.name} to {destination_file_path}")
                 shutil.copy2(temp_file.name, destination_file_path)

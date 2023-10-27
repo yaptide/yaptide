@@ -6,6 +6,7 @@ import platform
 import subprocess
 from typing import Generator
 import pytest
+from yaptide.admin.simulators import download_shieldhit
 
 from yaptide.application import create_app
 from yaptide.persistence.database import db
@@ -52,12 +53,11 @@ def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, 
 @pytest.fixture(scope='session')
 def shieldhit_binary_installed(shieldhit_binary_filename):
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
-    from yaptide.admin.simulators import download_simulator, SimulatorType
-    installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
-    shieldhit_bin_path = installation_path / shieldhit_binary_filename
+    installation_dir = Path(__file__).resolve().parent.parent.parent / 'bin'
+    shieldhit_bin_path = installation_dir / shieldhit_binary_filename
     logging.info("SHIELDHIT binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
-        download_simulator(SimulatorType.shieldhit, installation_path)
+        download_shieldhit(dir=installation_dir)
 
 
 @pytest.fixture(scope='session')
