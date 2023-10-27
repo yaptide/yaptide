@@ -1,4 +1,3 @@
-import logging
 import platform
 import shutil
 import tarfile
@@ -198,11 +197,9 @@ def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, s
             Bucket=bucket,
             Prefix=key,
         )
+        topas_file_downloaded = False
         for curr_version in response["Versions"]:
             version_id = curr_version["VersionId"]
-            if version_id == "null":
-                click.echo(f"No TOPAS versions available in bucket {bucket}, file {key}", err=True)
-                return False
 
             tags = s3_client.get_object_tagging(
                 Bucket=bucket,
@@ -216,6 +213,11 @@ def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, s
                                                Key=key,
                                                Fileobj=topas_temp_file,
                                                ExtraArgs={"VersionId": version_id})
+                    topas_file_downloaded = True
+        if not topas_file_downloaded:
+            click.echo(f"Could not find TOPAS version {version} in bucket {bucket}, file {key}", err=True)
+            return False
+
     except ClientError as e:
         click.echo("Failed to download TOPAS from S3 with error: ", e.response["Error"]["Message"])
         return False
