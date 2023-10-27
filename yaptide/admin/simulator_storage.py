@@ -147,6 +147,39 @@ def download_shieldhit_from_s3(
     return True
 
 
+def download_shieldhit_from_s3_or_from_website(
+    destination_dir: Path,
+    endpoint: str,
+    access_key: str,
+    secret_key: str,
+    password: str,
+    salt: str,
+    bucket: str,
+    key: str,
+    decrypt: bool = True,
+):
+    """Download SHIELD-HIT12A from S3 bucket, if not available download demo version from shieldhit.org website"""
+
+    download_ok = download_shieldhit_from_s3(destination_dir=destination_dir,
+                                             endpoint=endpoint,
+                                             access_key=access_key,
+                                             secret_key=secret_key,
+                                             password=password,
+                                             salt=salt,
+                                             bucket=bucket,
+                                             key=key,
+                                             decrypt=decrypt)
+    if download_ok:
+        click.echo(f'SHIELD-HIT12A downloaded from S3')
+    else:
+        click.echo(f'SHIELD-HIT12A download failed, trying to download demo version from shieldhit.org website')
+        demo_download_ok = download_shieldhit_demo_version(destination_dir=destination_dir)
+        if demo_download_ok:
+            click.echo(f'SHIELD-HIT12A demo version downloaded from shieldhit.org website')
+        else:
+            click.echo(f'SHIELD-HIT12A demo version download failed')
+
+
 # skipcq: PY-R1000
 def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, secret_key: str, bucket: str, key: str,
                            version: str, geant4_bucket: str) -> bool:

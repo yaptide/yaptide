@@ -11,7 +11,7 @@ if __name__ == "__main__":
     import sys
     this_file_path = Path(__file__).resolve()
     sys.path.insert(0, str(this_file_path.parent.parent.parent))
-from yaptide.admin.simulator_storage import decrypt_file, download_fluka_from_s3, download_shieldhit_demo_version, download_shieldhit_from_s3, download_topas_from_s3, encrypt_file, upload_file_to_s3
+from yaptide.admin.simulator_storage import decrypt_file, download_fluka_from_s3, download_shieldhit_demo_version, download_shieldhit_from_s3, download_shieldhit_from_s3_or_from_website, download_topas_from_s3, encrypt_file, upload_file_to_s3
 
 load_dotenv()
 endpoint = os.getenv('S3_ENDPOINT')
@@ -198,25 +198,15 @@ def download_topas(**kwargs):
 def download_shieldhit(**kwargs):
     """Download SHIELD-HIT12A"""
     click.echo(f'Downloading SHIELD-HIT12A into directory {kwargs["dir"]}')
-    click.echo(f'Decrypting SHIELD-HIT12A: {kwargs["decrypt"]}')
-    download_ok = download_shieldhit_from_s3(destination_dir=kwargs['dir'],
-                                             endpoint=kwargs['endpoint'],
-                                             access_key=kwargs['access_key'],
-                                             secret_key=kwargs['secret_key'],
-                                             password=kwargs['password'],
-                                             salt=kwargs['salt'],
-                                             bucket=kwargs['bucket'],
-                                             key=kwargs['key'],
-                                             decrypt=kwargs['decrypt'])
-    if download_ok:
-        click.echo(f'SHIELD-HIT12A downloaded from S3')
-    else:
-        click.echo(f'SHIELD-HIT12A download failed, trying to download demo version from shieldhit.org website')
-        demo_download_ok = download_shieldhit_demo_version(destination_dir=kwargs['dir'])
-        if demo_download_ok:
-            click.echo(f'SHIELD-HIT12A demo version downloaded from shieldhit.org website')
-        else:
-            click.echo(f'SHIELD-HIT12A demo version download failed')
+    download_shieldhit_from_s3_or_from_website(destination_dir=kwargs['dir'],
+                                               endpoint=kwargs['endpoint'],
+                                               access_key=kwargs['access_key'],
+                                               secret_key=kwargs['secret_key'],
+                                               password=kwargs['password'],
+                                               salt=kwargs['salt'],
+                                               bucket=kwargs['bucket'],
+                                               key=kwargs['key'],
+                                               decrypt=kwargs['decrypt'])
 
 
 @run.command
