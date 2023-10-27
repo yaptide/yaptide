@@ -215,7 +215,7 @@ def download_shieldhit(**kwargs):
               type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='file to upload')
-@s3credentials()
+@s3credentials(required=True)
 @encryption_options()
 def upload(**kwargs):
     """Upload simulator file to S3 bucket"""

@@ -93,12 +93,12 @@ curl -i -X DELETE http://localhost:5000/auth/logout
 
 Now registering, updating and deleting users is available with the use of `db_manage.py` located in `yaptide/admin` folder.
 Once docker compose is running, you can use the following command:
-`docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py --help`.
+`docker exec -w /usr/local/app/ yaptide_flask ./yaptide/admin/db_manage.py --help`.
 
 To add an user run:
 
 ```bash
-docker exec -w /usr/local/app/ yaptide_flask python3 yaptide/admin/db_manage.py add-user admin --password mysecretpassword
+docker exec -w /usr/local/app/ yaptide_flask ./yaptide/admin/db_manage.py add-user admin --password mysecretpassword
 ```
 
 ## Testing API with command-line tools
@@ -139,7 +139,7 @@ curl -i -X GET -b cookies.txt -H "Content-Type:application/json" -d "{'job_id' :
 
 ## Windows running script
 
-There are 3 scripts prepared for Windows. Example calls: 
+There are 3 scripts prepared for Windows. Example calls:
 
 ```shell
 .\scripts\run_yaptide.bat <shieldhit_binary_file_path>
