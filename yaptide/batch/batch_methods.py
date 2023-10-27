@@ -85,16 +85,12 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel,
         if line.startswith("Job id"):
             try:
                 array_id = int(line.split()[-1])
-            except ValueError:
-                logging.error(f"Could not parse array id from line: {line}")
-            except IndexError:
+            except (ValueError, IndexError):
                 logging.error(f"Could not parse array id from line: {line}")
         if line.startswith("Collect id"):
             try:
                 collect_id = int(line.split()[-1])
-            except ValueError:
-                logging.error(f"Could not parse collect id from line: {line}")
-            except IndexError:
+            except (ValueError, IndexError):
                 logging.error(f"Could not parse collect id from line: {line}")
 
     if array_id is None or collect_id is None:
