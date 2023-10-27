@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 
 class SimulatorType(IntEnum):
-    """Simulation types"""
+    """Simulator types"""
 
     shieldhit = auto()
     fluka = auto()
@@ -42,7 +42,7 @@ shieldhit_key = os.getenv('S3_SHIELDHIT_KEY')
 topas_bucket_name = os.getenv('S3_TOPAS_BUCKET')
 topas_key = os.getenv('S3_TOPAS_KEY')
 topas_version = os.getenv('S3_TOPAS_VERSION')
-geant_bucket_name = os.getenv('S3_GEANT_BUCKET')
+geant4_bucket_name = os.getenv('S3_GEANT4_BUCKET')
 fluka_bucket = os.getenv('S3_FLUKA_BUCKET')
 fluka_key = os.getenv('S3_FLUKA_KEY')
 
@@ -192,7 +192,7 @@ def download_topas_from_s3(path: Path,
                            bucket: str = topas_bucket_name,
                            key: str = topas_key,
                            version: str = topas_version,
-                           geant_bucket: str = geant_bucket_name
+                           geant4_bucket: str = geant4_bucket_name
                            ) -> bool:
     """Download TOPAS from S3 bucket"""
     s3_client = boto3.client(
@@ -230,22 +230,22 @@ def download_topas_from_s3(path: Path,
         click.echo("Failed to download TOPAS from S3 with error: ", e.response["Error"]["Message"])
         return False
 
-    # Download GEANT tar files
-    geant_temp_files = []
+    # Download GEANT4 tar files
+    geant4_temp_files = []
 
-    objects = s3_client.list_objects_v2(Bucket=geant_bucket)
+    objects = s3_client.list_objects_v2(Bucket=geant4_bucket)
 
     try:
         for obj in objects['Contents']:
             key = obj['Key']
             response = s3_client.list_object_versions(
-                Bucket=geant_bucket,
+                Bucket=geant4_bucket,
                 Prefix=key,
             )
             for curr_version in response["Versions"]:
                 version_id = curr_version["VersionId"]
                 tags = s3_client.get_object_tagging(
-                    Bucket=geant_bucket,
+                    Bucket=geant4_bucket,
                     Key=key,
                     VersionId=version_id,
                 )
@@ -257,11 +257,11 @@ def download_topas_from_s3(path: Path,
                             temp_file = tempfile.NamedTemporaryFile()
                             click.echo(f"""Downloading {key} for TOPAS version {version}
                                            from {bucket} to {temp_file.name}""")
-                            s3_client.download_fileobj(Bucket=geant_bucket,
+                            s3_client.download_fileobj(Bucket=geant4_bucket,
                                                        Key=key,
                                                        Fileobj=temp_file,
                                                        ExtraArgs={"VersionId": version_id})
-                            geant_temp_files.append(temp_file)
+                            geant4_temp_files.append(temp_file)
 
     except ClientError as e:
         click.echo("Failed to download Geant4 from S3 with error: ", e.response["Error"]["Message"])
@@ -276,20 +276,19 @@ def download_topas_from_s3(path: Path,
     logging.info("Installed TOPAS into %s", path)
     click.echo(f"Installed TOPAS into {path}")
 
-    geant_files_path = path / "geant4_files_path"
-    if not geant_files_path.exists():
+    geant4_files_path = path / "geant4_files_path"
+    if not geant4_files_path.exists():
         try:
-            geant_files_path.mkdir()
+            geant4_files_path.mkdir()
         except OSError as e:
             click.echo("Could not create installation directory")
             return False
-    for file in geant_temp_files:
+    for file in geant4_temp_files:
         file.seek(0)
         file_contents = tarfile.TarFile(fileobj=file)
-        click.echo(f"Unpacking {file.name} to {geant_files_path}")
-        file_contents.extractall(path=geant_files_path)
-    logging.info("Installed Geant4 files into %s", geant_files_path)
-    click.echo(f"Installed Geant4 files into {geant_files_path}")
+        click.echo(f"Unpacking {file.name} to {geant4_files_path}")
+        file_contents.extractall(path=geant4_files_path)
+    click.echo(f"Installed Geant4 files into {geant4_files_path}")
     return True
 
 
