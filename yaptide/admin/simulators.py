@@ -11,7 +11,7 @@ if __name__ == "__main__":
     import sys
     this_file_path = Path(__file__).resolve()
     sys.path.insert(0, str(this_file_path.parent.parent.parent))
-from yaptide.admin.simulator_storage import decrypt_file, download_fluka_from_s3, download_shieldhit_demo_version, download_shieldhit_from_s3, download_simulator, download_topas_from_s3, encrypt_file, upload_file_to_s3
+from yaptide.admin.simulator_storage import decrypt_file, download_fluka_from_s3, download_shieldhit_demo_version, download_shieldhit_from_s3, download_topas_from_s3, encrypt_file, upload_file_to_s3
 
 load_dotenv()
 endpoint = os.getenv('S3_ENDPOINT')

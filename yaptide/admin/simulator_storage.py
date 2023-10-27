@@ -59,59 +59,6 @@ def extract_shieldhit_from_zip(archive_path: Path, unpacking_dir: Path, member_n
                     shutil.move(local_file_path, destination_file_path)
 
 
-def download_simulator(sim_name: SimulatorType,
-                       download_dir: Path,
-                       endpoint: str = '',
-                       access_key: str = '',
-                       secret_key: str = '',
-                       bucket: str = '',
-                       key: str = '',
-                       password: str = '',
-                       salt: str = '') -> bool:
-    """Download simulator from S3/HTTP and install it in the filesystem"""
-    click.echo(f'Download simulator: {sim_name.name} started')
-
-    click.echo(f'Unpacking into {download_dir}')
-    download_dir.mkdir(exist_ok=True, parents=True)
-
-    download_status = False
-    if all([endpoint, access_key, secret_key]):
-        click.echo('Downloading from S3 bucket')
-
-        if sim_name == SimulatorType.shieldhit:
-            download_status = download_shieldhit_from_s3(destination_dir=download_dir,
-                                                         endpoint=endpoint,
-                                                         access_key=access_key,
-                                                         secret_key=secret_key,
-                                                         password=password,
-                                                         salt=salt,
-                                                         bucket=bucket,
-                                                         key=key)
-            if not download_status:
-                click.echo('Downloading SHIELD-HIT12A demo version from shieldhit.org site')
-                download_status = download_shieldhit_demo_version(destination_dir=download_dir)
-        elif sim_name == SimulatorType.topas:
-            download_status = download_topas_from_s3(download_dir=download_dir,
-                                                     endpoint=endpoint,
-                                                     access_key=access_key,
-                                                     secret_key=secret_key)
-        elif sim_name == SimulatorType.fluka:
-            download_status = download_fluka_from_s3(download_dir=download_dir,
-                                                     endpoint=endpoint,
-                                                     access_key=access_key,
-                                                     secret_key=secret_key,
-                                                     password=password,
-                                                     salt=salt)
-        else:
-            click.echo('Not implemented')
-            return False
-    else:
-        click.echo('Cannot download from S3 bucket, missing environment variables')
-        return False
-
-    return download_status
-
-
 def download_shieldhit_demo_version(destination_dir: Path) -> bool:
     """Download shieldhit demo version from shieldhit.org"""
     demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
