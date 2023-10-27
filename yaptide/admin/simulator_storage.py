@@ -78,6 +78,7 @@ def download_shieldhit_demo_version(destination_dir: Path) -> bool:
 
         # extract
         click.echo(f"Extracting {temp_file_archive} to {destination_dir}")
+        destination_dir.mkdir(parents=True, exist_ok=True)
         if temp_file_archive.suffix == '.gz':
             extract_shieldhit_from_tar_gz(temp_file_archive,
                                           Path(tmpdir_name),
