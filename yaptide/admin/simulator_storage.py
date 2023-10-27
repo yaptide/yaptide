@@ -26,21 +26,22 @@ class SimulatorType(IntEnum):
     topas = auto()
 
 
-def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str, shieldhit_path: Path):
+def extract_shieldhit_from_tar_gz(archive_path: Path, unpacking_directory: Path, member_name: str,
+                                  destination_dir: Path):
     """Extracts a single file from a tar.gz archive"""
     with tarfile.open(archive_path, "r:gz") as tar:
         # print all members
         for member in tar.getmembers():
             if Path(member.name).name == member_name and Path(member.name).parent.name == 'bin':
                 click.echo(f"Extracting {member.name}")
-                tar.extract(member, destination_dir)
+                tar.extract(member, unpacking_directory)
                 # move to installation path
-                local_file_path = Path(destination_dir) / member.name
-                click.echo(f"Moving {local_file_path} to {shieldhit_path}")
-                shutil.move(local_file_path, shieldhit_path / member_name)
+                local_file_path = unpacking_directory / member.name
+                click.echo(f"Moving {local_file_path} to {destination_dir}")
+                shutil.move(local_file_path, destination_dir / member_name)
 
 
-def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member_name: str, shieldhit_path: Path):
+def extract_shieldhit_from_zip(archive_path: Path, unpacking_dir: Path, member_name: str, destination_dir: Path):
     """Extracts a single file from a zip archive"""
     with zipfile.ZipFile(archive_path) as zip_handle:
         # print all members
@@ -48,42 +49,59 @@ def extract_shieldhit_from_zip(archive_path: Path, destination_dir: Path, member
             click.echo(f"Member: {member.filename}")
             if Path(member.filename).name == member_name:
                 click.echo(f"Extracting {member.filename}")
-                zip_handle.extract(member, destination_dir)
+                zip_handle.extract(member, unpacking_dir)
                 # move to installation path
-                local_file_path = Path(destination_dir) / member.filename
-                destination_file_path = shieldhit_path / member_name
+                local_file_path = Path(unpacking_dir) / member.filename
+                destination_file_path = destination_dir / member_name
                 click.echo(f"Moving {local_file_path} to {destination_file_path}")
                 # move file from temporary directory to installation path using shutils
                 if not destination_file_path.exists():
                     shutil.move(local_file_path, destination_file_path)
 
 
-def download_simulator(
-    sim_name: SimulatorType,
-    installation_path: Path,
-    endpoint: str = '',
-    access_key: str = '',
-    secret_key: str = '',
-) -> bool:
+def download_simulator(sim_name: SimulatorType,
+                       download_dir: Path,
+                       endpoint: str = '',
+                       access_key: str = '',
+                       secret_key: str = '',
+                       bucket: str = '',
+                       key: str = '',
+                       password: str = '',
+                       salt: str = '') -> bool:
     """Download simulator from S3/HTTP and install it in the filesystem"""
-    click.echo(f'Download for simulator: {sim_name.name} started')
+    click.echo(f'Download simulator: {sim_name.name} started')
 
-    click.echo(f'Unpacking into {installation_path}')
-    installation_path.mkdir(exist_ok=True, parents=True)
+    click.echo(f'Unpacking into {download_dir}')
+    download_dir.mkdir(exist_ok=True, parents=True)
 
     download_status = False
     if all([endpoint, access_key, secret_key]):
         click.echo('Downloading from S3 bucket')
 
         if sim_name == SimulatorType.shieldhit:
-            download_status = download_shieldhit_from_s3(shieldhit_path=installation_path)
+            download_status = download_shieldhit_from_s3(destination_dir=download_dir,
+                                                         endpoint=endpoint,
+                                                         access_key=access_key,
+                                                         secret_key=secret_key,
+                                                         password=password,
+                                                         salt=salt,
+                                                         bucket=bucket,
+                                                         key=key)
             if not download_status:
-                click.echo('Downloading demo version from shieldhit.org')
-                download_status = download_shieldhit_demo_version(shieldhit_path=installation_path)
+                click.echo('Downloading SHIELD-HIT12A demo version from shieldhit.org site')
+                download_status = download_shieldhit_demo_version(destination_dir=download_dir)
         elif sim_name == SimulatorType.topas:
-            download_status = download_topas_from_s3(path=installation_path)
+            download_status = download_topas_from_s3(download_dir=download_dir,
+                                                     endpoint=endpoint,
+                                                     access_key=access_key,
+                                                     secret_key=secret_key)
         elif sim_name == SimulatorType.fluka:
-            download_status = download_fluka_from_s3(fluka_path=installation_path)
+            download_status = download_fluka_from_s3(download_dir=download_dir,
+                                                     endpoint=endpoint,
+                                                     access_key=access_key,
+                                                     secret_key=secret_key,
+                                                     password=password,
+                                                     salt=salt)
         else:
             click.echo('Not implemented')
             return False
@@ -94,7 +112,7 @@ def download_simulator(
     return download_status
 
 
-def download_shieldhit_demo_version(shieldhit_path: Path) -> bool:
+def download_shieldhit_demo_version(destination_dir: Path) -> bool:
     """Download shieldhit demo version from shieldhit.org"""
     demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
     # check if working on Windows
@@ -113,17 +131,17 @@ def download_shieldhit_demo_version(shieldhit_path: Path) -> bool:
         click.echo(f"Saved to {temp_file_archive} with size {temp_file_archive.stat().st_size} bytes")
 
         # extract
-        click.echo(f"Extracting {temp_file_archive} to {shieldhit_path}")
+        click.echo(f"Extracting {temp_file_archive} to {destination_dir}")
         if temp_file_archive.suffix == '.gz':
             extract_shieldhit_from_tar_gz(temp_file_archive,
                                           Path(tmpdir_name),
                                           'shieldhit',
-                                          shieldhit_path=shieldhit_path)
+                                          destination_dir=destination_dir)
         elif temp_file_archive.suffix == '.zip':
             extract_shieldhit_from_zip(temp_file_archive,
                                        Path(tmpdir_name),
                                        'shieldhit.exe',
-                                       shieldhit_path=shieldhit_path)
+                                       destination_dir=destination_dir)
     return True
 
 
@@ -144,14 +162,17 @@ def check_if_s3_connection_is_working(s3_client: boto3.client) -> bool:
 
 
 def download_shieldhit_from_s3(
-    shieldhit_path: Path,
+    destination_dir: Path,
     endpoint: str,
     access_key: str,
     secret_key: str,
+    password: str,
+    salt: str,
     bucket: str,
     key: str,
+    decrypt: bool = True,
 ) -> bool:
-    """Download shieldhit from S3 bucket"""
+    """Download SHIELD-HIT12A from S3 bucket"""
     s3_client = boto3.client("s3",
                              aws_access_key_id=access_key,
                              aws_secret_access_key=secret_key,
@@ -160,14 +181,17 @@ def download_shieldhit_from_s3(
     if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
         return False
 
-    destination_file_path = shieldhit_path / 'shieldhit'
+    destination_file_path = destination_dir / 'shieldhit'
     # append '.exe' to file name if working on Windows
     if platform.system() == 'Windows':
-        destination_file_path = shieldhit_path / 'shieldhit.exe'
+        destination_file_path = destination_dir / 'shieldhit.exe'
 
     download_and_decrypt_status = download_file(key=key,
                                                 bucket=bucket,
                                                 s3_client=s3_client,
+                                                decrypt=decrypt,
+                                                password=password,
+                                                salt=salt,
                                                 destination_file_path=destination_file_path)
 
     if not download_and_decrypt_status:
@@ -177,7 +201,7 @@ def download_shieldhit_from_s3(
 
 
 # skipcq: PY-R1000
-def download_topas_from_s3(path: Path, endpoint: str, access_key: str, secret_key: str, bucket: str, key: str,
+def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, secret_key: str, bucket: str, key: str,
                            version: str, geant4_bucket: str) -> bool:
     """Download TOPAS from S3 bucket"""
     s3_client = boto3.client("s3",
@@ -197,6 +221,10 @@ def download_topas_from_s3(path: Path, endpoint: str, access_key: str, secret_ke
         )
         for curr_version in response["Versions"]:
             version_id = curr_version["VersionId"]
+            if version_id == "null":
+                click.echo(f"No TOPAS versions available in bucket {bucket}, file {key}", err=True)
+                return False
+
             tags = s3_client.get_object_tagging(
                 Bucket=bucket,
                 Key=key,
@@ -247,23 +275,23 @@ def download_topas_from_s3(path: Path, endpoint: str, access_key: str, secret_ke
                             geant4_temp_files.append(temp_file)
 
     except ClientError as e:
-        click.echo("Failed to download Geant4 from S3 with error: ", e.response["Error"]["Message"])
+        click.echo("Failed to download Geant4 data from S3 with error: ", e.response["Error"]["Message"])
         return False
 
     topas_temp_file.seek(0)
     topas_file_contents = tarfile.TarFile(fileobj=topas_temp_file)
-    click.echo(f"Unpacking {topas_temp_file.name} to {path}")
-    topas_file_contents.extractall(path=path)
-    topas_extracted_path = path / "topas" / "bin" / "topas"
+    click.echo(f"Unpacking {topas_temp_file.name} to {download_dir}")
+    topas_file_contents.extractall(path=download_dir)
+    topas_extracted_path = download_dir / "topas" / "bin" / "topas"
     topas_extracted_path.chmod(0o700)
-    click.echo(f"Installed TOPAS into {path}")
+    click.echo(f"Installed TOPAS into {download_dir}")
 
-    geant4_files_path = path / "geant4_files_path"
+    geant4_files_path = download_dir / "geant4_files_path"
     if not geant4_files_path.exists():
         try:
             geant4_files_path.mkdir()
         except OSError as e:
-            click.echo("Could not create installation directory")
+            click.echo(f"Could not create directory {geant4_files_path}: {e}", err=True)
             return False
     for file in geant4_temp_files:
         file.seek(0)
@@ -274,15 +302,15 @@ def download_topas_from_s3(path: Path, endpoint: str, access_key: str, secret_ke
     return True
 
 
-def download_fluka_from_s3(fluka_path: Path, endpoint: str, access_key: str, secret_key: str, bucket: str,
+def download_fluka_from_s3(download_dir: Path, endpoint: str, access_key: str, secret_key: str, bucket: str,
                            password: str, salt: str, key: str) -> bool:
-    """Download Fluka from S3 bucket"""
+    """Download (and decrypt) Fluka from S3 bucket"""
     s3_client = boto3.client("s3",
                              aws_access_key_id=access_key,
                              aws_secret_access_key=secret_key,
                              endpoint_url=endpoint)
 
-    destination_file_path = fluka_path / 'fluka'
+    destination_file_path = download_dir / 'fluka.tgz'
 
     if not validate_connection_data(bucket, key, s3_client):
         return False
@@ -290,6 +318,9 @@ def download_fluka_from_s3(fluka_path: Path, endpoint: str, access_key: str, sec
     download_ok = download_file(key=key,
                                 bucket=bucket,
                                 s3_client=s3_client,
+                                decrypt=True,
+                                password=password,
+                                salt=salt,
                                 destination_file_path=destination_file_path)
 
     return download_ok
@@ -297,18 +328,19 @@ def download_fluka_from_s3(fluka_path: Path, endpoint: str, access_key: str, sec
 
 def upload_file_to_s3(bucket: str,
                       file_path: Path,
-                      endpoint_url: str,
-                      aws_access_key_id: str,
-                      aws_secret_access_key: str,
+                      endpoint: str,
+                      access_key: str,
+                      secret_key: str,
+                      encrypt: bool = False,
                       encryption_password: str = '',
                       encryption_salt: str = '') -> bool:
     """Upload file to S3 bucket"""
     # Create S3 client
     s3_client = boto3.client(
         "s3",
-        aws_access_key_id=aws_access_key_id,
-        aws_secret_access_key=aws_secret_access_key,
-        endpoint_url=endpoint_url,
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint,
     )
     if not check_if_s3_connection_is_working(s3_client):
         click.echo("S3 connection failed", err=True)
@@ -316,41 +348,42 @@ def upload_file_to_s3(bucket: str,
 
     # Check if bucket exists and create if not
     if bucket not in [bucket["Name"] for bucket in s3_client.list_buckets()["Buckets"]]:
-        click.echo("Bucket does not exist. Creating bucket.")
+        click.echo(f"Bucket {bucket} does not exist. Creating.")
         s3_client.create_bucket(Bucket=bucket)
 
     # Encrypt file
-    encrypted_file_contents = encrypt_file(file_path, encryption_password, encryption_salt)
+    if encrypt:
+        click.echo(f"Encrypting file {file_path}")
+        file_contents = encrypt_file(file_path, encryption_password, encryption_salt)
+    file_contents = file_path.read_bytes()
     try:
         # Upload encrypted file to S3 bucket
         click.echo(f"Uploading file {file_path}")
-        s3_client.put_object(Body=encrypted_file_contents, Bucket=bucket, Key=file_path.name)
+        s3_client.put_object(Body=file_contents, Bucket=bucket, Key=file_path.name)
         return True
     except ClientError as e:
         click.echo("Upload failed with error: ", e.response["Error"]["Message"])
         return False
 
 
-def encrypt_file(file_path: Path, encryption_password: str, encryption_salt: str) -> bytes:
+def encrypt_file(file_path: Path, password: str, salt: str) -> bytes:
     """Encrypts a file using Fernet"""
-    encryption_key = derive_key(encryption_password, encryption_salt)
+    encryption_key = derive_key(password, salt)
     # skipcq: PTC-W6004
-    with open(file_path, "rb") as file:
-        original = file.read()
+    bytes_from_file = file_path.read_bytes()
     fernet = Fernet(encryption_key)
-    encrypted = fernet.encrypt(original)
+    encrypted = fernet.encrypt(bytes_from_file)
     return encrypted
 
 
-def decrypt_file(file_path: Path, encryption_password: str, encryption_salt: str) -> bytes:
+def decrypt_file(file_path: Path, password: str, salt: str) -> bytes:
     """Decrypts a file using Fernet"""
-    encryption_key = derive_key(encryption_password, encryption_salt)
+    encryption_key = derive_key(password, salt)
     # skipcq: PTC-W6004
-    with open(file_path, "rb") as file:
-        encrypted = file.read()
+    bytes_from_file = file_path.read_bytes()
     fernet = Fernet(encryption_key)
     try:
-        decrypted = fernet.decrypt(encrypted)
+        decrypted = fernet.decrypt(bytes_from_file)
     except cryptography.fernet.InvalidToken:
         click.echo("Decryption failed - invalid token (password+salt)", err=True)
         return b''
@@ -408,12 +441,12 @@ def download_file(key: str,
                 if not password or not salt:
                     click.echo("Password or salt not set", err=True)
                     return False
-                shieldhit_binary_bytes = decrypt_file(temp_file.name, password, salt)
-                if not shieldhit_binary_bytes:
+                bytes_from_decrypted_file = decrypt_file(file_path=Path(temp_file.name), password=password, salt=salt)
+                if not bytes_from_decrypted_file:
                     click.echo("Decryption failed", err=True)
                     return False
-                with open(destination_file_path, "wb") as dest_file:
-                    dest_file.write(shieldhit_binary_bytes)
+                destination_file_path.parent.mkdir(parents=True, exist_ok=True)
+                destination_file_path.write_bytes(bytes_from_decrypted_file)
             else:
                 click.echo(f"Copying {temp_file.name} to {destination_file_path}")
                 shutil.copy2(temp_file.name, destination_file_path)
@@ -425,8 +458,8 @@ def download_file(key: str,
     return True
 
 
-def derive_key(encryption_password: str, encryption_salt: str) -> bytes:
+def derive_key(password: str, salt: str) -> bytes:
     """Derives a key from the password and salt"""
-    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=encryption_salt.encode(), iterations=480_000)
-    key = urlsafe_b64encode(kdf.derive(encryption_password.encode()))
+    kdf = PBKDF2HMAC(algorithm=hashes.SHA256(), length=32, salt=salt.encode(), iterations=480_000)
+    key = urlsafe_b64encode(kdf.derive(password.encode()))
     return key

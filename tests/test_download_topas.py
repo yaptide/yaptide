@@ -31,7 +31,7 @@ def test_if_topas_downloaded(tmpdir):
                                       key=os.getenv("S3_TOPAS_KEY"),
                                       version=os.getenv("S3_TOPAS_VERSION"),
                                       geant4_bucket=os.getenv("S3_GEANT4_BUCKET"),
-                                      path=tmpdir) is True
+                                      download_dir=tmpdir) is True
         expected_path = Path(tmpdir / "topas" / "bin" / "topas")
         assert expected_path.exists(), "Expected TOPAS path does not exist."
         assert expected_path.stat().st_size > 0, "Expected TOPAS path is empty."

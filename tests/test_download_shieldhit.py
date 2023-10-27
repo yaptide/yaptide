@@ -28,7 +28,7 @@ def test_if_shieldhit_downloaded(tmpdir, shieldhit_binary_filename):
                                           key=os.getenv("S3_SHIELDHIT_KEY"),
                                           password=os.getenv("S3_ENCRYPTION_PASSWORD"),
                                           salt=os.getenv("S3_ENCRYPTION_SALT"),
-                                          shieldhit_path=tmpdir) is True
+                                          destination_dir=tmpdir) is True
         expected_path = Path(tmpdir / shieldhit_binary_filename)
         assert expected_path.exists(), "Expected path does not exist."
         assert expected_path.stat().st_size > 0, "Expected path is empty."

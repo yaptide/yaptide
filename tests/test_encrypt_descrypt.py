@@ -3,6 +3,7 @@ import pytest
 
 from yaptide.admin.simulators import decrypt_file, encrypt_file
 
+
 @pytest.fixture
 def salt() -> str:
     '''Salt for encryption'''
@@ -34,13 +35,13 @@ def test_enrypt_descrypt(tmpdir, password, salt):
     assert not encrypted_file_path.exists()
 
     # encrypt the file
-    encrypted_bytes = encrypt_file(file_path=plain_file_path, encryption_password=password, encryption_salt=salt)
+    encrypted_bytes = encrypt_file(file_path=plain_file_path, password=password, salt=salt)
 
     # check if original plain file is untouched
     assert plain_file_path.exists()
     assert plain_file_path.stat().st_size > 0
     assert plain_file_path.read_text(encoding='ascii') == plain_text_contents
-    
+
     # save encrypted bytes to file
     encrypted_file_path.write_bytes(encrypted_bytes)
 
@@ -52,11 +53,11 @@ def test_enrypt_descrypt(tmpdir, password, salt):
     assert encrypted_file_path.read_bytes() != plain_file_path.read_bytes()
 
     # decrypt the file
-    decrypted_bytes = decrypt_file(file_path=encrypted_file_path, encryption_password=password, encryption_salt=salt)
+    decrypted_bytes = decrypt_file(file_path=encrypted_file_path, password=password, salt=salt)
 
     # check if decrypted bytes are the same as original plain file
     assert decrypted_bytes == plain_file_path.read_bytes()
-    
+
     # save decrypted bytes to file
     decrypted_file_path.write_bytes(decrypted_bytes)
 
@@ -66,4 +67,3 @@ def test_enrypt_descrypt(tmpdir, password, salt):
 
     # check if decrypted file is the same as original plain file
     assert decrypted_file_path.read_bytes() == plain_file_path.read_bytes()
-
