@@ -8,7 +8,7 @@ from pathlib import Path
 import eventlet
 
 from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators, read_file,
+from yaptide.celery.utils.pymc import (average_estimators, read_file, run_fluka,
                                        run_shieldhit)
 from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
@@ -39,7 +39,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
 @celery_app.task()
 def install_simulators() -> bool:
     """Task responsible for installing simulators on the worker"""
-    result = install_simulator(SimulatorType.shieldhit)
+    result = install_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
     return result
 
 
@@ -56,8 +56,9 @@ def run_single_simulation(self,
                           task_id: str,
                           update_key: str = None,
                           simulation_id: int = None,
-                          keep_tmp_files: bool = False) -> dict:
-    """Function running single shieldhit simulation"""
+                          keep_tmp_files: bool = False,
+                          sim_type: str = 'shieldhit') -> dict:
+    """Function running single simulation"""
     # for the purpose of running this function in pytest we would like to have some control
     # on the temporary directory used by the function
 
@@ -110,15 +111,19 @@ def run_single_simulation(self,
                                                   simulation_id,
                                                   task_id,
                                                   update_key,
-                                                  current_logging_level)
+                                                  logging_level=current_logging_level)
             logging.info("Started monitoring process for task %s", task_id)
         else:
             logging.info("No monitoring processes started for task %s", task_id)
 
-        logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
-        estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
-        logging.info("Simulation finished for task %s", task_id)
+        if sim_type == 'shieldhit':
+            logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
+            estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
+        else:
+            logging.info("Running Fluka simulation in %s", tmp_dir_path)
+            estimators_dict = run_fluka(dir_path=Path(tmp_dir_path), task_id=task_id)
 
+        logging.info("Simulation finished for task %s", task_id)
         # at this point simulation is finished (failed or succeded) and we can kill the monitoring process
         if watcher_green_thread is not None:
             logging.info("Killing monitoring processes for task %s", task_id)

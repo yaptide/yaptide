@@ -4,9 +4,11 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Protocol
 
-from pymchelper.executor.options import SimulationSettings
+from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
+from pymchelper.executor.runner import Runner
 
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
                                    TIMEOUT_MATCH, log_generator)
@@ -17,6 +19,7 @@ from yaptide.utils.enums import EntityState
 def run_shieldhit(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single SHIELD-HIT12A simulation"""
     settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+                                  simulator_type=SimulatorType.shieldhit,
                                   simulator_exec_path=None,  # useless
                                   cmdline_opts="")  # useless
     # last part of task_id gives an integer seed for random number generator
@@ -56,6 +59,72 @@ def run_shieldhit(dir_path: Path, task_id: str) -> dict:
     estimators_list = frompattern(files_pattern_pattern)
     for estimator in estimators_list:
         logging.debug("Appending estimator for %s", estimator.file_corename)
+        estimators_dict[estimator.file_corename] = estimator
+
+    return estimators_dict
+
+
+def run_fluka(dir_path: Path, task_id: str) -> dict:
+    """Function run in eventlet to run single fluka simulation"""
+    settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+                                  simulator_type=SimulatorType.fluka,
+                                  simulator_exec_path=None,  # useless
+                                  cmdline_opts="")  # useless
+
+    input_file = next(dir_path.glob("*.inp"), None)
+    if input_file is None:
+        # if there is no input file, raise an error
+        # this should never happen
+        raise FileNotFoundError("Input file not found")
+
+    class UpdateFlukaRandomSeed(Protocol):
+        """Protocol for updating random seed in fluka input file"""
+
+        def __call__(self, file_path: str, rng_seed: int) -> None:
+            """Updates random seed in fluka input file"""
+
+    random_seed = int(task_id.split("_")[-1])
+    # propably should be protected instead of private
+    update_fluka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
+    update_fluka_function(str(input_file.resolve()), random_seed)
+
+    command_as_list = str(settings).split()
+
+    logging.debug("Running fluka with setting %s", settings)
+
+    try:
+        # If check=True and the exit code is non-zero, raises a
+        # CalledProcessError (has return code and output/error streams).
+        # text=True means stdout and stderr will be strings instead of bytes
+        completed_process = subprocess.run(command_as_list,
+                                           check=True,
+                                           cwd=str(dir_path),
+                                           stdout=subprocess.PIPE,
+                                           stderr=subprocess.PIPE,
+                                           text=True)
+
+        # Capture stdout and stderr
+        command_stdout = completed_process.stdout
+        command_stderr = completed_process.stderr
+
+        # Log stdout and stderr using logging
+        logging.info("Command Output:\n%s", command_stdout)
+        logging.info("Command Error Output:\n%s", command_stderr)
+    except subprocess.CalledProcessError as e:
+        # If the command exits with a non-zero status
+        logging.error("Command Error: %s\nExecuted Command: %s", e.stderr, " ".join(command_as_list))
+    except Exception as e:  # skipcq: PYL-W0703
+        logging.error("Exception while running Fluka: %s", e)
+
+    logging.info("Fluka simulation for task %s finished", task_id)
+
+    estimators_dict = {}
+    files_pattern_pattern = str(dir_path / "*_fort.*")
+    estimators_list = frompattern(files_pattern_pattern)
+    for estimator in estimators_list:
+        for i, page in enumerate(estimator.pages):
+            page.page_number = i
+
         estimators_dict[estimator.file_corename] = estimator
 
     return estimators_dict
@@ -117,6 +186,7 @@ def read_file(filepath: Path,
         }
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
+    logging.debug("Log file for task %s found", task_id)
 
     # create generator which waits for new lines in log file
     # if no new line appears in timeout_wait_for_line seconds, generator stops
@@ -126,6 +196,7 @@ def read_file(filepath: Path,
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
+            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             splitted = line.split()
             simulated_primaries = int(splitted[3])
             if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
@@ -141,6 +212,7 @@ def read_file(filepath: Path,
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(REQUESTED_MATCH, line):
+            logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             # found a line with requested primaries, update database
             # task is in RUNNING state
             splitted = line.split(": ")
@@ -163,6 +235,7 @@ def read_file(filepath: Path,
             return
 
         elif re.search(COMPLETE_MATCH, line):
+            logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             break
 
     logging.info("Parsing log file for task %s finished", task_id)

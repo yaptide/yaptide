@@ -9,11 +9,11 @@ flask-sqlalchemy==3.0.5
 flask_swagger_ui==4.11.1
 flask==2.3.3
 pyjwt==2.8.0
-pymchelper==2.5.2
+pymchelper==2.6.0
 redis==5.0.1
 requests==2.31.0
 scipy==1.11.3  # needed by converter submodule
 SQLAlchemy==1.4.44
-Werkzeug==3.0.0
-boto3==1.28.66
+Werkzeug==3.0.1
+boto3==1.28.69
 cryptography==41.0.4
