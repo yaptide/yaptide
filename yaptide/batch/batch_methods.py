@@ -17,7 +17,7 @@ from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options,
                                        extract_sbatch_header)
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel,
                                         KeycloakUserModel)
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import JobState, TaskState
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 
@@ -161,26 +161,27 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
 
     if job_state == "FAILED" or collect_state == "FAILED":
         return {
-            "job_state": EntityState.FAILED.value,
+            "job_state": JobState.FAILED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
     if collect_state == "COMPLETED":
         return {
-            "job_state": EntityState.COMPLETED.value,
+            "job_state": JobState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
     if collect_state == "RUNNING":
         logging.debug("Collect job is in RUNNING state")
+        return {"job_state": JobState.MERGING_RUNNING.value}
     if job_state == "RUNNING":
         logging.debug("Main job is in RUNNING state")
-    if collect_state == "PENDING":
-        logging.debug("Collect job is in PENDING state")
+        return {"job_state": JobState.SIMULATION_RUNNING.value}
     if job_state == "PENDING":
         logging.debug("Main job is in PENDING state")
-
-    return {
-        "job_state": EntityState.RUNNING.value
-    }
+        return {"job_state": JobState.SIMULATION_QUEUED.value}
+    
+    # Last possibility is that collect job is in PENDING state
+    logging.debug("Collect job is in PENDING state")
+    return {"job_state": JobState.MERGING_QUEUED.value}
 
 
 def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:

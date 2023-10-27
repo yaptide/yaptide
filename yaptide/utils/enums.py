@@ -14,36 +14,78 @@ class PlatformType(Enum):
     """
 
 
-class EntityState(Enum):
-    """Job and task state types"""
+class JobState(Enum):
+    """Job state types"""
 
-    UNKNOWN = "UNKNOWN"
+    PREPARING = "PREPARING"
     """
-    This state is used only for jobs which are not yet submitted but was created in the database.
-    Jobs in this state cannot be canceled.
+    Job is added to the database and is waiting for being queued.
     """
-    PENDING = "PENDING"
+    SIMULATION_QUEUED = "SIMULATION_QUEUED"
     """
-    Jobs and tasks in this state are waiting for execution.
+    Main calculations are queued.
     """
-    RUNNING = "RUNNING"
+    SIMULATION_RUNNING = "SIMULATION_RUNNING"
     """
-    Jobs and tasks in this state are currently running.
+    Main calculations are running.
     """
-    CANCELED = "CANCELED"
+    MERGING_QUEUED = "MERGING_QUEUED"
     """
-    Jobs and tasks in this state are canceled.
-    Jobs and tasks in this state cannot be canceled.
+    Merging of the results is queued.
     """
-    COMPLETED = "COMPLETED"
+    MERGING_RUNNING = "MERGING_RUNNING"
     """
-    Jobs and tasks in this state are completed.
-    Jobs and tasks in this state cannot be canceled.
+    Merging of the results is running.
     """
     FAILED = "FAILED"
     """
-    Jobs and tasks in this state are failed.
-    Jobs and tasks in this state cannot be canceled.
+    Job is failed.
+    Job in this state cannot be canceled.
+    """
+    COMPLETED = "COMPLETED"
+    """
+    Job is completed.
+    Job in this state cannot be canceled.
+    """
+    CANCELED = "CANCELED"
+    """
+    Job is canceled.
+    Job in this state cannot be canceled.
+    """
+
+
+class TaskState(Enum):
+    """Task state types"""
+    QUEUED = "QUEUED"
+    """
+    Task is queued.
+    """
+    INITIALIZING = "INITIALIZING"
+    """
+    Task is allocating memory and other resources.
+    """
+    RUNNING = "RUNNING"
+    """
+    Task is running.
+    """
+    FINALIZING = "FINALIZING"
+    """
+    Task is clearing memory and other resources.
+    """
+    FAILED = "FAILED"
+    """
+    Task is failed.
+    Task in this state cannot be canceled.
+    """
+    COMPLETED = "COMPLETED"
+    """
+    Task is completed.
+    Task in this state cannot be canceled.
+    """
+    CANCELED = "CANCELED"
+    """
+    Task is canceled.
+    Task in this state cannot be canceled.
     """
 
 

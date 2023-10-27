@@ -19,7 +19,7 @@ from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import JobState, TaskState
 
 
 class JobsResource(Resource):
@@ -47,8 +47,8 @@ class JobsResource(Resource):
             return yaptide_response(message=error_message, code=res_code)
 
         simulation = fetch_simulation_by_job_id(job_id=job_id)
-        if simulation.job_state == EntityState.UNKNOWN.value:
-            return yaptide_response(message="Job state is unknown",
+        if simulation.job_state == JobState.PREPARING.value:
+            return yaptide_response(message="Job state is being prepared",
                                     code=200,
                                     content={"job_state": simulation.job_state})
 
@@ -56,8 +56,8 @@ class JobsResource(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value):
+        if simulation.job_state in (JobState.COMPLETED.value,
+                                    JobState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -69,12 +69,12 @@ class JobsResource(Resource):
             "job_state": simulation.job_state
         }
         status_counter = Counter([task["task_state"] for task in job_tasks_status])
-        if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.PENDING.value
-        elif status_counter[EntityState.FAILED.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.FAILED.value
-        elif status_counter[EntityState.RUNNING.value] > 0:
-            job_info["job_state"] = EntityState.RUNNING.value
+        if status_counter[TaskState.QUEUED.value] == len(job_tasks_status):
+            job_info["job_state"] = JobState.SIMULATION_QUEUED.value
+        elif status_counter[TaskState.FAILED.value] == len(job_tasks_status):
+            job_info["job_state"] = JobState.FAILED.value
+        elif status_counter[TaskState.RUNNING.value] > 0:
+            job_info["job_state"] = JobState.SIMULATION_RUNNING.value
 
         update_simulation_state(simulation=simulation, update_dict=job_info)
 
@@ -135,7 +135,7 @@ class ResultsResource(Resource):
                     add_object_to_db(page, False)
             make_commit_to_db()
         update_simulation_state(simulation=simulation, update_dict={
-            "job_state": EntityState.COMPLETED.value,
+            "job_state": JobState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         })
         return yaptide_response(message="Results saved", code=202)

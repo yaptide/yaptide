@@ -14,7 +14,7 @@ from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_simulation_results,
                                            send_task_update)
 from yaptide.celery.worker import celery_app
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import TaskState
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
                                      estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)
@@ -63,6 +63,13 @@ def run_single_simulation(self,
     # on the temporary directory used by the function
 
     logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
+    
+    logging.info("Sending update for task %s, setting celery id %s", task_id, self.request.id)
+    up_dict = {
+        "task_state": TaskState.INITIALIZING.value,
+        "celery_id": self.request.id
+    }
+    send_task_update(simulation_id, task_id, update_key, up_dict)
 
     # lets try by default to use python tempfile module
     tmp_dir = tempfile.gettempdir()
@@ -98,10 +105,6 @@ def run_single_simulation(self,
         # this is done by reading the log file and sending the updates to the backend
         # if we have update_key and simulation_id the monitoring thread can submit the updates to backend
         if update_key is not None and simulation_id is not None:
-
-            logging.info("Sending update for task %s, setting celery id %s", task_id, self.request.id)
-            send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
-
             path_to_monitor = Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
 
             current_logging_level = logging.getLogger().getEffectiveLevel()
@@ -134,7 +137,7 @@ def run_single_simulation(self,
         # here we have simulation which failed, this means we mark the task as failed
         if not estimators_dict:
             logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
-            update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+            update_dict = {"task_state": TaskState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, update_dict)
 
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
@@ -157,7 +160,7 @@ def run_single_simulation(self,
 
         # We do not have any information if monitoring process sent the last update
         # so we send it here to make sure that we have the end_time and COMPLETED state
-        update_dict = {"task_state": EntityState.COMPLETED.value, "end_time": end_time}
+        update_dict = {"task_state": TaskState.COMPLETED.value, "end_time": end_time}
         send_task_update(simulation_id, task_id, update_key, update_dict)
 
         return {
