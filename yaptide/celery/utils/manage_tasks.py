@@ -5,7 +5,7 @@ from celery.result import AsyncResult
 
 from yaptide.celery.tasks import merge_results, run_single_simulation
 from yaptide.celery.worker import celery_app
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import JobState, TaskState
 
 
 def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, sim_type: str = 'shieldhit') -> str:
@@ -36,13 +36,13 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
     def get_task_status(job_id: str, state_key: str) -> dict:
         """Gets status of each task in the workflow"""
         job = AsyncResult(id=job_id, app=celery_app)
-        job_state: str = translate_celery_state_naming(job.state)
+        job_state: str = translate_celery_state_naming(job.state, state_key == "job_state")
 
         # we still need to convert string to enum and operate later on Enum
         result = {
             state_key: job_state
         }
-        if job_state == EntityState.FAILED.value:
+        if job_state == JobState.FAILED.value:
             result["message"] = str(job.info)
         if "end_time" in job.info:
             result["end_time"] = job.info["end_time"]
@@ -61,11 +61,11 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
     def cancel_task(job_id: str, state_key: str) -> dict:
         """Cancels (if possible) every task in the workflow"""
         job = AsyncResult(id=job_id, app=celery_app)
-        job_state: str = translate_celery_state_naming(job.state)
+        job_state: str = translate_celery_state_naming(job.state, state_key == "job_state")
 
-        if job_state in [EntityState.CANCELED.value,
-                         EntityState.COMPLETED.value,
-                         EntityState.FAILED.value]:
+        if job_state in [JobState.CANCELED.value,
+                         JobState.COMPLETED.value,
+                         JobState.FAILED.value]:
             logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
             return {
                 state_key: job_state,
@@ -81,7 +81,7 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
             }
 
         return {
-            state_key: EntityState.CANCELED.value,
+            state_key: TaskState.CANCELED.value,
             "message": f"Job {job_id} canceled"
         }
 
@@ -100,17 +100,18 @@ def get_job_results(job_id: str) -> dict:
     return job.info.get("result")
 
 
-def translate_celery_state_naming(job_state: str) -> str:
+def translate_celery_state_naming(job_state: str, is_merge: bool) -> str:
     """Function translating celery states' names to ones used in YAPTIDE"""
+    # TODO: this requires more attention since we have more states in YAPTIDE
     if job_state in ["RECEIVED", "RETRY"]:
-        return EntityState.PENDING.value
+        return JobState.MERGING_QUEUED.value if is_merge else TaskState.QUEUED.value
     if job_state in ["PROGRESS", "STARTED"]:
-        return EntityState.RUNNING.value
+        return JobState.MERGING_RUNNING.value if is_merge else TaskState.RUNNING.value
     if job_state in ["FAILURE"]:
-        return EntityState.FAILED.value
+        return JobState.FAILED.value if is_merge else TaskState.FAILED.value
     if job_state in ["REVOKED"]:
-        return EntityState.CANCELED.value
+        return JobState.CANCELED.value if is_merge else TaskState.CANCELED.value
     if job_state in ["SUCCESS"]:
-        return EntityState.COMPLETED.value
+        return JobState.COMPLETED.value if is_merge else TaskState.COMPLETED.value
     # Others are the same
     return job_state

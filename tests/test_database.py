@@ -4,7 +4,7 @@ import time
 from sqlalchemy.orm.scoping import scoped_session
 from sqlalchemy.orm import with_polymorphic
 
-from yaptide.utils.enums import PlatformType, EntityState, InputType, SimulationType
+from yaptide.utils.enums import PlatformType, JobState, TaskState, InputType, SimulationType
 from yaptide.persistence.models import (
     UserModel,
     YaptideUserModel,
@@ -114,7 +114,7 @@ def test_create_celery_simulation(db_session: scoped_session, db_good_username: 
     assert simulation.platform == PlatformType.DIRECT.value
     assert simulation.input_type == InputType.EDITOR.value
     assert simulation.sim_type == SimulationType.SHIELDHIT.value
-    assert simulation.job_state == EntityState.UNKNOWN.value
+    assert simulation.job_state == JobState.PREPARING.value
 
 
 def test_create_batch_simulation(db_session: scoped_session, db_good_username: str, db_good_password: str):
@@ -153,7 +153,7 @@ def test_create_batch_simulation(db_session: scoped_session, db_good_username: s
     assert simulation.platform == PlatformType.BATCH.value
     assert simulation.input_type == InputType.EDITOR.value
     assert simulation.sim_type == SimulationType.SHIELDHIT.value
-    assert simulation.job_state == EntityState.UNKNOWN.value
+    assert simulation.job_state == JobState.PREPARING.value
 
 
 def test_celery_task_model_creation_and_update(db_session: scoped_session, db_good_username: str, db_good_password: str):
@@ -180,18 +180,18 @@ def test_celery_task_model_creation_and_update(db_session: scoped_session, db_go
     # retrieve the task from the database and check its fields
     task: CeleryTaskModel = CeleryTaskModel.query.filter_by(simulation_id=simulation.id).first()
     assert task.id is not None
-    assert task.task_state == EntityState.PENDING.value
+    assert task.task_state == TaskState.QUEUED.value
 
     start_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
         'celery_id': 'testceleryid',
-        'task_state': EntityState.RUNNING.value,
+        'task_state': TaskState.RUNNING.value,
         'simulated_primaries': 500,
         'start_time': start_time
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 500
-    assert task.task_state == EntityState.RUNNING.value
+    assert task.task_state == TaskState.RUNNING.value
     assert task.end_time is None
     assert task.celery_id == 'testceleryid'
 
@@ -199,13 +199,13 @@ def test_celery_task_model_creation_and_update(db_session: scoped_session, db_go
 
     end_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': EntityState.COMPLETED.value,
+        'task_state': TaskState.COMPLETED.value,
         'end_time': end_time,
         'simulated_primaries': 1000
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 1000
-    assert task.task_state == EntityState.COMPLETED.value
+    assert task.task_state == TaskState.COMPLETED.value
     assert task.end_time is not None
     assert task.end_time > task.start_time
 
@@ -244,30 +244,30 @@ def test_batch_task_model_creation_and_update(db_session: scoped_session, db_goo
     # retrieve the task from the database and check its fields
     task: BatchTaskModel = BatchTaskModel.query.filter_by(simulation_id=simulation.id).first()
     assert task.id is not None
-    assert task.task_state == EntityState.PENDING.value
+    assert task.task_state == TaskState.PENDING.value
 
     start_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': EntityState.RUNNING.value,
+        'task_state': TaskState.RUNNING.value,
         'simulated_primaries': 500,
         'start_time': start_time
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 500
-    assert task.task_state == EntityState.RUNNING.value
+    assert task.task_state == TaskState.RUNNING.value
     assert task.end_time is None
 
     time.sleep(1)
 
     end_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': EntityState.COMPLETED.value,
+        'task_state': TaskState.COMPLETED.value,
         'end_time': end_time,
         'simulated_primaries': 1000
     }
     task.update_state(update_dict=update_dict)
     assert task.simulated_primaries == 1000
-    assert task.task_state == EntityState.COMPLETED.value
+    assert task.task_state == TaskState.COMPLETED.value
     assert task.end_time is not None
     assert task.end_time > task.start_time
 
@@ -301,7 +301,7 @@ def test_celery_simulation_with_multiple_tasks(db_session: scoped_session, db_go
 
     start_time = datetime.utcnow().isoformat(sep=" ")
     update_dict = {
-        'task_state': EntityState.RUNNING.value,
+        'task_state': TaskState.RUNNING.value,
         'simulated_primaries': 1,
         'start_time': start_time
     }
@@ -311,13 +311,13 @@ def test_celery_simulation_with_multiple_tasks(db_session: scoped_session, db_go
 
     time.sleep(1)
 
-    update_dict = {'task_state': EntityState.RUNNING.value, 'simulated_primaries': 500}
+    update_dict = {'task_state': TaskState.RUNNING.value, 'simulated_primaries': 500}
 
     for idx, task in enumerate(tasks):
         if idx == 50:
             end_time = datetime.utcnow().isoformat(sep=" ")
             update_dict = {
-                'task_state': EntityState.COMPLETED.value,
+                'task_state': TaskState.COMPLETED.value,
                 'end_time': end_time,
                 'simulated_primaries': 1000
             }
@@ -325,22 +325,22 @@ def test_celery_simulation_with_multiple_tasks(db_session: scoped_session, db_go
     db_session.commit()
 
     tasks_running: list[CeleryTaskModel] = CeleryTaskModel.query.filter_by(
-        simulation_id=simulation.id, task_state=EntityState.RUNNING.value).all()
+        simulation_id=simulation.id, task_state=TaskState.RUNNING.value).all()
     assert len(tasks_running) == 50
 
     for task in tasks_running:
         assert task.simulated_primaries == 500
-        assert task.task_state == EntityState.RUNNING.value
+        assert task.task_state == TaskState.RUNNING.value
         assert task.end_time is None
 
     tasks_completed: list[CeleryTaskModel] = CeleryTaskModel.query.filter_by(
-        simulation_id=simulation.id, task_state=EntityState.COMPLETED.value).all()
+        simulation_id=simulation.id, task_state=TaskState.COMPLETED.value).all()
 
     assert len(tasks_completed) == 50
 
     for task in tasks_completed:
         assert task.simulated_primaries == 1000
-        assert task.task_state == EntityState.COMPLETED.value
+        assert task.task_state == TaskState.COMPLETED.value
         assert task.end_time is not None
         assert task.end_time > task.start_time
 

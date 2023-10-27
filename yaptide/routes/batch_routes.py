@@ -23,7 +23,7 @@ from yaptide.routes.utils.response_templates import (error_validation_response,
                                                      error_internal_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
-from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.enums import JobState, TaskState, PlatformType
 
 
 class JobsBatch(Resource):
@@ -98,7 +98,7 @@ class JobsBatch(Resource):
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict
         add_object_to_db(input_model)
-        if simulation.update_state({"job_state": EntityState.PENDING.value}):
+        if simulation.update_state({"job_state": JobState.SIMULATION_QUEUED.value}):
             make_commit_to_db()
 
         return yaptide_response(
@@ -136,8 +136,8 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value):
+        if simulation.job_state in (JobState.COMPLETED.value,
+                                    JobState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -180,10 +180,10 @@ class JobsBatch(Resource):
 
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value,
-                                    EntityState.CANCELED.value,
-                                    EntityState.UNKNOWN.value):
+        if simulation.job_state in (JobState.COMPLETED.value,
+                                    JobState.FAILED.value,
+                                    JobState.CANCELED.value,
+                                    JobState.PREPARING.value):
             return yaptide_response(message=f"Cannot cancel job which is in {simulation.job_state} state",
                                     code=200,
                                     content={
@@ -196,12 +196,12 @@ class JobsBatch(Resource):
         if status_code != 200:
             return error_internal_response(content=result)
 
-        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+        update_simulation_state(simulation=simulation, update_dict={"job_state": JobState.CANCELED.value})
 
         tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
 
         for task in tasks:
-            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+            update_task_state(task=task, update_dict={"task_state": TaskState.CANCELED.value})
 
         return yaptide_response(
             message="",

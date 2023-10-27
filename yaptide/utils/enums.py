@@ -14,39 +14,6 @@ class PlatformType(Enum):
     """
 
 
-class EntityState(Enum):
-    """Job and task state types"""
-
-    UNKNOWN = "UNKNOWN"
-    """
-    This state is used only for jobs which are not yet submitted but was created in the database.
-    Jobs in this state cannot be canceled.
-    """
-    PENDING = "PENDING"
-    """
-    Jobs and tasks in this state are waiting for execution.
-    """
-    RUNNING = "RUNNING"
-    """
-    Jobs and tasks in this state are currently running.
-    """
-    CANCELED = "CANCELED"
-    """
-    Jobs and tasks in this state are canceled.
-    Jobs and tasks in this state cannot be canceled.
-    """
-    COMPLETED = "COMPLETED"
-    """
-    Jobs and tasks in this state are completed.
-    Jobs and tasks in this state cannot be canceled.
-    """
-    FAILED = "FAILED"
-    """
-    Jobs and tasks in this state are failed.
-    Jobs and tasks in this state cannot be canceled.
-    """
-
-
 class JobState(Enum):
     """Job state types"""
 

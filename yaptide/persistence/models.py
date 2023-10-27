@@ -8,7 +8,7 @@ from sqlalchemy.sql.functions import now
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from yaptide.persistence.database import db
-from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.enums import PlatformType, JobState, TaskState
 
 
 class UserModel(db.Model):
@@ -102,7 +102,7 @@ class SimulationModel(db.Model):
                                       doc="Simulator type (i.e. 'shieldhit', 'topas', 'fluka')")
     job_state: Column[str] = db.Column(db.String,
                                        nullable=False,
-                                       default=EntityState.UNKNOWN.value,
+                                       default=JobState.PREPARING.value,
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
     update_key_hash: Column[str] = db.Column(db.String,
                                              doc="Update key shared by tasks granting access to update themselves")
@@ -130,9 +130,9 @@ class SimulationModel(db.Model):
         perform it only for such fields which exists and which have updated values.
         Returns bool value telling if it is required to commit changes to db.
         """
-        if self.job_state in (EntityState.COMPLETED.value,
-                              EntityState.FAILED.value,
-                              EntityState.CANCELED.value):
+        if self.job_state in (JobState.COMPLETED.value,
+                              JobState.FAILED.value,
+                              JobState.CANCELED.value):
             return False
         db_commit_required = False
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
@@ -197,7 +197,7 @@ class TaskModel(db.Model):
                                                  doc="Simulated number of primaries")
     task_state: Column[str] = db.Column(db.String,
                                         nullable=False,
-                                        default=EntityState.PENDING.value,
+                                        default=TaskState.QUEUED.value,
                                         doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
@@ -224,9 +224,9 @@ class TaskModel(db.Model):
         Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
         """
-        if self.task_state in (EntityState.COMPLETED.value,
-                               EntityState.FAILED.value,
-                               EntityState.CANCELED.value):
+        if self.task_state in (TaskState.COMPLETED.value,
+                               TaskState.FAILED.value,
+                               TaskState.CANCELED.value):
             return
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
             self.requested_primaries = update_dict["requested_primaries"]

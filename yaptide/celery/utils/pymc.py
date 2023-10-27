@@ -13,7 +13,7 @@ from pymchelper.executor.runner import Runner
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
                                    TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.requests import send_task_update
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import TaskState
 
 
 def run_shieldhit(dir_path: Path, task_id: str) -> dict:
@@ -181,7 +181,7 @@ def read_file(filepath: Path,
     if logfile is None:
         logging.error("Log file for task %s not found", task_id)
         up_dict = {
-            "task_state": EntityState.FAILED.value,
+            "task_state": TaskState.FAILED.value,
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
         send_task_update(simulation_id, task_id, update_key, up_dict)
@@ -221,14 +221,14 @@ def read_file(filepath: Path,
                 "simulated_primaries": 0,
                 "requested_primaries": requested_primaries,
                 "start_time": utc_now.isoformat(sep=" "),
-                "task_state": EntityState.RUNNING.value
+                "task_state": TaskState.RUNNING.value
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", task_id)
             up_dict = {
-                "task_state": EntityState.FAILED.value,
+                "task_state": TaskState.FAILED.value,
                 "end_time": datetime.utcnow().isoformat(sep=" ")
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
@@ -242,7 +242,7 @@ def read_file(filepath: Path,
     up_dict = {
         "simulated_primaries": requested_primaries,
         "end_time": utc_now.isoformat(sep=" "),
-        "task_state": EntityState.COMPLETED.value
+        "task_state": TaskState.COMPLETED.value
     }
     logging.info("Sending final update for task %s", task_id)
     send_task_update(simulation_id, task_id, update_key, up_dict)
