@@ -478,13 +478,13 @@ def install(**kwargs):
               type=click.STRING,
               required=True,
               envvar='S3_ENDPOINT', default=endpoint, help='S3 endpoint')
-@click.option('--access_key', type=click.STRING, required=True, 
+@click.option('--access_key', type=click.STRING, required=True,
               envvar='S3_ACCESS_KEY', default=access_key, help='S3 access key')
-@click.option('--secret_key', type=click.STRING, required=True, 
+@click.option('--secret_key', type=click.STRING, required=True,
               envvar='S3_SECRET_KEY', default=secret_key, help='S3 secret key')
-@click.option('--password', type=click.STRING, 
+@click.option('--password', type=click.STRING,
               envvar='S3_ENCRYPTION_PASSWORD', default=password, help='encryption password')
-@click.option('--salt', type=click.STRING, 
+@click.option('--salt', type=click.STRING,
               envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
 def upload(**kwargs):
     """Upload simulator file to S3 bucket"""
@@ -503,24 +503,24 @@ def upload(**kwargs):
 
 
 @run.command
-@click.option('--infile', 
-              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path), 
+@click.option('--infile',
+              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='Path to file to encrypt')
-@click.option('--outfile', 
-              type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path), 
+@click.option('--outfile',
+              type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='Path where encrypted file is saved')
-@click.option('--password', type=click.STRING, 
+@click.option('--password', type=click.STRING,
               required=True,
               envvar='S3_ENCRYPTION_PASSWORD', default=password, help='encryption password')
-@click.option('--salt', type=click.STRING, 
+@click.option('--salt', type=click.STRING,
               required=True,
               envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
 def encrypt(**kwargs):
     """Encrypt a file"""
-    encrypted_bytes = encrypt_file(file_path=kwargs['infile'], 
-                                   encryption_password=kwargs['password'], 
+    encrypted_bytes = encrypt_file(file_path=kwargs['infile'],
+                                   encryption_password=kwargs['password'],
                                    encryption_salt=kwargs['salt'])
     outfile_path = Path(kwargs['outfile'])
     outfile_path.write_bytes(encrypted_bytes)
@@ -528,17 +528,17 @@ def encrypt(**kwargs):
 
 @run.command
 @click.option('--infile', 
-              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path), 
+              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='Path to file to decrypt')
-@click.option('--outfile', 
-              type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path), 
+@click.option('--outfile',
+              type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='Path where decrypted file is saved')
-@click.option('--password', type=click.STRING, 
+@click.option('--password', type=click.STRING,
               required=True,
               envvar='S3_ENCRYPTION_PASSWORD', default=password, help='encryption password')
-@click.option('--salt', type=click.STRING, 
+@click.option('--salt', type=click.STRING,
               required=True,
               envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
 def decrypt(**kwargs):
