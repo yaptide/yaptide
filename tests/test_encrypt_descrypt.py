@@ -18,7 +18,6 @@ def password() -> str:
 def test_enrypt_descrypt(tmpdir, password, salt):
     '''Test encrypting and decrypting a file'''
     # create a file to encrypt in the temporary directory
-    file = tmpdir.join('file.txt')
     plain_file_path = Path(tmpdir) / 'plain.txt'
     encrypted_file_path = Path(tmpdir) / 'encrypted.txt'
     decrypted_file_path = Path(tmpdir) / 'decrypted.txt'

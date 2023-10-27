@@ -502,6 +502,7 @@ def upload(**kwargs):
     if upload_status:
         click.echo('File uploaded successfully')
 
+
 @run.command
 @click.option('--infile', 
               type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path), 
@@ -525,6 +526,7 @@ def encrypt(**kwargs):
     outfile_path = Path(kwargs['outfile'])
     outfile_path.write_bytes(encrypted_bytes)
 
+
 @run.command
 @click.option('--infile', 
               type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path), 
@@ -547,6 +549,7 @@ def decrypt(**kwargs):
                                    encryption_salt=kwargs['salt'])
     outfile_path = Path(kwargs['outfile'])
     outfile_path.write_bytes(decrypted_bytes)
+
 
 if __name__ == "__main__":
     run()
