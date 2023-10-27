@@ -527,7 +527,7 @@ def encrypt(**kwargs):
 
 
 @run.command
-@click.option('--infile', 
+@click.option('--infile',
               type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path),
               required=True,
               help='Path to file to decrypt')
@@ -543,8 +543,8 @@ def encrypt(**kwargs):
               envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
 def decrypt(**kwargs):
     """Decrypt a file"""
-    decrypted_bytes = decrypt_file(file_path=kwargs['infile'], 
-                                   encryption_password=kwargs['password'], 
+    decrypted_bytes = decrypt_file(file_path=kwargs['infile'],
+                                   encryption_password=kwargs['password'],
                                    encryption_salt=kwargs['salt'])
     outfile_path = Path(kwargs['outfile'])
     outfile_path.write_bytes(decrypted_bytes)
