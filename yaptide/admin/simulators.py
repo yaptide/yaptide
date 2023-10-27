@@ -522,8 +522,8 @@ def encrypt(**kwargs):
     encrypted_bytes = encrypt_file(file_path=kwargs['infile'], 
                                    encryption_password=kwargs['password'], 
                                    encryption_salt=kwargs['salt'])
-    with open(kwargs['outfile'], 'wb') as outfile:
-        outfile.write(encrypted_bytes)
+    outfile_path = Path(kwargs['outfile'])
+    outfile_path.write_bytes(encrypted_bytes)
 
 @run.command
 @click.option('--infile', 
@@ -545,8 +545,8 @@ def decrypt(**kwargs):
     decrypted_bytes = decrypt_file(file_path=kwargs['infile'], 
                                    encryption_password=kwargs['password'], 
                                    encryption_salt=kwargs['salt'])
-    with open(kwargs['outfile'], 'wb') as outfile:
-        outfile.write(decrypted_bytes)
+    outfile_path = Path(kwargs['outfile'])
+    outfile_path.write_bytes(decrypted_bytes)
 
 if __name__ == "__main__":
     run()

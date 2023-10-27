@@ -4,13 +4,15 @@ import pytest
 from yaptide.admin.simulators import decrypt_file, encrypt_file
 
 @pytest.fixture
-def salt() -> bytes:
+def salt() -> str:
+    '''Salt for encryption'''
     return 'salt'
+
 
 @pytest.fixture
 def password() -> str:
+    '''Password for encryption'''
     return 'password'
-
 
 
 def test_enrypt_descrypt(tmpdir, password, salt):
