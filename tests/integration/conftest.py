@@ -12,7 +12,7 @@ from yaptide.persistence.database import db
 
 
 @pytest.fixture(scope='session')
-def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict, None, None]:
+def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, None, None]:
     """Small simulation payload for testing purposes"""
     payload_dict = copy.deepcopy(payload_editor_dict_data)
 
@@ -37,9 +37,11 @@ def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict,
     if platform.system() == "Windows":
         payload_dict["input_json"]["scoringManager"]["filters"] = []
         payload_dict["input_json"]["detectorManager"]["detectors"] = [
-            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
+            payload_dict["input_json"]["detectorManager"]["detectors"][0]
+        ]
         payload_dict["input_json"]["scoringManager"]["outputs"] = [
-            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
+            payload_dict["input_json"]["scoringManager"]["outputs"][0]
+        ]
         for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
             for quantity in output["quantities"]:
                 if "filter" in quantity:
@@ -50,12 +52,12 @@ def small_simulation_payload(payload_editor_dict_data : dict) -> Generator[dict,
 @pytest.fixture(scope='session')
 def shieldhit_binary_installed(shieldhit_binary_filename):
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
-    from yaptide.admin.simulators import install_simulator, SimulatorType
+    from yaptide.admin.simulators import download_simulator, SimulatorType
     installation_path = Path(__file__).resolve().parent.parent.parent / 'bin'
     shieldhit_bin_path = installation_path / shieldhit_binary_filename
     logging.info("SHIELDHIT binary path %s", shieldhit_bin_path)
     if not shieldhit_bin_path.exists():
-        install_simulator(SimulatorType.shieldhit, installation_path)
+        download_simulator(SimulatorType.shieldhit, installation_path)
 
 
 @pytest.fixture(scope='session')

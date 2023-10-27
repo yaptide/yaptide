@@ -7,16 +7,12 @@ from pathlib import Path
 
 import eventlet
 
-from yaptide.admin.simulators import SimulatorType, install_simulator
-from yaptide.celery.utils.pymc import (average_estimators, read_file, run_fluka,
-                                       run_shieldhit)
-from yaptide.celery.utils.requests import (send_simulation_logfiles,
-                                           send_simulation_results,
-                                           send_task_update)
+from yaptide.admin.simulators import SimulatorType, download_simulator
+from yaptide.celery.utils.pymc import (average_estimators, read_file, run_fluka, run_shieldhit)
+from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
-from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
-                                     estimators_to_list, simulation_logfiles,
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)
 
 # this is not being used now but we can use such hook to install simulations on the worker start
@@ -39,7 +35,7 @@ from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
 @celery_app.task()
 def install_simulators() -> bool:
     """Task responsible for installing simulators on the worker"""
-    result = install_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
+    result = download_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
     return result
 
 
@@ -85,11 +81,8 @@ def run_single_simulation(self,
 
     # with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
     # use the selected temporary directory to create a temporary directory
-    with (
-        contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir))
-        if keep_tmp_files
-        else tempfile.TemporaryDirectory(dir=tmp_dir)
-    ) as tmp_dir_path:
+    with (contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir)) if keep_tmp_files else tempfile.TemporaryDirectory(
+            dir=tmp_dir)) as tmp_dir_path:
         logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
 
@@ -139,19 +132,12 @@ def run_single_simulation(self,
 
             logfiles = simulation_logfiles(path=Path(tmp_dir_path))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            if send_simulation_logfiles(simulation_id=simulation_id,
-                                        update_key=update_key,
-                                        logfiles=logfiles):
+            if send_simulation_logfiles(simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
                 return {}
-            return {
-                "logfiles": logfiles,
-                "simulation_id": simulation_id,
-                "update_key": update_key
-            }
+            return {"logfiles": logfiles, "simulation_id": simulation_id, "update_key": update_key}
 
         logging.debug("Converting simulation results to JSON")
-        estimators = estimators_to_list(estimators_dict=estimators_dict,
-                                        dir_path=Path(tmp_dir_path))
+        estimators = estimators_to_list(estimators_dict=estimators_dict, dir_path=Path(tmp_dir_path))
 
         end_time = datetime.utcnow().isoformat(sep=" ")
 
@@ -160,11 +146,7 @@ def run_single_simulation(self,
         update_dict = {"task_state": EntityState.COMPLETED.value, "end_time": end_time}
         send_task_update(simulation_id, task_id, update_key, update_dict)
 
-        return {
-            "estimators": estimators,
-            "simulation_id": simulation_id,
-            "update_key": update_key
-        }
+        return {"estimators": estimators, "simulation_id": simulation_id, "update_key": update_key}
 
 
 @celery_app.task
@@ -192,18 +174,14 @@ def merge_results(results: list[dict]) -> dict:
 
         averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
 
-    final_result = {
-        "end_time": datetime.utcnow().isoformat(sep=" ")
-    }
+    final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
-    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(simulation_id=simulation_id,
-                                                                 update_key=update_key,
-                                                                 logfiles=logfiles):
+    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
+            simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
         final_result["logfiles"] = logfiles
 
-    if averaged_estimators is not None and not send_simulation_results(simulation_id=simulation_id,
-                                                                       update_key=update_key,
-                                                                       estimators=averaged_estimators):
+    if averaged_estimators is not None and not send_simulation_results(
+            simulation_id=simulation_id, update_key=update_key, estimators=averaged_estimators):
         final_result["estimators"] = averaged_estimators
 
     return final_result
