@@ -24,7 +24,7 @@ from dotenv import load_dotenv
 
 
 class SimulatorType(IntEnum):
-    """Table types"""
+    """Simulation types"""
 
     shieldhit = auto()
     fluka = auto()
@@ -50,12 +50,6 @@ fluka_key = os.getenv('S3_FLUKA_KEY')
 @click.group()
 def run():
     """Manage simulators"""
-
-
-@run.command
-def installed(**kwargs):
-    """List installed simulators"""
-    click.echo('to be implemented')
 
 
 def extract_shieldhit_from_tar_gz(archive_path: Path, destination_dir: Path, member_name: str, shieldhit_path: Path):
@@ -458,65 +452,101 @@ def derive_key(encryption_password: str = password, encryption_salt: str = salt)
 
 
 @run.command
-@click.option('--name', type=click.Choice([sim.name for sim in SimulatorType]))
-@click.option('--path', type=click.Path(file_okay=False, path_type=Path))
+@click.option('--name', required=True, type=click.Choice([sim.name for sim in SimulatorType]))
+@click.option('--path', required=True, type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path))
 @click.option('-v', '--verbose', count=True)
 def install(**kwargs):
     """Install simulator"""
-    if 'name' not in kwargs or kwargs['name'] is None:
-        click.echo('Please specify a simulator name using --name option, possible values are: ', nl=False)
-        for sim in SimulatorType:
-            click.echo(f'{sim.name} ', nl=False)
-        return
-    if 'path' not in kwargs or kwargs['path'] is None:
-        click.echo('Please specify installation path')
-        return
     click.echo(f'Installing simulator: {kwargs["name"]} to path {kwargs["path"]}')
     sim_type = SimulatorType[kwargs['name']]
-    if install_simulator(sim_type, kwargs['path']):
+    installation_status = install_simulator(sim_type, kwargs['path'])
+    if installation_status:
         click.echo(f'Simulator {sim_type.name} installed')
     else:
         click.echo(f'Simulator {sim_type.name} installation failed')
 
 
 @run.command
-@click.option('--bucket', help='S3 bucket name')
-@click.option('--file', help='Path to file to upload')
-@click.option('--endpoint', envvar='S3_ENDPOINT', default=endpoint, help='S3 endpoint')
-@click.option('--access_key', envvar='S3_ACCESS_KEY', default=access_key, help='S3 access key')
-@click.option('--secret_key', envvar='S3_SECRET_KEY', default=secret_key, help='S3 secret key')
-@click.option('--password', envvar='S3_ENCRYPTION_PASSWORD', default=password, help='S3 encryption password')
-@click.option('--salt', envvar='S3_ENCRYPTION_SALT', default=salt, help='S3 encryption salt')
+@click.option('--bucket',
+              type=click.STRING,
+              required=True,
+              help='S3 bucket name')
+@click.option('--file',
+              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path),
+              required=True,
+              help='Path to file to upload')
+@click.option('--endpoint',
+              type=click.STRING,
+              required=True,
+              envvar='S3_ENDPOINT', default=endpoint, help='S3 endpoint')
+@click.option('--access_key', type=click.STRING, required=True, 
+              envvar='S3_ACCESS_KEY', default=access_key, help='S3 access key')
+@click.option('--secret_key', type=click.STRING, required=True, 
+              envvar='S3_SECRET_KEY', default=secret_key, help='S3 secret key')
+@click.option('--password', type=click.STRING, 
+              envvar='S3_ENCRYPTION_PASSWORD', default=password, help='encryption password')
+@click.option('--salt', type=click.STRING, 
+              envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
 def upload(**kwargs):
-    """Upload simulator to S3 bucket"""
-    args = ['bucket', 'file', 'endpoint', 'access_key', 'secret_key', 'password', 'salt']
-    messages = [
-        'Bucket name is required specify with --bucket',
-        'Path to file is required specify with --file',
-        'S3 endpoint not found in environment variables specify with --endpoint',
-        'S3 access key not found in environment variables specify with --access_key',
-        'S3 secret key not found in environment variables specify with --secret_key',
-        'S3 encryption password not found in environment variables specify with --password',
-        'S3 encryption salt not found in environment variables specify with --salt'
-    ]
-    for arg, message in zip(args, messages):
-        if not kwargs[arg] or kwargs[arg] is None:
-            click.echo(message)
-            return
-    if not Path(kwargs['file']).exists():
-        click.echo('File does not exist')
-        return
-    if upload_file_to_s3(
+    """Upload simulator file to S3 bucket"""
+    click.echo(f'Uploading file {kwargs["file"]} to bucket {kwargs["bucket"]}')
+    upload_status = upload_file_to_s3(
             bucket=kwargs['bucket'],
-            file_path=Path(kwargs['file']),
+            file_path=kwargs['file'],
             endpoint_url=kwargs['endpoint'],
             aws_access_key_id=kwargs['access_key'],
             aws_secret_access_key=kwargs['secret_key'],
             encryption_password=kwargs['password'],
             encryption_salt=kwargs['salt']
-    ):
+    )
+    if upload_status:
         click.echo('File uploaded successfully')
 
+@run.command
+@click.option('--infile', 
+              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path), 
+              required=True,
+              help='Path to file to encrypt')
+@click.option('--outfile', 
+              type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path), 
+              required=True,
+              help='Path where encrypted file is saved')
+@click.option('--password', type=click.STRING, 
+              required=True,
+              envvar='S3_ENCRYPTION_PASSWORD', default=password, help='encryption password')
+@click.option('--salt', type=click.STRING, 
+              required=True,
+              envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
+def encrypt(**kwargs):
+    """Encrypt a file"""
+    encrypted_bytes = encrypt_file(file_path=kwargs['infile'], 
+                                   encryption_password=kwargs['password'], 
+                                   encryption_salt=kwargs['salt'])
+    with open(kwargs['outfile'], 'wb') as outfile:
+        outfile.write(encrypted_bytes)
+
+@run.command
+@click.option('--infile', 
+              type=click.Path(exists=True, readable=True, file_okay=True, dir_okay=False, path_type=Path), 
+              required=True,
+              help='Path to file to decrypt')
+@click.option('--outfile', 
+              type=click.Path(writable=True, file_okay=True, dir_okay=False, path_type=Path), 
+              required=True,
+              help='Path where decrypted file is saved')
+@click.option('--password', type=click.STRING, 
+              required=True,
+              envvar='S3_ENCRYPTION_PASSWORD', default=password, help='encryption password')
+@click.option('--salt', type=click.STRING, 
+              required=True,
+              envvar='S3_ENCRYPTION_SALT', default=salt, help='encryption salt')
+def decrypt(**kwargs):
+    """Decrypt a file"""
+    decrypted_bytes = decrypt_file(file_path=kwargs['infile'], 
+                                   encryption_password=kwargs['password'], 
+                                   encryption_salt=kwargs['salt'])
+    with open(kwargs['outfile'], 'wb') as outfile:
+        outfile.write(decrypted_bytes)
 
 if __name__ == "__main__":
     run()
