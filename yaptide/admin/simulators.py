@@ -1,5 +1,6 @@
 #! /usr/bin/env python
 
+from functools import wraps
 import os
 from pathlib import Path
 import click
@@ -41,25 +42,30 @@ def s3credentials(required: bool = False):
 
     def decorator(func):
         """Decorator for S3 credentials options"""
-        func = click.option('--endpoint',
-                            type=click.STRING,
-                            required=required,
-                            envvar='S3_ENDPOINT',
-                            default=endpoint,
-                            help='S3 endpoint')(func)
-        func = click.option('--access_key',
-                            type=click.STRING,
-                            required=required,
-                            envvar='S3_ACCESS_KEY',
-                            default=access_key,
-                            help='S3 access key')(func)
-        func = click.option('--secret_key',
-                            type=click.STRING,
-                            required=required,
-                            envvar='S3_SECRET_KEY',
-                            default=secret_key,
-                            help='S3 secret key')(func)
-        return func
+
+        @click.option('--endpoint',
+                      type=click.STRING,
+                      required=required,
+                      envvar='S3_ENDPOINT',
+                      default=endpoint,
+                      help='S3 endpoint')
+        @click.option('--access_key',
+                      type=click.STRING,
+                      required=required,
+                      envvar='S3_ACCESS_KEY',
+                      default=access_key,
+                      help='S3 access key')
+        @click.option('--secret_key',
+                      type=click.STRING,
+                      required=required,
+                      envvar='S3_SECRET_KEY',
+                      default=secret_key,
+                      help='S3 secret key')
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapper
 
     return decorator
 
@@ -69,19 +75,24 @@ def encryption_options(required: bool = False):
 
     def decorator(func):
         """Decorator for encryption options"""
-        func = click.option('--password',
-                            type=click.STRING,
-                            envvar='S3_ENCRYPTION_PASSWORD',
-                            default=password,
-                            required=required,
-                            help='encryption password')(func)
-        func = click.option('--salt',
-                            type=click.STRING,
-                            envvar='S3_ENCRYPTION_SALT',
-                            default=password,
-                            required=required,
-                            help='encryption salt')(func)
-        return func
+
+        @click.option('--password',
+                      type=click.STRING,
+                      envvar='S3_ENCRYPTION_PASSWORD',
+                      default=password,
+                      required=required,
+                      help='encryption password')
+        @click.option('--salt',
+                      type=click.STRING,
+                      envvar='S3_ENCRYPTION_SALT',
+                      default=password,
+                      required=required,
+                      help='encryption salt')
+        @wraps(func)
+        def wrapper(*args, **kwargs):
+            return func(*args, **kwargs)
+
+        return wrapper
 
     return decorator
 
@@ -129,7 +140,7 @@ def decrypt(**kwargs):
               help='download directory')
 @click.option('--bucket', type=click.STRING, envvar='S3_FLUKA_BUCKET', required=True, help='S3 bucket name')
 @click.option('--key', type=click.STRING, envvar='S3_FLUKA_KEY', required=True, help='S3 key (filename)')
-@s3credentials()
+@s3credentials(required=True)
 @encryption_options(required=True)
 def download_fluka(**kwargs):
     """Download Fluka simulator"""
@@ -165,7 +176,7 @@ def download_fluka(**kwargs):
               help='S3 bucket name with Geant4 data')
 @click.option('--topas_key', type=click.STRING, envvar='S3_TOPAS_KEY', required=True, help='S3 key (filename)')
 @click.option('--topas_version', type=click.STRING, envvar='S3_TOPAS_VERSION', required=True, help='TOPAS version')
-@s3credentials()
+@s3credentials(required=True)
 def download_topas(**kwargs):
     """Download TOPAS simulator and Geant4 data"""
     click.echo(f'Downloading TOPAS into directory {kwargs["dir"]}')
@@ -193,8 +204,8 @@ def download_topas(**kwargs):
 @click.option('--bucket', type=click.STRING, envvar='S3_SHIELDHIT_BUCKET', help='S3 bucket name')
 @click.option('--key', type=click.STRING, envvar='S3_SHIELDHIT_KEY', help='S3 key (filename)')
 @click.option('--decrypt', is_flag=True, default=False, help='decrypt file downloaded from S3')
-@s3credentials()
-@encryption_options()
+@s3credentials(required=False)
+@encryption_options(required=False)
 def download_shieldhit(**kwargs):
     """Download SHIELD-HIT12A"""
     click.echo(f'Downloading SHIELD-HIT12A into directory {kwargs["dir"]}')
@@ -217,7 +228,7 @@ def download_shieldhit(**kwargs):
               help='file to upload')
 @click.option('--encrypt', is_flag=True, default=False, help='encrypt file uploaded to S3')
 @s3credentials(required=True)
-@encryption_options()
+@encryption_options(required=False)
 def upload(**kwargs):
     """Upload simulator file to S3 bucket"""
     click.echo(f'Uploading file {kwargs["file"]} to bucket {kwargs["bucket"]}')
