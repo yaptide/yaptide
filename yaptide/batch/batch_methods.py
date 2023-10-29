@@ -41,31 +41,31 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     scratch = fabric_result.stdout.split()[0]
-    logging.debug(f"Scratch directory: {scratch}")
+    logging.debug("Scratch directory: %s", scratch)
 
     job_dir = f"{scratch}/yaptide_runs/{utc_now}"
-    logging.debug(f"Job directory: {job_dir}")
+    logging.debug("Job directory: %s", job_dir)
 
     con.run(f"mkdir -p {job_dir}")
     with tempfile.TemporaryDirectory() as tmp_dir_path:
-        logging.debug(f"Preparing simulation input in {tmp_dir_path}")
+        logging.debug("Preparing simulation input in: %s", tmp_dir_path)
         zip_path = Path(tmp_dir_path) / "input.zip"
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
-        logging.debug(f"Zipping simulation input to {zip_path}")
+        logging.debug("Zipping simulation input to %s", zip_path)
         with ZipFile(zip_path, mode="w") as archive:
             for file in Path(tmp_dir_path).iterdir():
                 if file.name == "input.zip":
                     continue
                 archive.write(file, arcname=file.name)
         con.put(zip_path, job_dir)
-        logging.debug(f"Transfering simulation input {zip_path} to {job_dir}")
+        logging.debug("Transfering simulation input %s to %s", zip_path, job_dir)
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
     RESULT_SENDER_SCRIPT = Path(__file__).parent.resolve() / "result_sender.py"
 
-    logging.debug(f"Transfering watcher script {WATCHER_SCRIPT} to {job_dir}")
+    logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
-    logging.debug(f"Transfering result sender script {RESULT_SENDER_SCRIPT} to {job_dir}")
+    logging.debug("Transfering result sender script %s to %s", RESULT_SENDER_SCRIPT, job_dir)
     con.put(RESULT_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(payload_dict=payload_dict,
@@ -83,17 +83,17 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
             try:
                 array_id = int(line.split()[-1])
             except (ValueError, IndexError):
-                logging.error(f"Could not parse array id from line: {line}")
+                logging.error("Could not parse array id from line: %s", line)
         if line.startswith("Collect id"):
             try:
                 collect_id = int(line.split()[-1])
             except (ValueError, IndexError):
-                logging.error(f"Could not parse collect id from line: {line}")
+                logging.error("Could not parse collect id from line: %s", line)
 
     if array_id is None or collect_id is None:
         logging.debug("Job submission failed")
-        logging.debug(f"Sbatch stdout: {submit_stdout}")
-        logging.debug(f"Sbatch stderr: {submit_stderr}")
+        logging.debug("Sbatch stdout: %s", submit_stdout)
+        logging.debug("Sbatch stderr: %s", submit_stderr)
         return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
     return {
         "message": "Job submitted",
