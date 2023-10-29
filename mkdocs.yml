@@ -20,6 +20,7 @@ nav:
   - Overview: index.md
   - Work with documentation: mkdocs.md
   - Jobs and tasks: states.md
+  - Simulator binaries: simulator_binaries.md
 - API Reference: swagger.md
 - Code Reference: reference/
 - Test coverage: coverage.md
