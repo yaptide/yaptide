@@ -157,7 +157,6 @@ def download_fluka(**kwargs):
         click.echo('Fluka installed')
     else:
         click.echo('Not implemented')
-        return False
 
 
 @run.command
