@@ -54,7 +54,6 @@ def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, 
 @pytest.fixture(scope='session')
 def shieldhit_binary_installed(shieldhit_binary_filename):
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
-    from yaptide.admin.simulators import install_simulator, SimulatorType
     download_dir = Path(__file__).resolve().parent.parent.parent / 'bin'
     shieldhit_bin_path = download_dir / shieldhit_binary_filename
     logging.info("SHIELD-HIT12A binary path %s", shieldhit_bin_path)
