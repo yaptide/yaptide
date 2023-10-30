@@ -22,6 +22,12 @@ if [ -z "$S3_TOPAS_BUCKET" ] || [ -z "$S3_TOPAS_KEY" ] || [ -z "$S3_TOPAS_VERSIO
         ./yaptide/admin/simulators.py download-topas --dir /simulators
 fi
 
+if [ -z "$S3_FLUKA_BUCKET" ] || [ -z "$S3_FLUKA_KEY" ] ||; then
+  echo "One or more environment variables required by FLUKA are not set, skipping TOPAS installation"
+else
+  ./yaptide/admin/simulators.py download-fluka --dir /simulators
+
+
 # Copy fluka fake simulator from yaptide dir
 echo "Copying fluka fake simulator from yaptide dir"
 
