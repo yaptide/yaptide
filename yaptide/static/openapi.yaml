@@ -890,6 +890,7 @@ paths:
     description: Route dedicated for Backend internal communication
     post:
       summary: Updates task state
+      description: Used by tasks to update their state
       requestBody:
         required: true
         content:
@@ -924,9 +925,9 @@ paths:
 
 # Logfiles Routes
   /logfiles:
-    description: Route dedicated for Backend internal communication
     post:
-      summary: Updates task state
+      summary: Allows for uploading logfiles of the simulation by its tasks
+      description: At current stage of development incoming logfiles override existing ones
       requestBody:
         required: true
         content:
