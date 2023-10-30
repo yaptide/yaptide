@@ -12,8 +12,7 @@ from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
 
-from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
-                                   TIMEOUT_MATCH, log_generator)
+from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
@@ -44,10 +43,11 @@ def get_tmp_dir() -> Path:
 
 def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
     """Function to create command to run SHIELD-HIT12A."""
-    settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
-                                  simulator_type=SimulatorType.shieldhit,
-                                  simulator_exec_path=None,  # useless, we guess from PATH
-                                  cmdline_opts="")  # useless, we could use -q in the future
+    settings = SimulationSettings(
+        input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+        simulator_type=SimulatorType.shieldhit,
+        simulator_exec_path=None,  # useless, we guess from PATH
+        cmdline_opts="")  # useless, we could use -q in the future
     # last part of task_id gives an integer seed for random number generator
     settings.set_rng_seed(int(task_id.split("_")[-1]))
     command_as_list = str(settings).split()
@@ -57,7 +57,7 @@ def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
 
 def execute_shieldhit_process(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
     """Function to execute SHIELD-HIT12A subprocess."""
-    process_exit_success : bool = True
+    process_exit_success: bool = True
     command_stdout: str = ""
     command_stderr: str = ""
     try:
@@ -114,10 +114,11 @@ def get_shieldhit_estimators(dir_path: Path) -> dict:
 
 def run_fluka(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single fluka simulation"""
-    settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
-                                  simulator_type=SimulatorType.fluka,
-                                  simulator_exec_path=None,  # useless
-                                  cmdline_opts="")  # useless
+    settings = SimulationSettings(
+        input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+        simulator_type=SimulatorType.fluka,
+        simulator_exec_path=None,  # useless
+        cmdline_opts="")  # useless
 
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
@@ -193,13 +194,11 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
                                if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
 
             base_list[est_i]["pages"][page_i]["data"]["values"] = [
-                sum(x) / (averaged_count + 1) for x in zip(
-                    map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
-                    page_dict["data"]["values"]
-                )
+                sum(x) / (averaged_count + 1)
+                for x in zip(map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
+                             page_dict["data"]["values"])
             ]
-            logging.debug("Averaged page %s with %d elements",
-                          page_dict["metadata"]["page_number"],
+            logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
                           len(page_dict["data"]["values"]))
     return base_list
 
@@ -209,7 +208,7 @@ def read_file(filepath: Path,
               task_id: str,
               update_key: str,
               timeout_wait_for_file: int = 20,
-              timeout_wait_for_line: int = 5*60,
+              timeout_wait_for_line: int = 5 * 60,
               next_backend_update_time: int = 2,
               logging_level: int = logging.WARNING):
     """Monitors log file of certain task, when new line with message matching regex appears, sends update to backend"""
@@ -229,10 +228,7 @@ def read_file(filepath: Path,
     # if logfile was not created in the first minute, task is marked as failed
     if logfile is None:
         logging.error("Log file for task %s not found", task_id)
-        up_dict = {
-            "task_state": EntityState.FAILED.value,
-            "end_time": datetime.utcnow().isoformat(sep=" ")
-        }
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
     logging.debug("Log file for task %s found", task_id)
@@ -248,18 +244,22 @@ def read_file(filepath: Path,
         if re.search(RUN_MATCH, line):
             logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line.rstrip(), filepath, task_id)
             splitted = line.split()
-            simulated_primaries = int(splitted[3])
+            simulated_primaries = 0
+            try:
+                simulated_primaries = int(splitted[3])
+            except (IndexError, ValueError):
+                logging.error("Cannot parse number of simulated primaries in line: %s", line.rstrip())
             if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
                     and requested_primaries >= simulated_primaries):
                 logging.debug("Skipping update for task %s", task_id)
                 continue
             update_time = utc_now.timestamp()
-            up_dict = {
-                "simulated_primaries": simulated_primaries,
-                "estimated_time": int(splitted[9])
-                + int(splitted[7]) * 60
-                + int(splitted[5]) * 3600
-            }
+            estimated_seconds = 0
+            try:
+                estimated_seconds = int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
+            except (IndexError, ValueError):
+                logging.error("Cannot parse estimated time in line: %s", line.rstrip())
+            up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
             logging.debug("Sending update for task %s, simulated primaries %d", task_id, simulated_primaries)
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
@@ -280,10 +280,7 @@ def read_file(filepath: Path,
 
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", task_id)
-            up_dict = {
-                "task_state": EntityState.FAILED.value,
-                "end_time": datetime.utcnow().isoformat(sep=" ")
-            }
+            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
 
@@ -305,15 +302,18 @@ def read_file_offline(filepath: Path) -> tuple[int, int]:
     """Reads log file and returns number of simulated and requested primaries"""
     simulated_primaries = 0
     requested_primaries = 0
-    with open(filepath, 'r') as f:
-        for line in f:
-            logging.debug("Parsing line: %s", line.rstrip())
-            if re.search(RUN_MATCH, line):
-                logging.debug("Found RUN_MATCH in line: %s for file: %s", line.rstrip(), filepath)
-                splitted = line.split()
-                simulated_primaries = int(splitted[3])
-            elif re.search(REQUESTED_MATCH, line):
-                logging.debug("Found REQUESTED_MATCH in line: %s for file: %s", line.rstrip(), filepath)
-                splitted = line.split(": ")
-                requested_primaries = int(splitted[1])
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                logging.debug("Parsing line: %s", line.rstrip())
+                if re.search(RUN_MATCH, line):
+                    logging.debug("Found RUN_MATCH in line: %s for file: %s", line.rstrip(), filepath)
+                    splitted = line.split()
+                    simulated_primaries = int(splitted[3])
+                elif re.search(REQUESTED_MATCH, line):
+                    logging.debug("Found REQUESTED_MATCH in line: %s for file: %s", line.rstrip(), filepath)
+                    splitted = line.split(": ")
+                    requested_primaries = int(splitted[1])
+    except FileNotFoundError:
+        logging.error("Log file %s not found", filepath)
     return simulated_primaries, requested_primaries
