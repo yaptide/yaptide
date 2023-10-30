@@ -5,7 +5,6 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 
-from yaptide.admin.simulators import SimulatorType, install_simulator
 from yaptide.celery.utils.pymc import (average_estimators,
                                        command_to_run_shieldhit,
                                        execute_shieldhit_process,
@@ -19,16 +18,8 @@ from yaptide.celery.utils.requests import (send_simulation_logfiles,
                                            send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
-from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict,
-                                     estimators_to_list, simulation_logfiles,
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)
-
-
-@celery_app.task()
-def install_simulators() -> bool:
-    """Task responsible for installing simulators on the worker"""
-    result = install_simulator(SimulatorType.shieldhit, Path('/simulators/shieldhit12a/bin'))
-    return result
 
 
 @celery_app.task
@@ -214,13 +205,10 @@ def merge_results(results: list[dict]) -> dict:
 
         averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
 
-    final_result = {
-        "end_time": datetime.utcnow().isoformat(sep=" ")
-    }
+    final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
-    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(simulation_id=simulation_id,
-                                                                 update_key=update_key,
-                                                                 logfiles=logfiles):
+    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
+            simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
         final_result["logfiles"] = logfiles
 
     if averaged_estimators:

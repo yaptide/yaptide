@@ -1,3 +1,4 @@
+#! /usr/bin/env python
 from enum import Enum
 from pathlib import Path
 
@@ -69,7 +70,7 @@ def list_users(**kwargs):
 
 @run.command
 def list_tasks(**kwargs):
-    """List all tasks"""
+    """List tasks"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -178,7 +179,7 @@ def add_cluster(**kwargs):
 @click.argument('name')
 @click.argument('auth_provider')
 def remove_user(**kwargs):
-    """Deletes user with provided login from db"""
+    """Delete user"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -200,7 +201,7 @@ def remove_user(**kwargs):
 
 @run.command
 def list_simulations(**kwargs):
-    """List all simulations in db"""
+    """List simulations"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
@@ -216,7 +217,7 @@ def list_simulations(**kwargs):
 
 @run.command
 def list_clusters(**kwargs):
-    """List all clusters in db"""
+    """List clusters"""
     con, metadata, engine = connect_to_db()
     if con is None or metadata is None or engine is None:
         return None
