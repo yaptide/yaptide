@@ -9,7 +9,7 @@ from yaptide.admin.simulator_storage import download_fluka_from_s3
 def check_if_environment_variables_set() -> bool:
     """Check if environment variables are set"""
     result = True
-    for var_name in ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', '$S3_FLUKA_BUCKET', 'S3_FLUKA_KEY']:
+    for var_name in ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_FLUKA_BUCKET', 'S3_FLUKA_KEY']:
         if var_name not in os.environ:
             logging.error('variable %s not set', var_name)
             result = False
