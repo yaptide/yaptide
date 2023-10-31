@@ -2,6 +2,7 @@ import pytest
 from werkzeug.exceptions import Forbidden, Unauthorized
 from yaptide.routes.keycloak_routes import check_user_based_on_keycloak_token
 
+
 @pytest.fixture(scope="function")
 def keycloak_environment(monkeypatch):
     """Set keycloak environment variables"""
@@ -22,7 +23,7 @@ def test_cannot_connect(token, keycloak_environment):
     """Test token not provided"""
     with pytest.raises(Forbidden) as e:
         check_user_based_on_keycloak_token(token=token, username="plgtestuser")
-    assert e.match("Service is not available")
+    assert e.match("User plgtestuser has no access to our service")
 
 
 def test_token_not_provided():
@@ -43,4 +44,4 @@ def test_username_not_matching(token, keycloak_environment):
     """Test username mismatch"""
     with pytest.raises(Forbidden) as e:
         check_user_based_on_keycloak_token(token, "test")
-    assert e.match("Username mismatch")
+    assert e.match("User test has no access to our service")
