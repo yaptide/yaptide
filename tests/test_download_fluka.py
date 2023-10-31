@@ -15,7 +15,7 @@ def check_if_environment_variables_set() -> bool:
             result = False
     return result
 
-@pytest.mark.skipif(sys.platform == "win32", reason="TOPAS does not work on Windows.")
+@pytest.mark.skipif(sys.platform == "win32", reason="FLUKA does not work on Windows.")
 def test_if_fluka_downloaded(tmpdir):
     """Check if FLUKA is downloaded and can be executed"""
     if check_if_environment_variables_set():
