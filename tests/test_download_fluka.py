@@ -16,8 +16,8 @@ def check_if_environment_variables_set() -> bool:
     return result
 
 @pytest.mark.skipif(sys.platform == "win32", reason="TOPAS does not work on Windows.")
-def test_if_topas_downloaded(tmpdir):
-    """Check if TOPAS is downloaded and can be executed"""
+def test_if_fluka_downloaded(tmpdir):
+    """Check if FLUKA is downloaded and can be executed"""
     if check_if_environment_variables_set():
         assert download_fluka_from_s3(download_dir=tmpdir,
                                       endpoint=os.getenv("S3_ENDPOINT"),
