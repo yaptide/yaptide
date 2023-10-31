@@ -4,7 +4,7 @@ import pytest
 import logging
 import subprocess
 from pathlib import Path
-from yaptide.admin.simulator_storage import download_topas_from_s3
+from yaptide.admin.simulator_storage import download_fluka_from_s3
 
 def check_if_environment_variables_set() -> bool:
     """Check if environment variables are set"""
@@ -19,12 +19,16 @@ def check_if_environment_variables_set() -> bool:
 def test_if_topas_downloaded(tmpdir):
     """Check if TOPAS is downloaded and can be executed"""
     if check_if_environment_variables_set():
-        assert download_topas_from_s3(endpoint=os.getenv("S3_ENDPOINT"),
+        assert download_fluka_from_s3(download_dir=tmpdir,
+                                      endpoint=os.getenv("S3_ENDPOINT"),
                                       access_key=os.getenv("S3_ACCESS_KEY"),
                                       secret_key=os.getenv("S3_SECRET_KEY"),
                                       bucket=os.getenv("S3_FLUKA_BUCKET"),
+                                      password=os.getenv("S3_ENCRYPTION_PASSWORD"),
+                                      salt=os.getenv("S3_ENCRYPTION_SALT"),
                                       key=os.getenv("S3_FLUKA_KEY"),
-                                      download_dir=tmpdir) is True
+                                      ) is True
+
         expected_path = Path(tmpdir / "fluka" / "bin" / "fluka")
         assert expected_path.exists(), "Expected FLUKA path does not exist."
         assert expected_path.stat().st_size > 0, "Expected FLUKA path is empty."
