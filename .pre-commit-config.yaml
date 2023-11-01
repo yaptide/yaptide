@@ -14,7 +14,7 @@ repos:
     -   id: yapf
 -   repo: local
     hooks:
-    -   id: check_not_empty_files
+    -   id: check_not_empty_env_files
         name: Check not empty env files
         language: python
         entry: python3 .pre_commit_hooks/check_not_empty_files.py
