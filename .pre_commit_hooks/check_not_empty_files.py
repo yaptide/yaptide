@@ -10,7 +10,6 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument('filenames', nargs='*', help='Filenames to check.')
     args = parser.parse_args(argv)
-    print(f'Running check_not_empty_files hook with argv: {argv} and args {args}')
 
     for filename in args.filenames:
         if os.stat(filename).st_size > 0:
