@@ -1,1 +1,1 @@
-"""Our pre commit hook for preventing pushing specific files to the repo."""
+"""Local pre commit hooks."""

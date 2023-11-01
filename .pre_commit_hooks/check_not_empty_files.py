@@ -1,3 +1,5 @@
+"""Check that files are not empty."""
+
 from __future__ import annotations
 
 import argparse
