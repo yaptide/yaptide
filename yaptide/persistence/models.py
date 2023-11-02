@@ -20,15 +20,9 @@ class UserModel(db.Model):
     auth_provider: Column[str] = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
 
-    __table_args__ = (
-        UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),
-    )
+    __table_args__ = (UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'), )
 
-    __mapper_args__ = {
-        "polymorphic_identity": "User",
-        "polymorphic_on": auth_provider,
-        "with_polymorphic": "*"
-    }
+    __mapper_args__ = {"polymorphic_identity": "User", "polymorphic_on": auth_provider, "with_polymorphic": "*"}
 
     def __repr__(self) -> str:
         return f'User #{self.id} {self.username}'
@@ -41,10 +35,7 @@ class YaptideUserModel(UserModel, db.Model):
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
     password_hash: Column[str] = db.Column(db.String, nullable=False)
 
-    __mapper_args__ = {
-        "polymorphic_identity": "YaptideUser",
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": "YaptideUser", "polymorphic_load": "inline"}
 
     def set_password(self, password: str):
         """Sets hashed password"""
@@ -60,13 +51,10 @@ class KeycloakUserModel(UserModel, db.Model):
 
     __tablename__ = 'KeycloakUser'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
-    cert: Column[str] = db.Column(db.String, nullable=False)
-    private_key: Column[str] = db.Column(db.String, nullable=False)
+    cert: Column[str] = db.Column(db.String, nullable=True)
+    private_key: Column[str] = db.Column(db.String, nullable=True)
 
-    __mapper_args__ = {
-        "polymorphic_identity": "KeycloakUser",
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": "KeycloakUser", "polymorphic_load": "inline"}
 
 
 class ClusterModel(db.Model):
@@ -109,11 +97,7 @@ class SimulationModel(db.Model):
     tasks = relationship("TaskModel")
     estimators = relationship("EstimatorModel")
 
-    __mapper_args__ = {
-        "polymorphic_identity": "Simulation",
-        "polymorphic_on": platform,
-        "with_polymorphic": "*"
-    }
+    __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
 
     def set_update_key(self, update_key: str):
         """Sets hashed update key"""
@@ -130,9 +114,7 @@ class SimulationModel(db.Model):
         perform it only for such fields which exists and which have updated values.
         Returns bool value telling if it is required to commit changes to db.
         """
-        if self.job_state in (EntityState.COMPLETED.value,
-                              EntityState.FAILED.value,
-                              EntityState.CANCELED.value):
+        if self.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return False
         db_commit_required = False
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
@@ -155,10 +137,7 @@ class CelerySimulationModel(SimulationModel):
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id', ondelete="CASCADE"), primary_key=True)
     merge_id: Column[str] = db.Column(db.String, nullable=True, doc="Celery collect job ID")
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.DIRECT.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}
 
 
 class BatchSimulationModel(SimulationModel):
@@ -171,10 +150,7 @@ class BatchSimulationModel(SimulationModel):
     array_id: Column[int] = db.Column(db.Integer, nullable=True, doc="Batch array jon ID")
     collect_id: Column[int] = db.Column(db.Integer, nullable=True, doc="Batch collect job ID")
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.BATCH.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
 
 class TaskModel(db.Model):
@@ -203,20 +179,13 @@ class TaskModel(db.Model):
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
     platform: Column[str] = db.Column(db.String, nullable=False, doc="Execution platform name (i.e. 'direct', 'batch')")
-    last_update_time: Column[datetime] = db.Column(
-        db.DateTime(timezone=True),
-        default=now(),
-        doc="Task last update time")
+    last_update_time: Column[datetime] = db.Column(db.DateTime(timezone=True),
+                                                   default=now(),
+                                                   doc="Task last update time")
 
-    __table_args__ = (
-        UniqueConstraint('simulation_id', 'task_id', name='_simulation_id_task_id_uc'),
-    )
+    __table_args__ = (UniqueConstraint('simulation_id', 'task_id', name='_simulation_id_task_id_uc'), )
 
-    __mapper_args__ = {
-        "polymorphic_identity": "Task",
-        "polymorphic_on": platform,
-        "with_polymorphic": "*"
-    }
+    __mapper_args__ = {"polymorphic_identity": "Task", "polymorphic_on": platform, "with_polymorphic": "*"}
 
     def update_state(self, update_dict: dict):
         """
@@ -224,9 +193,7 @@ class TaskModel(db.Model):
         Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
         """
-        if self.task_state in (EntityState.COMPLETED.value,
-                               EntityState.FAILED.value,
-                               EntityState.CANCELED.value):
+        if self.task_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
             self.requested_primaries = update_dict["requested_primaries"]
@@ -285,10 +252,7 @@ class CeleryTaskModel(TaskModel):
             self.celery_id = update_dict["celery_id"]
         return super().update_state(update_dict)
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.DIRECT.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}
 
 
 class BatchTaskModel(TaskModel):
@@ -297,10 +261,7 @@ class BatchTaskModel(TaskModel):
     __tablename__ = 'BatchTask'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('Task.id', ondelete="CASCADE"), primary_key=True)
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.BATCH.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
 
 class InputModel(db.Model):
