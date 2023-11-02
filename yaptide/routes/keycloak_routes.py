@@ -98,21 +98,23 @@ class AuthKeycloak(Resource):
         # ask cert auth service for cert and private key
         session = requests.Session()
         res: requests.Response = session.get(cert_auth_url, headers={'Authorization': keycloak_token})
-        res_json: dict = res.json()
         logging.debug("auth cert service response code: %d", res.status_code)
-        logging.debug("auth cert service response mesg: %s", res_json)
+        res_json: dict = {}
+        if res.status_code == 200:
+            res_json: dict = res.json()
+            logging.debug("auth cert service response mesg: %s", res_json)
 
         # check if user exists in our database, if not create new user
         user = fetch_keycloak_user_by_username(username=username)
         if not user:
             # user not existing, adding user together with cert and private key
-            user = KeycloakUserModel(username=username, cert=res_json["cert"], private_key=res_json["private"])
+            user = KeycloakUserModel(username=username, cert=res_json.get("cert"), private_key=res_json.get("private"))
 
             add_object_to_db(user)
         else:
             # user existing, updating cert and private key
-            user.cert = res_json["cert"]
-            user.private_key = res_json["private"]
+            user.cert = res_json.get("cert")
+            user.private_key = res_json.get("private")
             make_commit_to_db()
 
         try:
