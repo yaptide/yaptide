@@ -1,4 +1,4 @@
-"""Check that files are not empty."""
+#! /usr/bin/env python
 
 from __future__ import annotations
 
