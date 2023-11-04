@@ -131,11 +131,13 @@ class SimulationTaskResult:
 def run_single_simulation_for_shieldhit(tmp_work_dir: str,
                                         task_id: str,
                                         update_key: str = '',
-                                        simulation_id: int = None) -> dict:
+                                        simulation_id: int = None) -> SimulationTaskResult:
     """Function running single simulation for shieldhit"""
     command_as_list = command_to_run_shieldhit(dir_path=Path(tmp_work_dir), task_id=task_id)
     logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
 
+    command_stdout, command_stderr = '', ''
+    simulated_primaries, requested_primaries = 0, 0
     task_monitor = monitor_shieldhit(tmp_work_dir, task_id, update_key, simulation_id)
 
     # run the simulation
