@@ -112,14 +112,21 @@ def get_shieldhit_estimators(dir_path: Path) -> dict:
     return estimators_dict
 
 
-def run_fluka(dir_path: Path, task_id: str) -> dict:
-    """Function run in eventlet to run single fluka simulation"""
+def command_to_run_fluka(dir_path: Path, task_id: str) -> list[str]:
+    """Function to create command to run FLUKA."""
     settings = SimulationSettings(
         input_path=dir_path,  # skipcq: PYL-W0612 # usefull
         simulator_type=SimulatorType.fluka,
-        simulator_exec_path=None,  # useless
-        cmdline_opts="")  # useless
+        simulator_exec_path=None,  # useless, we guess from PATH
+        cmdline_opts="")  # useless, not useful for fluka
+    update_rng_seed_in_fluka_file(dir_path, task_id)
+    command_as_list = str(settings).split()
+    command_as_list.append(str(dir_path))
+    return command_as_list
 
+
+def update_rng_seed_in_fluka_file(dir_path: Path, task_id: str) -> None:
+    """Function to update random seed in FLUKA input file."""
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
         # if there is no input file, raise an error
@@ -127,50 +134,71 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
         raise FileNotFoundError("Input file not found")
 
     class UpdateFlukaRandomSeed(Protocol):
-        """Protocol for updating random seed in fluka input file"""
+        """Definition of protocol for updating random seed in fluka input file.
+
+        Its purpose is to allow us to use private method of Runner class.
+        """
 
         def __call__(self, file_path: str, rng_seed: int) -> None:
             """Updates random seed in fluka input file"""
 
     random_seed = int(task_id.split("_")[-1])
-    # propably should be protected instead of private
     update_fluka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
     update_fluka_function(str(input_file.resolve()), random_seed)
 
-    command_as_list = str(settings).split()
 
-    logging.debug("Running fluka with setting %s", settings)
-
+def execute_fluka_process(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
+    """Function to execute FLUKA subprocess."""
+    process_exit_success: bool = True
+    command_stdout: str = ""
+    command_stderr: str = ""
     try:
         # If check=True and the exit code is non-zero, raises a
         # CalledProcessError (has return code and output/error streams).
         # text=True means stdout and stderr will be strings instead of bytes
+        logging.info("Starting FLUKA subprocess")
         completed_process = subprocess.run(command_as_list,
                                            check=True,
                                            cwd=str(dir_path),
                                            stdout=subprocess.PIPE,
                                            stderr=subprocess.PIPE,
                                            text=True)
+        logging.info("FLUKA subprocess with return code %d finished", completed_process.returncode)
 
         # Capture stdout and stderr
         command_stdout = completed_process.stdout
         command_stderr = completed_process.stderr
 
+        process_exit_success = True
+
         # Log stdout and stderr using logging
         logging.info("Command Output:\n%s", command_stdout)
         logging.info("Command Error Output:\n%s", command_stderr)
     except subprocess.CalledProcessError as e:
+        process_exit_success = False
         # If the command exits with a non-zero status
         logging.error("Command Error: %s\nExecuted Command: %s", e.stderr, " ".join(command_as_list))
     except Exception as e:  # skipcq: PYL-W0703
-        logging.error("Exception while running Fluka: %s", e)
+        process_exit_success = False
+        logging.error("Exception while running FLUKA: %s", e)
 
-    logging.info("Fluka simulation for task %s finished", task_id)
+    return process_exit_success, command_stdout, command_stderr
 
+
+def get_fluka_estimators(dir_path: Path) -> dict:
+    """Function to get estimators from FLUKA output files."""
     estimators_dict = {}
+
+    matching_files = list(dir_path.glob("*_fort.*"))
+    if len(matching_files) == 0:
+        logging.error("No *_fort.* files found in %s", dir_path)
+        return estimators_dict
+
+    logging.debug("Found %d *_fort.* files in %s", len(matching_files), dir_path)
     files_pattern_pattern = str(dir_path / "*_fort.*")
-    estimators_list = frompattern(files_pattern_pattern)
+    estimators_list = frompattern(pattern=files_pattern_pattern)
     for estimator in estimators_list:
+        logging.debug("Appending estimator for %s", estimator.file_corename)
         for i, page in enumerate(estimator.pages):
             page.page_number = i
 
