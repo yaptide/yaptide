@@ -3,7 +3,7 @@ from pathlib import Path
 import re
 from typing import Optional, Tuple
 
-# templates for regex matching output from `<simulation>_<no>.err` file
+# templates for regex matching output from `<simulation>_<no>.out` file
 S_OK_OUT_INIT = re.compile(r"^ Total time used for initialization:")
 S_OK_OUT_START = re.compile(r"^1NUMBER OF BEAM")
 S_OK_OUT_IN_PROGRESS = re.compile(r"^ NEXT SEEDS:")
