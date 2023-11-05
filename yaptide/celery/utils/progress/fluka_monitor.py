@@ -16,13 +16,13 @@ S_OK_OUT_PROGRESS_REMAINING_LINE_EXAMPLE = \
 
 
 def parse_progress_remaining_line(line: str) -> Optional[Tuple[int, int]]:
-    """Function parsing the line with progress remaining information
+    """Function parsing the line with progress remaining information.
 
     Args:
         line (str): line to be parsed
     Returns:
-        Tuple[int, int]: tuple with two integers representing the progress and remaining
-        if the line cannot be parsed None is returned
+        Tuple[int, int]: tuple with two integers representing the progress and remaining.
+        If the line cannot be parsed None is returned.
     """
     list = line.split()
     # expecting 6 sections which are int or floats
