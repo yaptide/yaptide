@@ -27,4 +27,8 @@ def parse_progress_remaining_line(line: str) -> Optional[Tuple[int, int]]:
     # expecting 6 sections which are int or floats
     if len(list) != 6:
         return None
+    try:
+        [float(x) for x in list]
+    except ValueError:
+        return None
     return (int(list[0]), int(list[1]))
