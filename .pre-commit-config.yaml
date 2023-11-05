@@ -18,5 +18,5 @@ repos:
         name: Check not empty env files
         language: python
         entry: python3 .pre_commit_hooks/check_not_empty_files.py
-        files: .env*
+        types: [dotenv]
         stages: [commit, push, manual]
