@@ -4,8 +4,7 @@ from typing import Optional, Tuple
 # templates for regex matching output from `<simulation>_<no>.err` file
 S_OK_OUT_INIT = re.compile(r"^ Total time used for initialization:")
 S_OK_OUT_START = re.compile(r"^1NUMBER OF BEAM")
-S_OK_OUT_IN_PROGRESS = re.compile("^ NEXT SEEDS:")
-S_OK_OUT_IN_PROGRESS_NEXT_LINE_REMAINIGN = re.compile()
+S_OK_OUT_IN_PROGRESS = re.compile(r"^ NEXT SEEDS:")
 S_OK_OUT_COLLECTED = re.compile(r"^ All cases handled by Feeder")
 S_OK_OUT_FIN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
 
