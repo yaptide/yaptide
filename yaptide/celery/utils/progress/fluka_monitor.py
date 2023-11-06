@@ -64,6 +64,7 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
     """Function reading the fluka output file and raporting progress to the backend."""
     in_progress = False
     requested_primaries = 0
+    update_time = 0
     for line in linte_iterator:
         utc_now = time_now_utc()
         if re.match(S_OK_OUT_START, line):
@@ -89,13 +90,21 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
                 progress, remainder = res
                 if not requested_primaries:
                     requested_primaries = progress + remainder
-                up_dict = {
-                    "simulated_primaries": progress,
-                    "requested_primaries": requested_primaries,
-                    "start_time": utc_now.isoformat(sep=" "),
-                    "task_state": EntityState.RUNNING.value
-                }
-                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+                    up_dict = {
+                        "simulated_primaries": progress,
+                        "requested_primaries": requested_primaries,
+                        "start_time": utc_now.isoformat(sep=" "),
+                        "task_state": EntityState.RUNNING.value
+                    }
+                else:
+                    if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
+                            and requested_primaries > progress):
+                        continue
+                    update_time = utc_now.timestamp()
+                    up_dict = {
+                        "simulated_primaries": progress,
+                    }
+                    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
                 continue
         # handle generator timeout
         if re.search(TIMEOUT_MATCH, line):
