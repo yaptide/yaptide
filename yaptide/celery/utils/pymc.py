@@ -67,17 +67,17 @@ def run_shieldhit(dir_path: Path, task_id: str) -> dict:
 
 def run_fluka(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single fluka simulation"""
-    settings = SimulationSettings(
-        input_path=dir_path,  # skipcq: PYL-W0612 # usefull
-        simulator_type=SimulatorType.fluka,
-        simulator_exec_path=None,  # useless
-        cmdline_opts="")  # useless
-
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
         # if there is no input file, raise an error
         # this should never happen
         raise FileNotFoundError("Input file not found")
+
+    settings = SimulationSettings(
+        input_path=str(input_file),  # skipcq: PYL-W0612 # usefull
+        simulator_type=SimulatorType.fluka,
+        simulator_exec_path=None,  # useless
+        cmdline_opts="")  # useless
 
     class UpdateFlukaRandomSeed(Protocol):
         """Protocol for updating random seed in fluka input file"""
