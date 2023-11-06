@@ -140,9 +140,9 @@ def run_shieldhit_watcher(task_id, update_key, simulation_id, tmp_dir_path, curr
 def run_fluka_watcher(task_id, update_key, simulation_id, tmp_dir_path, current_logging_level):
     """Function running the monitoring process for SHIELDHIT simulation"""
     # hack to  pass glob to the function
-    path_with_glob = Path(tmp_dir_path) / "fluka_*" / "*001.out"
+    fluka_task_dir = Path(tmp_dir_path)
     watcher_green_thread = eventlet.spawn(read_fluka_file,
-                                          path_with_glob,
+                                          fluka_task_dir,
                                           simulation_id,
                                           task_id,
                                           update_key,

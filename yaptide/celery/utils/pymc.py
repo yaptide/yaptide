@@ -257,7 +257,7 @@ def read_fluka_file(filepath: Path,
     # continuantion of awful glob path hack
     def get_fierst_matching_file() -> Optional[Path]:
         """Returns first matching file."""
-        path = next(Path().glob(str(filepath.relative_to(Path()))), None)
+        path = next(filepath.glob("fluka_*/*001.out"), None)
         return path.resolve() if path else None
 
     for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
