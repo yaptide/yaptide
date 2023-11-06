@@ -11,6 +11,7 @@ from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
 
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
+from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
@@ -250,7 +251,6 @@ def read_fluka_file(filepath: Path,
     """Monitors log file of fluka task"""
     logging.getLogger(__name__).setLevel(logging_level)
     logfile = None
-    update_time = 0
     logging.info("Started monitoring, simulation id: %d, task id: %s", simulation_id, task_id)
 
     # if the logfile is not created in the first X seconds, it is probably an error
@@ -277,53 +277,8 @@ def read_fluka_file(filepath: Path,
     # create generator which waits for new lines in log file
     # if no new line appears in timeout_wait_for_line seconds, generator stops
     loglines = log_generator(logfile, timeout=timeout_wait_for_line)
-    requested_primaries = 0
     logging.info("Parsing log file for task %s started", task_id)
-    for line in loglines:
-        utc_now = datetime.utcnow()
-        if re.search(RUN_MATCH, line):
-            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            splitted = line.split()
-            simulated_primaries = int(splitted[3])
-            if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
-                    and requested_primaries > simulated_primaries):
-                continue
-            update_time = utc_now.timestamp()
-            up_dict = {
-                "simulated_primaries": simulated_primaries,
-                "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
-            }
-            send_task_update(simulation_id, task_id, update_key, up_dict)
-
-        elif re.search(REQUESTED_MATCH, line):
-            logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            # found a line with requested primaries, update database
-            # task is in RUNNING state
-            splitted = line.split(": ")
-            requested_primaries = int(splitted[1])
-            up_dict = {
-                "simulated_primaries": 0,
-                "requested_primaries": requested_primaries,
-                "start_time": utc_now.isoformat(sep=" "),
-                "task_state": EntityState.RUNNING.value
-            }
-            send_task_update(simulation_id, task_id, update_key, up_dict)
-
-        elif re.search(TIMEOUT_MATCH, line):
-            logging.error("Simulation watcher %s timed out", task_id)
-            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
-            return
-
-        elif re.search(COMPLETE_MATCH, line):
-            logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            break
-
-    logging.info("Parsing log file for task %s finished", task_id)
-    up_dict = {
-        "simulated_primaries": requested_primaries,
-        "end_time": utc_now.isoformat(sep=" "),
-        "task_state": EntityState.COMPLETED.value
-    }
-    logging.info("Sending final update for task %s", task_id)
-    send_task_update(simulation_id, task_id, update_key, up_dict)
+    read_fluka_out_file(loglines,
+                        next_backend_update_time=next_backend_update_time,
+                        details=TaskDetails(simulation_id, task_id, update_key),
+                        varbose=logging_level <= logging.DEBUG)

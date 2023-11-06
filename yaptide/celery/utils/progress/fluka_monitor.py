@@ -1,7 +1,13 @@
+from dataclasses import dataclass
+from datetime import datetime, timezone
 import logging
 from pathlib import Path
 import re
 from typing import Iterator, Optional, Tuple
+from yaptide.batch.watcher import TIMEOUT_MATCH
+
+from yaptide.celery.utils.requests import send_task_update
+from yaptide.utils.enums import EntityState
 
 # templates for regex matching output from `<simulation>_<no>.out` file
 S_OK_OUT_INIT = re.compile(r"^ Total time used for initialization:")
@@ -38,15 +44,28 @@ def parse_progress_remaining_line(line: str) -> Optional[Tuple[int, int]]:
     return (int(list[0]), int(list[1]))
 
 
-def read_fluka_out_file(linte_iterator: Iterator[str], varbose: bool = False):
-    """Function reading the fluka output file and returning the progress and remaining values.
+@dataclass
+class TaskDetails:
+    simulation_id: int
+    task_id: str
+    update_key: str
 
-    Returns:
-        Tuple[int, int]: tuple with two integers representing the progress and remaining.
-        If the line cannot be parsed None is returned.
-    """
+
+def time_now_utc() -> datetime:
+    """Function returning current time in UTC timezone."""
+    # because datetime.utcnow() is deprecated
+    return datetime.now(timezone.utc)
+
+
+def read_fluka_out_file(linte_iterator: Iterator[str],
+                        next_backend_update_time: int,
+                        details: TaskDetails,
+                        varbose: bool = False) -> None:
+    """Function reading the fluka output file and raporting progress to the backend."""
     in_progress = False
+    requested_primaries = 0
     for line in linte_iterator:
+        utc_now = time_now_utc()
         if re.match(S_OK_OUT_START, line):
             logger.debug("Found start of the simulation")
             continue
@@ -66,6 +85,30 @@ def read_fluka_out_file(linte_iterator: Iterator[str], varbose: bool = False):
         if in_progress:
             res = parse_progress_remaining_line(line)
             if res:
-                progress, remainder = res
                 logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
+                progress, remainder = res
+                if not requested_primaries:
+                    requested_primaries = progress + remainder
+                up_dict = {
+                    "simulated_primaries": progress,
+                    "requested_primaries": requested_primaries,
+                    "start_time": utc_now.isoformat(sep=" "),
+                    "task_state": EntityState.RUNNING.value
+                }
+                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
                 continue
+        # handle generator timeout
+        if re.search(TIMEOUT_MATCH, line):
+            logging.error("Simulation watcher %s timed out", details.task_id)
+            up_dict = {"task_state": EntityState.FAILED.value, "end_time": time_now_utc().isoformat(sep=" ")}
+            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            return
+
+    logging.info("Parsing log file for task %s finished", details.task_id)
+    up_dict = {
+        "simulated_primaries": requested_primaries,
+        "end_time": utc_now.isoformat(sep=" "),
+        "task_state": EntityState.COMPLETED.value
+    }
+    logging.info("Sending final update for task %s", details.task_id)
+    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
