@@ -258,14 +258,14 @@ def read_fluka_file(filepath: Path,
 
     # if the logfile is not created in the first X seconds, it is probably an error
     # continuantion of awful glob path hack
-    def get_fierst_matching_file() -> Optional[Path]:
+    def get_first_matching_file() -> Optional[Path]:
         """Returns first matching file."""
         path = next(filepath.glob("fluka_*/*001.out"), None)
         return path.resolve() if path else None
 
     for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
         try:
-            optional_file = get_fierst_matching_file()
+            optional_file = get_first_matching_file()
             if not optional_file:
                 time.sleep(1)
                 continue
