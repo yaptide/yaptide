@@ -86,8 +86,8 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
         if in_progress:
             res = parse_progress_remaining_line(line)
             if res:
-                logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
                 progress, remainder = res
+                logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
                 if not requested_primaries:
                     requested_primaries = progress + remainder
                     up_dict = {
