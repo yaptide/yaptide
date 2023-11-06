@@ -262,7 +262,11 @@ def read_fluka_file(filepath: Path,
 
     for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
         try:
-            logfile = open(get_fierst_matching_file())  # skipcq: PTC-W6004
+            optional_file = get_fierst_matching_file()
+            if not optional_file:
+                time.sleep(1)
+                continue
+            logfile = open(optional_file)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
             time.sleep(1)
