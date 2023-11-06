@@ -10,18 +10,18 @@ from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
 
-from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
-                                   TIMEOUT_MATCH, log_generator)
+from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
 
 def run_shieldhit(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single SHIELD-HIT12A simulation"""
-    settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
-                                  simulator_type=SimulatorType.shieldhit,
-                                  simulator_exec_path=None,  # useless
-                                  cmdline_opts="")  # useless
+    settings = SimulationSettings(
+        input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+        simulator_type=SimulatorType.shieldhit,
+        simulator_exec_path=None,  # useless
+        cmdline_opts="")  # useless
     # last part of task_id gives an integer seed for random number generator
     settings.set_rng_seed(int(task_id.split("_")[-1]))
 
@@ -66,10 +66,11 @@ def run_shieldhit(dir_path: Path, task_id: str) -> dict:
 
 def run_fluka(dir_path: Path, task_id: str) -> dict:
     """Function run in eventlet to run single fluka simulation"""
-    settings = SimulationSettings(input_path=dir_path,  # skipcq: PYL-W0612 # usefull
-                                  simulator_type=SimulatorType.fluka,
-                                  simulator_exec_path=None,  # useless
-                                  cmdline_opts="")  # useless
+    settings = SimulationSettings(
+        input_path=dir_path,  # skipcq: PYL-W0612 # usefull
+        simulator_type=SimulatorType.fluka,
+        simulator_exec_path=None,  # useless
+        cmdline_opts="")  # useless
 
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
@@ -145,13 +146,11 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
                                if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
 
             base_list[est_i]["pages"][page_i]["data"]["values"] = [
-                sum(x) / (averaged_count + 1) for x in zip(
-                    map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
-                    page_dict["data"]["values"]
-                )
+                sum(x) / (averaged_count + 1)
+                for x in zip(map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
+                             page_dict["data"]["values"])
             ]
-            logging.debug("Averaged page %s with %d elements",
-                          page_dict["metadata"]["page_number"],
+            logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
                           len(page_dict["data"]["values"]))
     return base_list
 
@@ -161,7 +160,7 @@ def read_file(filepath: Path,
               task_id: str,
               update_key: str,
               timeout_wait_for_file: int = 60,
-              timeout_wait_for_line: int = 5*60,
+              timeout_wait_for_line: int = 5 * 60,
               next_backend_update_time: int = 2,
               logging_level: int = logging.WARNING):
     """Monitors log file of certain task"""
@@ -180,10 +179,7 @@ def read_file(filepath: Path,
     # if logfile was not created in the first minute, task is marked as failed
     if logfile is None:
         logging.error("Log file for task %s not found", task_id)
-        up_dict = {
-            "task_state": EntityState.FAILED.value,
-            "end_time": datetime.utcnow().isoformat(sep=" ")
-        }
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
     logging.debug("Log file for task %s found", task_id)
@@ -205,9 +201,7 @@ def read_file(filepath: Path,
             update_time = utc_now.timestamp()
             up_dict = {
                 "simulated_primaries": simulated_primaries,
-                "estimated_time": int(splitted[9])
-                + int(splitted[7]) * 60
-                + int(splitted[5]) * 3600
+                "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
@@ -227,10 +221,91 @@ def read_file(filepath: Path,
 
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", task_id)
+            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+            return
+
+        elif re.search(COMPLETE_MATCH, line):
+            logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+            break
+
+    logging.info("Parsing log file for task %s finished", task_id)
+    up_dict = {
+        "simulated_primaries": requested_primaries,
+        "end_time": utc_now.isoformat(sep=" "),
+        "task_state": EntityState.COMPLETED.value
+    }
+    logging.info("Sending final update for task %s", task_id)
+    send_task_update(simulation_id, task_id, update_key, up_dict)
+
+
+def read_fluka_file(filepath: Path,
+                    simulation_id: int,
+                    task_id: str,
+                    update_key: str,
+                    timeout_wait_for_file: int = 60,
+                    timeout_wait_for_line: int = 5 * 60,
+                    next_backend_update_time: int = 2,
+                    logging_level: int = logging.WARNING):
+    """Monitors log file of certain task"""
+    logging.getLogger(__name__).setLevel(logging_level)
+    logfile = None
+    update_time = 0
+    logging.info("Started monitoring, simulation id: %d, task id: %s", simulation_id, task_id)
+    # if the logfile is not created in the first X seconds, it is probably an error
+    for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
+        try:
+            logfile = open(filepath)  # skipcq: PTC-W6004
+            break
+        except FileNotFoundError:
+            time.sleep(1)
+
+    # if logfile was not created in the first minute, task is marked as failed
+    if logfile is None:
+        logging.error("Log file for task %s not found", task_id)
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        send_task_update(simulation_id, task_id, update_key, up_dict)
+        return
+    logging.debug("Log file for task %s found", task_id)
+
+    # create generator which waits for new lines in log file
+    # if no new line appears in timeout_wait_for_line seconds, generator stops
+    loglines = log_generator(logfile, timeout=timeout_wait_for_line)
+    requested_primaries = 0
+    logging.info("Parsing log file for task %s started", task_id)
+    for line in loglines:
+        utc_now = datetime.utcnow()
+        if re.search(RUN_MATCH, line):
+            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+            splitted = line.split()
+            simulated_primaries = int(splitted[3])
+            if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
+                    and requested_primaries > simulated_primaries):
+                continue
+            update_time = utc_now.timestamp()
             up_dict = {
-                "task_state": EntityState.FAILED.value,
-                "end_time": datetime.utcnow().isoformat(sep=" ")
+                "simulated_primaries": simulated_primaries,
+                "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
             }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+
+        elif re.search(REQUESTED_MATCH, line):
+            logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+            # found a line with requested primaries, update database
+            # task is in RUNNING state
+            splitted = line.split(": ")
+            requested_primaries = int(splitted[1])
+            up_dict = {
+                "simulated_primaries": 0,
+                "requested_primaries": requested_primaries,
+                "start_time": utc_now.isoformat(sep=" "),
+                "task_state": EntityState.RUNNING.value
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+
+        elif re.search(TIMEOUT_MATCH, line):
+            logging.error("Simulation watcher %s timed out", task_id)
+            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
 

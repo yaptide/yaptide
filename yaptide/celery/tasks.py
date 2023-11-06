@@ -7,7 +7,7 @@ from pathlib import Path
 
 import eventlet
 
-from yaptide.celery.utils.pymc import (average_estimators, read_file, run_fluka, run_shieldhit)
+from yaptide.celery.utils.pymc import (average_estimators, read_file, read_fluka_file, run_fluka, run_shieldhit)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
@@ -72,9 +72,14 @@ def run_single_simulation(self,
             send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
             current_logging_level = logging.getLogger().getEffectiveLevel()
-
-            watcher_green_thread = run_shieldhit_watcher(task_id, update_key, simulation_id, tmp_dir_path,
+            watcher_green_thread = None
+            if sim_type == 'shieldhit':
+                watcher_green_thread = run_shieldhit_watcher(task_id, update_key, simulation_id, tmp_dir_path,
+                                                             current_logging_level)
+            elif sim_type == 'fluka':
+                watcher_green_thread = run_fluka_watcher(task_id, update_key, simulation_id, tmp_dir_path,
                                                          current_logging_level)
+
             logging.info("Started monitoring process for task %s", task_id)
         else:
             logging.info("No monitoring processes started for task %s", task_id)
@@ -125,6 +130,21 @@ def run_shieldhit_watcher(task_id, update_key, simulation_id, tmp_dir_path, curr
 
     watcher_green_thread = eventlet.spawn(read_file,
                                           path_to_monitor,
+                                          simulation_id,
+                                          task_id,
+                                          update_key,
+                                          logging_level=current_logging_level)
+
+    return watcher_green_thread
+
+
+def run_fluka_watcher(task_id, update_key, simulation_id, tmp_dir_path, current_logging_level):
+    """Function running the monitoring process for SHIELDHIT simulation"""
+    # hack to  pass glob to the function
+    path_with_glob = Path(tmp_dir_path) / "fluka_*" / "*001.out"
+
+    watcher_green_thread = eventlet.spawn(read_fluka_file,
+                                          path_with_glob,
                                           simulation_id,
                                           task_id,
                                           update_key,
