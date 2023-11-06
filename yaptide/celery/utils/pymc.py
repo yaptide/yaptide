@@ -77,7 +77,7 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
         input_path=str(input_file),  # skipcq: PYL-W0612 # usefull
         simulator_type=SimulatorType.fluka,
         simulator_exec_path=None,  # useless
-        cmdline_opts="")  # useless
+        cmdline_opts="-M 1")  # only one run
 
     class UpdateFlukaRandomSeed(Protocol):
         """Protocol for updating random seed in fluka input file"""
