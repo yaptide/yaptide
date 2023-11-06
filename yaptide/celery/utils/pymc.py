@@ -73,6 +73,8 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
         # this should never happen
         raise FileNotFoundError("Input file not found")
 
+    logging.info("Running fluka simulation file %s", str(input_file))
+
     settings = SimulationSettings(
         input_path=str(input_file),  # skipcq: PYL-W0612 # usefull
         simulator_type=SimulatorType.fluka,
@@ -89,8 +91,9 @@ def run_fluka(dir_path: Path, task_id: str) -> dict:
     # propably should be protected instead of private
     update_fluka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
     update_fluka_function(str(input_file.resolve()), random_seed)
-
+    logging.info("log cmd line opts: %s and str(settings) %s", settings.cmdline_opts, str(settings))
     command_as_list = str(settings).split()
+    command_as_list.append(input_file)
 
     logging.debug("Running fluka with setting %s", settings)
 
