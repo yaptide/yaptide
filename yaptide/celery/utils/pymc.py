@@ -4,7 +4,7 @@ import subprocess
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Optional, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
@@ -252,10 +252,16 @@ def read_fluka_file(filepath: Path,
     logfile = None
     update_time = 0
     logging.info("Started monitoring, simulation id: %d, task id: %s", simulation_id, task_id)
+
     # if the logfile is not created in the first X seconds, it is probably an error
+    # continuantion of awful glob path hack
+    def get_fierst_matching_file() -> Optional[Path]:
+        """Returns first matching file."""
+        return next(Path().glob(str(filepath)), None)
+
     for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
         try:
-            logfile = open(filepath)  # skipcq: PTC-W6004
+            logfile = open(get_fierst_matching_file())  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
             time.sleep(1)

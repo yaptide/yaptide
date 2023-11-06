@@ -72,7 +72,6 @@ def run_single_simulation(self,
             send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
             current_logging_level = logging.getLogger().getEffectiveLevel()
-            watcher_green_thread = None
             if sim_type == 'shieldhit':
                 watcher_green_thread = run_shieldhit_watcher(task_id, update_key, simulation_id, tmp_dir_path,
                                                              current_logging_level)
@@ -142,7 +141,6 @@ def run_fluka_watcher(task_id, update_key, simulation_id, tmp_dir_path, current_
     """Function running the monitoring process for SHIELDHIT simulation"""
     # hack to  pass glob to the function
     path_with_glob = Path(tmp_dir_path) / "fluka_*" / "*001.out"
-
     watcher_green_thread = eventlet.spawn(read_fluka_file,
                                           path_with_glob,
                                           simulation_id,
