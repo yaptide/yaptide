@@ -289,4 +289,4 @@ def read_fluka_file(filepath: Path,
     read_fluka_out_file(loglines,
                         next_backend_update_time=next_backend_update_time,
                         details=TaskDetails(simulation_id, task_id, update_key),
-                        varbose=logging_level <= logging.DEBUG)
+                        varbose=logging_level <= logging.INFO)
