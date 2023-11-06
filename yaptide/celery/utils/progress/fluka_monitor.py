@@ -96,6 +96,7 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
                         "start_time": utc_now.isoformat(sep=" "),
                         "task_state": EntityState.RUNNING.value
                     }
+                    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
                 else:
                     if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
                             and requested_primaries > progress):
