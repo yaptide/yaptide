@@ -247,7 +247,7 @@ def read_fluka_file(filepath: Path,
                     timeout_wait_for_line: int = 5 * 60,
                     next_backend_update_time: int = 2,
                     logging_level: int = logging.WARNING):
-    """Monitors log file of certain task"""
+    """Monitors log file of fluka task"""
     logging.getLogger(__name__).setLevel(logging_level)
     logfile = None
     update_time = 0
