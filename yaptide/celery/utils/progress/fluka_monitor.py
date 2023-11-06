@@ -57,6 +57,11 @@ def time_now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def utc_without_offset(utc: datetime) -> str:
+    """Function returning current time in UTC timezone."""
+    return utc.strftime('%Y-%m-%d %H:%M:%S.%f')
+
+
 def read_fluka_out_file(linte_iterator: Iterator[str],
                         next_backend_update_time: int,
                         details: TaskDetails,
@@ -93,7 +98,7 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
                     up_dict = {
                         "simulated_primaries": progress,
                         "requested_primaries": requested_primaries,
-                        "start_time": utc_now.isoformat(sep=" "),
+                        "start_time": utc_without_offset(utc_now),
                         "task_state": EntityState.RUNNING.value
                     }
                     send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
@@ -117,7 +122,7 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
     logging.info("Parsing log file for task %s finished", details.task_id)
     up_dict = {
         "simulated_primaries": requested_primaries,
-        "end_time": utc_now.isoformat(sep=" "),
+        "end_time": utc_without_offset(utc_now),
         "task_state": EntityState.COMPLETED.value
     }
     logging.info("Sending final update for task %s", details.task_id)
