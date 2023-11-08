@@ -138,6 +138,8 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
 
     command_stdout, command_stderr = '', ''
     simulated_primaries, requested_primaries = 0, 0
+    # start monitoring process if possible
+    # is None if monitoring if monitor was not started
     task_monitor = monitor_shieldhit(tmp_work_dir, task_id, update_key, simulation_id)
 
     # run the simulation
