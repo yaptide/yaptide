@@ -1,10 +1,10 @@
 import contextlib
 from dataclasses import dataclass
 import logging
-import multiprocessing
 import tempfile
 from datetime import datetime
 from pathlib import Path
+import threading
 from typing import Optional
 
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
@@ -138,10 +138,11 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
 
     command_stdout, command_stderr = '', ''
     simulated_primaries, requested_primaries = 0, 0
+    event = threading.Event()
+
     # start monitoring process if possible
     # is None if monitoring if monitor was not started
-    task_monitor = monitor_shieldhit(tmp_work_dir, task_id, update_key, simulation_id)
-
+    task_monitor = monitor_shieldhit(event, tmp_work_dir, task_id, update_key, simulation_id)
     # run the simulation
     logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
     process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),
@@ -150,9 +151,10 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
 
     # terminate monitoring process
     if task_monitor:
-        task_monitor.process.terminate()
-        task_monitor.process.join()
-
+        logging.debug("Terminating monitoring process for task %s", task_id)
+        event.set()
+        task_monitor.task.join()
+        logging.debug("Monitoring process for task %s terminated", task_id)
     # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
     if task_monitor:
         simulated_primaries, requested_primaries = read_file_offline(task_monitor.path_to_monitor)
@@ -246,10 +248,11 @@ class MonitorTask:
     """Class representing monitoring task"""
 
     path_to_monitor: Path
-    process: multiprocessing.Process
+    task: threading.Thread
 
 
-def monitor_shieldhit(tmp_work_dir: str, task_id: str, update_key: str, simulation_id: str) -> Optional[MonitorTask]:
+def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: str, update_key: str,
+                      simulation_id: str) -> Optional[MonitorTask]:
     """Function monitoring progress of SHIELD-HIT12A simulation"""
     # we would like to monitor the progress of simulation
     # this is done by reading the log file and sending the updates to the backend
@@ -257,18 +260,16 @@ def monitor_shieldhit(tmp_work_dir: str, task_id: str, update_key: str, simulati
     path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
     if update_key and simulation_id is not None:
         current_logging_level = logging.getLogger().getEffectiveLevel()
-        background_process = multiprocessing.Process(target=read_file,
-                                                     kwargs={
-                                                         "filepath": path_to_monitor,
-                                                         "simulation_id": simulation_id,
-                                                         "task_id": task_id,
-                                                         "update_key": update_key,
-                                                         "logging_level": current_logging_level
-                                                     })
-        background_process.start()
-
+        task = threading.Thread(target=read_file,
+                                kwargs=dict(event=event,
+                                            filepath=path_to_monitor,
+                                            simulation_id=simulation_id,
+                                            task_id=task_id,
+                                            update_key=update_key,
+                                            logging_level=current_logging_level))
+        task.start()
         logging.info("Started monitoring process for task %s", task_id)
-        return MonitorTask(path_to_monitor=path_to_monitor, process=background_process)
+        return MonitorTask(path_to_monitor=path_to_monitor, task=task)
 
     logging.info("No monitoring processes started for task %s", task_id)
     return None

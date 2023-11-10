@@ -3,6 +3,7 @@ import os
 import re
 import subprocess
 import tempfile
+import threading
 import time
 from datetime import datetime
 from pathlib import Path
@@ -231,7 +232,8 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
     return base_list
 
 
-def read_file(filepath: Path,
+def read_file(event: threading.Event,
+              filepath: Path,
               simulation_id: int,
               task_id: str,
               update_key: str,
@@ -246,6 +248,8 @@ def read_file(filepath: Path,
     logging.info("Started monitoring, simulation id: %d, task id: %s", simulation_id, task_id)
     # if the logfile is not created in the first X seconds, it is probably an error
     for i in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
+        if event.is_set():
+            return
         try:
             logging.debug("Trying to open file %s, attempt %d/%d", filepath, i, timeout_wait_for_file)
             logfile = open(filepath)  # skipcq: PTC-W6004
@@ -263,10 +267,12 @@ def read_file(filepath: Path,
 
     # create generator which waits for new lines in log file
     # if no new line appears in timeout_wait_for_line seconds, generator stops
-    loglines = log_generator(logfile, timeout=timeout_wait_for_line)
+    loglines = log_generator(event, logfile, timeout=timeout_wait_for_line)
     requested_primaries = 0
     logging.info("Parsing log file for task %s started", task_id)
     for line in loglines:
+        if event.is_set():
+            return
         utc_now = datetime.utcnow()
         logging.debug("Parsing line: %s", line.rstrip())
         if re.search(RUN_MATCH, line):
