@@ -7,7 +7,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import Any, List, Optional, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
@@ -166,25 +166,27 @@ def get_fluka_estimators(dir_path: Path) -> dict:
     return estimators_dict
 
 
+def find_matching_index(lst: list[dict], key: str, value: Any) -> Optional[int]:
+    """Find the index of the dictionary in a list that has a specific key-value pair"""
+    return next((i for i, item in enumerate(lst) if item[key] == value), None)
+
+
+def average_values(base_values: List[float], new_values: List[float], count: int) -> list[float]:
+    """Average two lists of values"""
+    return [sum(x) / (count + 1) for x in zip(map(lambda x: x * count, base_values), new_values)]
+
+
 def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
     """Averages estimators from two dicts"""
     logging.debug("Averaging estimators - already averaged: %d", averaged_count)
-    for est_i, estimator_dict in enumerate(list_to_add):
-        # check if estimator names are the same and if not, find matching estimator's index in base_list
-        if estimator_dict["name"] != base_list[est_i]["name"]:
-            est_i = next((i for i, item in enumerate(base_list) if item["name"] == estimator_dict["name"]), None)
+    for estimator_dict in list_to_add:
+        est_i = find_matching_index(base_list, "name", estimator_dict["name"])
         logging.debug("Averaging estimator %s", estimator_dict["name"])
-        for page_i, page_dict in enumerate(estimator_dict["pages"]):
-            # check if page numbers are the same and if not, find matching page's index in base_list
-            if page_dict["metadata"]["page_number"] != base_list[est_i]["pages"][page_i]["metadata"]["page_number"]:
-                page_i = next((i for i, item in enumerate(base_list[est_i]["pages"])
-                               if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
-
-            base_list[est_i]["pages"][page_i]["data"]["values"] = [
-                sum(x) / (averaged_count + 1)
-                for x in zip(map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
-                             page_dict["data"]["values"])
-            ]
+        for page_dict in estimator_dict["pages"]:
+            page_i = find_matching_index(base_list[est_i]["pages"], "metadata.page_number",
+                                         page_dict["metadata"]["page_number"])
+            base_list[est_i]["pages"][page_i]["data"]["values"] = average_values(
+                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count)
             logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
                           len(page_dict["data"]["values"]))
     return base_list
