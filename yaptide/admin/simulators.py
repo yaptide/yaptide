@@ -145,18 +145,18 @@ def decrypt(**kwargs):
 def download_fluka(**kwargs):
     """Download Fluka simulator"""
     click.echo(f'Downloading Fluka into directory {kwargs["dir"]}')
-    installation_status = download_fluka_from_s3(download_dir=kwargs['dir'],
-                                                 endpoint=kwargs['endpoint'],
-                                                 access_key=kwargs['access_key'],
-                                                 secret_key=kwargs['secret_key'],
-                                                 bucket=kwargs['bucket'],
-                                                 key=kwargs['key'],
-                                                 password=kwargs['password'],
-                                                 salt=kwargs['salt'])
-    if installation_status:
-        click.echo('Fluka installed')
+    download_status = download_fluka_from_s3(download_dir=kwargs['dir'],
+                                             endpoint=kwargs['endpoint'],
+                                             access_key=kwargs['access_key'],
+                                             secret_key=kwargs['secret_key'],
+                                             bucket=kwargs['bucket'],
+                                             key=kwargs['key'],
+                                             password=kwargs['password'],
+                                             salt=kwargs['salt'])
+    if download_status:
+        click.echo('Fluka downloaded')
     else:
-        click.echo('Not implemented')
+        click.echo('Fluka download failed')
 
 
 @run.command
