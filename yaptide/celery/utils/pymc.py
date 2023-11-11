@@ -7,7 +7,7 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Protocol
+from typing import List, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
@@ -166,6 +166,11 @@ def get_fluka_estimators(dir_path: Path) -> dict:
     return estimators_dict
 
 
+def average_values(base_values: List[float], new_values: List[float], count: int) -> List[float]:
+    """Average two lists of values"""
+    return [sum(x) / (count + 1) for x in zip(map(lambda x: x * count, base_values), new_values)]
+
+
 def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
     """Averages estimators from two dicts"""
     logging.debug("Averaging estimators - already averaged: %d", averaged_count)
@@ -180,11 +185,9 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
                 page_i = next((i for i, item in enumerate(base_list[est_i]["pages"])
                                if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
 
-            base_list[est_i]["pages"][page_i]["data"]["values"] = [
-                sum(x) / (averaged_count + 1)
-                for x in zip(map(lambda x: x * averaged_count, base_list[est_i]["pages"][page_i]["data"]["values"]),
-                             page_dict["data"]["values"])
-            ]
+            base_list[est_i]["pages"][page_i]["data"]["values"] = average_values(
+                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count)
+
             logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
                           len(page_dict["data"]["values"]))
     return base_list
