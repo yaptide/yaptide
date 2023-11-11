@@ -8,8 +8,8 @@ import threading
 from typing import Optional
 
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
-                                       execute_fluka_process, execute_shieldhit_process, get_fluka_estimators,
-                                       get_shieldhit_estimators, get_tmp_dir, read_file, read_file_offline)
+                                       execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
+                                       get_tmp_dir, read_file, read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
@@ -145,8 +145,8 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
     task_monitor = monitor_shieldhit(event, tmp_work_dir, task_id, update_key, simulation_id)
     # run the simulation
     logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
-    process_exit_success, command_stdout, command_stderr = execute_shieldhit_process(dir_path=Path(tmp_work_dir),
-                                                                                     command_as_list=command_as_list)
+    process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
+        dir_path=Path(tmp_work_dir), command_as_list=command_as_list)
     logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
 
     # terminate monitoring process
@@ -186,8 +186,8 @@ def run_single_simulation_for_fluka(
 
     # run the simulation
     logging.info("Running Fluka process in %s", tmp_work_dir)
-    process_exit_success, command_stdout, command_stderr = execute_fluka_process(dir_path=Path(tmp_work_dir),
-                                                                                 command_as_list=command_as_list)
+    process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
+        dir_path=Path(tmp_work_dir), command_as_list=command_as_list)
     logging.info("Fluka process finished with status %s", process_exit_success)
 
     # both simulation execution and monitoring process are finished now, we can read the estimators
