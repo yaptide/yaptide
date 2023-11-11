@@ -17,7 +17,7 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(event: threading.Event, thefile: TextIOWrapper, timeout: int = 3600) -> str:
+def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout: int = 3600) -> str:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
@@ -26,7 +26,7 @@ def log_generator(event: threading.Event, thefile: TextIOWrapper, timeout: int =
     """
     sleep_counter = 0
     while True:
-        if event.is_set():
+        if event and event.is_set():
             break
         if thefile is None:
             return "File not found"
@@ -94,7 +94,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
         print(f"Update for task: {task_id} - FAILED")
         return
 
-    loglines = log_generator(logfile)
+    loglines = log_generator(logfile, threading.Event())
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):

@@ -267,7 +267,7 @@ def read_file(event: threading.Event,
 
     # create generator which waits for new lines in log file
     # if no new line appears in timeout_wait_for_line seconds, generator stops
-    loglines = log_generator(event, logfile, timeout=timeout_wait_for_line)
+    loglines = log_generator(logfile, event, timeout=timeout_wait_for_line)
     requested_primaries = 0
     logging.info("Parsing log file for task %s started", task_id)
     for line in loglines:
