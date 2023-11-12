@@ -58,28 +58,26 @@ def test_run_simulation_with_flask_crashing(celery_app,
             logging.error("Job did not crash in %d seconds - aborting", wait_this_long)
             assert False
         counter+=1
-        logging.info("Sending check job status request on /jobs endpoint, attempt %d", counter)
+        logging.debug("Sending check job status request on /jobs endpoint, attempt %d", counter)
         resp = client.get("/jobs", query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
-        data = json.loads(resp.data.decode())
+        jobs_data = json.loads(resp.data.decode())
 
         # lets ensure that the keys contain only message, job_state and job_tasks_status
         # and that there is no results, logfiles and input files here
-        assert set(data.keys()) == {"message", "job_state", "job_tasks_status"}
-        assert len(data["job_tasks_status"]) == payload_dict_with_broken_input["ntasks"]
-        logging.info("Job state: %s", data['job_state'])
-        for i, task_status in enumerate(data["job_tasks_status"]):
+        assert set(jobs_data.keys()) == {"message", "job_state", "job_tasks_status"}
+        assert len(jobs_data["job_tasks_status"]) == payload_dict_with_broken_input["ntasks"]
+        logging.debug("Job state: %s", jobs_data['job_state'])
+        for i, task_status in enumerate(jobs_data["job_tasks_status"]):
             logging.info("Task %d status %s", i, task_status)
 
-        if data['job_state'] in ['COMPLETED', 'FAILED']:
-            assert data['job_state'] == 'FAILED'
+        if jobs_data['job_state'] in ['COMPLETED', 'FAILED']:
+            logging.debug("Job state is %s, breaking the loop", jobs_data['job_state'])
+            assert jobs_data['job_state'] == 'FAILED'
             break
         sleep(1)
 
+    # right now sending of logfiles is disabled
     logging.info("Fetching logfiles from /logfiles endpoint")
     resp = client.get("/logfiles", query_string={"job_id": job_id})
-    data: dict = json.loads(resp.data.decode())
-    print(data)
-
-    assert resp.status_code == 200  # skipcq: BAN-B101
-    assert {"message", "logfiles"} == set(data.keys())
+    assert resp.status_code == 404

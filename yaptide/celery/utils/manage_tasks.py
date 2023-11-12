@@ -10,9 +10,12 @@ from yaptide.utils.enums import EntityState
 
 def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, sim_type: str = 'shieldhit') -> str:
     """Runs asynchronous simulation job"""
+    logging.debug("Starting run_simulation task for %d tasks", ntasks)
+    logging.debug("Simulation id: %d", simulation_id)
+    logging.debug("Update key: %s", update_key)
     map_group = group([
         run_single_simulation.s(
-            files_dict=files_dict,
+            files_dict=files_dict,  # simulation input, keys: filenames, values: file contents
             task_id=f"{simulation_id}_{i}",
             update_key=update_key,
             simulation_id=simulation_id,

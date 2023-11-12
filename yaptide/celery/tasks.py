@@ -1,13 +1,15 @@
 import contextlib
+from dataclasses import dataclass
 import logging
-import os
 import tempfile
 from datetime import datetime
 from pathlib import Path
+import threading
+from typing import Optional
 
-import eventlet
-
-from yaptide.celery.utils.pymc import (average_estimators, read_file, run_fluka, run_shieldhit)
+from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
+                                       execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
+                                       get_tmp_dir, read_file, read_file_offline)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
@@ -26,7 +28,7 @@ def convert_input_files(payload_dict: dict) -> dict:
 def run_single_simulation(self,
                           files_dict: dict,
                           task_id: str,
-                          update_key: str = None,
+                          update_key: str = '',
                           simulation_id: int = None,
                           keep_tmp_files: bool = False,
                           sim_type: str = 'shieldhit') -> dict:
@@ -36,93 +38,167 @@ def run_single_simulation(self,
 
     logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
 
-    # lets try by default to use python tempfile module
-    tmp_dir = tempfile.gettempdir()
-    logging.debug("1. tempfile.gettempdir() is: %s", tmp_dir)
+    logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
+    send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
-    # if the TMPDIR env variable is set we will use it to override the default
-    logging.info("1. TMPDIR is: %s", os.environ.get("TMPDIR", "not set"))
-    if os.environ.get("TMPDIR"):
-        tmp_dir = os.environ.get("TMPDIR")
-
-    # if the TEMP env variable is set we will use it to override the default
-    logging.info("2. TEMP is: %s", os.environ.get("TEMP", "not set"))
-    if os.environ.get("TEMP"):
-        tmp_dir = os.environ.get("TEMP")
-
-    # if the TMP env variable is set we will use it to override the default
-    logging.info("3. TMP is: %s", os.environ.get("TMP", "not set"))
-    if os.environ.get("TMP"):
-        tmp_dir = os.environ.get("TMP")
+    # we would like to have some control on the temporary directory used by the function
+    tmp_dir = get_tmp_dir()
+    logging.info("Temporary directory is: %s", tmp_dir)
 
     # with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
     # use the selected temporary directory to create a temporary directory
     with (contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir)) if keep_tmp_files else tempfile.TemporaryDirectory(
-            dir=tmp_dir)) as tmp_dir_path:
-        logging.debug("Task %s saves the files for simulation %s", task_id, files_dict.keys())
-        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
+            dir=tmp_dir)) as tmp_work_dir:
 
-        watcher_green_thread = None
-        # we would like to monitor the progress of simulation
-        # this is done by reading the log file and sending the updates to the backend
-        # if we have update_key and simulation_id the monitoring thread can submit the updates to backend
-        if update_key is not None and simulation_id is not None:
-
-            logging.info("Sending update for task %s, setting celery id %s", task_id, self.request.id)
-            send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
-
-            path_to_monitor = Path(tmp_dir_path) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
-
-            current_logging_level = logging.getLogger().getEffectiveLevel()
-
-            watcher_green_thread = eventlet.spawn(read_file,
-                                                  path_to_monitor,
-                                                  simulation_id,
-                                                  task_id,
-                                                  update_key,
-                                                  logging_level=current_logging_level)
-            logging.info("Started monitoring process for task %s", task_id)
-        else:
-            logging.info("No monitoring processes started for task %s", task_id)
+        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
+        logging.debug("Generated input files: %s", files_dict.keys())
 
         if sim_type == 'shieldhit':
-            logging.info("Running SHIELDHIT simulation in %s", tmp_dir_path)
-            estimators_dict = run_shieldhit(dir_path=Path(tmp_dir_path), task_id=task_id)
-        else:
-            logging.info("Running Fluka simulation in %s", tmp_dir_path)
-            estimators_dict = run_fluka(dir_path=Path(tmp_dir_path), task_id=task_id)
+            simulation_result = run_single_simulation_for_shieldhit(tmp_work_dir, task_id, update_key, simulation_id)
+        elif sim_type == 'fluka':
+            simulation_result = run_single_simulation_for_fluka(tmp_work_dir, task_id, update_key, simulation_id)
 
-        logging.info("Simulation finished for task %s", task_id)
-        # at this point simulation is finished (failed or succeded) and we can kill the monitoring process
-        if watcher_green_thread is not None:
-            logging.info("Killing monitoring processes for task %s", task_id)
-            watcher_green_thread.kill()
-        else:
-            logging.info("No monitoring processes to kill for task %s", task_id)
-
-        # here we have simulation which failed, this means we mark the task as failed
-        if not estimators_dict:
+        # there is no simulation output
+        if not simulation_result.estimators_dict:
+            # first we notify the backend that the task with simulation has failed
             logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
             update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, update_dict)
 
-            logfiles = simulation_logfiles(path=Path(tmp_dir_path))
+            # then we send the logfiles to the backend, if available
+            logfiles = simulation_logfiles(path=Path(tmp_work_dir))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            if send_simulation_logfiles(simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
-                return {}
-            return {"logfiles": logfiles, "simulation_id": simulation_id, "update_key": update_key}
+            # the method below is in particular broken,
+            # as there may be several logfiles, for some of the tasks
+            # lets imagine following sequence of actions:
+            # task 1 fails, with some usefule message in the logfile,
+            # i.e. after 100 primaries the SHIELD-HIT12A binary crashed
+            # then the useful logfiles are being sent to the backend
+            # task 2 fails later, but here the SHIELD-HIT12A binary crashes
+            # at the beginning of the simulation, without producing of the logfiles
+            # then again the logfiles are being sent to the backend, but this time they are empty
+            # so the useful logfiles are overwritten by the empty ones
+            # we temporarily disable sending logfiles to the backend
+            # if logfiles:
+            #     pass
+            # sending_logfiles_status = send_simulation_logfiles(simulation_id=simulation_id,
+            #                                                 update_key=update_key,
+            #                                                 logfiles=logfiles)
+            # if not sending_logfiles_status:
+            #     logging.error("Sending logfiles failed for task %s", task_id)
 
+            # finally we return from the celery task, returning the logfiles and stdout/stderr as result
+            return {
+                "logfiles": logfiles,
+                "stdout": simulation_result.command_stdout,
+                "stderr": simulation_result.command_stderr,
+                "simulation_id": simulation_id,
+                "update_key": update_key
+            }
+
+        # otherwise we have simulation output
         logging.debug("Converting simulation results to JSON")
-        estimators = estimators_to_list(estimators_dict=estimators_dict, dir_path=Path(tmp_dir_path))
+        estimators = estimators_to_list(estimators_dict=simulation_result.estimators_dict, dir_path=Path(tmp_work_dir))
 
-        end_time = datetime.utcnow().isoformat(sep=" ")
+    # We do not have any information if monitoring process sent the last update
+    # so we send it here to make sure that we have the end_time and COMPLETED state
+    end_time = datetime.utcnow().isoformat(sep=" ")
+    update_dict = {
+        "task_state": EntityState.COMPLETED.value,
+        "end_time": end_time,
+        "simulated_primaries": simulation_result.requested_primaries,
+        "requested_primaries": simulation_result.requested_primaries
+    }
+    send_task_update(simulation_id, task_id, update_key, update_dict)
 
-        # We do not have any information if monitoring process sent the last update
-        # so we send it here to make sure that we have the end_time and COMPLETED state
-        update_dict = {"task_state": EntityState.COMPLETED.value, "end_time": end_time}
-        send_task_update(simulation_id, task_id, update_key, update_dict)
+    # finally return from the celery task, returning the estimators and stdout/stderr as result
+    # the estimators will be merged by subsequent celery task
+    return {"estimators": estimators, "simulation_id": simulation_id, "update_key": update_key}
 
-        return {"estimators": estimators, "simulation_id": simulation_id, "update_key": update_key}
+
+@dataclass
+class SimulationTaskResult:
+    """Class representing result of single simulation task"""
+
+    process_exit_success: bool
+    command_stdout: str
+    command_stderr: str
+    simulated_primaries: int
+    requested_primaries: int
+    estimators_dict: dict
+
+
+def run_single_simulation_for_shieldhit(tmp_work_dir: str,
+                                        task_id: str,
+                                        update_key: str = '',
+                                        simulation_id: int = None) -> SimulationTaskResult:
+    """Function running single simulation for shieldhit"""
+    command_as_list = command_to_run_shieldhit(dir_path=Path(tmp_work_dir), task_id=task_id)
+    logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
+
+    command_stdout, command_stderr = '', ''
+    simulated_primaries, requested_primaries = 0, 0
+    event = threading.Event()
+
+    # start monitoring process if possible
+    # is None if monitoring if monitor was not started
+    task_monitor = monitor_shieldhit(event, tmp_work_dir, task_id, update_key, simulation_id)
+    # run the simulation
+    logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
+    process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
+        dir_path=Path(tmp_work_dir), command_as_list=command_as_list)
+    logging.info("SHIELD-HIT12A process finished with status %s", process_exit_success)
+
+    # terminate monitoring process
+    if task_monitor:
+        logging.debug("Terminating monitoring process for task %s", task_id)
+        event.set()
+        task_monitor.task.join()
+        logging.debug("Monitoring process for task %s terminated", task_id)
+    # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
+    if task_monitor:
+        simulated_primaries, requested_primaries = read_file_offline(task_monitor.path_to_monitor)
+
+    # both simulation execution and monitoring process are finished now, we can read the estimators
+    estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
+
+    return SimulationTaskResult(process_exit_success=process_exit_success,
+                                command_stdout=command_stdout,
+                                command_stderr=command_stderr,
+                                simulated_primaries=simulated_primaries,
+                                requested_primaries=requested_primaries,
+                                estimators_dict=estimators_dict)
+
+
+def run_single_simulation_for_fluka(
+    tmp_work_dir: str,
+    task_id: str,
+    update_key: str = '',  # skipcq: PYL-W0613 # will be requiired for monitoring
+    simulation_id: int = None  # skipcq: PYL-W0613 # will be requiired for monitoring
+) -> SimulationTaskResult:
+    """Function running single simulation for shieldhit"""
+    command_as_list = []
+    command_as_list = command_to_run_fluka(dir_path=Path(tmp_work_dir), task_id=task_id)
+    logging.info("Command to run FLUKA: %s", " ".join(command_as_list))
+
+    command_stdout, command_stderr = '', ''
+    simulated_primaries, requested_primaries = 0, 0
+
+    # run the simulation
+    logging.info("Running Fluka process in %s", tmp_work_dir)
+    process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
+        dir_path=Path(tmp_work_dir), command_as_list=command_as_list)
+    logging.info("Fluka process finished with status %s", process_exit_success)
+
+    # both simulation execution and monitoring process are finished now, we can read the estimators
+    estimators_dict = get_fluka_estimators(dir_path=Path(tmp_work_dir))
+
+    return SimulationTaskResult(process_exit_success=process_exit_success,
+                                command_stdout=command_stdout,
+                                command_stderr=command_stderr,
+                                simulated_primaries=simulated_primaries,
+                                requested_primaries=requested_primaries,
+                                estimators_dict=estimators_dict)
 
 
 @celery_app.task
@@ -156,8 +232,44 @@ def merge_results(results: list[dict]) -> dict:
             simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
         final_result["logfiles"] = logfiles
 
-    if averaged_estimators is not None and not send_simulation_results(
-            simulation_id=simulation_id, update_key=update_key, estimators=averaged_estimators):
-        final_result["estimators"] = averaged_estimators
+    if averaged_estimators:
+        # send results to the backend and mark whole simulation as completed
+        sending_results_ok = send_simulation_results(simulation_id=simulation_id,
+                                                     update_key=update_key,
+                                                     estimators=averaged_estimators)
+        if not sending_results_ok:
+            final_result["estimators"] = averaged_estimators
 
     return final_result
+
+
+@dataclass
+class MonitorTask:
+    """Class representing monitoring task"""
+
+    path_to_monitor: Path
+    task: threading.Thread
+
+
+def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: str, update_key: str,
+                      simulation_id: str) -> Optional[MonitorTask]:
+    """Function monitoring progress of SHIELD-HIT12A simulation"""
+    # we would like to monitor the progress of simulation
+    # this is done by reading the log file and sending the updates to the backend
+    # if we have update_key and simulation_id the monitoring task can submit the updates to backend
+    path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
+    if update_key and simulation_id is not None:
+        current_logging_level = logging.getLogger().getEffectiveLevel()
+        task = threading.Thread(target=read_file,
+                                kwargs=dict(event=event,
+                                            filepath=path_to_monitor,
+                                            simulation_id=simulation_id,
+                                            task_id=task_id,
+                                            update_key=update_key,
+                                            logging_level=current_logging_level))
+        task.start()
+        logging.info("Started monitoring process for task %s", task_id)
+        return MonitorTask(path_to_monitor=path_to_monitor, task=task)
+
+    logging.info("No monitoring processes started for task %s", task_id)
+    return None
