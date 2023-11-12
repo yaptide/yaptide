@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 import logging
 from pathlib import Path
 import re
+import threading
 from typing import Iterator, Optional, Tuple
 from yaptide.batch.watcher import TIMEOUT_MATCH
 
@@ -62,7 +63,8 @@ def utc_without_offset(utc: datetime) -> str:
     return utc.strftime('%Y-%m-%d %H:%M:%S.%f')
 
 
-def read_fluka_out_file(linte_iterator: Iterator[str],
+def read_fluka_out_file(event: threading.Event,
+                        linte_iterator: Iterator[str],
                         next_backend_update_time: int,
                         details: TaskDetails,
                         varbose: bool = False) -> None:
@@ -71,6 +73,8 @@ def read_fluka_out_file(linte_iterator: Iterator[str],
     requested_primaries = 0
     update_time = 0
     for line in linte_iterator:
+        if event.is_set():
+            return
         utc_now = time_now_utc()
         if re.match(S_OK_OUT_START, line):
             logger.debug("Found start of the simulation")

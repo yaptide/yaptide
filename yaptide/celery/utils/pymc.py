@@ -14,6 +14,7 @@ from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
 
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
+from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
@@ -81,7 +82,7 @@ def command_to_run_fluka(dir_path: Path, task_id: str) -> list[str]:
         input_path=dir_path,  # skipcq: PYL-W0612 # usefull
         simulator_type=SimulatorType.fluka,
         simulator_exec_path=None,  # useless, we guess from PATH
-        cmdline_opts="")  # useless, not useful for fluka
+        cmdline_opts="-M 1")  # useless, not useful for fluka
     update_rng_seed_in_fluka_file(dir_path, task_id)
     command_as_list = str(settings).split()
     command_as_list.append(str(dir_path))
@@ -95,14 +96,6 @@ def update_rng_seed_in_fluka_file(dir_path: Path, task_id: str) -> None:
         # if there is no input file, raise an error
         # this should never happen
         raise FileNotFoundError("Input file not found")
-
-    logging.info("Running fluka simulation file %s", str(input_file))
-
-    settings = SimulationSettings(
-        input_path=str(input_file),  # skipcq: PYL-W0612 # usefull
-        simulator_type=SimulatorType.fluka,
-        simulator_exec_path=None,  # useless
-        cmdline_opts="-M 1")  # only one run
 
     class UpdateFlukaRandomSeed(Protocol):
         """Definition of protocol for updating random seed in fluka input file.
@@ -301,11 +294,12 @@ def read_file(event: threading.Event,
     send_task_update(simulation_id, task_id, update_key, up_dict)
 
 
-def read_fluka_file(filepath: Path,
+def read_fluka_file(event: threading.Event,
+                    dirpath: Path,
                     simulation_id: int,
                     task_id: str,
                     update_key: str,
-                    timeout_wait_for_file: int = 60,
+                    timeout_wait_for_file: int = 20,
                     timeout_wait_for_line: int = 5 * 60,
                     next_backend_update_time: int = 2,
                     logging_level: int = logging.WARNING):
@@ -318,10 +312,12 @@ def read_fluka_file(filepath: Path,
     # continuantion of awful glob path hack
     def get_first_matching_file() -> Optional[Path]:
         """Returns first matching file."""
-        path = next(filepath.glob("fluka_*/*001.out"), None)
+        path = next(dirpath.glob("fluka_*/*001.out"), None)
         return path.resolve() if path else None
 
     for _ in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
+        if event.is_set():
+            return
         try:
             optional_file = get_first_matching_file()
             if not optional_file:
@@ -342,9 +338,10 @@ def read_fluka_file(filepath: Path,
 
     # create generator which waits for new lines in log file
     # if no new line appears in timeout_wait_for_line seconds, generator stops
-    loglines = log_generator(logfile, timeout=timeout_wait_for_line)
+    loglines = log_generator(logfile, event, timeout=timeout_wait_for_line)
     logging.info("Parsing log file for task %s started", task_id)
-    read_fluka_out_file(loglines,
+    read_fluka_out_file(event,
+                        loglines,
                         next_backend_update_time=next_backend_update_time,
                         details=TaskDetails(simulation_id, task_id, update_key),
                         varbose=logging_level <= logging.INFO)
