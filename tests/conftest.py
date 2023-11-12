@@ -115,6 +115,8 @@ def db_session():
     logging.debug("Database path %s", os.environ['FLASK_SQLALCHEMY_DATABASE_URI'])
     _app = create_app()
     with _app.app_context():
+        db.drop_all()
+        db.create_all()
         yield db.session
         db.drop_all()
 

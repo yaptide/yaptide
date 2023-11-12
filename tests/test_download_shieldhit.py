@@ -30,8 +30,8 @@ def test_if_shieldhit_downloaded(tmpdir, shieldhit_binary_filename):
                                           salt=os.getenv("S3_ENCRYPTION_SALT"),
                                           destination_dir=tmpdir) is True
         expected_path = Path(tmpdir / shieldhit_binary_filename)
-        assert expected_path.exists(), "Expected path does not exist."
-        assert expected_path.stat().st_size > 0, "Expected path is empty."
+        assert expected_path.exists(), f"Expected path {expected_path} does not exist."
+        assert expected_path.stat().st_size > 0, f"Expected path {expected_path} is empty."
 
         command = [str(expected_path), "--version"]
         try:

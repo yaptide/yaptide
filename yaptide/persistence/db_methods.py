@@ -1,3 +1,4 @@
+import logging
 from typing import Union
 
 from sqlalchemy.orm import with_polymorphic
@@ -167,3 +168,5 @@ def update_simulation_state(simulation: Union[BatchSimulationModel, CelerySimula
     """Updates simulation state and makes commit"""
     if simulation.update_state(update_dict):
         db.session.commit()
+    else:
+        logging.warning("Simulation state not updated, skipping commit")
