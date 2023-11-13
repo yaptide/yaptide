@@ -17,3 +17,4 @@ SQLAlchemy==1.4.44
 Werkzeug==3.0.1
 boto3==1.28.83
 cryptography==41.0.5
+psycopg2-binary

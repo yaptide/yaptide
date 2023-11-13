@@ -14,14 +14,14 @@ services:
             - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
-            - FLOWER_BASIC_AUTH=admin:password
             - CERT_AUTH_URL=${CERT_AUTH_URL-""}
             - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL-""}
             - KEYCLOAK_REALM=${KEYCLOAK_REALM-""}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL-""}
+            - FLASK_SQLALCHEMY_DATABASE_URI=postgresql://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
         depends_on:
             - redis
-            - flower
+            - postgresql
 
     yaptide_worker:
         build:
@@ -62,16 +62,18 @@ services:
         depends_on:
             - yaptide_flask
 
-    flower:
-        image: mher/flower
-        container_name: yaptide_flower
-        ports:
-        - 55555:5555
+    postgresql:
+        image: postgres:latest
+        container_name: yaptide_postgresql
         environment:
-        - BROKER_URL=redis://redis:6379/0
-        - FLOWER_BASIC_AUTH=admin:password  # Modify this for basic authentication
-        depends_on:
-        - redis
+            POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
+            POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
+        volumes:
+            - data:/var/lib/postgresql/data
+        ports:
+            - 5432:5432
+
 volumes:
     data:
     simulators:
