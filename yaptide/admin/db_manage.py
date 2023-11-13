@@ -9,11 +9,6 @@ from werkzeug.security import generate_password_hash
 
 
 class TableTypes(Enum):
-    """
-    Table types.
-    The types are defined here as we want this to be a standalone script, not importing the model
-    """
-
     User = auto()
     YaptideUser = auto()
     KeycloakUser = auto()
@@ -21,6 +16,9 @@ class TableTypes(Enum):
     Cluster = auto()
     Task = auto()
     Result = auto()
+    Input = auto()
+    Estimator = auto()
+    Page = auto()
 
 
 def connect_to_db():
@@ -34,6 +32,7 @@ def connect_to_db():
     try:
         con = engine.connect()
         metadata = db.MetaData()
+        metadata.reflect(bind=engine)
     except db.exc.OperationalError:
         click.echo(f'Connection to db {db_uri} failed', err=True)
         raise click.Abort()
@@ -72,7 +71,7 @@ def list_users(**kwargs):
 def list_tasks(**kwargs):
     """List tasks"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('simulation_id'), db.column('task_id')).select_from(db.table(TableTypes.TASK.name))
+    stmt = db.select(db.column('simulation_id'), db.column('task_id')).select_from(db.table(TableTypes.Task.name))
     tasks = con.execute(stmt).all()
 
     click.echo(f"{len(tasks)} tasks in DB:")
@@ -143,29 +142,6 @@ def update_user(**kwargs):
 
 
 @run.command
-@click.argument('cluster_name')
-@click.option('-v', '--verbose', count=True)
-def add_cluster(**kwargs):
-    """Adds cluster with provided name to database if it does not exist"""
-    con, metadata, engine = connect_to_db()
-    cluster_name = kwargs['cluster_name']
-
-    clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
-
-    query = db.select([clusters]).where(clusters.c.cluster_name == cluster_name)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) > 0:
-        click.echo(f'Cluster: {cluster_name} already exists, aborting adding cluster')
-        return None
-
-    click.echo(f'Adding cluster: {cluster_name}')
-    query = db.insert(clusters).values(cluster_name=cluster_name)
-    con.execute(query)
-    return None
-
-
-@run.command
 @click.argument('name')
 @click.argument('auth_provider')
 def remove_user(**kwargs):
@@ -188,10 +164,10 @@ def remove_user(**kwargs):
 
 
 @run.command
-def list_simulations(**kwargs):
+def list_simulations():
     """List simulations"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'), db.column('end_time')).select_from(db.table(TableTypes.SIMULATION.name))
+    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'), db.column('end_time')).select_from(db.table(TableTypes.Simulation.name))
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
@@ -200,10 +176,30 @@ def list_simulations(**kwargs):
 
 
 @run.command
+@click.argument('cluster_name')
+@click.option('-v', '--verbose', count=True)
+def add_cluster(cluster_name, verbose):
+    """Adds cluster with provided name to database if it does not exist"""
+    con, metadata, engine = connect_to_db()
+    cluster_table = metadata.tables[TableTypes.Cluster.name]
+
+    # check if cluster already exists
+    stmt = db.select(cluster_table).filter_by(cluster_name = cluster_name)
+    clusters = con.execute(stmt).all()
+    if len(clusters) > 0:
+        click.echo(f"Cluster {cluster_name} already exists in DB")
+        return None
+
+    stmt = db.insert(cluster_table).values(cluster_name=cluster_name)
+    con.execute(stmt)
+    con.commit()
+    click.echo(f"Cluster {cluster_name} added to DB")
+
+@run.command
 def list_clusters(**kwargs):
     """List clusters"""
-    con, _, _ = connect_to_db()
-    stmt = db.select(db.column('id'), db.column('cluster_name')).select_from(db.table(TableTypes.CLUSTER.name))
+    con, metadata, engine = connect_to_db()
+    stmt = db.select(metadata.tables[TableTypes.Cluster.name])
     clusters = con.execute(stmt).all()
 
     click.echo(f"{len(clusters)} clusters in DB:")
