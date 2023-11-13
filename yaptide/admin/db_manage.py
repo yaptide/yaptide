@@ -1,5 +1,5 @@
 #! /usr/bin/env python
-from enum import Enum
+from enum import Enum, auto
 from pathlib import Path
 import os
 
@@ -9,15 +9,18 @@ from werkzeug.security import generate_password_hash
 
 
 class TableTypes(Enum):
-    """Table types"""
+    """
+    Table types.
+    The types are defined here as we want this to be a standalone script, not importing the model
+    """
 
-    USER = "User"
-    YAPTIDEUSER = "YaptideUser"
-    KEYCLOAKUSER = "KeycloakUser"
-    SIMULATION = "Simulation"
-    CLUSTER = "Cluster"
-    TASK = "Task"
-    RESULT = "Result"
+    User = auto()
+    YaptideUser = auto()
+    KeycloakUser = auto()
+    Simulation = auto()
+    Cluster = auto()
+    Task = auto()
+    Result = auto()
 
 
 def connect_to_db():
@@ -57,7 +60,7 @@ def run():
 def list_users(**kwargs):
     """List users"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('username'), db.column('auth_provider')).select_from(db.table(TableTypes.USER.value))
+    stmt = db.select(db.column('username'), db.column('auth_provider')).select_from(db.table(TableTypes.User.name))
     users = con.execute(stmt).all()
 
     click.echo(f"{len(users)} users in DB:")
@@ -69,7 +72,7 @@ def list_users(**kwargs):
 def list_tasks(**kwargs):
     """List tasks"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('simulation_id'), db.column('task_id')).select_from(db.table(TableTypes.TASK.value))
+    stmt = db.select(db.column('simulation_id'), db.column('task_id')).select_from(db.table(TableTypes.TASK.name))
     tasks = con.execute(stmt).all()
 
     click.echo(f"{len(tasks)} tasks in DB:")
@@ -188,7 +191,7 @@ def remove_user(**kwargs):
 def list_simulations(**kwargs):
     """List simulations"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'), db.column('end_time')).select_from(db.table(TableTypes.SIMULATION.value))
+    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'), db.column('end_time')).select_from(db.table(TableTypes.SIMULATION.name))
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
@@ -200,7 +203,7 @@ def list_simulations(**kwargs):
 def list_clusters(**kwargs):
     """List clusters"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('id'), db.column('cluster_name')).select_from(db.table(TableTypes.CLUSTER.value))
+    stmt = db.select(db.column('id'), db.column('cluster_name')).select_from(db.table(TableTypes.CLUSTER.name))
     clusters = con.execute(stmt).all()
 
     click.echo(f"{len(clusters)} clusters in DB:")
