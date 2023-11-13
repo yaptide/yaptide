@@ -56,31 +56,25 @@ def run():
 @run.command
 def list_users(**kwargs):
     """List users"""
-    con, metadata, engine = connect_to_db()
-
+    con, _, _ = connect_to_db()
     stmt = db.select(db.column('username'), db.column('auth_provider')).select_from(db.table(TableTypes.USER.value))
     users = con.execute(stmt).all()
 
     click.echo(f"{len(users)} users in DB:")
     for user in users:
         click.echo(f"Login {user.username}; Auth provider {user.auth_provider}")
-    return None
 
 
 @run.command
 def list_tasks(**kwargs):
     """List tasks"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    tasks = db.Table(TableTypes.TASK.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([tasks])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} tasks in DB:")
-    for row in ResultSet:
-        click.echo(f"Simulation id {row.simulation_id}; Task id ...{row.task_id}")
-    return None
+    con, _, _ = connect_to_db()
+    stmt = db.select(db.column('simulation_id'), db.column('task_id')).select_from(db.table(TableTypes.TASK.value))
+    tasks = con.execute(stmt).all()
+
+    click.echo(f"{len(tasks)} tasks in DB:")
+    for task in tasks:
+        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id}")
 
 
 @run.command
@@ -90,8 +84,6 @@ def list_tasks(**kwargs):
 def add_user(**kwargs):
     """Add yaptide user to database"""
     con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
     username = kwargs['name']
     password = kwargs['password']
     click.echo(f'Adding user: {username}')
@@ -120,8 +112,6 @@ def add_user(**kwargs):
 def update_user(**kwargs):
     """Update user in database"""
     con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
     username = kwargs['name']
     click.echo(f'Updating user: {username}')
     users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
@@ -155,8 +145,6 @@ def update_user(**kwargs):
 def add_cluster(**kwargs):
     """Adds cluster with provided name to database if it does not exist"""
     con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
     cluster_name = kwargs['cluster_name']
 
     clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
@@ -180,8 +168,6 @@ def add_cluster(**kwargs):
 def remove_user(**kwargs):
     """Delete user"""
     con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
     username = kwargs['name']
     auth_provider = kwargs['auth_provider']
     click.echo(f'Deleting user: {username}')
@@ -201,33 +187,25 @@ def remove_user(**kwargs):
 @run.command
 def list_simulations(**kwargs):
     """List simulations"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([simulations])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} simulations in DB:")
-    for row in ResultSet:
-        click.echo(f"id {row.id}; job id {row.job_id}; start_time {row.start_time}; end_time {row.end_time};")
-    return None
+    con, _, _ = connect_to_db()
+    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'), db.column('end_time')).select_from(db.table(TableTypes.SIMULATION.value))
+    sims = con.execute(stmt).all()
+
+    click.echo(f"{len(sims)} simulations in DB:")
+    for sim in sims:
+        click.echo(f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};")
 
 
 @run.command
 def list_clusters(**kwargs):
     """List clusters"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([clusters])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} clusters in DB:")
-    for row in ResultSet:
-        click.echo(f"id {row.id}; cluster name {row.cluster_name};")
-    return None
+    con, _, _ = connect_to_db()
+    stmt = db.select(db.column('id'), db.column('cluster_name')).select_from(db.table(TableTypes.CLUSTER.value))
+    clusters = con.execute(stmt).all()
+
+    click.echo(f"{len(clusters)} clusters in DB:")
+    for cluster in clusters:
+        click.echo(f"id {cluster.id}; cluster name {cluster.cluster_name};")
 
 
 if __name__ == "__main__":
