@@ -69,6 +69,7 @@ services:
             POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
             POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
             POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
+            PGDATA: /var/lib/postgresql/data/pgdata
         volumes:
             - data:/var/lib/postgresql/data
         ports:
