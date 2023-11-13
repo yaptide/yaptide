@@ -1,6 +1,7 @@
 #! /usr/bin/env python
 from enum import Enum
 from pathlib import Path
+import os
 
 import click
 import sqlalchemy as db
@@ -21,17 +22,18 @@ class TableTypes(Enum):
 
 def connect_to_db():
     """Connects to db"""
-    sqlite_file_path = Path(Path(__file__).resolve().parent.parent, 'data', 'main.db')
-    if not sqlite_file_path.exists():
-        click.echo(f'Database file: {sqlite_file_path} does not exist - aborting', err=True)
-        return None, None, None
-    engine = db.create_engine(f'sqlite:////{sqlite_file_path}')
+    db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
+    click.echo(f'Found URI: {db_uri}')
+    if not db_uri:
+        click.echo(f'Database URI: {db_uri} not set - aborting', err=True)
+        raise click.Abort()
+    engine = db.create_engine(db_uri, echo=True)
     try:
         con = engine.connect()
         metadata = db.MetaData()
     except db.exc.OperationalError:
-        click.echo(f'Connection to db {sqlite_file_path} failed', err=True)
-        return None, None, None
+        click.echo(f'Connection to db {db_uri} failed', err=True)
+        raise click.Abort()
     return con, metadata, engine
 
 
@@ -55,16 +57,13 @@ def run():
 def list_users(**kwargs):
     """List users"""
     con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
 
-    query = db.select([users])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} users in DB:")
-    for row in ResultSet:
-        click.echo(f"Login {row.username}; Auth provider {row.auth_provider}")
+    stmt = db.select(db.column('username'), db.column('auth_provider')).select_from(db.table(TableTypes.USER.value))
+    users = con.execute(stmt).all()
+
+    click.echo(f"{len(users)} users in DB:")
+    for user in users:
+        click.echo(f"Login {user.username}; Auth provider {user.auth_provider}")
     return None
 
 
