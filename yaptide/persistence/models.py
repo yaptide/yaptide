@@ -265,7 +265,7 @@ class BatchTaskModel(TaskModel):
 
 
 def decompress(data: bytes):
-    data_to_unpack : str = 'null'
+    data_to_unpack: str = 'null'
     if data is not None:
         # Decompress the data
         decompressed_bytes: bytes = gzip.decompress(data)
@@ -273,11 +273,12 @@ def decompress(data: bytes):
         # Deserialize the JSON
     return json.loads(data_to_unpack)
 
+
 def compress(data) -> bytes:
     compressed_bytes = b''
     if data is not None:
         # Serialize the JSON
-        serialized_data : str = json.dumps(data)
+        serialized_data: str = json.dumps(data)
         # Compress the data
         bytes_to_compress: bytes = serialized_data.encode('utf-8')
         compressed_bytes = gzip.compress(bytes_to_compress)
@@ -321,7 +322,6 @@ class EstimatorModel(db.Model):
             self.compressed_data = compress(value)
 
 
-
 class PageModel(db.Model):
     """Estimator single page model"""
 
@@ -341,7 +341,6 @@ class PageModel(db.Model):
             self.compressed_data = compress(value)
 
 
-
 class LogfilesModel(db.Model):
     """Simulation logfiles model"""
 
@@ -358,7 +357,6 @@ class LogfilesModel(db.Model):
     def data(self, value):
         if value is not None:
             self.compressed_data = compress(value)
-
 
 
 def create_models():
