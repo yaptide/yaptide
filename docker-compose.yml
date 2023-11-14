@@ -5,10 +5,6 @@ services:
         build:
             context: .
             dockerfile: Dockerfile-flask
-        image: yaptide_flask
-        # mount data volume as /usr/local/app/yaptide/data in rw mode
-        volumes:
-            - data:/usr/local/app/yaptide/data:rw
         container_name: yaptide_flask
         environment:
             - FLASK_DEBUG=1
@@ -19,6 +15,11 @@ services:
             - KEYCLOAK_REALM=${KEYCLOAK_REALM-""}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL-""}
             - FLASK_SQLALCHEMY_DATABASE_URI=postgresql://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
+            interval: 10s
+            timeout: 5s
+            retries: 5
         depends_on:
             - redis
             - postgresql
@@ -27,7 +28,7 @@ services:
         build:
             context: .
             dockerfile: Dockerfile-worker
-        image: yaptide_worker
+        container_name: yaptide_worker
         volumes:
             - simulators:/simulators:rw
         deploy:
@@ -35,7 +36,6 @@ services:
                 limits:
                     # the explanation of below syntax: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
                     cpus: ${MAX_CORES-1.0}
-        container_name: yaptide_worker
         env_file: .env
         environment:
             - CELERY_BROKER_URL=redis://redis:6379/0
@@ -52,7 +52,6 @@ services:
 
     nginx:
         image: yaptide_nginx
-        container_name: yaptide_nginx
         build:
             context: .
             dockerfile: Dockerfile-nginx
