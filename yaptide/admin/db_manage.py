@@ -1,6 +1,5 @@
 #! /usr/bin/env python
 from enum import Enum, auto
-from pathlib import Path
 import os
 
 import click
@@ -21,14 +20,17 @@ class TableTypes(Enum):
     Page = auto()
 
 
-def connect_to_db():
-    """Connects to db"""
+def connect_to_db(verbose: int = 0):
+    """Connects to the db"""
     db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
     click.echo(f'Found URI: {db_uri}')
     if not db_uri:
         click.echo(f'Database URI: {db_uri} not set - aborting', err=True)
         raise click.Abort()
-    engine = db.create_engine(db_uri, echo=True)
+    echo = False
+    if verbose > 1:
+        echo = True
+    engine = db.create_engine(db_uri, echo=echo)
     try:
         con = engine.connect()
         metadata = db.MetaData()
@@ -41,10 +43,11 @@ def connect_to_db():
 
 def user_exists(name: str, auth_provider: str, users: db.Table, con) -> bool:
     """Check if user already exists"""
-    query = db.select(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) > 0:
+
+    # check if cluster already exists
+    stmt = db.select(users).filter_by(username=name, auth_provider=auth_provider)
+    users_found = con.execute(stmt).all()
+    if len(users_found) > 0:
         click.echo(f'User: {name} exists')
         return True
     return False
@@ -56,7 +59,7 @@ def run():
 
 
 @run.command
-def list_users(**kwargs):
+def list_users():
     """List users"""
     con, _, _ = connect_to_db()
     stmt = db.select(db.column('username'), db.column('auth_provider')).select_from(db.table(TableTypes.User.name))
@@ -68,7 +71,7 @@ def list_users(**kwargs):
 
 
 @run.command
-def list_tasks(**kwargs):
+def list_tasks():
     """List tasks"""
     con, _, _ = connect_to_db()
     stmt = db.select(db.column('simulation_id'), db.column('task_id')).select_from(db.table(TableTypes.Task.name))
@@ -83,28 +86,30 @@ def list_tasks(**kwargs):
 @click.argument('name')
 @click.option('password', '--password', default='')
 @click.option('-v', '--verbose', count=True)
-def add_user(**kwargs):
+def add_user(name, password, verbose):
     """Add yaptide user to database"""
-    con, metadata, engine = connect_to_db()
-    username = kwargs['name']
-    password = kwargs['password']
-    click.echo(f'Adding user: {username}')
-    if kwargs['verbose'] > 2:
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Adding user: {name}')
+    if verbose > 2:
         click.echo(f'Password: {password}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
-    if user_exists(username, "YaptideUser", users, con):
-        return None
-    query = db.insert(users).values(username=username, auth_provider="YaptideUser")
+    users = metadata.tables[TableTypes.User.name]
+
+    if user_exists(name=name, auth_provider="YaptideUser", users=users, con=con):
+        click.echo(f'YaptideUser: {name} already exists, aborting add')
+        raise click.Abort()
+
+    click.echo(f'YaptideUser: {name} does not exist, adding')
+    click.echo(f'Adding user: {name}')
+    query = db.insert(users).values(username=name, auth_provider="YaptideUser")
     result = con.execute(query)
     user_id = result.inserted_primary_key[0]
     password_hash = generate_password_hash(password)
 
+    yaptide_users = metadata.tables[TableTypes.YaptideUser.name]
     query = db.insert(yaptide_users).values(id=user_id, password_hash=password_hash)
-    result = con.execute(query)
-
-    return None
+    con.execute(query)
+    con.commit()
 
 
 @run.command
@@ -181,7 +186,7 @@ def list_simulations():
 @click.option('-v', '--verbose', count=True)
 def add_cluster(cluster_name, verbose):
     """Adds cluster with provided name to database if it does not exist"""
-    con, metadata, engine = connect_to_db()
+    con, metadata, _ = connect_to_db()
     cluster_table = metadata.tables[TableTypes.Cluster.name]
 
     # check if cluster already exists
