@@ -167,7 +167,8 @@ def remove_user(**kwargs):
 def list_simulations():
     """List simulations"""
     con, _, _ = connect_to_db()
-    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'), db.column('end_time')).select_from(db.table(TableTypes.Simulation.name))
+    stmt = db.select(db.column('id'), db.column('job_id'), db.column('start_time'),
+                     db.column('end_time')).select_from(db.table(TableTypes.Simulation.name))
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
@@ -184,7 +185,7 @@ def add_cluster(cluster_name, verbose):
     cluster_table = metadata.tables[TableTypes.Cluster.name]
 
     # check if cluster already exists
-    stmt = db.select(cluster_table).filter_by(cluster_name = cluster_name)
+    stmt = db.select(cluster_table).filter_by(cluster_name=cluster_name)
     clusters = con.execute(stmt).all()
     if len(clusters) > 0:
         click.echo(f"Cluster {cluster_name} already exists in DB")
@@ -194,6 +195,7 @@ def add_cluster(cluster_name, verbose):
     con.execute(stmt)
     con.commit()
     click.echo(f"Cluster {cluster_name} added to DB")
+
 
 @run.command
 def list_clusters(**kwargs):
