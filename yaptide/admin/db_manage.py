@@ -149,22 +149,21 @@ def update_user(**kwargs):
 @run.command
 @click.argument('name')
 @click.argument('auth_provider')
-def remove_user(**kwargs):
+def remove_user(name, auth_provider):
     """Delete user"""
-    con, metadata, engine = connect_to_db()
-    username = kwargs['name']
-    auth_provider = kwargs['auth_provider']
-    click.echo(f'Deleting user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    con, metadata, _ = connect_to_db()
+    click.echo(f'Deleting user: {name}')
+    users = metadata.tables[TableTypes.User.name]
 
     # abort if user does not exist
-    if not user_exists(username, auth_provider, users, con):
-        click.echo("Aborting, user does not exist")
+    if not user_exists(name, auth_provider, users, con):
+        click.echo(f"Aborting, user {name} does not exist")
         return None
 
-    query = db.delete(users).where(users.c.username == username, users.c.auth_provider == auth_provider)
+    query = db.delete(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     con.execute(query)
-    click.echo(f'Successfully deleted user: {username}')
+    con.commit()
+    click.echo(f'Successfully deleted user: {name}')
     return None
 
 
