@@ -1,4 +1,10 @@
 #! /usr/bin/env python
+'''
+This script is used to manage the database via a command line application.
+It is supposed to be used outside of the docker container, therefore by purpose it has
+no dependency on the yaptide package. All the tables used by ORM are defined here again.
+We do not use ORM model classes here, because we do not want to import the yaptide package.
+'''
 from enum import Enum, auto
 import os
 
@@ -8,6 +14,7 @@ from werkzeug.security import generate_password_hash
 
 
 class TableTypes(Enum):
+    '''Enum for table names used in ORM'''
     User = auto()
     YaptideUser = auto()
     KeycloakUser = auto()
@@ -147,7 +154,6 @@ def remove_user(name, auth_provider):
     con.execute(query)
     con.commit()
     click.echo(f'Successfully deleted user: {name}')
-    return None
 
 
 @run.command
