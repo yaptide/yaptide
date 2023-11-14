@@ -265,7 +265,7 @@ class BatchTaskModel(TaskModel):
 
 
 def decompress(data: bytes):
-    '''Decompresses data and deserializes JSON'''
+    """Decompresses data and deserializes JSON"""
     data_to_unpack: str = 'null'
     if data is not None:
         # Decompress the data
@@ -276,7 +276,7 @@ def decompress(data: bytes):
 
 
 def compress(data) -> bytes:
-    '''Serializes JSON and compresses data'''
+    """Serializes JSON and compresses data"""
     compressed_bytes = b''
     if data is not None:
         # Serialize the JSON
