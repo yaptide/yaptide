@@ -162,7 +162,7 @@ class TaskModel(db.Model):
                                            db.ForeignKey('Simulation.id'),
                                            doc="Simulation job ID (foreign key)")
 
-    task_id: Column[str] = db.Column(db.String, nullable=False, doc="Task ID")
+    task_id: Column[int] = db.Column(db.Integer, nullable=False, doc="Task ID")
     requested_primaries: Column[int] = db.Column(db.Integer,
                                                  nullable=False,
                                                  default=0,

@@ -72,7 +72,7 @@ class JobsDirect(Resource):
 
         # create tasks in the database in the default PENDING state
         for i in range(payload_dict["ntasks"]):
-            task = CeleryTaskModel(simulation_id=simulation.id, task_id=f"{simulation.id}_{i}")
+            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i)
             add_object_to_db(task, make_commit=False)
 
         input_model = InputModel(simulation_id=simulation.id)

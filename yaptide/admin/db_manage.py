@@ -31,7 +31,8 @@ class TableTypes(Enum):
 def connect_to_db(verbose: int = 0):
     """Connects to the db"""
     db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
-    click.echo(f'Found URI: {db_uri}')
+    if verbose > 1:
+        click.echo(f'Connecting to URI: {db_uri}')
     if not db_uri:
         click.echo(f'Database URI: {db_uri} not set - aborting', err=True)
         raise click.Abort()
