@@ -27,7 +27,7 @@ def convert_input_files(payload_dict: dict) -> dict:
 @celery_app.task(bind=True)
 def run_single_simulation(self,
                           files_dict: dict,
-                          task_id: str,
+                          task_id: int,
                           update_key: str = '',
                           simulation_id: int = None,
                           keep_tmp_files: bool = False,
@@ -36,9 +36,9 @@ def run_single_simulation(self,
     # for the purpose of running this function in pytest we would like to have some control
     # on the temporary directory used by the function
 
-    logging.info("Running simulation, simulation_id: %s, task_id: %s", simulation_id, task_id)
+    logging.info("Running simulation, simulation_id: %s, task_id: %d", simulation_id, task_id)
 
-    logging.info("Sending initial update for task %s, setting celery id %s", task_id, self.request.id)
+    logging.info("Sending initial update for task %d, setting celery id %s", task_id, self.request.id)
     send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
     # we would like to have some control on the temporary directory used by the function
@@ -61,7 +61,7 @@ def run_single_simulation(self,
         # there is no simulation output
         if not simulation_result.estimators_dict:
             # first we notify the backend that the task with simulation has failed
-            logging.info("Simulation failed for task %s, sending update that it has failed", task_id)
+            logging.info("Simulation failed for task %d, sending update that it has failed", task_id)
             update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, update_dict)
 
@@ -129,7 +129,7 @@ class SimulationTaskResult:
 
 
 def run_single_simulation_for_shieldhit(tmp_work_dir: str,
-                                        task_id: str,
+                                        task_id: int,
                                         update_key: str = '',
                                         simulation_id: int = None) -> SimulationTaskResult:
     """Function running single simulation for shieldhit"""
@@ -151,10 +151,10 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
 
     # terminate monitoring process
     if task_monitor:
-        logging.debug("Terminating monitoring process for task %s", task_id)
+        logging.debug("Terminating monitoring process for task %d", task_id)
         event.set()
         task_monitor.task.join()
-        logging.debug("Monitoring process for task %s terminated", task_id)
+        logging.debug("Monitoring process for task %d terminated", task_id)
     # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
     if task_monitor:
         simulated_primaries, requested_primaries = read_file_offline(task_monitor.path_to_monitor)
@@ -172,7 +172,7 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
 
 def run_single_simulation_for_fluka(
     tmp_work_dir: str,
-    task_id: str,
+    task_id: int,
     update_key: str = '',  # skipcq: PYL-W0613 # will be requiired for monitoring
     simulation_id: int = None  # skipcq: PYL-W0613 # will be requiired for monitoring
 ) -> SimulationTaskResult:
@@ -251,13 +251,13 @@ class MonitorTask:
     task: threading.Thread
 
 
-def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: str, update_key: str,
+def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str,
                       simulation_id: str) -> Optional[MonitorTask]:
     """Function monitoring progress of SHIELD-HIT12A simulation"""
     # we would like to monitor the progress of simulation
     # this is done by reading the log file and sending the updates to the backend
     # if we have update_key and simulation_id the monitoring task can submit the updates to backend
-    path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{int(task_id.split('_')[-1]):04d}.log"
+    path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{task_id:04d}.log"
     if update_key and simulation_id is not None:
         current_logging_level = logging.getLogger().getEffectiveLevel()
         task = threading.Thread(target=read_file,
@@ -268,8 +268,8 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: str, u
                                             update_key=update_key,
                                             logging_level=current_logging_level))
         task.start()
-        logging.info("Started monitoring process for task %s", task_id)
+        logging.info("Started monitoring process for task %d", task_id)
         return MonitorTask(path_to_monitor=path_to_monitor, task=task)
 
-    logging.info("No monitoring processes started for task %s", task_id)
+    logging.info("No monitoring processes started for task %d", task_id)
     return None
