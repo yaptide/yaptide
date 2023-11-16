@@ -49,7 +49,7 @@ services:
 
     redis:
         image: redis:6-alpine
-        container_name: yaptide_redis        
+        container_name: yaptide_redis
 
     nginx:
         image: yaptide_nginx
