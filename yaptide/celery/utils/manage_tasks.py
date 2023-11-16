@@ -29,26 +29,25 @@ def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, 
     return job.id
 
 
+def get_task_status(job_id: str, state_key: str) -> dict:
+    """Gets status of each task in the workflow"""
+    job = AsyncResult(id=job_id, app=celery_app)
+    job_state: str = translate_celery_state_naming(job.state)
+
+    # we still need to convert string to enum and operate later on Enum
+    result = {state_key: job_state}
+    if job_state == EntityState.FAILED.value:
+        result["message"] = str(job.info)
+    if "end_time" in job.info:
+        result["end_time"] = job.info["end_time"]
+    return result
+
+
 def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
     """
     Returns simulation state, results are not returned here
     Simulation may consist of multiple tasks, so we need to check all of them
     """
-
-    # Here we ask Celery (via Redis) for job state
-    def get_task_status(job_id: str, state_key: str) -> dict:
-        """Gets status of each task in the workflow"""
-        job = AsyncResult(id=job_id, app=celery_app)
-        job_state: str = translate_celery_state_naming(job.state)
-
-        # we still need to convert string to enum and operate later on Enum
-        result = {state_key: job_state}
-        if job_state == EntityState.FAILED.value:
-            result["message"] = str(job.info)
-        if "end_time" in job.info:
-            result["end_time"] = job.info["end_time"]
-        return result
-
     result = {
         "merge": get_task_status(merge_id, "job_state"),
         "tasks": [get_task_status(job_id, "task_state") for job_id in celery_ids]
