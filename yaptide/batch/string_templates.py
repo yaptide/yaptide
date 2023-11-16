@@ -79,7 +79,8 @@ python3 $ROOT_DIR/watcher.py \\
     --sim_id={sim_id}\\
     --task_id=$SLURM_ARRAY_TASK_ID\\
     --update_key={update_key}\\
-    --backend_url={backend_url} 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.err &
+    --backend_url={backend_url}\\
+    --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 trap 'sig_handler' SIGUSR1
 
