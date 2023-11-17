@@ -4,32 +4,9 @@
 
 We have following data model, implemented in `yaptide/persistence/models.py`:
 
+Simulation model and dependent classes:
 ```mermaid
 classDiagram
-  class UserModel {
-    id: int
-    username: str
-    auth_provider: str
-    simulations
-  }
-
-  class YaptideUserModel {
-    id: int
-    password_hash: str
-  }
-
-  class KeycloakUserModel {
-    id: int
-    cert: str
-    private_key: str
-  }
-
-  class ClusterModel {
-    id: int
-    cluster_name: str
-    simulations
-  }
-
   class SimulationModel {
     id: int
     job_id: str
@@ -112,8 +89,6 @@ classDiagram
     data
   }
 
-  UserModel <|-- YaptideUserModel
-  UserModel <|-- KeycloakUserModel
   SimulationModel <|-- CelerySimulationModel
   SimulationModel <|-- BatchSimulationModel
   TaskModel <|-- CeleryTaskModel
@@ -123,12 +98,46 @@ classDiagram
   EstimatorModel "1" *-- "0..*" PageModel
   SimulationModel "1" *-- "0..*" LogfilesModel
   SimulationModel *-- InputModel
-
 ```
+
+other classes we use are:
+
+```mermaid
+classDiagram
+  class UserModel {
+    id: int
+    username: str
+    auth_provider: str
+    simulations
+  }
+
+  class YaptideUserModel {
+    id: int
+    password_hash: str
+  }
+
+  class KeycloakUserModel {
+    id: int
+    cert: str
+    private_key: str
+  }
+
+  class ClusterModel {
+    id: int
+    cluster_name: str
+    simulations
+  }
+
+  UserModel <|-- YaptideUserModel
+  UserModel <|-- KeycloakUserModel
+```
+
+We've been too lazy to write down the mermaid code for these diagrams, but ChatGPT nowadays does a good job on that.
+Whenever you need to update the diagrams, just copy the code from the `yaptide/persistence/models.py` file and ask ChatGPT to generate the diagram for you.
 
 ## Database
 
-Production version uses PostgreSQL database, while in tests we use SQLite.
+Production version uses PostgreSQL database, while in the unit tests suite we use SQLite in-memory database.
 
 To check database URI:
 
