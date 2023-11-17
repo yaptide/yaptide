@@ -1,6 +1,34 @@
 version: "3.3"
 
 services:
+
+    redis:
+        image: redis:6-alpine
+        container_name: yaptide_redis
+        healthcheck:
+            test: ["CMD", "redis-cli", "ping"]
+            interval: 5s
+            timeout: 3s
+            retries: 5
+
+    postgresql:
+        image: postgres:latest
+        container_name: yaptide_postgresql
+        environment:
+            POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
+            POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
+            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
+            PGDATA: /var/lib/postgresql/data/pgdata
+        volumes:
+            - data:/var/lib/postgresql/data
+        ports:
+            - 5432:5432
+        healthcheck:
+            test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
+            interval: 5s
+            timeout: 3s
+            retries: 5
+
     yaptide_flask:
         build:
             context: .
@@ -16,20 +44,20 @@ services:
             - KEYCLOAK_REALM=${KEYCLOAK_REALM-""}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL-""}
             - FLASK_SQLALCHEMY_DATABASE_URI=postgresql://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
         depends_on:
-            - redis
-            - postgresql
+            redis:
+                condition: service_healthy
+                restart: true
+            postgresql:
+                condition: service_healthy
+                restart: true
 
     yaptide_worker:
         build:
             context: .
             dockerfile: Dockerfile-worker
         image: yaptide_worker
+        container_name: yaptide_worker
         volumes:
             - simulators:/simulators:rw
         deploy:
@@ -44,12 +72,12 @@ services:
             - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
             - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
         depends_on:
-            - redis
-            - yaptide_flask
-
-    redis:
-        image: redis:6-alpine
-        container_name: yaptide_redis
+            redis:
+                condition: service_healthy
+                restart: true
+            yaptide_flask:
+                condition: service_healthy
+                restart: true
 
     nginx:
         image: yaptide_nginx
@@ -61,20 +89,13 @@ services:
             - 5000:5000
             - 8443:8443
         depends_on:
-            - yaptide_flask
+            yaptide_flask:
+                condition: service_healthy
+                restart: true
+            yaptide_worker:
+                condition: service_healthy
+                restart: true
 
-    postgresql:
-        image: postgres:latest
-        container_name: yaptide_postgresql
-        environment:
-            POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
-            POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
-            PGDATA: /var/lib/postgresql/data/pgdata
-        volumes:
-            - data:/var/lib/postgresql/data
-        ports:
-            - 5432:5432
 
 volumes:
     data:
