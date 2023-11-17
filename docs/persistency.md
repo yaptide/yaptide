@@ -139,22 +139,24 @@ Whenever you need to update the diagrams, just copy the code from the `yaptide/p
 
 Production version uses PostgreSQL database, while in the unit tests suite we use SQLite in-memory database.
 
-To check database URI:
+Sometimes it may be convenient to connect to the production DB from outside the container, e.g. to check the content of the database.
+Then you can use the following command to get the DB URL.
 
-```
+```shell
 docker exec -it yaptide_flask bash -c "cd /usr/local/app && python -c 'from yaptide.application import create_app; app = create_app(); app.app_context().push() or print(app.extensions[\"sqlalchemy\"].engine.url.render_as_string(hide_password=False))'"
 ```
 
-or
+The code above is implemented as a handy onliner, the code may look tricky, epecially the `app.app_context().push() or` part.
+The reason for that hacking is simple. Regular methods to get the DB URL require the application context. This is usually achieved using `with app.app_context():` construct, which is not possible in the oneliner.
 
-```
-(venv) grzanka@grzankax1:~/workspace/yaptide$ DB_URL=$(docker exec -it yaptide_flask bash -c "cd /usr/local/app && python -c 'from yaptide.application import create_
-app; app = create_app(); app.app_context().push() or print(app.extensions[\"sqlalchemy\"].engine.url.render_as_string(hide_password=False))'")
-(venv) grzanka@grzankax1:~/workspace/yaptide$ echo $DB_URL
-postgresql://yaptide_user:yaptide_password@postgresql:5432/yaptide_db
-```
+Knowing the DB URL, you can connect to the DB using any DB client, e.g. `psql` or `pgadmin`. You can also use the `db_manage.py` script from the `yaptide/admin` directory. For example, to list all users in the DB, you can use the following command from outside the container:
 
-testing:
-```
+```shell
 FLASK_SQLALCHEMY_DATABASE_URI=postgresql://yaptide_user:yaptide_password@localhost:5432/yaptide_db ./yaptide/admin/db_manage.py list-users
+```
+
+This is equivalent to the following command executed inside the container:
+
+```shell
+docker exec -it yaptide_flask ./yaptide/admin/db_manage.py list-users
 ```
