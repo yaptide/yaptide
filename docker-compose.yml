@@ -43,7 +43,7 @@ services:
             - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL-""}
             - KEYCLOAK_REALM=${KEYCLOAK_REALM-""}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL-""}
-            - FLASK_SQLALCHEMY_DATABASE_URI=postgresql://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+            - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
         depends_on:
             redis:
                 condition: service_healthy
