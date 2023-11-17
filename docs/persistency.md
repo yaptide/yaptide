@@ -152,7 +152,7 @@ The reason for that hacking is simple. Regular methods to get the DB URL require
 Knowing the DB URL, you can connect to the DB using any DB client, e.g. `psql` or `pgadmin`. You can also use the `db_manage.py` script from the `yaptide/admin` directory. For example, to list all users in the DB, you can use the following command from outside the container:
 
 ```shell
-FLASK_SQLALCHEMY_DATABASE_URI=postgresql://yaptide_user:yaptide_password@localhost:5432/yaptide_db ./yaptide/admin/db_manage.py list-users
+FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://yaptide_user:yaptide_password@localhost:5432/yaptide_db ./yaptide/admin/db_manage.py list-users
 ```
 
 This is equivalent to the following command executed inside the container:
