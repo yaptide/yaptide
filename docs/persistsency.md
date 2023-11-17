@@ -128,7 +128,7 @@ classDiagram
 
 ## Database
 
-Production version is using Postgresql database, while in tests we use SQLite.
+Production version uses PostgreSQL database, while in tests we use SQLite.
 
 To check database URI:
 
