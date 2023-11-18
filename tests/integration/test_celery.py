@@ -86,7 +86,7 @@ def expected_fluka_mock_results() -> dict:
     }
 
 
-@pytest.mark.xfail(condition=platform.system() == "Windows", reason="FLUKA mock is not supported on Windows")
+@pytest.mark.skipif(platform.system() == "Windows", reason="FLUKA mock is not supported on Windows")
 @pytest.mark.usefixtures("live_server")
 def test_celery_run_simulation_for_fluka_mock(celery_app, celery_worker, payload_editor_dict_data_fluka: dict, client,
                                               add_simulator_mocks_to_path_variable, modify_tmpdir,
