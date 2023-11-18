@@ -22,13 +22,9 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_celery_run_simulation_for_shieldhit(celery_app,
-                               celery_worker,
-                               payload_editor_dict_data: dict,
-                               client,
-                               add_simulators_to_path_variable,
-                               modify_tmpdir,
-                               shieldhit_binary_installed):
+def test_celery_run_simulation_for_shieldhit(celery_app, celery_worker, payload_editor_dict_data: dict, client,
+                                             add_simulators_to_path_variable, modify_tmpdir,
+                                             shieldhit_binary_installed):
     """Test run_simulation task with SHIELD-HIT12A binary
     Current Windows demo version version of SHIELD-HIT12A has a bug, so it cannot parse more elaborated input files.
     Parser relies on rewind function, which does not work properly on Windows, see:
@@ -46,9 +42,11 @@ def test_celery_run_simulation_for_shieldhit(celery_app,
     if platform.system() == "Windows":
         payload_dict["input_json"]["scoringManager"]["filters"] = []
         payload_dict["input_json"]["detectorManager"]["detectors"] = [
-            payload_dict["input_json"]["detectorManager"]["detectors"][0]]
+            payload_dict["input_json"]["detectorManager"]["detectors"][0]
+        ]
         payload_dict["input_json"]["scoringManager"]["outputs"] = [
-            payload_dict["input_json"]["scoringManager"]["outputs"][0]]
+            payload_dict["input_json"]["scoringManager"]["outputs"][0]
+        ]
         for output in payload_dict["input_json"]["scoringManager"]["outputs"]:
             for quantity in output["quantities"]:
                 if "filter" in quantity:
@@ -60,12 +58,11 @@ def test_celery_run_simulation_for_shieldhit(celery_app,
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
-            task_id=str(i+1),
+            task_id=i + 1,
             keep_tmp_files=True,  # lets pytest to clean up the tmp files, last 3 directories will be kept
-            sim_type='shieldhit'
-        ) for i in range(payload_dict["ntasks"])
+            sim_type='shieldhit') for i in range(payload_dict["ntasks"])
     ])
-        
+
     workflow = chord(map_group, merge_results.s())
     job = workflow.delay()
     logging.info("Waiting for run_simulation task to finish")
@@ -80,33 +77,20 @@ def expected_fluka_mock_results() -> dict:
     """Return expected result"""
     yield {
         "21": {
-            "4x4": [
-                [0., 0., 0., 0.],
-                [0., 0.00146468, 0.00169978, 0.],
-                [0.00090805, 0., 0., 0.],
-                [0, 0., 0., 0.]
-            ]
+            "4x4": [[0., 0., 0., 0.], [0., 0.00146468, 0.00169978, 0.], [0.00090805, 0., 0., 0.], [0, 0., 0., 0.]]
         },
         "22": {
-            "4x4": [
-                [0.00047575, 0., 0., 0.],
-                [0., 0.00188021, 0.00166488, 0.],
-                [0., 0.0010242, 0.00105254, 0.],
-                [0., 0., 0., 0.]
-            ]
+            "4x4": [[0.00047575, 0., 0., 0.], [0., 0.00188021, 0.00166488, 0.], [0., 0.0010242, 0.00105254, 0.],
+                    [0., 0., 0., 0.]]
         }
     }
 
 
-@pytest.mark.xfail(condition=platform.system() == "Windows", reason="FLUKA mock is not supported on Windows")
+@pytest.mark.skipif(platform.system() == "Windows", reason="FLUKA mock is not supported on Windows")
 @pytest.mark.usefixtures("live_server")
-def test_celery_run_simulation_for_fluka_mock(celery_app,
-                               celery_worker,
-                               payload_editor_dict_data_fluka: dict,
-                               client,
-                               add_simulator_mocks_to_path_variable,
-                               modify_tmpdir,
-                               expected_fluka_mock_results):
+def test_celery_run_simulation_for_fluka_mock(celery_app, celery_worker, payload_editor_dict_data_fluka: dict, client,
+                                              add_simulator_mocks_to_path_variable, modify_tmpdir,
+                                              expected_fluka_mock_results):
     """Test run_simulation task with FLUKA mock binary"""
     # lets make a local copy of the payload dict, so we don't modify the original one
     payload_dict = copy.deepcopy(payload_editor_dict_data_fluka)
@@ -121,10 +105,9 @@ def test_celery_run_simulation_for_fluka_mock(celery_app,
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,
-            task_id=str(i+1),
+            task_id=i + 1,
             keep_tmp_files=True,  # lets pytest to clean up the tmp files, last 3 directories will be kept
-            sim_type='fluka'
-        ) for i in range(payload_dict["ntasks"])
+            sim_type='fluka') for i in range(payload_dict["ntasks"])
     ])
 
     workflow = chord(map_group, merge_results.s())

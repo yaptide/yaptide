@@ -91,7 +91,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                          update_key=update_key,
                          update_dict=up_dict,
                          backend_url=backend_url)
-        print(f"Update for task: {task_id} - FAILED")
+        logging.debug("Update for task: %d - FAILED", task_id)
         return
 
     loglines = log_generator(logfile, threading.Event())
@@ -100,6 +100,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
         if re.search(RUN_MATCH, line):
             logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+                logging.debug("Skipping update, too often")
                 continue
             update_time = utc_now.timestamp()
             splitted = line.split()
@@ -112,7 +113,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                              update_key=update_key,
                              update_dict=up_dict,
                              backend_url=backend_url)
-            print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
+            logging.debug("Update for task: %d - simulated primaries: %s", task_id, splitted[3])
 
         elif re.search(REQUESTED_MATCH, line):
             logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
@@ -128,7 +129,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                              update_key=update_key,
                              update_dict=up_dict,
                              backend_url=backend_url)
-            print(f"Update for task: {task_id} - RUNNING")
+            logging.debug("Update for task: %d - RUNNING", task_id)
 
         elif re.search(COMPLETE_MATCH, line):
             logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
@@ -142,7 +143,7 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                              update_key=update_key,
                              update_dict=up_dict,
                              backend_url=backend_url)
-            print(f"Update for task: {task_id} - COMPLETED")
+            logging.debug("Update for task: %d - COMPLETED", task_id)
             return
 
         elif re.search(TIMEOUT_MATCH, line):
@@ -156,25 +157,32 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                              update_key=update_key,
                              update_dict=up_dict,
                              backend_url=backend_url)
-            print(f"Update for task: {task_id} - TIMEOUT")
+            print("Update for task: %d - TIMEOUT", task_id)
             return
-        logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
+        else:
+            logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
     return
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.StreamHandler()])
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str)
     parser.add_argument("--sim_id", type=int)
     parser.add_argument("--task_id", type=int)
     parser.add_argument("--update_key", type=str)
     parser.add_argument("--backend_url", type=str)
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+
+    log_level = logging.INFO
+    if args.verbose:
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level,
+                        format="%(asctime)s %(levelname)s %(message)s",
+                        handlers=[logging.StreamHandler()])
+
     logging.info("log file %s", args.filepath)
     logging.info("sim_id %s", args.sim_id)
     logging.info("task_id %s", args.task_id)
