@@ -28,7 +28,7 @@ class TableTypes(Enum):
     Page = auto()
 
 
-def connect_to_db(verbose: int = 0) -> tuple(db.Connection, db.MetaData, db.Engine):
+def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
     """Connects to the db"""
     db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
     if verbose > 1:
