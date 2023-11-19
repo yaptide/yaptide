@@ -162,7 +162,7 @@ class TaskModel(db.Model):
                                            db.ForeignKey('Simulation.id'),
                                            doc="Simulation job ID (foreign key)")
 
-    task_id: Column[str] = db.Column(db.String, nullable=False, doc="Task ID")
+    task_id: Column[int] = db.Column(db.Integer, nullable=False, doc="Task ID")
     requested_primaries: Column[int] = db.Column(db.Integer,
                                                  nullable=False,
                                                  default=0,
@@ -264,30 +264,45 @@ class BatchTaskModel(TaskModel):
     __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
 
+def decompress(data: bytes):
+    """Decompresses data and deserializes JSON"""
+    data_to_unpack: str = 'null'
+    if data is not None:
+        # Decompress the data
+        decompressed_bytes: bytes = gzip.decompress(data)
+        data_to_unpack = decompressed_bytes.decode('utf-8')
+        # Deserialize the JSON
+    return json.loads(data_to_unpack)
+
+
+def compress(data) -> bytes:
+    """Serializes JSON and compresses data"""
+    compressed_bytes = b''
+    if data is not None:
+        # Serialize the JSON
+        serialized_data: str = json.dumps(data)
+        # Compress the data
+        bytes_to_compress: bytes = serialized_data.encode('utf-8')
+        compressed_bytes = gzip.compress(bytes_to_compress)
+    return compressed_bytes
+
+
 class InputModel(db.Model):
     """Simulation inputs model"""
 
     __tablename__ = 'Input'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
-    compressed_data: Column[str] = db.Column(db.Text)
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary)
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 class EstimatorModel(db.Model):
@@ -297,24 +312,16 @@ class EstimatorModel(db.Model):
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
     name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
-    compressed_data: Column[str] = db.Column(db.Text, doc="Estimator metadata")
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Estimator metadata")
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 class PageModel(db.Model):
@@ -323,25 +330,17 @@ class PageModel(db.Model):
     __tablename__ = 'Page'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'), nullable=False)
-    page_number: Column[int] = db.Column(db.String, nullable=False, doc="Page number")
-    compressed_data: Column[str] = db.Column(db.Text, doc="Page json object - data, axes and metadata")
+    page_number: Column[int] = db.Column(db.Integer, nullable=False, doc="Page number")
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Page json object - data, axes and metadata")
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 class LogfilesModel(db.Model):
@@ -350,24 +349,16 @@ class LogfilesModel(db.Model):
     __tablename__ = 'Logfiles'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
-    compressed_data: Column[str] = db.Column(db.Text, doc="Json object containing logfiles")
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Json object containing logfiles")
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 def create_models():

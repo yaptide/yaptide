@@ -43,7 +43,7 @@ def get_tmp_dir() -> Path:
     return Path(tmp_dir)
 
 
-def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
+def command_to_run_shieldhit(dir_path: Path, task_id: int) -> list[str]:
     """Function to create command to run SHIELD-HIT12A."""
     settings = SimulationSettings(
         input_path=dir_path,  # skipcq: PYL-W0612 # usefull
@@ -51,7 +51,7 @@ def command_to_run_shieldhit(dir_path: Path, task_id: str) -> list[str]:
         simulator_exec_path=None,  # useless, we guess from PATH
         cmdline_opts="")  # useless, we could use -q in the future
     # last part of task_id gives an integer seed for random number generator
-    settings.set_rng_seed(int(task_id.split("_")[-1]))
+    settings.set_rng_seed(task_id)
     command_as_list = str(settings).split()
     command_as_list.append(str(dir_path))
     return command_as_list
@@ -89,7 +89,7 @@ def command_to_run_fluka(dir_path: Path, task_id: str) -> list[str]:
     return command_as_list
 
 
-def update_rng_seed_in_fluka_file(dir_path: Path, task_id: str) -> None:
+def update_rng_seed_in_fluka_file(dir_path: Path, task_id: int) -> None:
     """Function to update random seed in FLUKA input file."""
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
@@ -106,7 +106,7 @@ def update_rng_seed_in_fluka_file(dir_path: Path, task_id: str) -> None:
         def __call__(self, file_path: str, rng_seed: int) -> None:
             """Updates random seed in fluka input file"""
 
-    random_seed = int(task_id.split("_")[-1])
+    random_seed = task_id
     update_fluka_function: UpdateFlukaRandomSeed = Runner._Runner__update_fluka_input_file  # pylint: disable=W0212
     update_fluka_function(str(input_file.resolve()), random_seed)
 

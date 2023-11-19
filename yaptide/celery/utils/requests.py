@@ -4,7 +4,7 @@ import os
 import requests
 
 
-def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
+def send_task_update(simulation_id: int, task_id: int, update_key: str, update_dict: dict) -> bool:
     """Sends task status to backend which will update the database"""
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
