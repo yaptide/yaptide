@@ -288,7 +288,6 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, u
     return None
 
 
-# def run_fluka_watcher(task_id, update_key, simulation_id, tmp_dir_path, ):
 def monitor_fluka(event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str,
                   simulation_id: int) -> Optional[MonitorTask]:
     """Function running the monitoring process for SHIELDHIT simulation"""

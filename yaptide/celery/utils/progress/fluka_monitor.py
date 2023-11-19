@@ -1,7 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
-from pathlib import Path
 import re
 import threading
 from typing import Iterator, Optional, Tuple
@@ -17,11 +16,6 @@ S_OK_OUT_IN_PROGRESS = " NEXT SEEDS:"
 S_OK_OUT_COLLECTED = " All cases handled by Feeder"
 S_OK_OUT_FIN_PATTERN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
 
-# for larger number of particles values are shifted accordingly to fit all digits, e.g. for 1e+12 particles:
-# "              1          999999999999          999999999999         2.8598309E-04         1.0000000E+30                 0       "
-S_OK_OUT_PROGRESS_REMAINING_LINE_EXAMPLE = \
-    "     980000                 20000                 20000             1.8515483E-04         1.0000000E+30             44182       "
-
 logger = logging.getLogger(__name__)
 
 
@@ -34,19 +28,21 @@ def parse_progress_remaining_line(line: str) -> Optional[Tuple[int, int]]:
         Tuple[int, int]: tuple with two integers representing the progress and remaining.
         If the line cannot be parsed None is returned.
     """
-    list = line.split()
+    parts = line.split()
     # expecting 6 sections which are int or floats
-    if len(list) != 6:
+    if len(parts) != 6:
         return None
     try:
-        [float(x) for x in list]
+        [float(x) for x in parts]
     except ValueError:
         return None
-    return (int(list[0]), int(list[1]))
+    return (int(parts[0]), int(parts[1]))
 
 
 @dataclass
 class TaskDetails:
+    """Class holding details about the task."""
+
     simulation_id: int
     task_id: str
     update_key: str
