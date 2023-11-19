@@ -284,6 +284,20 @@ def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, s
     return True
 
 
+def extract_fluka_from_tar_gz(archive_path: Path, unpacking_directory: Path, destination_dir: Path) -> bool:
+    """Extracts a single directory from a tar.gz archive"""
+    with tarfile.open(archive_path, "r:gz") as tar:
+        tar.extractall(path=unpacking_directory)
+        content = list(unpacking_directory.iterdir())
+        if len(content) == 1:
+            content[0].rename(destination_dir / 'fluka')
+            return True
+        elif len(content) > 1:
+            unpacking_directory.rename(destination_dir / 'fluka')
+            return True
+    return False
+
+
 def download_fluka_from_s3(download_dir: Path, endpoint: str, access_key: str, secret_key: str, bucket: str,
                            password: str, salt: str, key: str) -> bool:
     """Download (and decrypt) Fluka from S3 bucket"""
@@ -292,20 +306,27 @@ def download_fluka_from_s3(download_dir: Path, endpoint: str, access_key: str, s
                              aws_secret_access_key=secret_key,
                              endpoint_url=endpoint)
 
-    destination_file_path = download_dir / 'fluka.tgz'
-
     if not validate_connection_data(bucket, key, s3_client):
         return False
 
-    download_ok = download_file(key=key,
-                                bucket=bucket,
-                                s3_client=s3_client,
-                                decrypt=True,
-                                password=password,
-                                salt=salt,
-                                destination_file_path=destination_file_path)
+    with tempfile.TemporaryDirectory() as tmpdir_name:
+        tmp_dir = Path(tmpdir_name).resolve()
+        tmp_archive = tmp_dir / 'fluka.tgz'
+        tmp_dir_path = tmp_dir / 'fluka'
+        download_and_decrypt_status = download_file(key=key,
+                                                    bucket=bucket,
+                                                    s3_client=s3_client,
+                                                    decrypt=True,
+                                                    password=password,
+                                                    salt=salt,
+                                                    destination_file_path=tmp_archive)
+        if not download_and_decrypt_status:
+            return False
+        download_and_decrypt_status = extract_fluka_from_tar_gz(archive_path=tmp_archive,
+                                                                unpacking_directory=tmp_dir_path,
+                                                                destination_dir=download_dir)
 
-    return download_ok
+    return download_and_decrypt_status
 
 
 def upload_file_to_s3(bucket: str,
