@@ -4,11 +4,14 @@ import os
 import requests
 
 
-def send_task_update(simulation_id: int, task_id: str, update_key: str, update_dict: dict) -> bool:
-    """Sends task update to flask to update database"""
+def send_task_update(simulation_id: int, task_id: int, update_key: str, update_dict: dict) -> bool:
+    """Sends task status to backend which will update the database"""
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
+        return False
+    if not update_key:
+        logging.warning("Update key not found, skipping update")
         return False
     dict_to_send = {
         "simulation_id": simulation_id,
@@ -26,10 +29,13 @@ def send_task_update(simulation_id: int, task_id: str, update_key: str, update_d
 
 
 def send_simulation_results(simulation_id: int, update_key: str, estimators: list) -> bool:
-    """Sends results of simulation to flask to save it in database"""
+    """Sends simulation results to flask to save it in database"""
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
+        return False
+    if not update_key:
+        logging.warning("Update key not found, skipping update")
         return False
     dict_to_send = {
         "simulation_id": simulation_id,
@@ -45,7 +51,10 @@ def send_simulation_results(simulation_id: int, update_key: str, estimators: lis
 
 
 def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict) -> bool:
-    """Sends results of simulation to flask to save it in database"""
+    """
+    Sends simulation logfiles to Flask backend which will save it in database
+    Returns True if successful, False otherwise
+    """
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")

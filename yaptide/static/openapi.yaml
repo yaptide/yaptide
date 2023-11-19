@@ -348,7 +348,8 @@ paths:
 # Jobs Routes
   /jobs:
     get:
-      summary: Allows for getting job status.
+      summary: Allows for getting job status from database.
+      description: Endpoint designed for getting periodical job status from database.
       parameters:
         - in: query
           name: job_id
@@ -410,7 +411,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
   /jobs/direct:
     post:
-      summary: Allows for submitting jobs
+      summary: Allows for submitting jobs to run directly on server.
       requestBody:
         required: true
         content:
@@ -456,7 +457,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      summary: Allows for getting job status and additional job's info.
+      summary: Allows for getting job status and additional job's info. Available only for jobs run directly.
+      description: At current stage of development it does not provide any addtional features than GET method from '/jobs' route - it does the same thing but it is available only for jobs run directly.
       parameters:
         - in: query
           name: job_id
@@ -517,7 +519,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     delete:
-      summary: Allows for job cancelation.
+      summary: Allows for job cancelation. Available only for jobs run directly.
       parameters:
         - in: query
           name: job_id
@@ -568,7 +570,7 @@ paths:
                 $ref: '#/components/schemas/BasicResponse'
   /jobs/batch:
     post:
-      summary: Allows for submitting jobs
+      summary: Allows for submitting jobs to run on SLURM.
       description: This endpoint can be used only by keycloak authenticated users
       requestBody:
         required: true
@@ -632,8 +634,8 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     get:
-      summary: Allows for getting job status and additional job's info.
-      description: This endpoint can be used only by keycloak authenticated users
+      summary: Allows for getting job status and additional job's info. Available only for jobs run on SLURM.
+      description: This endpoint can be used only by keycloak authenticated users. It is recommended not to use it very often because of the high load it puts on the SLURM system.
       parameters:
         - in: query
           name: job_id
@@ -710,7 +712,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
     delete:
-      summary: Allows for job cancelation.
+      summary: Allows for job cancelation. Available only for jobs run on SLURM.
       description: This endpoint can be used only by keycloak authenticated users
       parameters:
         - in: query
@@ -888,6 +890,7 @@ paths:
     description: Route dedicated for Backend internal communication
     post:
       summary: Updates task state
+      description: Used by tasks to update their state
       requestBody:
         required: true
         content:
@@ -922,9 +925,9 @@ paths:
 
 # Logfiles Routes
   /logfiles:
-    description: Route dedicated for Backend internal communication
     post:
-      summary: Updates task state
+      summary: Allows for uploading logfiles of the simulation by its tasks
+      description: At current stage of development incoming logfiles override existing ones
       requestBody:
         required: true
         content:

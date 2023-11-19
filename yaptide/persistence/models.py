@@ -20,15 +20,9 @@ class UserModel(db.Model):
     auth_provider: Column[str] = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
 
-    __table_args__ = (
-        UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'),
-    )
+    __table_args__ = (UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'), )
 
-    __mapper_args__ = {
-        "polymorphic_identity": "User",
-        "polymorphic_on": auth_provider,
-        "with_polymorphic": "*"
-    }
+    __mapper_args__ = {"polymorphic_identity": "User", "polymorphic_on": auth_provider, "with_polymorphic": "*"}
 
     def __repr__(self) -> str:
         return f'User #{self.id} {self.username}'
@@ -41,10 +35,7 @@ class YaptideUserModel(UserModel, db.Model):
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
     password_hash: Column[str] = db.Column(db.String, nullable=False)
 
-    __mapper_args__ = {
-        "polymorphic_identity": "YaptideUser",
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": "YaptideUser", "polymorphic_load": "inline"}
 
     def set_password(self, password: str):
         """Sets hashed password"""
@@ -60,13 +51,10 @@ class KeycloakUserModel(UserModel, db.Model):
 
     __tablename__ = 'KeycloakUser'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), primary_key=True)
-    cert: Column[str] = db.Column(db.String, nullable=False)
-    private_key: Column[str] = db.Column(db.String, nullable=False)
+    cert: Column[str] = db.Column(db.String, nullable=True)
+    private_key: Column[str] = db.Column(db.String, nullable=True)
 
-    __mapper_args__ = {
-        "polymorphic_identity": "KeycloakUser",
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": "KeycloakUser", "polymorphic_load": "inline"}
 
 
 class ClusterModel(db.Model):
@@ -109,11 +97,7 @@ class SimulationModel(db.Model):
     tasks = relationship("TaskModel")
     estimators = relationship("EstimatorModel")
 
-    __mapper_args__ = {
-        "polymorphic_identity": "Simulation",
-        "polymorphic_on": platform,
-        "with_polymorphic": "*"
-    }
+    __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
 
     def set_update_key(self, update_key: str):
         """Sets hashed update key"""
@@ -130,9 +114,7 @@ class SimulationModel(db.Model):
         perform it only for such fields which exists and which have updated values.
         Returns bool value telling if it is required to commit changes to db.
         """
-        if self.job_state in (EntityState.COMPLETED.value,
-                              EntityState.FAILED.value,
-                              EntityState.CANCELED.value):
+        if self.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return False
         db_commit_required = False
         if "job_state" in update_dict and self.job_state != update_dict["job_state"]:
@@ -155,10 +137,7 @@ class CelerySimulationModel(SimulationModel):
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id', ondelete="CASCADE"), primary_key=True)
     merge_id: Column[str] = db.Column(db.String, nullable=True, doc="Celery collect job ID")
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.DIRECT.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}
 
 
 class BatchSimulationModel(SimulationModel):
@@ -171,10 +150,7 @@ class BatchSimulationModel(SimulationModel):
     array_id: Column[int] = db.Column(db.Integer, nullable=True, doc="Batch array jon ID")
     collect_id: Column[int] = db.Column(db.Integer, nullable=True, doc="Batch collect job ID")
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.BATCH.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
 
 class TaskModel(db.Model):
@@ -186,7 +162,7 @@ class TaskModel(db.Model):
                                            db.ForeignKey('Simulation.id'),
                                            doc="Simulation job ID (foreign key)")
 
-    task_id: Column[str] = db.Column(db.String, nullable=False, doc="Task ID")
+    task_id: Column[int] = db.Column(db.Integer, nullable=False, doc="Task ID")
     requested_primaries: Column[int] = db.Column(db.Integer,
                                                  nullable=False,
                                                  default=0,
@@ -203,20 +179,13 @@ class TaskModel(db.Model):
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
     platform: Column[str] = db.Column(db.String, nullable=False, doc="Execution platform name (i.e. 'direct', 'batch')")
-    last_update_time: Column[datetime] = db.Column(
-        db.DateTime(timezone=True),
-        default=now(),
-        doc="Task last update time")
+    last_update_time: Column[datetime] = db.Column(db.DateTime(timezone=True),
+                                                   default=now(),
+                                                   doc="Task last update time")
 
-    __table_args__ = (
-        UniqueConstraint('simulation_id', 'task_id', name='_simulation_id_task_id_uc'),
-    )
+    __table_args__ = (UniqueConstraint('simulation_id', 'task_id', name='_simulation_id_task_id_uc'), )
 
-    __mapper_args__ = {
-        "polymorphic_identity": "Task",
-        "polymorphic_on": platform,
-        "with_polymorphic": "*"
-    }
+    __mapper_args__ = {"polymorphic_identity": "Task", "polymorphic_on": platform, "with_polymorphic": "*"}
 
     def update_state(self, update_dict: dict):
         """
@@ -224,9 +193,7 @@ class TaskModel(db.Model):
         Therefore we check first if update is needed and
         perform it only for such fields which exists and which have updated values.
         """
-        if self.task_state in (EntityState.COMPLETED.value,
-                               EntityState.FAILED.value,
-                               EntityState.CANCELED.value):
+        if self.task_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return
         if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
             self.requested_primaries = update_dict["requested_primaries"]
@@ -285,10 +252,7 @@ class CeleryTaskModel(TaskModel):
             self.celery_id = update_dict["celery_id"]
         return super().update_state(update_dict)
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.DIRECT.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}
 
 
 class BatchTaskModel(TaskModel):
@@ -297,10 +261,30 @@ class BatchTaskModel(TaskModel):
     __tablename__ = 'BatchTask'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('Task.id', ondelete="CASCADE"), primary_key=True)
 
-    __mapper_args__ = {
-        "polymorphic_identity": PlatformType.BATCH.value,
-        "polymorphic_load": "inline"
-    }
+    __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
+
+
+def decompress(data: bytes):
+    """Decompresses data and deserializes JSON"""
+    data_to_unpack: str = 'null'
+    if data is not None:
+        # Decompress the data
+        decompressed_bytes: bytes = gzip.decompress(data)
+        data_to_unpack = decompressed_bytes.decode('utf-8')
+        # Deserialize the JSON
+    return json.loads(data_to_unpack)
+
+
+def compress(data) -> bytes:
+    """Serializes JSON and compresses data"""
+    compressed_bytes = b''
+    if data is not None:
+        # Serialize the JSON
+        serialized_data: str = json.dumps(data)
+        # Compress the data
+        bytes_to_compress: bytes = serialized_data.encode('utf-8')
+        compressed_bytes = gzip.compress(bytes_to_compress)
+    return compressed_bytes
 
 
 class InputModel(db.Model):
@@ -309,24 +293,16 @@ class InputModel(db.Model):
     __tablename__ = 'Input'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
-    compressed_data: Column[str] = db.Column(db.Text)
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary)
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 class EstimatorModel(db.Model):
@@ -336,24 +312,16 @@ class EstimatorModel(db.Model):
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
     name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
-    compressed_data: Column[str] = db.Column(db.Text, doc="Estimator metadata")
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Estimator metadata")
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 class PageModel(db.Model):
@@ -362,25 +330,17 @@ class PageModel(db.Model):
     __tablename__ = 'Page'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'), nullable=False)
-    page_number: Column[int] = db.Column(db.String, nullable=False, doc="Page number")
-    compressed_data: Column[str] = db.Column(db.Text, doc="Page json object - data, axes and metadata")
+    page_number: Column[int] = db.Column(db.Integer, nullable=False, doc="Page number")
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Page json object - data, axes and metadata")
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 class LogfilesModel(db.Model):
@@ -389,24 +349,16 @@ class LogfilesModel(db.Model):
     __tablename__ = 'Logfiles'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
-    compressed_data: Column[str] = db.Column(db.Text, doc="Json object containing logfiles")
+    compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Json object containing logfiles")
 
     @property
     def data(self):
-        if self.compressed_data is not None:
-            # Decompress the data
-            decompressed_data = gzip.decompress(self.compressed_data).decode('utf-8')
-            # Deserialize the JSON
-            return json.loads(decompressed_data)
-        return None
+        return decompress(self.compressed_data)
 
     @data.setter
     def data(self, value):
         if value is not None:
-            # Serialize the JSON
-            serialized_data = json.dumps(value)
-            # Compress the data
-            self.compressed_data = gzip.compress(serialized_data.encode('utf-8'))
+            self.compressed_data = compress(value)
 
 
 def create_models():

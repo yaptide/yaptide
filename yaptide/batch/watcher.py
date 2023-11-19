@@ -4,6 +4,7 @@ import logging
 import re
 import signal
 import ssl
+import threading
 import time
 from datetime import datetime
 from io import TextIOWrapper
@@ -16,7 +17,7 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(thefile: TextIOWrapper, timeout: int = 3600) -> str:
+def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout: int = 3600) -> str:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
@@ -25,6 +26,8 @@ def log_generator(thefile: TextIOWrapper, timeout: int = 3600) -> str:
     """
     sleep_counter = 0
     while True:
+        if event and event.is_set():
+            break
         if thefile is None:
             return "File not found"
         line = thefile.readline()
@@ -44,19 +47,13 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
         logging.error("Backend url not specified")
         return False
 
-    dict_to_send = {
-        "simulation_id": sim_id,
-        "task_id": task_id,
-        "update_key": update_key,
-        "update_dict": update_dict
-    }
+    dict_to_send = {"simulation_id": sim_id, "task_id": task_id, "update_key": update_key, "update_dict": update_dict}
     tasks_url = f"{backend_url}/tasks"
     logging.debug("Sending update %s to the backend %s", dict_to_send, tasks_url)
     context = ssl.SSLContext()
 
     req = request.Request(tasks_url,
-                          json.dumps(dict_to_send).encode(),
-                          {'Content-Type': 'application/json'},
+                          json.dumps(dict_to_send).encode(), {'Content-Type': 'application/json'},
                           method='POST')
 
     try:
@@ -89,29 +86,34 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
             "task_state": "FAILED",
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
-        send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
-                         update_dict=up_dict, backend_url=backend_url)
-        print(f"Update for task: {task_id} - FAILED")
+        send_task_update(sim_id=sim_id,
+                         task_id=task_id,
+                         update_key=update_key,
+                         update_dict=up_dict,
+                         backend_url=backend_url)
+        logging.debug("Update for task: %d - FAILED", task_id)
         return
 
-    loglines = log_generator(logfile)
+    loglines = log_generator(logfile, threading.Event())
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
             logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
             if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+                logging.debug("Skipping update, too often")
                 continue
             update_time = utc_now.timestamp()
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": int(splitted[3]),
-                "estimated_time": int(splitted[9])
-                + int(splitted[7]) * 60
-                + int(splitted[5]) * 3600
+                "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
-                             update_dict=up_dict, backend_url=backend_url)
-            print(f"Update for task: {task_id} - simulated primaries: {splitted[3]}")
+            send_task_update(sim_id=sim_id,
+                             task_id=task_id,
+                             update_key=update_key,
+                             update_dict=up_dict,
+                             backend_url=backend_url)
+            logging.debug("Update for task: %d - simulated primaries: %s", task_id, splitted[3])
 
         elif re.search(REQUESTED_MATCH, line):
             logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
@@ -122,9 +124,12 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": "RUNNING"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
-                             update_dict=up_dict, backend_url=backend_url)
-            print(f"Update for task: {task_id} - RUNNING")
+            send_task_update(sim_id=sim_id,
+                             task_id=task_id,
+                             update_key=update_key,
+                             update_dict=up_dict,
+                             backend_url=backend_url)
+            logging.debug("Update for task: %d - RUNNING", task_id)
 
         elif re.search(COMPLETE_MATCH, line):
             logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
@@ -133,9 +138,12 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
-                             update_dict=up_dict, backend_url=backend_url)
-            print(f"Update for task: {task_id} - COMPLETED")
+            send_task_update(sim_id=sim_id,
+                             task_id=task_id,
+                             update_key=update_key,
+                             update_dict=up_dict,
+                             backend_url=backend_url)
+            logging.debug("Update for task: %d - COMPLETED", task_id)
             return
 
         elif re.search(TIMEOUT_MATCH, line):
@@ -144,31 +152,37 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 "task_state": "FAILED",
                 "end_time": datetime.utcnow().isoformat(sep=" ")
             }
-            send_task_update(sim_id=sim_id, task_id=task_id, update_key=update_key,
-                             update_dict=up_dict, backend_url=backend_url)
-            print(f"Update for task: {task_id} - TIMEOUT")
+            send_task_update(sim_id=sim_id,
+                             task_id=task_id,
+                             update_key=update_key,
+                             update_dict=up_dict,
+                             backend_url=backend_url)
+            print("Update for task: %d - TIMEOUT", task_id)
             return
-        logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
+        else:
+            logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
     return
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[
-            logging.StreamHandler()
-        ]
-    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--filepath", type=str)
     parser.add_argument("--sim_id", type=int)
     parser.add_argument("--task_id", type=int)
     parser.add_argument("--update_key", type=str)
     parser.add_argument("--backend_url", type=str)
+    parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
+
+    log_level = logging.INFO
+    if args.verbose:
+        log_level = logging.DEBUG
+    logging.basicConfig(level=log_level,
+                        format="%(asctime)s %(levelname)s %(message)s",
+                        handlers=[logging.StreamHandler()])
+
     logging.info("log file %s", args.filepath)
     logging.info("sim_id %s", args.sim_id)
     logging.info("task_id %s", args.task_id)
