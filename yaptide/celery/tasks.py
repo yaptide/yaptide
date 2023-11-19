@@ -308,8 +308,8 @@ def monitor_fluka(event: threading.Event, tmp_work_dir: str, task_id: int, updat
                                             logging_level=current_logging_level))
 
         task.start()
-        logging.info("Started monitoring process for task %s", task_id)
+        logging.info("Started monitoring process for task %d", task_id)
         return MonitorTask(path_to_monitor=dir_to_monitor, task=task)
 
-    logging.info("No monitoring processes started for task %s", task_id)
+    logging.info("No monitoring processes started for task %d", task_id)
     return None
