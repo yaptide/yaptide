@@ -78,24 +78,22 @@ def get_shieldhit_estimators(dir_path: Path) -> dict:
 
 def command_to_run_fluka(dir_path: Path, task_id: str) -> list[str]:
     """Function to create command to run FLUKA."""
-    settings = SimulationSettings(
-        input_path=dir_path,  # skipcq: PYL-W0612 # usefull
-        simulator_type=SimulatorType.fluka,
-        simulator_exec_path=None,  # useless, we guess from PATH
-        cmdline_opts="-M 1")  # useless, not useful for fluka
-    update_rng_seed_in_fluka_file(dir_path, task_id)
-    command_as_list = str(settings).split()
-    command_as_list.append(str(dir_path))
-    return command_as_list
-
-
-def update_rng_seed_in_fluka_file(dir_path: Path, task_id: int) -> None:
-    """Function to update random seed in FLUKA input file."""
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
+        logging.debug("failed to generate fluka command. No *.inp file found in %s", dir_path)
         # if there is no input file, raise an error
         # this should never happen
         raise FileNotFoundError("Input file not found")
+
+    settings = SimulationSettings(input_path=str(input_file), simulator_type=SimulatorType.fluka, cmdline_opts="-M 1")
+    update_rng_seed_in_fluka_file(input_file, task_id)
+    command_as_list = str(settings).split()
+    command_as_list.append(str(input_file))
+    return command_as_list
+
+
+def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
+    """Function to update random seed in FLUKA input file."""
 
     class UpdateFlukaRandomSeed(Protocol):
         """Definition of protocol for updating random seed in fluka input file.
