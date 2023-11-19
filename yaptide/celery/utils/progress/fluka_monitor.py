@@ -11,11 +11,11 @@ from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
 # templates for regex matching output from `<simulation>_<no>.out` file
-S_OK_OUT_INIT = re.compile(r"^ Total time used for initialization:")
-S_OK_OUT_START = re.compile(r"^1NUMBER OF BEAM")
-S_OK_OUT_IN_PROGRESS = re.compile(r"^ NEXT SEEDS:")
-S_OK_OUT_COLLECTED = re.compile(r"^ All cases handled by Feeder")
-S_OK_OUT_FIN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
+S_OK_OUT_INIT = "Total time used for initialization:"
+S_OK_OUT_START = "1NUMBER OF BEAM"
+S_OK_OUT_IN_PROGRESS = " NEXT SEEDS:"
+S_OK_OUT_COLLECTED = " All cases handled by Feeder"
+S_OK_OUT_FIN_PATTERN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
 
 # for larger number of particles values are shifted accordingly to fit all digits, e.g. for 1e+12 particles:
 # "              1          999999999999          999999999999         2.8598309E-04         1.0000000E+30                 0       "
@@ -76,20 +76,20 @@ def read_fluka_out_file(event: threading.Event,
         if event.is_set():
             return
         utc_now = time_now_utc()
-        if re.match(S_OK_OUT_START, line):
+        if line.startswith(S_OK_OUT_START):
             logger.debug("Found start of the simulation")
             continue
-        if re.match(S_OK_OUT_IN_PROGRESS, line):
+        if line.startswith(S_OK_OUT_IN_PROGRESS):
             in_progress = True
             if varbose:
                 logger.debug("Found progress line")
             continue
-        if re.match(S_OK_OUT_COLLECTED, line):
+        if line.startswith(S_OK_OUT_COLLECTED):
             in_progress = False
             if varbose:
                 logger.debug("Found end of simulation calculation line")
             continue
-        if re.match(S_OK_OUT_FIN, line):
+        if re.match(S_OK_OUT_FIN_PATTERN, line):
             logger.debug("Found end of the simulation")
             break
         if in_progress:
