@@ -290,7 +290,7 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, u
 
 def monitor_fluka(event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str,
                   simulation_id: int) -> Optional[MonitorTask]:
-    """Function running the monitoring process for SHIELDHIT simulation"""
+    """Function running the monitoring process for Fluka simulation"""
     # we would like to monitor the progress of simulation
     # this is done by reading the log file and sending the updates to the backend
     # if we have update_key and simulation_id the monitoring task can submit the updates to backend

@@ -19,7 +19,7 @@ S_OK_OUT_FIN_PATTERN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* ru
 logger = logging.getLogger(__name__)
 
 
-def parse_progress_remaining_line(line: str) -> Optional[Tuple[int, int]]:
+def parse_progress_remaining_line(line: str) -> Optional[tuple[int, int]]:
     """Function parsing the line with progress remaining information.
 
     Args:
