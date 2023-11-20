@@ -2,7 +2,6 @@ import os
 import sys
 import pytest
 import logging
-import subprocess
 from pathlib import Path
 from yaptide.admin.simulator_storage import download_fluka_from_s3
 

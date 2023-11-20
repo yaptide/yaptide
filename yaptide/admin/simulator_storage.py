@@ -292,7 +292,7 @@ def extract_fluka_from_tar_gz(archive_path: Path, unpacking_directory: Path, des
         if len(content) == 1:
             content[0].rename(destination_dir / 'fluka')
             return True
-        elif len(content) > 1:
+        if len(content) > 1:
             unpacking_directory.rename(destination_dir / 'fluka')
             return True
     return False
