@@ -135,7 +135,8 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
     except subprocess.CalledProcessError as e:
         process_exit_success = False
         # If the command exits with a non-zero status
-        logging.error("Command Error: %s\nExecuted Command: %s", e.stderr, " ".join(command_as_list))
+        logging.error("Command Error: %sSTD OUT: %s\nExecuted Command: %s", e.stderr, e.stdout,
+                      " ".join(command_as_list))
     except Exception as e:  # skipcq: PYL-W0703
         process_exit_success = False
         logging.error("Exception while running simulation: %s", e)
