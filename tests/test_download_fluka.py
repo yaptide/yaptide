@@ -32,7 +32,7 @@ def test_if_fluka_downloaded(tmpdir):
         )
 
         expected_rfluka_path = Path(tmpdir / "fluka" / "bin" / "rfluka")
-        expected_lib_path = Path(tmpdir / "fluka" / "libs")
+        expected_lib_path = Path(tmpdir / "fluka" / "lib")
         assert expected_rfluka_path.exists(), "Expected FLUKA path does not exist."
         assert expected_rfluka_path.stat().st_size > 0, "Expected FLUKA path is empty."
         assert expected_lib_path.exists(), "Expected FLUKA lib does not exist."
