@@ -137,3 +137,13 @@ def db_good_password() -> str:
 def db_bad_username() -> str:
     """Username for user with invalid password"""
     return "Sauron"
+
+
+def check_if_environment_variables_set(variables: list[str]) -> bool:
+    """Check if environment variables are set"""
+    result = True
+    for var_name in variables:
+        if var_name not in os.environ:
+            logging.error('variable %s not set', var_name)
+            result = False
+    return result
