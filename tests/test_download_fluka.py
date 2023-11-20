@@ -3,23 +3,15 @@ import sys
 import pytest
 import logging
 from pathlib import Path
+from tests.conftest import check_if_environment_variables_set
 from yaptide.admin.simulator_storage import download_fluka_from_s3
-
-
-def check_if_environment_variables_set() -> bool:
-    """Check if environment variables are set"""
-    result = True
-    for var_name in ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_FLUKA_BUCKET', 'S3_FLUKA_KEY']:
-        if var_name not in os.environ:
-            logging.error('variable %s not set', var_name)
-            result = False
-    return result
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="FLUKA does not work on Windows.")
 def test_if_fluka_downloaded(tmpdir):
     """Check if FLUKA is downloaded and can be executed"""
-    if check_if_environment_variables_set():
+    variables = ['S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_FLUKA_BUCKET', 'S3_FLUKA_KEY']
+    if check_if_environment_variables_set(variables):
         assert download_fluka_from_s3(
             download_dir=tmpdir,
             endpoint=os.getenv("S3_ENDPOINT"),

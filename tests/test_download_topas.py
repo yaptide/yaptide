@@ -4,26 +4,18 @@ import pytest
 import logging
 import subprocess
 from pathlib import Path
+from tests.conftest import check_if_environment_variables_set
 from yaptide.admin.simulator_storage import download_topas_from_s3
-
-
-def check_if_environment_variables_set() -> bool:
-    """Check if environment variables are set"""
-    result = True
-    for var_name in [
-            'S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_TOPAS_BUCKET', 'S3_TOPAS_KEY', 'S3_GEANT4_BUCKET',
-            'S3_TOPAS_VERSION'
-    ]:
-        if var_name not in os.environ:
-            logging.error(' variable %s not set', var_name)
-            result = False
-    return result
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="TOPAS does not work on Windows.")
 def test_if_topas_downloaded(tmpdir):
     """Check if TOPAS is downloaded and can be executed"""
-    if check_if_environment_variables_set():
+    variables = [
+        'S3_ENDPOINT', 'S3_ACCESS_KEY', 'S3_SECRET_KEY', 'S3_TOPAS_BUCKET', 'S3_TOPAS_KEY', 'S3_GEANT4_BUCKET',
+        'S3_TOPAS_VERSION'
+    ]
+    if check_if_environment_variables_set(variables):
         assert download_topas_from_s3(endpoint=os.getenv("S3_ENDPOINT"),
                                       access_key=os.getenv("S3_ACCESS_KEY"),
                                       secret_key=os.getenv("S3_SECRET_KEY"),
