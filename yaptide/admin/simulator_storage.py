@@ -290,10 +290,10 @@ def extract_fluka_from_tar_gz(archive_path: Path, unpacking_directory: Path, des
         tar.extractall(path=unpacking_directory)
         content = list(unpacking_directory.iterdir())
         if len(content) == 1:
-            content[0].rename(destination_dir / 'fluka')
+            shutil.copytree(str(content[0]), str(destination_dir / 'fluka'), dirs_exist_ok=True)
             return True
         if len(content) > 1:
-            unpacking_directory.rename(destination_dir / 'fluka')
+            shutil.copytree(str(unpacking_directory), str(destination_dir / 'fluka'), dirs_exist_ok=True)
             return True
     return False
 
