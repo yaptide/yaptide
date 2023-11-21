@@ -197,11 +197,10 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
         event.set()
         task_monitor.task.join()
         logging.debug("Monitoring process for task %s terminated", task_id)
+    # TO BE IMPLEMENTED
     # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
-    # TODO: implement reading of the log file for fluka after simulation was finished
-    # fluka copies the file back to main direcotry from temporary directory
-    # if task_monitor:
-    #     simulated_primaries, requested_primaries = read_file_offline(task_monitor.path_to_monitor)
+    # reading of the log file for fluka after simulation was finished
+    # fluka copies the file back to main directory from temporary directory
 
     # both simulation execution and monitoring process are finished now, we can read the estimators
     estimators_dict = get_fluka_estimators(dir_path=Path(tmp_work_dir))
