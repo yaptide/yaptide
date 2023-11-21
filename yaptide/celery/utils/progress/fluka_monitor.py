@@ -60,59 +60,74 @@ def utc_without_offset(utc: datetime) -> str:
     return utc.strftime('%Y-%m-%d %H:%M:%S.%f')
 
 
+# @dataclass
+# class ProgressDetails:
+#     in_progress: bool = False
+#     requested_primaries: int = 0
+#     update_time: int = 0
+
+
 def read_fluka_out_file(event: threading.Event,
-                        linte_iterator: Iterator[str],
+                        line_iterator: Iterator[str],
                         next_backend_update_time: int,
                         details: TaskDetails,
-                        varbose: bool = False) -> None:
-    """Function reading the fluka output file and raporting progress to the backend."""
+                        verbose: bool = False) -> None:
+    """Function reading the fluka output file and reporting progress to the backend."""
     in_progress = False
     requested_primaries = 0
     update_time = 0
-    for line in linte_iterator:
+
+    def check_progress() -> bool:
+        nonlocal update_time
+        nonlocal requested_primaries
+        res = parse_progress_remaining_line(line)
+        if res:
+            progress, remainder = res
+            logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
+            if not requested_primaries:
+                requested_primaries = progress + remainder
+                up_dict = {
+                    "simulated_primaries": progress,
+                    "requested_primaries": requested_primaries,
+                    "start_time": utc_without_offset(utc_now),
+                    "task_state": EntityState.RUNNING.value
+                }
+                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            else:
+                if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
+                        and requested_primaries > progress):
+                    return True
+                update_time = utc_now.timestamp()
+                up_dict = {
+                    "simulated_primaries": progress,
+                }
+                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            return True
+
+    for line in line_iterator:
         if event.is_set():
             return
         utc_now = time_now_utc()
         if in_progress:
-            res = parse_progress_remaining_line(line)
-            if res:
-                progress, remainder = res
-                logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
-                if not requested_primaries:
-                    requested_primaries = progress + remainder
-                    up_dict = {
-                        "simulated_primaries": progress,
-                        "requested_primaries": requested_primaries,
-                        "start_time": utc_without_offset(utc_now),
-                        "task_state": EntityState.RUNNING.value
-                    }
-                    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
-                else:
-                    if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
-                            and requested_primaries > progress):
-                        continue
-                    update_time = utc_now.timestamp()
-                    up_dict = {
-                        "simulated_primaries": progress,
-                    }
-                    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            if check_progress():
                 continue
-        if line.startswith(S_OK_OUT_IN_PROGRESS):
-            in_progress = True
-            if varbose:
-                logger.debug("Found progress line")
-            continue
-        if line.startswith(S_OK_OUT_START):
-            logger.debug("Found start of the simulation")
-            continue
-        if line.startswith(S_OK_OUT_COLLECTED):
-            in_progress = False
-            if varbose:
-                logger.debug("Found end of simulation calculation line")
-            continue
-        if S_OK_OUT_FIN_PRE_CHECK in line and re.match(S_OK_OUT_FIN_PATTERN, line):
-            logger.debug("Found end of the simulation")
-            break
+            if line.startswith(S_OK_OUT_COLLECTED):
+                in_progress = False
+                if verbose:
+                    logger.debug("Found end of simulation calculation line")
+                continue
+        else:
+            if line.startswith(S_OK_OUT_IN_PROGRESS):
+                in_progress = True
+                if verbose:
+                    logger.debug("Found progress line")
+                continue
+            if line.startswith(S_OK_OUT_START):
+                logger.debug("Found start of the simulation")
+                continue
+            if S_OK_OUT_FIN_PRE_CHECK in line and re.match(S_OK_OUT_FIN_PATTERN, line):
+                logger.debug("Found end of the simulation")
+                break
         # handle generator timeout
         if re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", details.task_id)

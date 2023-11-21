@@ -311,7 +311,7 @@ def read_fluka_file(event: threading.Event,
     logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
 
     # if the logfile is not created in the first X seconds, it is probably an error
-    # continuantion of awful glob path hack
+    # continuation of awful glob path hack
     def get_first_matching_file() -> Optional[Path]:
         """Returns first matching file."""
         path = next(dirpath.glob("fluka_*/*001.out"), None)
@@ -346,7 +346,7 @@ def read_fluka_file(event: threading.Event,
                         loglines,
                         next_backend_update_time=next_backend_update_time_s,
                         details=TaskDetails(simulation_id, task_id, update_key),
-                        varbose=logging_level <= logging.INFO)
+                        verbose=logging_level <= logging.INFO)
 
 
 def read_file_offline(filepath: Path) -> tuple[int, int]:
