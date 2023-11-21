@@ -62,6 +62,8 @@ def utc_without_offset(utc: datetime) -> str:
 
 @dataclass
 class ProgressDetails:
+    """Class holding details about the progress."""
+
     utc_now: datetime
     requested_primaries: int = 0
     last_update_timestamp: int = 0
