@@ -14,6 +14,7 @@ S_OK_OUT_INIT = "Total time used for initialization:"
 S_OK_OUT_START = "1NUMBER OF BEAM"
 S_OK_OUT_IN_PROGRESS = " NEXT SEEDS:"
 S_OK_OUT_COLLECTED = " All cases handled by Feeder"
+S_OK_OUT_FIN_PRE_CHECK = "End of FLUKA"
 S_OK_OUT_FIN_PATTERN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
 
 logger = logging.getLogger(__name__)
@@ -72,22 +73,6 @@ def read_fluka_out_file(event: threading.Event,
         if event.is_set():
             return
         utc_now = time_now_utc()
-        if line.startswith(S_OK_OUT_START):
-            logger.debug("Found start of the simulation")
-            continue
-        if line.startswith(S_OK_OUT_IN_PROGRESS):
-            in_progress = True
-            if varbose:
-                logger.debug("Found progress line")
-            continue
-        if line.startswith(S_OK_OUT_COLLECTED):
-            in_progress = False
-            if varbose:
-                logger.debug("Found end of simulation calculation line")
-            continue
-        if re.match(S_OK_OUT_FIN_PATTERN, line):
-            logger.debug("Found end of the simulation")
-            break
         if in_progress:
             res = parse_progress_remaining_line(line)
             if res:
@@ -112,6 +97,22 @@ def read_fluka_out_file(event: threading.Event,
                     }
                     send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
                 continue
+        if line.startswith(S_OK_OUT_IN_PROGRESS):
+            in_progress = True
+            if varbose:
+                logger.debug("Found progress line")
+            continue
+        if line.startswith(S_OK_OUT_START):
+            logger.debug("Found start of the simulation")
+            continue
+        if line.startswith(S_OK_OUT_COLLECTED):
+            in_progress = False
+            if varbose:
+                logger.debug("Found end of simulation calculation line")
+            continue
+        if S_OK_OUT_FIN_PRE_CHECK in line and re.match(S_OK_OUT_FIN_PATTERN, line):
+            logger.debug("Found end of the simulation")
+            break
         # handle generator timeout
         if re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", details.task_id)
