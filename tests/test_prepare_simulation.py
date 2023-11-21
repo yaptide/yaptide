@@ -14,7 +14,8 @@ sys.path.append(str(converter_path))
 from converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
 
 
-@pytest.mark.parametrize("json_fixture", ["project_json_path", "payload_files_dict_path", "payload_editor_dict_path"])
+@pytest.mark.parametrize("json_fixture",
+                         ["project_json_path", "shieldhit_payload_files_dict_path", "payload_editor_dict_path"])
 def test_if_json_valid(json_fixture: str, request):
     """Check if test file exists."""
     # we cannot pass directly a fixture object (pytest limitation)
