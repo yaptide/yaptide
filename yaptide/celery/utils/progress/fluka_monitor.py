@@ -78,6 +78,10 @@ def read_fluka_out_file(event: threading.Event,
     update_time = 0
 
     def check_progress() -> bool:
+        """Function checking if the line contains progress information and sending update if needed.
+
+        Function returns True if the line contained progress information, False otherwise.
+        """
         nonlocal update_time
         nonlocal requested_primaries
         res = parse_progress_remaining_line(line)
@@ -103,6 +107,7 @@ def read_fluka_out_file(event: threading.Event,
                 }
                 send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
             return True
+        return False
 
     for line in line_iterator:
         if event.is_set():
