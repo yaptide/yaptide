@@ -74,19 +74,37 @@ def payload_editor_dict_data_fluka(payload_editor_dict_path: Path) -> Generator[
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_path() -> Generator[Path, None, None]:
+def shieldhit_payload_files_dict_path() -> Generator[Path, None, None]:
     """Path to payload file with simulation defined as user uploaded files"""
     main_dir = Path(__file__).resolve().parent
-    yield main_dir / "res" / "json_payload_files.json"
+    yield main_dir / "res" / "shieldhit_json_payload_files.json"
 
 
 @pytest.fixture(scope='session')
-def payload_files_dict_data(payload_files_dict_path: Path) -> Generator[dict, None, None]:
+def payload_files_dict_data(shieldhit_payload_files_dict_path: Path) -> Generator[dict, None, None]:
     """Reads payload JSON file and returns its contents as dictionary"""
     json_data = {}
-    if not payload_files_dict_path.suffix == '.json':
+    if not shieldhit_payload_files_dict_path.suffix == '.json':
         raise ValueError("Payload file must be JSON file")
-    with open(payload_files_dict_path, 'r') as file_handle:
+    with open(shieldhit_payload_files_dict_path, 'r') as file_handle:
+        json_data = json.load(file_handle)
+    yield json_data
+
+
+@pytest.fixture(scope='session')
+def fluka_payload_files_dict_path() -> Generator[Path, None, None]:
+    """Path to payload file with simulation defined as user uploaded files"""
+    main_dir = Path(__file__).resolve().parent
+    yield main_dir / "res" / "fluka_json_payload_files.json"
+
+
+@pytest.fixture(scope='session')
+def payload_files_dict_data(fluka_payload_files_dict_path: Path) -> Generator[dict, None, None]:
+    """Reads payload JSON file and returns its contents as dictionary"""
+    json_data = {}
+    if not fluka_payload_files_dict_path.suffix == '.json':
+        raise ValueError("Payload file must be JSON file")
+    with open(fluka_payload_files_dict_path, 'r') as file_handle:
         json_data = json.load(file_handle)
     yield json_data
 

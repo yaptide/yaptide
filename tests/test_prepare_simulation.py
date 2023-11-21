@@ -4,15 +4,9 @@ from pathlib import Path
 import pytest
 import sys
 
-from yaptide.utils.sim_utils import (
-    check_and_convert_payload_to_files_dict,
-    convert_editor_dict_to_files_dict,
-    adjust_primaries_in_editor_dict,
-    adjust_primaries_in_files_dict,
-    write_simulation_input_files,
-    get_json_type,
-    JSON_TYPE
-)
+from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, convert_editor_dict_to_files_dict,
+                                     adjust_primaries_in_editor_dict, adjust_primaries_in_files_dict,
+                                     write_simulation_input_files, get_json_type, JSON_TYPE)
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 converter_path = Path(__file__).resolve().parent.parent / "yaptide" / "converter"
@@ -65,10 +59,27 @@ def validate_config_dict(files_dict: dict, expected_primaries: int = 10000):
     assert number_of_primaries == f'{expected_primaries}'
 
 
+def validate_fluka_config_dict(files_dict: dict, expected_primaries: int = 10000):
+    """Validate if config dictionary contains all the required keys and values"""
+    assert files_dict is not None
+    assert 'fl_sim.inp' in files_dict
+    assert 'invalid_key' not in files_dict
+    assert 'START' in files_dict['fl_sim.inp']
+    all_strings_with_start = [line for line in files_dict['fl_sim.inp'].split('\n') if 'START' in line]
+    assert len(all_strings_with_start) == 1
+    line_with_start = all_strings_with_start[0]
+    print(line_with_start)
+    assert len(line_with_start.split()) == 2
+    start_keyword = line_with_start.split()[0].strip()
+    assert start_keyword == 'START'
+    number_of_primaries = line_with_start.split()[1].strip()
+    assert int(float(number_of_primaries)) == expected_primaries
+
+
 def test_json_type_detection_editor(payload_editor_dict_data: dict):
     """
-    We have two possible types of JSON project data : 
-       - generated using editor (project) or 
+    We have two possible types of JSON project data :
+       - generated using editor (project) or
        - containing user uploaded files (files)
     """
     json_type = get_json_type(payload_editor_dict_data)
@@ -78,8 +89,8 @@ def test_json_type_detection_editor(payload_editor_dict_data: dict):
 
 def test_json_type_detection_files(payload_files_dict_data: dict):
     """
-    We have two possible types of JSON project data : 
-       - generated using editor (project) or 
+    We have two possible types of JSON project data :
+       - generated using editor (project) or
        - containing user uploaded files (files)
     """
     json_type = get_json_type(payload_files_dict_data)
@@ -112,7 +123,8 @@ def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     """Check if JSON data is parseable by converter"""
     number_of_primaries_per_task = payload_editor_dict_data['input_json']['beam']['numberOfParticles']
     number_of_primaries_per_task //= payload_editor_dict_data["ntasks"]
-    json_project_data_with_adjust_prim_no, number_of_all_primaries = adjust_primaries_in_editor_dict(payload_editor_dict_data)
+    json_project_data_with_adjust_prim_no, number_of_all_primaries = adjust_primaries_in_editor_dict(
+        payload_editor_dict_data)
     files_dict = convert_editor_dict_to_files_dict(editor_dict=json_project_data_with_adjust_prim_no,
                                                    parser_type="shieldhit")
     assert number_of_all_primaries == payload_editor_dict_data['input_json']['beam']['numberOfParticles']
@@ -120,10 +132,11 @@ def test_setting_primaries_per_task_for_editor(payload_editor_dict_data: dict):
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
 
-def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
-    """Check if JSON data is parseable by converter"""
-    beam_nstat_line: str = [line for line in payload_files_dict_data['input_files']
-                            ['beam.dat'].split('\n') if 'NSTAT' in line][0]
+def test_setting_primaries_per_task_for_shieldhit_files(payload_files_dict_data: dict):
+    """Check if JSON data with SHIELD-HIT12A file is parsable by converter"""
+    beam_nstat_line: str = [
+        line for line in payload_files_dict_data['input_files']['beam.dat'].split('\n') if 'NSTAT' in line
+    ][0]
     number_of_primaries_per_task = int(beam_nstat_line.split()[1])
     number_of_primaries_per_task //= payload_files_dict_data['ntasks']
     # print(number_of_primaries_per_task)
@@ -131,6 +144,20 @@ def test_setting_primaries_per_task_for_files(payload_files_dict_data: dict):
     assert files_dict is not None
     assert number_of_all_primaries == int(beam_nstat_line.split()[1])
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
+
+
+def test_setting_primaries_per_task_for_fluka_files(payload_files_dict_data: dict):
+    """Check if JSON data with FLUKA file is parsable by converter"""
+    start_line: str = [
+        line for line in payload_files_dict_data['input_files']['fl_sim.inp'].split('\n') if 'START' in line
+    ][0]
+    initial_primaries = int(float(start_line.split()[1].strip()))
+    number_of_primaries_per_task = initial_primaries // payload_files_dict_data['ntasks']
+    # print(number_of_primaries_per_task)
+    files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(payload_files_dict_data)
+    assert files_dict is not None
+    assert number_of_all_primaries == initial_primaries
+    validate_fluka_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
 
 def test_input_files_writing(payload_editor_dict_data: dict, tmp_path: Path):
