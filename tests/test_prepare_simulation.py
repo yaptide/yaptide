@@ -146,15 +146,15 @@ def test_setting_primaries_per_task_for_shieldhit_files(payload_files_dict_data:
     validate_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
 
 
-def test_setting_primaries_per_task_for_fluka_files(payload_files_dict_data: dict):
+def test_setting_primaries_per_task_for_fluka_files(fluka_payload_files_dict_data: dict):
     """Check if JSON data with FLUKA file is parsable by converter"""
     start_line: str = [
-        line for line in payload_files_dict_data['input_files']['fl_sim.inp'].split('\n') if 'START' in line
+        line for line in fluka_payload_files_dict_data['input_files']['fl_sim.inp'].split('\n') if 'START' in line
     ][0]
     initial_primaries = int(float(start_line.split()[1].strip()))
-    number_of_primaries_per_task = initial_primaries // payload_files_dict_data['ntasks']
+    number_of_primaries_per_task = initial_primaries // fluka_payload_files_dict_data['ntasks']
     # print(number_of_primaries_per_task)
-    files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(payload_files_dict_data)
+    files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(fluka_payload_files_dict_data)
     assert files_dict is not None
     assert number_of_all_primaries == initial_primaries
     validate_fluka_config_dict(files_dict, expected_primaries=number_of_primaries_per_task)
