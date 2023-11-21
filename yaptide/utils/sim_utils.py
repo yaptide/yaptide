@@ -113,9 +113,9 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     # TODO refactor a lot of methods to use sim_type instead
     if 'beam.dat' in input_files:
         return adjust_primaries_for_shieldhit_files(payload_files_dict=payload_files_dict, ntasks=ntasks)
-    if next(file for file in input_files if file.endswith(".inp")):
+    if next((file for file in input_files if file.endswith(".inp")), None):
         return adjust_primaries_for_fluka_files(payload_files_dict=payload_files_dict, ntasks=ntasks)
-    return dict({}), 0
+    return {}, 0
 
 
 def adjust_primaries_for_shieldhit_files(payload_files_dict: dict, ntasks: int = None) -> tuple[dict, int]:
@@ -146,14 +146,14 @@ def adjust_primaries_for_shieldhit_files(payload_files_dict: dict, ntasks: int =
 def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = None) -> tuple[dict, int]:
     """Adjusts number of primaries in *.inp file for FLUKA"""
     files_dict = copy.deepcopy(payload_files_dict['input_files'])
-    input_file = next(file for file in files_dict if file.endswith(".inp"))
+    input_file = next((file for file in files_dict if file.endswith(".inp")), None)
     if not input_file:
-        return dict({}), 0
+        return {}, 0
 
     # read number of promaries from fluka file
     all_input_lines: list[str] = files_dict[input_file].split('\n')
     # get value from START card
-    start_card = next(line for line in all_input_lines if line.lstrip().startswith('START'))
+    start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
     number_of_all_primaries = start_card.split()[1]
     parsed_number_of_all_primaries = int(float(number_of_all_primaries))
     primaries_per_task = parsed_number_of_all_primaries // ntasks
