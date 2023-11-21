@@ -9,13 +9,12 @@ from pathlib import Path
 from pymchelper.estimator import Estimator
 from pymchelper.writers.json import JsonWriter
 
-from yaptide.converter.converter.fluka.cards.card import Card
-
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
 from ..converter.converter.api import (
     get_parser_from_str,  # skipcq: FLK-E402
     run_parser)
+from ..converter.converter.fluka.cards.card import Card
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
@@ -158,9 +157,11 @@ def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = Non
     number_of_all_primaries = start_card.split()[1]
     parsed_number_of_all_primaries = int(float(number_of_all_primaries))
     primaries_per_task = parsed_number_of_all_primaries // ntasks
+    logging.warning("Number of primaries per task: %d", primaries_per_task)
     for i in range(len(all_input_lines)):
         # replace first found card with START keyword
         if all_input_lines[i].lstrip().startswith('START'):
+            logging.warning("Replacing START card with new value")
             start_card = str(Card(tag="START", what=[str(primaries_per_task)]))
             all_input_lines[i] = start_card
             break
