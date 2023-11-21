@@ -85,6 +85,9 @@ def command_to_run_fluka(dir_path: Path, task_id: str) -> list[str]:
         # this should never happen
         raise FileNotFoundError("Input file not found")
 
+    # create settings object
+    # we are providing input file, simulator type and additional options
+    # provided option M with value 1 will run execute only one simulation cycle, default is 5
     settings = SimulationSettings(input_path=str(input_file), simulator_type=SimulatorType.fluka, cmdline_opts="-M 1")
     update_rng_seed_in_fluka_file(input_file, task_id)
     command_as_list = str(settings).split()
