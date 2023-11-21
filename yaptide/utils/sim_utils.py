@@ -108,7 +108,8 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
     input_files = payload_files_dict['input_files']
-    # TODO refactor a lot of methods to use sim_type instead
+    # determining input file type
+    # should be done in more robust way which will require a lot of refactoring to pass sim_type
     if 'beam.dat' in input_files:
         return adjust_primaries_for_shieldhit_files(payload_files_dict=payload_files_dict, ntasks=ntasks)
     if next((file for file in input_files if file.endswith(".inp")), None):
