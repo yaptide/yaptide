@@ -11,10 +11,8 @@ from pymchelper.writers.json import JsonWriter
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
-from ..converter.converter.api import (
-    get_parser_from_str,  # skipcq: FLK-E402
-    run_parser)
-from ..converter.converter.fluka.cards.card import Card
+from ..converter.converter.api import (get_parser_from_str, run_parser)  # skipcq: FLK-E402
+from ..converter.converter.fluka.cards.card import Card  # skipcq: FLK-E402
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
@@ -150,7 +148,7 @@ def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = Non
     if not input_file:
         return {}, 0
 
-    # read number of promaries from fluka file
+    # read number of primaries from fluka file
     all_input_lines: list[str] = files_dict[input_file].split('\n')
     # get value from START card
     start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
@@ -159,7 +157,7 @@ def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = Non
     primaries_per_task = parsed_number_of_all_primaries // ntasks
     logging.warning("Number of primaries per task: %d", primaries_per_task)
     for i in range(len(all_input_lines)):
-        # replace first found card with START keyword
+        # replace first found card START
         if all_input_lines[i].lstrip().startswith('START'):
             logging.warning("Replacing START card with new value")
             start_card = str(Card(tag="START", what=[str(primaries_per_task)]))
