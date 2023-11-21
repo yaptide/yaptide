@@ -60,11 +60,44 @@ def utc_without_offset(utc: datetime) -> str:
     return utc.strftime('%Y-%m-%d %H:%M:%S.%f')
 
 
-# @dataclass
-# class ProgressDetails:
-#     in_progress: bool = False
-#     requested_primaries: int = 0
-#     update_time: int = 0
+@dataclass
+class ProgressDetails:
+    utc_now: datetime
+    requested_primaries: int = 0
+    last_update_timestamp: int = 0
+
+
+def check_progress(line: str, next_backend_update_time: int, details: TaskDetails,
+                   progress_details: ProgressDetails) -> bool:
+    """Function checking if the line contains progress information and sending update if needed.
+
+    Function returns True if the line contained progress information, False otherwise.
+    """
+    res = parse_progress_remaining_line(line)
+    if res:
+        progress, remainder = res
+        logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
+        if not progress_details.requested_primaries:
+            progress_details.requested_primaries = progress + remainder
+            up_dict = {
+                "simulated_primaries": progress,
+                "requested_primaries": progress_details.requested_primaries,
+                "start_time": utc_without_offset(progress_details.utc_now),
+                "task_state": EntityState.RUNNING.value
+            }
+            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+        else:
+            if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp <
+                    next_backend_update_time  # do not send update too often
+                    and progress_details.requested_primaries > progress):
+                return True
+            progress_details.last_update_timestamp = progress_details.utc_now.timestamp()
+            up_dict = {
+                "simulated_primaries": progress,
+            }
+            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+        return True
+    return False
 
 
 def read_fluka_out_file(event: threading.Event,
@@ -74,47 +107,16 @@ def read_fluka_out_file(event: threading.Event,
                         verbose: bool = False) -> None:
     """Function reading the fluka output file and reporting progress to the backend."""
     in_progress = False
-    requested_primaries = 0
-    update_time = 0
-
-    def check_progress() -> bool:
-        """Function checking if the line contains progress information and sending update if needed.
-
-        Function returns True if the line contained progress information, False otherwise.
-        """
-        nonlocal update_time
-        nonlocal requested_primaries
-        res = parse_progress_remaining_line(line)
-        if res:
-            progress, remainder = res
-            logger.debug("Found progress remaining line with progress: %s, remaining: %s", progress, remainder)
-            if not requested_primaries:
-                requested_primaries = progress + remainder
-                up_dict = {
-                    "simulated_primaries": progress,
-                    "requested_primaries": requested_primaries,
-                    "start_time": utc_without_offset(utc_now),
-                    "task_state": EntityState.RUNNING.value
-                }
-                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
-            else:
-                if (utc_now.timestamp() - update_time < next_backend_update_time  # do not send update too often
-                        and requested_primaries > progress):
-                    return True
-                update_time = utc_now.timestamp()
-                up_dict = {
-                    "simulated_primaries": progress,
-                }
-                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
-            return True
-        return False
-
+    progress_details = ProgressDetails(utc_now=time_now_utc())
     for line in line_iterator:
         if event.is_set():
             return
         utc_now = time_now_utc()
         if in_progress:
-            if check_progress():
+            if check_progress(line=line,
+                              next_backend_update_time=next_backend_update_time,
+                              details=details,
+                              progress_details=progress_details):
                 continue
             if line.startswith(S_OK_OUT_COLLECTED):
                 in_progress = False
@@ -142,7 +144,7 @@ def read_fluka_out_file(event: threading.Event,
 
     logging.info("Parsing log file for task %s finished", details.task_id)
     up_dict = {
-        "simulated_primaries": requested_primaries,
+        "simulated_primaries": progress_details.requested_primaries,
         "end_time": utc_without_offset(utc_now),
         "task_state": EntityState.COMPLETED.value
     }
