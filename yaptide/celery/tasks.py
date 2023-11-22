@@ -9,7 +9,7 @@ from typing import Optional
 
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
-                                       get_tmp_dir, read_file, read_file_offline)
+                                       get_tmp_dir, read_file, read_file_offline, read_fluka_file)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
@@ -131,7 +131,7 @@ class SimulationTaskResult:
 def run_single_simulation_for_shieldhit(tmp_work_dir: str,
                                         task_id: int,
                                         update_key: str = '',
-                                        simulation_id: int = None) -> SimulationTaskResult:
+                                        simulation_id: int = Optional[None]) -> SimulationTaskResult:
     """Function running single simulation for shieldhit"""
     command_as_list = command_to_run_shieldhit(dir_path=Path(tmp_work_dir), task_id=task_id)
     logging.info("Command to run SHIELD-HIT12A: %s", " ".join(command_as_list))
@@ -170,25 +170,37 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
                                 estimators_dict=estimators_dict)
 
 
-def run_single_simulation_for_fluka(
-    tmp_work_dir: str,
-    task_id: int,
-    update_key: str = '',  # skipcq: PYL-W0613 # will be requiired for monitoring
-    simulation_id: int = None  # skipcq: PYL-W0613 # will be requiired for monitoring
-) -> SimulationTaskResult:
+def run_single_simulation_for_fluka(tmp_work_dir: str,
+                                    task_id: int,
+                                    update_key: str = '',
+                                    simulation_id: Optional[int] = None) -> SimulationTaskResult:
     """Function running single simulation for shieldhit"""
-    command_as_list = []
     command_as_list = command_to_run_fluka(dir_path=Path(tmp_work_dir), task_id=task_id)
     logging.info("Command to run FLUKA: %s", " ".join(command_as_list))
 
     command_stdout, command_stderr = '', ''
     simulated_primaries, requested_primaries = 0, 0
+    event = threading.Event()
+    # start monitoring process if possible
+    # is None if monitoring if monitor was not started
+    task_monitor = monitor_fluka(event, tmp_work_dir, task_id, update_key, simulation_id)
 
     # run the simulation
     logging.info("Running Fluka process in %s", tmp_work_dir)
     process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
         dir_path=Path(tmp_work_dir), command_as_list=command_as_list)
     logging.info("Fluka process finished with status %s", process_exit_success)
+
+    # terminate monitoring process
+    if task_monitor:
+        logging.debug("Terminating monitoring process for task %s", task_id)
+        event.set()
+        task_monitor.task.join()
+        logging.debug("Monitoring process for task %s terminated", task_id)
+    # TO BE IMPLEMENTED
+    # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
+    # reading of the log file for fluka after simulation was finished
+    # fluka copies the file back to main directory from temporary directory
 
     # both simulation execution and monitoring process are finished now, we can read the estimators
     estimators_dict = get_fluka_estimators(dir_path=Path(tmp_work_dir))
@@ -270,6 +282,32 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, u
         task.start()
         logging.info("Started monitoring process for task %d", task_id)
         return MonitorTask(path_to_monitor=path_to_monitor, task=task)
+
+    logging.info("No monitoring processes started for task %d", task_id)
+    return None
+
+
+def monitor_fluka(event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str,
+                  simulation_id: int) -> Optional[MonitorTask]:
+    """Function running the monitoring process for Fluka simulation"""
+    # we would like to monitor the progress of simulation
+    # this is done by reading the log file and sending the updates to the backend
+    # if we have update_key and simulation_id the monitoring task can submit the updates to backend
+    # We use dir instead path, because fluka simulator generates direcoty with PID in name of its process
+    dir_to_monitor = Path(tmp_work_dir)
+    if update_key and simulation_id is not None:
+        current_logging_level = logging.getLogger().getEffectiveLevel()
+        task = threading.Thread(target=read_fluka_file,
+                                kwargs=dict(event=event,
+                                            dirpath=dir_to_monitor,
+                                            simulation_id=simulation_id,
+                                            task_id=task_id,
+                                            update_key=update_key,
+                                            logging_level=current_logging_level))
+
+        task.start()
+        logging.info("Started monitoring process for task %d", task_id)
+        return MonitorTask(path_to_monitor=dir_to_monitor, task=task)
 
     logging.info("No monitoring processes started for task %d", task_id)
     return None
