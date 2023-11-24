@@ -113,7 +113,7 @@ def read_fluka_out_file(event: threading.Event,
     for line in line_iterator:
         if event.is_set():
             return
-        utc_now = time_now_utc()
+        progress_details.utc_now = time_now_utc()
         if in_progress:
             if check_progress(line=line,
                               next_backend_update_time=next_backend_update_time,
@@ -147,7 +147,7 @@ def read_fluka_out_file(event: threading.Event,
     logging.info("Parsing log file for task %s finished", details.task_id)
     up_dict = {
         "simulated_primaries": progress_details.requested_primaries,
-        "end_time": utc_without_offset(utc_now),
+        "end_time": utc_without_offset(progress_details.utc_now),
         "task_state": EntityState.COMPLETED.value
     }
     logging.info("Sending final update for task %s", details.task_id)
