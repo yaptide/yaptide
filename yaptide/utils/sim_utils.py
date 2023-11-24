@@ -11,8 +11,8 @@ from pymchelper.writers.json import JsonWriter
 
 # dirty hack needed to properly handle relative imports in the converter submodule
 sys.path.append("yaptide/converter")
-from ..converter.converter.api import (get_parser_from_str,  # skipcq: FLK-E402
-                                       run_parser)
+from ..converter.converter.api import (get_parser_from_str, run_parser)  # skipcq: FLK-E402
+from ..converter.converter.fluka.cards.card import Card  # skipcq: FLK-E402
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
@@ -107,6 +107,18 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     else:
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
+    input_files = payload_files_dict['input_files']
+    # determining input file type
+    # should be done in more robust way which will require a lot of refactoring to pass sim_type
+    if 'beam.dat' in input_files:
+        return adjust_primaries_for_shieldhit_files(payload_files_dict=payload_files_dict, ntasks=ntasks)
+    if next((file for file in input_files if file.endswith(".inp")), None):
+        return adjust_primaries_for_fluka_files(payload_files_dict=payload_files_dict, ntasks=ntasks)
+    return {}, 0
+
+
+def adjust_primaries_for_shieldhit_files(payload_files_dict: dict, ntasks: int = None) -> tuple[dict, int]:
+    """Adjusts number of primaries in beam.dat file for SHIELD-HIT12A"""
     files_dict = copy.deepcopy(payload_files_dict['input_files'])
     all_beam_lines: list[str] = files_dict['beam.dat'].split('\n')
     all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
@@ -130,6 +142,32 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     return files_dict, int(number_of_all_primaries)
 
 
+def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = None) -> tuple[dict, int]:
+    """Adjusts number of primaries in *.inp file for FLUKA"""
+    files_dict = copy.deepcopy(payload_files_dict['input_files'])
+    input_file = next((file for file in files_dict if file.endswith(".inp")), None)
+    if not input_file:
+        return {}, 0
+
+    # read number of primaries from fluka file
+    all_input_lines: list[str] = files_dict[input_file].split('\n')
+    # get value from START card
+    start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
+    number_of_all_primaries = start_card.split()[1]
+    parsed_number_of_all_primaries = int(float(number_of_all_primaries))
+    primaries_per_task = parsed_number_of_all_primaries // ntasks
+    logging.warning("Number of primaries per task: %d", primaries_per_task)
+    for i in range(len(all_input_lines)):
+        # replace first found card START
+        if all_input_lines[i].lstrip().startswith('START'):
+            logging.warning("Replacing START card with new value")
+            start_card = str(Card(tag="START", what=[str(primaries_per_task)]))
+            all_input_lines[i] = start_card
+            break
+    files_dict[input_file] = '\n'.join(all_input_lines)
+    return files_dict, parsed_number_of_all_primaries
+
+
 def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -> tuple[dict, int]:
     """
     Replaces number of primaries in `payload_dict`
@@ -144,8 +182,8 @@ def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -
             payload_editor_dict=payload_dict, ntasks=ntasks)
         return check_and_convert_payload_to_files_dict(new_payload_dict), number_of_all_primaries
     if json_type == JSON_TYPE.Files:
-        files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(
-            payload_files_dict=payload_dict, ntasks=ntasks)
+        files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(payload_files_dict=payload_dict,
+                                                                             ntasks=ntasks)
         return files_dict, number_of_all_primaries
     return {}, 0
 

@@ -1,6 +1,12 @@
 #! /usr/bin/env python
-from enum import Enum
-from pathlib import Path
+"""
+This script is used to manage the database via a command line application.
+It is supposed to be used outside of the docker container, therefore by purpose it has
+no dependency on the yaptide package. All the tables used by ORM are defined here again.
+We do not use ORM model classes here, because we do not want to import the yaptide package.
+"""
+from enum import Enum, auto
+import os
 
 import click
 import sqlalchemy as db
@@ -8,39 +14,45 @@ from werkzeug.security import generate_password_hash
 
 
 class TableTypes(Enum):
-    """Table types"""
+    """Enum for table names used in ORM"""
 
-    USER = "User"
-    YAPTIDEUSER = "YaptideUser"
-    KEYCLOAKUSER = "KeycloakUser"
-    SIMULATION = "Simulation"
-    CLUSTER = "Cluster"
-    TASK = "Task"
-    RESULT = "Result"
+    User = auto()
+    YaptideUser = auto()
+    KeycloakUser = auto()
+    Simulation = auto()
+    Cluster = auto()
+    Task = auto()
+    Result = auto()
+    Input = auto()
+    Estimator = auto()
+    Page = auto()
 
 
-def connect_to_db():
-    """Connects to db"""
-    sqlite_file_path = Path(Path(__file__).resolve().parent.parent, 'data', 'main.db')
-    if not sqlite_file_path.exists():
-        click.echo(f'Database file: {sqlite_file_path} does not exist - aborting', err=True)
-        return None, None, None
-    engine = db.create_engine(f'sqlite:////{sqlite_file_path}')
+def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
+    """Connects to the db"""
+    db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
+    if verbose > 1:
+        click.echo(f'Connecting to URI: {db_uri}')
+    if not db_uri:
+        click.echo(f'Database URI: {db_uri} not set - aborting', err=True)
+        raise click.Abort()
+    echo: bool = verbose > 1
+    engine = db.create_engine(db_uri, echo=echo)
     try:
         con = engine.connect()
         metadata = db.MetaData()
+        metadata.reflect(bind=engine)
     except db.exc.OperationalError:
-        click.echo(f'Connection to db {sqlite_file_path} failed', err=True)
-        return None, None, None
+        click.echo(f'Connection to db {db_uri} failed', err=True)
+        raise click.Abort()
     return con, metadata, engine
 
 
 def user_exists(name: str, auth_provider: str, users: db.Table, con) -> bool:
     """Check if user already exists"""
-    query = db.select(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) > 0:
+    stmt = db.select(users).filter_by(username=name, auth_provider=auth_provider)
+    users_found = con.execute(stmt).all()
+    if len(users_found) > 0:
         click.echo(f'User: {name} exists')
         return True
     return False
@@ -52,183 +64,157 @@ def run():
 
 
 @run.command
-def list_users(**kwargs):
+@click.option('-v', '--verbose', count=True)
+def list_users(verbose):
     """List users"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    users = metadata.tables[TableTypes.User.name]
+    stmt = db.select(users.c.username, users.c.auth_provider)
+    all_users = con.execute(stmt).all()
 
-    query = db.select([users])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} users in DB:")
-    for row in ResultSet:
-        click.echo(f"Login {row.username}; Auth provider {row.auth_provider}")
-    return None
-
-
-@run.command
-def list_tasks(**kwargs):
-    """List tasks"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    tasks = db.Table(TableTypes.TASK.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([tasks])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} tasks in DB:")
-    for row in ResultSet:
-        click.echo(f"Simulation id {row.simulation_id}; Task id ...{row.task_id}")
-    return None
+    click.echo(f"{len(all_users)} users in DB:")
+    for user in all_users:
+        click.echo(f"Login {user.username}; Auth provider {user.auth_provider}")
 
 
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
 @click.option('-v', '--verbose', count=True)
-def add_user(**kwargs):
+def add_user(name, password, verbose):
     """Add yaptide user to database"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    username = kwargs['name']
-    password = kwargs['password']
-    click.echo(f'Adding user: {username}')
-    if kwargs['verbose'] > 2:
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Adding user: {name}')
+    if verbose > 2:
         click.echo(f'Password: {password}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
 
-    if user_exists(username, "YaptideUser", users, con):
-        return None
-    query = db.insert(users).values(username=username, auth_provider="YaptideUser")
+    users = metadata.tables[TableTypes.User.name]
+
+    if user_exists(name=name, auth_provider="YaptideUser", users=users, con=con):
+        click.echo(f'YaptideUser: {name} already exists, aborting add')
+        raise click.Abort()
+
+    click.echo(f'YaptideUser: {name} does not exist, adding')
+    click.echo(f'Adding user: {name}')
+    query = db.insert(users).values(username=name, auth_provider="YaptideUser")
     result = con.execute(query)
     user_id = result.inserted_primary_key[0]
     password_hash = generate_password_hash(password)
 
+    yaptide_users = metadata.tables[TableTypes.YaptideUser.name]
     query = db.insert(yaptide_users).values(id=user_id, password_hash=password_hash)
-    result = con.execute(query)
-
-    return None
+    con.execute(query)
+    con.commit()
 
 
 @run.command
 @click.argument('name')
 @click.option('password', '--password', default='')
 @click.option('-v', '--verbose', count=True)
-def update_user(**kwargs):
+def update_user(name, password, verbose):
     """Update user in database"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    username = kwargs['name']
-    click.echo(f'Updating user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
-    yaptide_users = db.Table(TableTypes.YAPTIDEUSER.value, metadata, autoload=True, autoload_with=engine)
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Updating user: {name}')
+    users = metadata.tables[TableTypes.User.name]
 
-    if not user_exists(username, "YaptideUser", users, con):
-        click.echo(f'YaptideUser: {username} does not exist, aborting update')
-        return None
+    if not user_exists(name, "YaptideUser", users, con):
+        click.echo(f'YaptideUser: {name} does not exist, aborting update')
+        raise click.Abort()
 
     # update password
-    password = kwargs['password']
     if password:
-        pwd_hash = generate_password_hash(password)
-
-        subquery = db.select([users.c.id]).where(users.c.username == username,
-                                                 users.c.auth_provider == "YaptideUser").scalar_subquery()
-
-        query = db.update(yaptide_users).\
-            where(yaptide_users.c.id == subquery).\
+        pwd_hash: str = generate_password_hash(password)
+        yaptide_users = metadata.tables[TableTypes.YaptideUser.name]
+        stmt = db.update(yaptide_users).\
+            where(yaptide_users.c.id == users.c.id).\
+            where(users.c.username == name).\
+            where(users.c.auth_provider == "YaptideUser").\
             values(password_hash=pwd_hash)
-        con.execute(query)
-        if kwargs['verbose'] > 2:
+        con.execute(stmt)
+        con.commit()
+        if verbose > 2:
             click.echo(f'Updating password: {password}')
-    click.echo(f'Successfully updated user: {username}')
-    return None
-
-
-@run.command
-@click.argument('cluster_name')
-@click.option('-v', '--verbose', count=True)
-def add_cluster(**kwargs):
-    """Adds cluster with provided name to database if it does not exist"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    cluster_name = kwargs['cluster_name']
-
-    clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
-
-    query = db.select([clusters]).where(clusters.c.cluster_name == cluster_name)
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    if len(ResultSet) > 0:
-        click.echo(f'Cluster: {cluster_name} already exists, aborting adding cluster')
-        return None
-
-    click.echo(f'Adding cluster: {cluster_name}')
-    query = db.insert(clusters).values(cluster_name=cluster_name)
-    con.execute(query)
-    return None
+    click.echo(f'Successfully updated user: {name}')
 
 
 @run.command
 @click.argument('name')
 @click.argument('auth_provider')
-def remove_user(**kwargs):
+def remove_user(name, auth_provider):
     """Delete user"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    username = kwargs['name']
-    auth_provider = kwargs['auth_provider']
-    click.echo(f'Deleting user: {username}')
-    users = db.Table(TableTypes.USER.value, metadata, autoload=True, autoload_with=engine)
+    con, metadata, _ = connect_to_db()
+    click.echo(f'Deleting user: {name}')
+    users = metadata.tables[TableTypes.User.name]
 
     # abort if user does not exist
-    if not user_exists(username, auth_provider, users, con):
-        click.echo("Aborting, user does not exist")
-        return None
+    if not user_exists(name, auth_provider, users, con):
+        click.echo(f"Aborting, user {name} does not exist")
+        raise click.Abort()
 
-    query = db.delete(users).where(users.c.username == username, users.c.auth_provider == auth_provider)
+    query = db.delete(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     con.execute(query)
-    click.echo(f'Successfully deleted user: {username}')
-    return None
+    con.commit()
+    click.echo(f'Successfully deleted user: {name}')
 
 
 @run.command
-def list_simulations(**kwargs):
+def list_tasks():
+    """List tasks"""
+    con, metadata, _ = connect_to_db()
+    tasks = metadata.tables[TableTypes.Task.name]
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id)
+    all_tasks = con.execute(stmt).all()
+
+    click.echo(f"{len(all_tasks)} tasks in DB:")
+    for task in all_tasks:
+        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id}")
+
+
+@run.command
+@click.option('-v', '--verbose', count=True)
+def list_simulations(verbose):
     """List simulations"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    simulations = db.Table(TableTypes.SIMULATION.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([simulations])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} simulations in DB:")
-    for row in ResultSet:
-        click.echo(f"id {row.id}; job id {row.job_id}; start_time {row.start_time}; end_time {row.end_time};")
-    return None
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    simulations = metadata.tables[TableTypes.Simulation.name]
+    stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time)
+    sims = con.execute(stmt).all()
+
+    click.echo(f"{len(sims)} simulations in DB:")
+    for sim in sims:
+        click.echo(f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};")
 
 
 @run.command
-def list_clusters(**kwargs):
+@click.argument('cluster_name')
+@click.option('-v', '--verbose', count=True)
+def add_cluster(cluster_name, verbose):
+    """Adds cluster with provided name to database if it does not exist"""
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    cluster_table = metadata.tables[TableTypes.Cluster.name]
+
+    # check if cluster already exists
+    stmt = db.select(cluster_table).filter_by(cluster_name=cluster_name)
+    clusters = con.execute(stmt).all()
+    if len(clusters) > 0:
+        click.echo(f"Cluster {cluster_name} already exists in DB")
+        raise click.Abort()
+
+    stmt = db.insert(cluster_table).values(cluster_name=cluster_name)
+    con.execute(stmt)
+    con.commit()
+    click.echo(f"Cluster {cluster_name} added to DB")
+
+
+@run.command
+def list_clusters():
     """List clusters"""
-    con, metadata, engine = connect_to_db()
-    if con is None or metadata is None or engine is None:
-        return None
-    clusters = db.Table(TableTypes.CLUSTER.value, metadata, autoload=True, autoload_with=engine)
-    query = db.select([clusters])
-    ResultProxy = con.execute(query)
-    ResultSet = ResultProxy.fetchall()
-    click.echo(f"{len(ResultSet)} clusters in DB:")
-    for row in ResultSet:
-        click.echo(f"id {row.id}; cluster name {row.cluster_name};")
-    return None
+    con, metadata, _ = connect_to_db()
+    stmt = db.select(metadata.tables[TableTypes.Cluster.name])
+    clusters = con.execute(stmt).all()
+
+    click.echo(f"{len(clusters)} clusters in DB:")
+    for cluster in clusters:
+        click.echo(f"id {cluster.id}; cluster name {cluster.cluster_name};")
 
 
 if __name__ == "__main__":

@@ -14,13 +14,15 @@ env:
   S3_TOPAS_VERSION: ${{ vars.S3_TOPAS_VERSION }}
   S3_TOPAS_BUCKET: ${{ vars.S3_TOPAS_BUCKET }}
   S3_GEANT4_BUCKET: ${{ vars.S3_GEANT4_BUCKET }}
+  S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
+  S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
 
 jobs:
   build-and-test:
     runs-on:  ${{ matrix.platform }}
     strategy:
       matrix:
-        python-version: ['3.9', '3.10']
+        python-version: ['3.9', '3.10', '3.11']
         platform: [ubuntu-latest, windows-latest]
         exclude:
           - python-version: '3.9'

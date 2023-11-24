@@ -37,6 +37,8 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
 
+    if user.cert is None or user.private_key is None:
+        return {"message": f"User {user.username} has no certificate or private key"}
     con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
