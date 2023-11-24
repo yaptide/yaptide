@@ -32,7 +32,7 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
         # first lets try to decode token without verifying signature
         unverified_encoded_token = jwt.decode(token, options={"verify_signature": False})
         # check if token gives access to our service
-        if "PLG_YAPTIDE_ACCESS" not in unverified_encoded_token.get("plgridAccessServices"):
+        if "PLG_YAPTIDE_ACCESS" not in unverified_encoded_token.get("plgridAccessServices", []):
             logging.error("User %s has no access to Yaptide service", username)
             raise Forbidden(description=f"User {username} has no access to our service")
 
