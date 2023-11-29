@@ -14,6 +14,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # copy project
 COPY yaptide ./yaptide
 
+# Some of our developers use Windows to run Docker, their bash scripts have CRLF line endings
+# therefore when copied to the container they are not executable. This is a workaround to fix that.
+# skipcq: DOK-W1001
+RUN python -c "import os; content = open('yaptide/admin/db_manage.py', 'rb').read().replace(b'\r\n', b'\n'); open('yaptide/admin/db_manage.py', 'wb').write(content)"
+
 # Health check using Python and requests, we are not using curl or wget as they are not installed by default
 HEALTHCHECK CMD python -c "import requests; exit(0) if requests.get('http://localhost:6000/').ok else exit(1)"
 
