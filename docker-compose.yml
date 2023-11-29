@@ -43,10 +43,8 @@ services:
         depends_on:
             redis:
                 condition: service_healthy
-                restart: true
             postgresql:
                 condition: service_healthy
-                restart: true
 
     yaptide_worker:
         build:
@@ -70,10 +68,8 @@ services:
         depends_on:
             redis:
                 condition: service_healthy
-                restart: true
             yaptide_flask:
                 condition: service_healthy
-                restart: true
 
     nginx:
         image: yaptide_nginx
@@ -87,11 +83,8 @@ services:
         depends_on:
             yaptide_flask:
                 condition: service_healthy
-                restart: true
             yaptide_worker:
                 condition: service_healthy
-                restart: true
-
 
 volumes:
     data:
