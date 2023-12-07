@@ -234,6 +234,7 @@ def read_file(event: threading.Event,
     loglines = log_generator(logfile, event, timeout=timeout_wait_for_line)
     requested_primaries = 0
     logging.info("Parsing log file for task %d started", task_id)
+    simulated_primaries = 0
     for line in loglines:
         if event.is_set():
             return
@@ -242,7 +243,6 @@ def read_file(event: threading.Event,
         if re.search(RUN_MATCH, line):
             logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath, task_id)
             splitted = line.split()
-            simulated_primaries = 0
             try:
                 simulated_primaries = int(splitted[3])
             except (IndexError, ValueError):

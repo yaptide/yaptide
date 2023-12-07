@@ -150,5 +150,6 @@ def read_fluka_out_file(event: threading.Event,
         "end_time": utc_without_offset(progress_details.utc_now),
         "task_state": EntityState.COMPLETED.value
     }
-    logging.info("Sending final update for task %s", details.task_id)
+    logging.info("Sending final update for task %d, simulated primaries %d", details.task_id,
+                 progress_details.requested_primaries)
     send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
