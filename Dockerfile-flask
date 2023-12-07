@@ -7,7 +7,7 @@ EXPOSE 6000
 ENV FLASK_APP=yaptide.application
 WORKDIR /home
 
-RUN python -m venv /home/venv
+RUN python -m venv /home/venv && chmod -R 777 /home/venv
 ENV PATH="/home/venv/bin:$PATH"
 # install dependencies
 COPY ./requirements.txt ./
