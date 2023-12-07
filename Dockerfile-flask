@@ -5,7 +5,7 @@ EXPOSE 6000
 
 # set environment variables
 ENV FLASK_APP=yaptide.application
-WORKDIR /usr/local/app
+WORKDIR /home
 
 # install dependencies
 COPY ./requirements.txt ./
