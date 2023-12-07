@@ -161,7 +161,9 @@ def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = Non
         # replace first found card START
         if all_input_lines[i].lstrip().startswith('START'):
             logging.warning("Replacing START card with new value")
-            start_card = str(Card(tag="START", what=[str(primaries_per_task)]))
+            card = Card(tag="START")
+            card.setWhat(1, str(primaries_per_task))
+            start_card = str(card)
             all_input_lines[i] = start_card
             break
     files_dict[input_file] = '\n'.join(all_input_lines)
