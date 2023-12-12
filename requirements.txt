@@ -17,4 +17,4 @@ SQLAlchemy==2.0.23
 Werkzeug==3.0.1
 boto3==1.33.12
 cryptography==41.0.7
-psycopg[binary]==3.1.13
+psycopg[binary]==3.1.14
