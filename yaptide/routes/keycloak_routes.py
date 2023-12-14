@@ -74,7 +74,6 @@ class AuthKeycloak(Resource):
     @staticmethod
     def post():
         """Method returning status of logging in (and token if it was successful)"""
-
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
@@ -100,9 +99,8 @@ class AuthKeycloak(Resource):
             logging.debug("auth cert service response code: %d", res.status_code)
             if res.status_code == 200:
                 res_json: dict = res.json()
-                logging.debug("auth cert service response mesg: %s", res_json)
             else:
-                logging.warning("failed to get SSH certs from %s", cert_auth_url)
+                logging.warning("failed to get SSH certs, inspect CERT_AUTH_URL")
         else:
             logging.info("Skip fetching SSH certs as CERT_AUTH_URL not set")
 

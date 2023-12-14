@@ -35,10 +35,10 @@ services:
             - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://redis:6379/0
             - CELERY_RESULT_BACKEND=redis://redis:6379/0
-            - CERT_AUTH_URL=${CERT_AUTH_URL-""}
-            - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL-""}
-            - KEYCLOAK_REALM=${KEYCLOAK_REALM-""}
-            - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL-""}
+            - CERT_AUTH_URL=${CERT_AUTH_URL:-}
+            - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-}
+            - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
+            - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
             - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
         depends_on:
             redis:
