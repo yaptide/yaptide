@@ -74,11 +74,6 @@ class AuthKeycloak(Resource):
     @staticmethod
     def post():
         """Method returning status of logging in (and token if it was successful)"""
-        cert_auth_url = os.environ.get('CERT_AUTH_URL', '')
-        if not cert_auth_url:
-            logging.error("CERT_AUTH_URL not set")
-            return yaptide_response(message="Service is unavailable, contact with support", code=500)
-
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
@@ -95,14 +90,19 @@ class AuthKeycloak(Resource):
         # check if user has access to our service, if not throw an exception here
         check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
 
-        # ask cert auth service for cert and private key
-        session = requests.Session()
-        res: requests.Response = session.get(cert_auth_url, headers={'Authorization': keycloak_token})
-        logging.debug("auth cert service response code: %d", res.status_code)
+        cert_auth_url = os.environ.get('CERT_AUTH_URL', '')
         res_json: dict = {}
-        if res.status_code == 200:
-            res_json: dict = res.json()
-            logging.debug("auth cert service response mesg: %s", res_json)
+        if cert_auth_url:
+            # ask cert auth service for cert and private key
+            session = requests.Session()
+            res: requests.Response = session.get(cert_auth_url, headers={'Authorization': keycloak_token})
+            logging.debug("auth cert service response code: %d", res.status_code)
+            if res.status_code == 200:
+                res_json: dict = res.json()
+            else:
+                logging.warning("failed to get SSH certs, inspect CERT_AUTH_URL")
+        else:
+            logging.info("Skip fetching SSH certs as CERT_AUTH_URL not set")
 
         # check if user exists in our database, if not create new user
         user = fetch_keycloak_user_by_username(username=username)
