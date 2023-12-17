@@ -22,7 +22,8 @@ COPY --from=cert-gen /certs /etc/nginx/conf.d
 
 # Copy the Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d
-RUN chmod -R 777 /etc/nginx/conf.d
+RUN chown -R 1000730000:1000730000 /etc/nginx
+RUN chmod 600 -R /etc/nginx
 
 EXPOSE 5000
 
