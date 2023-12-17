@@ -22,10 +22,14 @@ COPY --from=cert-gen /certs /etc/nginx/conf.d
 
 # Copy the Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d
+
+# Permission fixes
 RUN chown -R 1000730000:1000730000 /etc/nginx
 RUN chown -R 1000730000:1000730000 /var
+RUN chown -R 1000730000:1000730000 /run
 RUN chmod 700 -R /var
 RUN chmod 700 -R /etc/nginx
+RUN chmod 700 -R /run
 
 EXPOSE 5000
 
