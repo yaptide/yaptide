@@ -1,4 +1,4 @@
-name: Deploy worker and flask on push to master
+name: Deploy worker and flask docker images to GHCR registry on push to master
 
 on:
   push:

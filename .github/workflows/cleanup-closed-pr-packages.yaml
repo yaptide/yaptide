@@ -1,4 +1,4 @@
-name: Cleanup packages on closed pull request
+name: Cleanup GHCR docker packages on closed pull request
 
 on:
   pull_request:

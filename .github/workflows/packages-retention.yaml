@@ -1,13 +1,13 @@
-name: Retention policy for worker and flask packages
+name: Retention policy for worker and flask GHCR docker packages
 
 on:
   schedule:
-    - cron: '30 4 * * MON'
+    - cron: '30 4 * * MON' # Running every Monday at 04:30 AM
   workflow_dispatch:
 
 jobs:
   cleanup-packages:
-    name: Cleanup old packages
+    name: Cleanup old GHCR docker packages
     runs-on: ubuntu-latest
     steps:
       - name: Cleanup flask and worker old PR packages
