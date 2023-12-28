@@ -22,6 +22,7 @@ nav:
   - Jobs and tasks: states.md
   - Simulator binaries: simulator_binaries.md
   - Persistent storage: persistency.md
+  - Docker images on GHCR: ghcr_packages.md
 - API Reference: swagger.md
 - Code Reference: reference/
 - Test coverage: coverage.md

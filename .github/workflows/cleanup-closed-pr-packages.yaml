@@ -1,0 +1,24 @@
+name: Cleanup GHCR docker packages on closed pull request
+
+on:
+  pull_request:
+    types:
+      - closed
+
+jobs:
+  cleanup-packages:
+    name: Cleanup closed PR packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cleanup flask and worker packages
+        uses: snok/container-retention-policy@v2
+        with:
+          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-worker
+          cut-off: now UTC
+          timestamp-to-use: created_at
+          account-type: org
+          org-name: ${{ github.repository_owner }}
+          keep-at-least: 0
+          filter-tags: pr-${{github.event.pull_request.number}}
+          token: ${{ secrets.PAT }}
+          dry-run: true
