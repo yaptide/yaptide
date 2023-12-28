@@ -21,4 +21,3 @@ jobs:
           keep-at-least: 0
           filter-tags: pr-${{github.event.pull_request.number}}
           token: ${{ secrets.PAT }}
-          dry-run: true
