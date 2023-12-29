@@ -18,11 +18,7 @@ All available packages are shown in the [Packages](https://github.com/orgs/yapti
 docker pull ghcr.io/yaptide/yaptide-flask:pr-17
 ```
 
-Deployed packages can be accessed from gitpod.io or GitHub Codespaces to easily run and test them in pull requests or on master branch. It might be requested to log in to ghcr.io via Docker using GitHub credentials:
-```bash
-docker login ghcr.io --username <github_username>
-```
-Then it is allowed to pull the images.
+Deployed packages can be accessed from gitpod.io or GitHub Codespaces to easily run and test them in pull requests or on master branch. 
 
 ## Retention policies
 
