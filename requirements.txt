@@ -13,7 +13,7 @@ pymchelper==2.6.3
 redis==5.0.1
 requests==2.31.0
 scipy==1.11.4  # needed by converter submodule
-SQLAlchemy==2.0.23
+SQLAlchemy==2.0.25
 Werkzeug==3.0.1
 boto3==1.34.10
 cryptography==41.0.7
