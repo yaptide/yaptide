@@ -31,6 +31,7 @@ GitHub Container Registry doesn't provide any retention mechanisms. It is requir
 - Outdated master's packages are removed if they are older than 1 month.
 - Pull request's newest packages are removed when it is merged or closed.
 - Outdated pull requests' packages are removed if they are older than 2 weeks.
+- Latest pull requests' packages are removed if they are older than 2 months.
 
 It is also possible to run the latter two policies manually by dispatching the `packages-retention` GitHub action. Normally it is dispatched using cron job every Monday at 04:30 AM.
 
