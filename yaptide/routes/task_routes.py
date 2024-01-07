@@ -1,7 +1,10 @@
+from datetime import datetime
+import json
 import logging
+import os
 from flask import request
 from flask_restful import Resource
-from datetime import datetime
+from yaptide.redis.redis import redis_client
 from yaptide.persistence.db_methods import (fetch_simulation_by_sim_id,
                                             fetch_task_by_sim_id_and_task_id,
                                             update_task_state)
@@ -54,8 +57,13 @@ class TasksResource(Resource):
             return yaptide_response(message=f"Task {payload_dict['task_id']} does not exist", code=400)
         start_time_7 = datetime.now()
 
-        update_task_state(task=task, update_dict=payload_dict["update_dict"])
+        if required_keys != set(payload_dict.keys()):
+            diff = required_keys.difference(set(payload_dict.keys()))
+            return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
+
+        redis_client.lpush('task_updates', json.dumps(payload_dict))
         start_time_8 = datetime.now()
+        logging.info("Sent task update to redis queue.")
 
         # Calculate and log durations
         duration_1_2 = (start_time_2 - start_time_1).total_seconds()
@@ -69,4 +77,5 @@ class TasksResource(Resource):
         logger = logging.getLogger("performance_test")
         logger.info(f"{duration_1_2},{duration_2_3},{duration_3_4},{duration_4_5},{duration_5_6},{duration_6_7},{duration_7_8},{total}")
 
-        return yaptide_response(message="Task updated", code=202)
+
+        return yaptide_response(message="Task queued for the update", code=202)
