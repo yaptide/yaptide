@@ -5,9 +5,10 @@ from flask import Flask
 from yaptide.persistence import  models
 from yaptide.persistence.database import db
 from yaptide.redis_consumers.redis_consumer_base import RedisConsumerBase
+from yaptide.redis_consumers.task_progress_consumer import TaskProgressConsumerThread
 
 def run_consumers(app: Flask) -> None:
-    consumers = [] #TODO: Implement consumer for task update queue and put here
+    consumers = [TaskProgressConsumerThread(app)] #TODO: Implement consumer for task update queue and put here
     for consumer in consumers:
         consumer.start()
 

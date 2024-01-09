@@ -40,6 +40,7 @@ services:
             - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
             - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+            - REDIS_URL=redis://redis:6379/0
         depends_on:
             redis:
                 condition: service_healthy
@@ -70,7 +71,20 @@ services:
                 condition: service_healthy
             yaptide_flask:
                 condition: service_healthy
-
+    yaptide_redis_consumers:
+        build:
+            context: .
+            dockerfile: Dockerfile-redis-consumers
+        image: yaptide_redis_consumers
+        container_name: yaptide_redis_consumers
+        environment:
+            - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+            - REDIS_URL=redis://redis:6379/0
+        depends_on:
+            redis:
+                condition: service_healthy
+            postgresql:
+                condition: service_healthy
     nginx:
         image: yaptide_nginx
         container_name: yaptide_nginx
