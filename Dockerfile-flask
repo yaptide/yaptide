@@ -9,7 +9,6 @@ WORKDIR /home
 
 RUN python -m venv /home/venv && chmod -R 777 /home/venv
 ENV PATH="/home/venv/bin:$PATH"
-RUN apt-get update; apt-get -y install curl
 
 # install dependencies
 COPY ./requirements.txt ./
