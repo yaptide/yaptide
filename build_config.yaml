@@ -1,8 +1,0 @@
-kind: BuildConfig
-apiVersion: build.openshift.io/v1
-metadata:
-  name: "flask-sample-build" 1
-spec:
-  strategy: 5
-    dockerStrategy:
-      dockerfilePath: Dockerfile-flask
