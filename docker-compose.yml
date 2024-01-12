@@ -74,6 +74,8 @@ services:
     nginx:
         image: yaptide_nginx
         container_name: yaptide_nginx
+        environment:
+            - FLASK_URL=yaptide_flask:6000
         build:
             context: .
             dockerfile: Dockerfile-nginx

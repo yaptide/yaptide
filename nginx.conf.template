@@ -1,6 +1,8 @@
 # Flask backend is listening on port 6000 on host called yaptide_flask
+
+
 upstream backend_flask {
-    server yaptide-4.yaptide.svc.cluster.local:6000;
+    server '${FLASK_URL}';
 }
 
 # main proxy server listening on port 5000 for plain HTTP and 8443 for HTTPS

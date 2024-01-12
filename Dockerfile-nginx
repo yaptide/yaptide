@@ -21,7 +21,7 @@ RUN rm /etc/nginx/conf.d/default.conf
 COPY --from=cert-gen /certs /etc/nginx/conf.d
 
 # Copy the Nginx configuration
-COPY nginx.conf /etc/nginx/conf.d
+COPY ./nginx.conf.template /nginx.conf.template
 
 # Permission fixes
 RUN chown -R 1000730000:1000730000 /etc/nginx && \
@@ -33,4 +33,4 @@ RUN chown -R 1000730000:1000730000 /etc/nginx && \
 
 EXPOSE 5000
 
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["/bin/sh" , "-c" , "envsubst < /nginx.conf.template > /etc/nginx/nginx.d && exec nginx -g 'daemon off;'"]
