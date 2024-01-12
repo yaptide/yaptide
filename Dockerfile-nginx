@@ -33,4 +33,4 @@ RUN chown -R 1000730000:1000730000 /etc/nginx && \
 
 EXPOSE 5000
 
-CMD ["/bin/sh" , "-c" , "envsubst < /nginx.conf.template > /etc/nginx/conf.d && exec nginx -g 'daemon off;'"]
+CMD ["/bin/sh" , "-c" , "envsubst < /nginx.conf.template > /etc/nginx/conf.d/nginx.conf && exec nginx -g 'daemon off;'"]
