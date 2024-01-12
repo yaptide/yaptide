@@ -17,9 +17,9 @@ server {
     # set CORS policy for all requests including preflighted ones (credentials are allowed by default)
     location / {
         proxy_pass http://backend_flask; # pass requests for dynamic content to Flask app
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        add_header 'Access-Control-Allow-Origin' '$http_origin' always;
+        proxy_set_header Host ${DOLLAR}host;
+        proxy_set_header X-Real-IP ${DOLLAR}remote_addr;
+        add_header 'Access-Control-Allow-Origin' '${DOLLAR}http_origin' always;
         add_header 'Access-Control-Allow-Methods' 'GET, POST, PUT, OPTIONS, DELETE' always;
         add_header 'Access-Control-Allow-Headers' 'DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization' always;
         add_header 'Access-Control-Expose-Headers' 'Content-Length,Content-Range' always;

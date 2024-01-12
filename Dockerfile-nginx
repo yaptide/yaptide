@@ -22,15 +22,21 @@ COPY --from=cert-gen /certs /etc/nginx/conf.d
 
 # Copy the Nginx configuration
 COPY ./nginx.conf.template /nginx.conf.template
+COPY ./nginx-entrypoint.sh /nginx-entrypoint.sh 
 
 # Permission fixes
 RUN chown -R 1000730000:1000730000 /etc/nginx && \
     chown -R 1000730000:1000730000 /var && \
     chown -R 1000730000:1000730000 /run && \
+    chown 1000730000:1000730000 /nginx-entrypoint.sh && \
     chmod 700 -R /var && \
     chmod 700 -R /etc/nginx && \
-    chmod 700 -R /run
+    chmod 700 -R /run && \
+    chmod 700 /nginx-entrypoint.sh
+
+RUN echo $FLASK_URL
+RUN export DOLLAR="$" && envsubst < /nginx.conf.template > /etc/nginx/conf.d/nginx.conf
 
 EXPOSE 5000
 
-CMD ["/bin/sh" , "-c" , "envsubst < /nginx.conf.template > /etc/nginx/conf.d/nginx.conf && exec nginx -g 'daemon off;'"]
+CMD ["/nginx-entrypoint.sh"]
