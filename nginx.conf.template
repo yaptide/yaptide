@@ -2,7 +2,7 @@
 
 
 upstream backend_flask {
-    server '${FLASK_URL}';
+    server ${FLASK_URL};
 }
 
 # main proxy server listening on port 5000 for plain HTTP and 8443 for HTTPS
