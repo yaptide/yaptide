@@ -6,9 +6,8 @@ EXPOSE 6000
 # set environment variables
 ENV FLASK_APP=yaptide.application
 WORKDIR /home
-RUN chown -R 1000730000:1000730000 /home
+RUN chown -R 1000730000:1000730000 /home && python -m venv /home/venv
 
-RUN python -m venv /home/venv
 ENV PATH="/home/venv/bin:$PATH"
 
 # install dependencies
