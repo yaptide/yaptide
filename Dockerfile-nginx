@@ -35,6 +35,8 @@ RUN chown -R 1000730000:1000730000 /etc/nginx && \
     chmod 700 /nginx-entrypoint.sh
 
 RUN echo $FLASK_URL
+# env DOLLAR needed to substitue only backend address (not other variables in nginx.conf)
+# https://www.baeldung.com/linux/nginx-config-environment-variables
 RUN export DOLLAR="$" && envsubst < /nginx.conf.template > /etc/nginx/conf.d/nginx.conf
 
 EXPOSE 5000
