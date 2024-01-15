@@ -1,7 +1,7 @@
 mkdocs==1.5.3
 mkdocs-coverage==1.0.0
 mkdocstrings[python]>=0.18
-mkdocs-material==9.5.3
+mkdocs-material==9.5.4
 mkdocs-gen-files==0.5.0
 mkdocs-literate-nav==0.6.1
 mkdocs-section-index==0.3.8
