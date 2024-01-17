@@ -1,6 +1,7 @@
 from abc import abstractmethod
 import logging
 from threading import Thread
+import time
 from flask import Flask
 from yaptide.redis.redis import redis_client
 
@@ -22,13 +23,13 @@ class RedisConsumerBase(Thread):
     def run(self) -> None:
         self.log_message_info("starts working...")
         while True:
-            message = redis_client.lpop(self.queue_name, count = batch_size)
+            message = redis_client.lpop(self.queue_name, count = self.batch_size)
             if(len(message) != 0):
-                execute_handler
+                self.execute_handler(message)
             else:
                 time.sleep(1)
 
-    def execute_handler(): 
+    def execute_handler(self, message): 
             self.log_message_info(f"Received message: {message}")
             self.handle_message(message)
             self.log_message_info(f"Processed message successfully")
