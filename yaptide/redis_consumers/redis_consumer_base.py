@@ -24,7 +24,7 @@ class RedisConsumerBase(Thread):
         self.log_message_info("starts working...")
         while True:
             message = redis_client.lpop(self.queue_name, count = self.batch_size)
-            if(len(message) != 0):
+            if(message is not None and len(message) > 0):
                 self.execute_handler(message)
             else:
                 time.sleep(1)
