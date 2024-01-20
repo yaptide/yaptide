@@ -48,6 +48,15 @@ def create_app():
     api = Api(app)
     initialize_routes(api)
 
+    performance_test_logger = logging.getLogger('performance_test')
+    performance_test_logger.setLevel(logging.INFO)
+    log_file_path = "performance_tests.log"
+    file_handler = logging.FileHandler(log_file_path)
+    file_handler.setLevel(logging.INFO)
+    formatter = logging.Formatter('%(message)s')
+    file_handler.setFormatter(formatter)
+    performance_test_logger.addHandler(file_handler)
+
     return app
 
 
