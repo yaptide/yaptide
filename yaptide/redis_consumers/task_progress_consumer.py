@@ -26,10 +26,6 @@ class TaskProgressConsumerThread(RedisConsumerBase):
                 if not simulation:
                     self.log_message_error(f"Simulation {sim_id} does not exist")
                     return
-
-                if not simulation.check_update_key(payload_dict["update_key"]):
-                    self.log_message_error("Invalid update key")
-                    return
                 
                 task = fetch_task_by_sim_id_and_task_id(sim_id=simulation.id, task_id=payload_dict["task_id"])
 

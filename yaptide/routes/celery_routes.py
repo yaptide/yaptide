@@ -26,6 +26,7 @@ from yaptide.routes.utils.response_templates import (error_internal_response,
                                                      error_validation_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
 
 
@@ -58,9 +59,8 @@ class JobsDirect(Resource):
                                            sim_type=payload_dict["sim_type"],
                                            input_type=input_type,
                                            title=payload_dict.get("title", ''))
-        update_key = str(uuid.uuid4())
-        simulation.set_update_key(update_key)
         add_object_to_db(simulation)
+        update_key = encode_simulation_auth_token(simulation.id)
         logging.info("Simulation %d created and inserted into DB", simulation.id)
         logging.debug("Update key set to %s", update_key)
 

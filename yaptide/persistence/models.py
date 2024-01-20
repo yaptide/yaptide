@@ -92,20 +92,11 @@ class SimulationModel(db.Model):
                                        nullable=False,
                                        default=EntityState.UNKNOWN.value,
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
-    update_key_hash: Column[str] = db.Column(db.String,
-                                             doc="Update key shared by tasks granting access to update themselves")
     tasks = relationship("TaskModel")
     estimators = relationship("EstimatorModel")
 
     __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
 
-    def set_update_key(self, update_key: str):
-        """Sets hashed update key"""
-        self.update_key_hash = generate_password_hash(update_key)
-
-    def check_update_key(self, update_key: str) -> bool:
-        """Checks update key correctness"""
-        return check_password_hash(self.update_key_hash, update_key)
 
     def update_state(self, update_dict: dict) -> bool:
         """

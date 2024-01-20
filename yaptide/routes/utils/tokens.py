@@ -1,15 +1,15 @@
 from datetime import datetime, timedelta
 from secrets import token_hex
 from typing import Union
-
 import jwt
 
 SECRET_KEY_TOKEN = token_hex(256)
+SIMULATION_SECRET_KEY_TOKEN = token_hex(256)
 SECRET_KEY_TOKEN_REFRESH = token_hex(256)
 _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
 _Keycloak_Token_Expiration_Time = 30  # minutes
-
+_Simulation_Token_Expiration_time = 7 #days
 
 def encode_auth_token(user_id: int,
                       is_refresh: bool = False,
@@ -35,6 +35,30 @@ def encode_auth_token(user_id: int,
         return jwt.encode(payload, secret, algorithm='HS256'), exp
     except Exception as e:  # skipcq: PYL-W0703
         return e, exp
+
+def encode_simulation_auth_token(simulation_id: int):
+    secret = SIMULATION_SECRET_KEY_TOKEN
+    exp = datetime.utcnow() + timedelta(days=_Simulation_Token_Expiration_time)
+    try:
+        payload = {
+            'exp': exp,  # Token Expiration Time
+            'iat': datetime.utcnow(),  # Issued At Time
+            'simulation_id': simulation_id  # Subject
+        }
+        return jwt.encode(payload, secret, algorithm='HS256')
+    except Exception as e:  # skipcq: PYL-W0703
+        return e, exp
+
+def decode_simulation_auth_token(token: str):
+    """Function decoding the token"""
+    secret = SIMULATION_SECRET_KEY_TOKEN
+    try:
+        payload = jwt.decode(token, secret, algorithms=['HS256'])
+        return payload['simulation_id']
+    except jwt.ExpiredSignatureError:
+        return 'Signature expired.'
+    except jwt.InvalidTokenError:
+        return 'Invalid token.'
 
 
 def decode_auth_token(token: str,
