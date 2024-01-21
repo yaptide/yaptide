@@ -6,12 +6,13 @@ import os
 import platform
 import subprocess
 from typing import Generator
+from unittest.mock import patch
 import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
+from fakeredis import FakeRedis, FakeServer
 
 from yaptide.application import create_app
 from yaptide.persistence.database import db
-
 
 @pytest.fixture(scope='session')
 def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, None, None]:
@@ -76,7 +77,6 @@ def yaptide_bin_dir() -> Generator[Path, None, None]:
     """directory with simulators executable files"""
     project_main_dir = Path(__file__).resolve().parent.parent.parent
     yield project_main_dir / 'bin'
-
 
 @pytest.fixture(scope='function')
 def add_simulators_to_path_variable(yaptide_bin_dir: Path):
@@ -223,12 +223,10 @@ def app(tmp_path):
     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 
     logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
     app = create_app()
     with app.app_context():
         db.drop_all()
         db.create_all()
-
     yield app
 
     # clean up the database
@@ -272,3 +270,10 @@ def live_server_win():
         yield server
     finally:
         server.terminate()
+
+@pytest.fixture(scope="function")
+def fake_redis():
+    fake_redis = FakeRedis(FakeServer())
+    with patch('redis.from_url') as _patch:
+        _patch.return_value = fake_redis
+        yield

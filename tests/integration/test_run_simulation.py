@@ -6,7 +6,7 @@ from time import sleep
 from flask import Flask
 
 
-@pytest.mark.usefixtures("live_server", "live_server_win")
+@pytest.mark.usefixtures("live_server", "live_server_win", "fake_redis")
 def test_run_simulation_with_flask(celery_app,
                                    celery_worker,
                                    client: Flask,

@@ -1,3 +1,5 @@
+from unittest.mock import patch
+from fakeredis import FakeRedis, FakeServer
 import pytest
 from yaptide.persistence.database import db
 from yaptide.application import create_app
@@ -21,7 +23,7 @@ def client(app):
     _client = app.test_client()
     yield _client
 
-
+    
 def test_app_started(client):
     """Test if the app started."""
     resp = client.get("/")

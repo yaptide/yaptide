@@ -2,7 +2,7 @@ import json
 import logging
 from flask import request
 from flask_restful import Resource
-from yaptide.redis.redis import redis_client
+from yaptide.redis.redis import get_redis_client
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.tokens import decode_simulation_auth_token
 
@@ -33,6 +33,7 @@ class TasksResource(Resource):
         decoded_token = decode_simulation_auth_token(payload_dict["update_key"])
         if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
+        redis_client = get_redis_client()
         redis_client.lpush('task_updates', json.dumps(payload_dict))
         logging.info("Sent task update to redis queue.")
 
