@@ -158,9 +158,10 @@ def fetch_logfiles_by_sim_id(sim_id: int) -> LogfilesModel:
     return logfiles
 
 
-def update_task_state(task: Union[BatchTaskModel, CeleryTaskModel], update_dict: dict) -> None:
-    """Updates task state and makes commit"""
-    task.update_state(update_dict)
+def update_tasks_states(tasks: list[tuple[Union[BatchTaskModel, CeleryTaskModel], dict]]) -> None:
+    """Updates many tasks states and makes commit"""
+    for task, update_dict in tasks:
+        task.update_state(update_dict)
     db.session.commit()
 
 

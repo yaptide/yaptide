@@ -23,13 +23,13 @@ class RedisConsumerBase(Thread):
     def run(self) -> None:
         self.log_message_info("starts working...")
         while True:
-            message = redis_client.lpop(self.queue_name, count = self.batch_size)
-            if(message is not None and len(message) > 0):
-                self.execute_handler(message)
+            messages = redis_client.lpop(self.queue_name, count = self.batch_size)
+            if(messages is not None and len(messages) > 0):
+                self.execute_handler(messages)
             else:
                 time.sleep(1)
 
-    def execute_handler(self, message): 
-            self.log_message_info(f"Received message: {message}")
-            self.handle_message(message)
-            self.log_message_info(f"Processed message successfully")
+    def execute_handler(self, messages): 
+            self.log_message_info(f"Received {len(messages)} messages")
+            self.handle_message(messages)
+            self.log_message_info(f"Processed messages successfully")
