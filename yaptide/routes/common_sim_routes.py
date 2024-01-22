@@ -108,7 +108,7 @@ class ResultsResource(Resource):
         simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
 
         if not simulation:
-            return yaptide_response(message="Simulation does not exist", code=400)
+            return yaptide_response(message=f"Simulation does not exist", code=400)
 
         decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
         if decoded_token != sim_id:

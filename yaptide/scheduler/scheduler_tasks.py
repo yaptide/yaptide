@@ -13,7 +13,6 @@ def save_tasks_progres_from_redis_job(app):
     redis_client = get_redis_client()
     # Pop 1000 or less messages from left end of queue.
     messages = redis_client.lpop('task_updates', count = 1000)
-
     # Queue can be empty if there are no tasks to update
     if messages == None or len(messages) == 0:
         logging.info('No tasks received from redis')
