@@ -146,8 +146,13 @@ class ResultsResource(Resource):
         update_simulation_state(simulation=simulation, update_dict=update_dict)
 
         logging.debug("Marking simulation tasks as completed")
+        
+        # If simulation is too short, it can happen that the simulation completes,
+        # but tasks didnt' sent their completion status or simulated_primaries = requested_primaries.
+        # To avoid this, we update simulation tasks by their final status
         tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
-        update_tasks_states([(task, {"task_state": EntityState.COMPLETED.value, "simulated_primaries": task.requested_primaries}) for task in tasks])
+        update_dicts = [(task, {"task_state": EntityState.COMPLETED.value }) for task in tasks]
+        update_tasks_states(update_dicts)
 
         return yaptide_response(message="Results saved", code=202)
 

@@ -1,5 +1,3 @@
-from unittest.mock import patch
-from fakeredis import FakeRedis, FakeServer
 import pytest
 from yaptide.persistence.database import db
 from yaptide.application import create_app

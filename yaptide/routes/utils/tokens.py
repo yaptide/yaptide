@@ -4,7 +4,6 @@ from typing import Union
 import jwt
 
 SECRET_KEY_TOKEN = token_hex(256)
-SIMULATION_SECRET_KEY_TOKEN = token_hex(256)
 SECRET_KEY_TOKEN_REFRESH = token_hex(256)
 _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
@@ -37,7 +36,8 @@ def encode_auth_token(user_id: int,
         return e, exp
 
 def encode_simulation_auth_token(simulation_id: int):
-    secret = SIMULATION_SECRET_KEY_TOKEN
+    """Function that encodes JWT token for batched simulation 'update_key'"""
+    secret = SECRET_KEY_TOKEN
     exp = datetime.utcnow() + timedelta(days=_Simulation_Token_Expiration_time)
     try:
         payload = {
@@ -49,20 +49,9 @@ def encode_simulation_auth_token(simulation_id: int):
     except Exception as e:  # skipcq: PYL-W0703
         return e, exp
 
-def decode_simulation_auth_token(token: str):
-    """Function decoding the token"""
-    secret = SIMULATION_SECRET_KEY_TOKEN
-    try:
-        payload = jwt.decode(token, secret, algorithms=['HS256'])
-        return payload['simulation_id']
-    except jwt.ExpiredSignatureError:
-        return 'Signature expired.'
-    except jwt.InvalidTokenError:
-        return 'Invalid token.'
-
-
 def decode_auth_token(token: str,
-                      is_refresh: bool = False) -> Union[int, str]:
+                      is_refresh: bool = False, 
+                      payload_key_to_return = "sub") -> Union[int, str]:
     """Function decoding the token"""
     if is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
@@ -71,7 +60,7 @@ def decode_auth_token(token: str,
 
     try:
         payload = jwt.decode(token, secret, algorithms=['HS256'])
-        return payload['sub']
+        return payload[payload_key_to_return]
     except jwt.ExpiredSignatureError:
         return 'Signature expired.'
     except jwt.InvalidTokenError:
