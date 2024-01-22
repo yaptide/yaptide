@@ -3,9 +3,8 @@ import json
 import logging
 from yaptide.persistence.db_methods import fetch_simulation_by_sim_id, fetch_task_by_sim_id_and_task_id, update_tasks_states
 from yaptide.redis.redis import get_redis_client
-from yaptide.scheduler.scheduler import scheduler
 
-def save_tasks_progres_from_redis_job():
+def save_tasks_progres_from_redis_job(app):
     """
     Save tasks updates that are enqueued to redis queue "task_updates".
     Main goal of this job is to process batched updates in database
@@ -27,7 +26,7 @@ def save_tasks_progres_from_redis_job():
     tasks_to_update = []
     # Required to process data from oldest to newest - to prevent overriding new state by old for one task
     payload_dicts.reverse()
-    with scheduler.app.app_context():
+    with app.app_context():
         for payload_dict in payload_dicts:
             sim_id = payload_dict["simulation_id"]
             task_id = payload_dict["task_id"]

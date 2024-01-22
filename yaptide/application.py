@@ -8,8 +8,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from yaptide.persistence import models
 from yaptide.persistence.database import db
 from yaptide.routes.main_routes import initialize_routes
-from yaptide.scheduler.scheduler import scheduler
-from yaptide.scheduler.scheduler_tasks import save_tasks_progres_from_redis
+from yaptide.scheduler.scheduler import run_scheduler
 
 def create_app():
     """Function starting Flask Server"""
@@ -40,14 +39,13 @@ def create_app():
     app.register_blueprint(swaggerui_blueprint)
 
     db.init_app(app)
-    scheduler.init_app(app)
-    scheduler.start()
+    run_scheduler(app)
 
     # Find a better solution (maybe with Flask-Migrate)
     # Uncomment the two lines below to update models
     with app.app_context():
         models.create_models()
-        scheduler.add_job("save_tasks_progres_from_redis", save_tasks_progres_from_redis, trigger="interval", seconds=2)
+
     api = Api(app)
     initialize_routes(api)
 
