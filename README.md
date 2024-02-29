@@ -1,14 +1,23 @@
 # yaptide backend
 
-## Installation
+## Getting the code
 
-Run: `$ pip install -r requirements.txt`
+Clone the repository including submodules:
 
-Download/update sumbmodules:
+```shell
+git clone --recurse-submodules https://github.com/yaptide/yaptide.git
+```
+
+In case you have used regular `git clone` command, without `--recurse-submodules` option, you can still download the submodules by running:
 
 ```shell
 git submodule update --init --recursive
 ```
+
+## Installation
+
+Run: `pip install -r requirements.txt`
+
 
 ## Running the app
 
