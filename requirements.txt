@@ -2,7 +2,7 @@ celery==5.3.6
 click==8.1.7
 decorator==5.1.1
 environs==10.3.0
-eventlet==0.35.0
+eventlet==0.35.2
 fabric==3.2.2
 flask-restful==0.3.10
 flask-sqlalchemy==3.1.1
@@ -10,7 +10,7 @@ flask_swagger_ui==4.11.1
 flask==2.3.3
 pyjwt==2.8.0
 pymchelper==2.6.4
-redis==5.0.1
+redis==5.0.2
 requests==2.31.0
 scipy==1.12.0  # needed by converter submodule
 SQLAlchemy==2.0.25
