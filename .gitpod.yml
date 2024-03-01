@@ -7,7 +7,8 @@ tasks:
       export FLASK_APP=yaptide.application
       export FLASK_DEBUG=1
     init: |
-      pip install -r requirements.txt
+      export POETRY_VIRTUALENVS_CREATE=false
+      pip install poetry && poetry install --only main
     command: |
       flask run
 vscode:
