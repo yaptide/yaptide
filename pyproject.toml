@@ -62,6 +62,8 @@ max-line-length = 120
 [tool.yapf]
 based_on_style = "pep8"
 column_limit = 120
+recursive = true
+in_place = true
 
 [tool.yapfignore]
 ignore_patterns = [
