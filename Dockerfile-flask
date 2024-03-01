@@ -1,4 +1,5 @@
 FROM python:3.10-slim
+ARG POETRY_VERSION=1.2.0
 
 # expose port to run Flask
 EXPOSE 6000
@@ -11,7 +12,7 @@ WORKDIR /usr/local/app
 COPY poetry.lock poetry.toml pyproject.toml ./
 # Insatll poatry and project dependencies, we also disables virtualenv creation
 ENV POETRY_VIRTUALENVS_CREATE=false
-RUN pip install poetry && poetry install --only main
+RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main
 
 # copy project
 COPY yaptide ./yaptide
