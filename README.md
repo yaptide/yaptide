@@ -172,14 +172,14 @@ To install all dependencies, run:
 poetry install
 ```
 
-This will install all the dependencies including test and docs ones.
-If you want to test app, you do not need docs dependencies, you can skip them by using:
+This will install all the dependencies including `test` and `docs` ones.
+If you want to test app, you do not need `docs` dependencies, you can skip them by using:
 
 ```bash
 poetry install --without docs
 ```
 
-If you want to install only required dependencies, you can use:
+If you want to install only main dependencies, you can use:
 
 ```bash
 poetry install --only main 
