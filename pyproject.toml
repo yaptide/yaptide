@@ -62,3 +62,8 @@ max-line-length = 120
 [tool.yapf]
 based_on_style = "pep8"
 column_limit = 120
+
+[tool.yapfignore]
+ignore_patterns = [
+  ".venv/**"
+]
