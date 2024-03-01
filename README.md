@@ -14,12 +14,10 @@ In case you have used regular `git clone` command, without `--recurse-submodules
 git submodule update --init --recursive
 ```
 
-## Installation
-
-Run: `pip install -r requirements.txt`
-
-
 ## Running the app
+
+Application consists of multiple components. The simplest way to run the app is to use docker-compose.
+Following instruction will guide you through the process of set up and running the application.
 
 1. Get the redis
 
@@ -162,9 +160,7 @@ Third one setups the environment, runs tests and deletes environment
 
 ## For developers
 
-### installation
-
-Alternative method for [installation](#installation) of requirements using **venv**.
+### Preparing environment
 
 ```bash
 python -m venv venv
@@ -173,6 +169,12 @@ pip install -r requirements.txt
 ```
 
 ### Testing
+
+Install test dependencies:
+
+```bash
+pip install -r requirements-test.txt
+```
 
 Run tests on Linux with:
 
