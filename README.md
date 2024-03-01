@@ -160,21 +160,32 @@ Third one setups the environment, runs tests and deletes environment
 
 ## For developers
 
-### Preparing environment
+Project make use of poetry for dependency management. If you do not have it installed, check official [poetry installation guide](https://python-poetry.org/docs/).
+Project is configured to  create virtual environment for you, so you do not need to worry about it.
+Virtual environment is created in `.venv` folder in the root of the project.
+
+### Installing dependencies
+
+To install all dependencies, run:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+poetry install
+```
+
+This will install all the dependencies including test and docs ones.
+If you want to test app, you do not need docs dependencies, you can skip them by using:
+
+```bash
+poetry install --without docs
+```
+
+If you want to install only required dependencies, you can use:
+
+```bash
+poetry install --only main 
 ```
 
 ### Testing
-
-Install test dependencies:
-
-```bash
-pip install -r requirements-test.txt
-```
 
 Run tests on Linux with:
 
@@ -188,6 +199,6 @@ on Windows you need to run them one by one:
 Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 ```
 
-# Credits
+## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
