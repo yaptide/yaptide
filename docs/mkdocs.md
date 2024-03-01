@@ -1,6 +1,6 @@
 # Developer documentation
 
-The documentation indended for developes is located in the `docs` folder. 
+The documentation indended for developes is located in the `docs` folder.
 We use [mkdocs](https://www.mkdocs.org) with [material for mkdocs](https://squidfunk.github.io/mkdocs-material/) customisation to generate the documentation in the HTML format.
 
 ## Documentation structure
@@ -11,20 +11,20 @@ Technical documentation is written in markdown format and can be found in the [d
 
 ### API reference
 
-The [API reference](swagger.md) is generated from the [swagger](https://swagger.io) yaml file. 
+The [API reference](swagger.md) is generated from the [swagger](https://swagger.io) yaml file.
 The [swagger.yaml](https://github.com/yaptide/yaptide/blob/master/yaptide/static/openapi.yaml) file is located in the [yaptide/static](https://github.com/yaptide/yaptide/tree/master/yaptide/static) folder. This is the location from which Flask serve it when the backend is deployed.
 
-The HTML API documentation is rendered using [render_swagger](https://github.com/bharel/mkdocs-render-swagger-plugin) mkdocs plugin installed as [mkdocs-render-swagger-plugin](https://pypi.org/project/mkdocs-render-swagger-plugin/) pip package. 
+The HTML API documentation is rendered using [render_swagger](https://github.com/bharel/mkdocs-render-swagger-plugin) mkdocs plugin installed as [mkdocs-render-swagger-plugin](https://pypi.org/project/mkdocs-render-swagger-plugin/) pip package.
 Its a bit abandoned project but it seems to be the only solution to generate static HTML from swagger yaml file.
 The swagger documenation can be viewed locally by deploying backend and connecting to the backend server via `/api/docs` endpoint.
 By using the `mkdocs-render-swagger-plugin` we can serve the documenation statically on github pages.
 This way users may read the documenation without deploying the backend.
 
-The `mkdocs-render-swagger-plugin` expects the swagger yaml file to be located in the  [docs folder](https://github.com/yaptide/yaptide/tree/master/docs). Therefore we modified the [docs/gen_ref_pages.py](https://github.com/yaptide/yaptide/blob/master/docs/gen_ref_pages.py) script to copy the swagger yaml file from the Flask static directory to the docs folder. The copy happens whenever the `mkdocs build` or `mkdocs serve` command is run. 
+The `mkdocs-render-swagger-plugin` expects the swagger yaml file to be located in the  [docs folder](https://github.com/yaptide/yaptide/tree/master/docs). Therefore we modified the [docs/gen_ref_pages.py](https://github.com/yaptide/yaptide/blob/master/docs/gen_ref_pages.py) script to copy the swagger yaml file from the Flask static directory to the docs folder. The copy happens whenever the `mkdocs build` or `mkdocs serve` command is run.
 
 ### Code reference
 
-The code reference is generated using [mkdocs-gen-files](https://github.com/oprypin/mkdocs-gen-files) mkdocs plugin. 
+The code reference is generated using [mkdocs-gen-files](https://github.com/oprypin/mkdocs-gen-files) mkdocs plugin.
 We have a [docs/gen_ref_pages.py](https://github.com/yaptide/yaptide/blob/master/docs/gen_ref_pages.py) scripts that crawls through all Python files in the [yaptide  folder](https://github.com/yaptide/yaptide/tree/master/yaptide) directory. Then it generates on-the-fly a markdown documentation from docstrings for each module, class and function. Also a on-the-fly `reference/SUMMARY.md` file is generated using [mkdocs-literate-nav](https://github.com/oprypin/mkdocs-literate-nav) mkdocs plugin. This file serves as left-side menu for the code reference.
 
 ### Tests coverage
@@ -41,30 +41,11 @@ The deployment includes generation of test coverage report and API reference doc
 
 ### Prerequisites
 
-First a local venv environment needs to be created. This can be done by running the following command in the root of the project:
+First, user needs to install [poetry](https://python-poetry.org).
+Then, user needs to install the dependencies for the backend and the documentation:
 
 ```bash
-python3 -m venv venv
-```
-
-Activate the venv environment by running the following command:
-
-=== "Linux"
-
-    ```bash
-    source venv/bin/activate
-    ```
-
-=== "Windows"
-
-    ```powershell
-    . .\venv\Scripts\Activate.ps1
-    ```
-
-Then install the required packages needed by mkdocs by running the following command:
-
-```bash
-pip install -r requirements-docs.txt
+poetry install --only main,docs
 ```
 
 ### Building the documentation
@@ -91,7 +72,7 @@ After modification of the markdown file the documenation served via `mkdocs serv
 
 ### Working with the API reference
 
-After modification of the swagger yaml one needs to stop the `mkdocs serve` command and run it again. This is required as to re-generate the API reference documentation mkdocs needs to copy the swagger yaml file from the Flask static directory to the docs folder. 
+After modification of the swagger yaml one needs to stop the `mkdocs serve` command and run it again. This is required as to re-generate the API reference documentation mkdocs needs to copy the swagger yaml file from the Flask static directory to the docs folder.
 Please avoid modification and commiting of the swagger yaml file in the docs folder as it will be overwritten by the `mkdocs serve` command.
 
 ### Working with the code reference
@@ -106,9 +87,8 @@ To regeneate tests coverage one needs to run the following command:
 pytest --cov-report html:htmlcov --cov=yaptide
 ```
 
-Note that this requires installation of usual requirements for the backend and the tests:
+Note that this requires installation of dependencies for the backend and the tests:
 
 ```bash
-pip install -r requirements.txt
-pip install -r requirements-test.txt
+poetry install --only main,test
 ```
