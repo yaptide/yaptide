@@ -182,7 +182,7 @@ poetry install --without docs
 If you want to install only main dependencies, you can use:
 
 ```bash
-poetry install --only main 
+poetry  install --only main,test
 ```
 
 ### Testing
