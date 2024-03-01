@@ -199,6 +199,15 @@ on Windows you need to run them one by one:
 Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 ```
 
+### Development
+
+To maintain code quality, we use yapf and flake8. You can run them with.
+To avoid running them manually we strongly recommend to use pre-commit hooks. To install them run:
+
+```shell
+poetry run pre-commit install
+```
+
 ## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
