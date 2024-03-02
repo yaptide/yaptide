@@ -11,7 +11,7 @@ tasks:
       export FLASK_SQLALCHEMY_DATABASE_URI=sqlite://
       pip install poetry && poetry install --only main
     command: |
-      flask run
+      poetry run flask run
 vscode:
   extensions:
     - ms-python.python
