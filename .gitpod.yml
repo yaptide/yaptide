@@ -8,7 +8,7 @@ tasks:
       export FLASK_DEBUG=1
     init: |
       export POETRY_VIRTUALENVS_CREATE=false
-      export FLASK_SQLALCHEMY_DATABASE_URI=sqlite://
+      export FLASK_SQLALCHEMY_DATABASE_URI=sqlite://yaptide/main.db
       pip install poetry && poetry install --only main
     command: |
       poetry run flask run
