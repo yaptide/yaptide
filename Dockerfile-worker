@@ -25,7 +25,7 @@ RUN chgrp -R 0 /usr/local/app && \
 
 # Copy poetry configuration files
 COPY poetry.lock poetry.toml pyproject.toml ./
-# Insatll poatry and project dependencies, we also disables virtualenv creation
+# Install poetry and project dependencies, we also disabled virtualenv creation
 ENV POETRY_VIRTUALENVS_CREATE=false
 RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main
 
