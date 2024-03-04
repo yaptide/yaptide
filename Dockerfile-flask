@@ -1,5 +1,5 @@
 FROM python:3.10-slim
-ARG POETRY_VERSION=1.2.0
+ARG POETRY_VERSION=1.8.2
 
 # expose port to run Flask
 EXPOSE 6000
