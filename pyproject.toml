@@ -1,0 +1,70 @@
+[tool.poetry]
+name = "yaptide"
+version = "2.0.0"
+description = "Yaptide Yet Another Particle Transport IDE"
+authors = []
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+celery = "5.3.6"
+click = "8.1.7"
+decorator = "5.1.1"
+environs = "10.3.0"
+eventlet = "0.35.2"
+fabric = "3.2.2"
+flask-restful = "0.3.10"
+flask-sqlalchemy = "3.1.1"
+flask-swagger-ui = "4.11.1"
+flask = "2.3.3"
+pyjwt = "2.8.0"
+pymchelper = "2.6.4"
+redis = "5.0.2"
+requests = "2.31.0"
+sqlalchemy = "2.0.25"
+werkzeug = "3.0.1"
+boto3 = "1.34.28"
+cryptography = "41.0.7"
+psycopg = {version = "3.1.17", extras = ["binary"]}
+# required by converter submodule
+scipy = "1.12.0"
+
+[tool.poetry.group.test.dependencies]
+pytest-celery = "0.0.0"
+pytest-flask = "1.2.0"
+pytest-cov = "4.1.0"
+pytest-env = "1.1.3"
+pytest = "8.0.0"
+pre-commit = "3.6.0"
+pytest-dotenv = "0.5.2"
+black = "24.1.0"
+
+
+[tool.poetry.group.docs.dependencies]
+mkdocs = "1.5.3"
+mkdocs-coverage = "1.0.0"
+mkdocstrings = {version = ">=0.18", extras = ["python"]}
+mkdocs-material = "9.5.6"
+mkdocs-gen-files = "0.5.0"
+mkdocs-literate-nav = "0.6.1"
+mkdocs-section-index = "0.3.8"
+mkdocs-render-swagger-plugin = "0.1.1"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+
+# Tooling configuration
+
+[tool.flake8]
+max-line-length = 120
+
+[tool.yapf]
+based_on_style = "pep8"
+column_limit = 120
+
+[tool.yapfignore]
+ignore_patterns = [
+  ".venv/**"
+]

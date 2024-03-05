@@ -14,12 +14,10 @@ In case you have used regular `git clone` command, without `--recurse-submodules
 git submodule update --init --recursive
 ```
 
-## Installation
-
-Run: `pip install -r requirements.txt`
-
-
 ## Running the app
+
+Application consists of multiple components. The simplest way to run the app is to use docker-compose.
+Following instruction will guide you through the process of set up and running the application.
 
 1. Get the redis
 
@@ -162,14 +160,29 @@ Third one setups the environment, runs tests and deletes environment
 
 ## For developers
 
-### installation
+Project make use of poetry for dependency management. If you do not have it installed, check official [poetry installation guide](https://python-poetry.org/docs/).
+Project is configured to  create virtual environment for you, so you do not need to worry about it.
+Virtual environment is created in `.venv` folder in the root of the project.
 
-Alternative method for [installation](#installation) of requirements using **venv**.
+### Installing dependencies
+
+To install all dependencies, run:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+poetry install
+```
+
+This will install all the dependencies including `test` and `docs` ones.
+If you want to test app, you do not need `docs` dependencies, you can skip them by using:
+
+```bash
+poetry install --without docs
+```
+
+If you want to install only main dependencies, you can use:
+
+```bash
+poetry  install --only main,test
 ```
 
 ### Testing
@@ -186,6 +199,15 @@ on Windows you need to run them one by one:
 Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 ```
 
-# Credits
+### Development
+
+To maintain code quality, we use yapf and flake8. You can run them with.
+To avoid running them manually we strongly recommend to use pre-commit hooks. To install them run:
+
+```shell
+poetry run pre-commit install
+```
+
+## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
