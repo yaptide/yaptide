@@ -7,7 +7,6 @@ from flask_swagger_ui import get_swaggerui_blueprint
 
 from yaptide.persistence import models
 from yaptide.persistence.database import db
-from yaptide.routes.main_routes import initialize_routes
 
 
 def create_app():
@@ -15,6 +14,11 @@ def create_app():
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
+
+    if not check_submodules():
+        raise RuntimeError("Submodules are missing! Please clone with submodules or use: git submodule update --init --recursive")
+
+    from yaptide.routes.main_routes import initialize_routes
 
     # Print env variables
     for item in os.environ.items():
@@ -50,6 +54,13 @@ def create_app():
 
     return app
 
+def check_submodules():
+    with open('.gitmodules') as f:
+        for line in f:
+            if 'path' in line:
+                path = line.split('=')[-1].strip()
+                if not os.path.exists(path):
+                    return False
 
 if __name__ == "__main__":
     create_app()
