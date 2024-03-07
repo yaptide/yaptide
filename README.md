@@ -49,13 +49,13 @@ Following instruction will guide you through the process of set up and running t
    - For Linux run:
 
    ```bash
-   FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" flask --app yaptide.application run
+   FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///"`pwd`"/db.sqlite" flask --app yaptide.application run
    ```
 
    - For Windows run:
 
    ```powershell
-   $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///" + (Get-Location).Path + "\test.db"; flask --app yaptide.application run
+   $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///" + (Get-Location).Path + "\db.sqlite"; flask --app yaptide.application run
    ```
    For unknown reasons in Windows full absolute path is required.
 
@@ -64,13 +64,13 @@ Following instruction will guide you through the process of set up and running t
    - For Linux run:
 
    ```bash
-   FLASK_SQLALCHEMY_ECHO=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" flask --app yaptide.application run
+   FLASK_SQLALCHEMY_ECHO=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///"`pwd`"/db.sqlite" flask --app yaptide.application run
    ```
 
    - For Windows run:
 
    ```powershell
-   $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///" + (Get-Location).Path + "\test.db"; flask --app yaptide.application run
+   $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///" + (Get-Location).Path + "\db.sqlite"; flask --app yaptide.application run
    ```
 
    - To include debugging messages from flask, add `--debug` option to the command.
@@ -101,13 +101,13 @@ docker exec -w /usr/local/app/ yaptide_flask ./yaptide/admin/db_manage.py add-us
 In developer mode, use:
 
 ```powershell
-$env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///test.db"; python ./yaptide/admin/db_manage.py add-user admin --password mysecretpassword
+$env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; python ./yaptide/admin/db_manage.py add-user admin --password admin
 ```
 
 or
 
 ```bash
-FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///test.db" python ./yaptide/admin/db_manage.py add-user admin --password mysecretpassword
+FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" python ./yaptide/admin/db_manage.py add-user admin --password admin
 ```
 
 ## For developers
