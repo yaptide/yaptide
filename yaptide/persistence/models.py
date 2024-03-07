@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 
 from sqlalchemy import Column, UniqueConstraint
-from sqlalchemy.orm import relationship, DeclarativeBase
+from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -11,11 +11,7 @@ from yaptide.persistence.database import db
 from yaptide.utils.enums import EntityState, PlatformType
 
 
-class Base(DeclarativeBase):
-    pass
-
-
-class UserModel(Base):
+class UserModel(db.Model):
     """User model"""
 
     __tablename__ = 'User'
@@ -32,7 +28,7 @@ class UserModel(Base):
         return f'User #{self.id} {self.username}'
 
 
-class YaptideUserModel(UserModel, Base):
+class YaptideUserModel(UserModel, db.Model):
     """Yaptide user model"""
 
     __tablename__ = 'YaptideUser'
@@ -50,7 +46,7 @@ class YaptideUserModel(UserModel, Base):
         return check_password_hash(self.password_hash, password)
 
 
-class KeycloakUserModel(UserModel, Base):
+class KeycloakUserModel(UserModel, db.Model):
     """PLGrid user model"""
 
     __tablename__ = 'KeycloakUser'
@@ -61,7 +57,7 @@ class KeycloakUserModel(UserModel, Base):
     __mapper_args__ = {"polymorphic_identity": "KeycloakUser", "polymorphic_load": "inline"}
 
 
-class ClusterModel(Base):
+class ClusterModel(db.Model):
     """Cluster info for specific user"""
 
     __tablename__ = 'Cluster'
@@ -70,7 +66,7 @@ class ClusterModel(Base):
     simulations = relationship("BatchSimulationModel")
 
 
-class SimulationModel(Base):
+class SimulationModel(db.Model):
     """Simulation model"""
 
     __tablename__ = 'Simulation'
@@ -157,7 +153,7 @@ class BatchSimulationModel(SimulationModel):
     __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
 
-class TaskModel(Base):
+class TaskModel(db.Model):
     """Simulation task model"""
 
     __tablename__ = 'Task'
@@ -291,7 +287,7 @@ def compress(data) -> bytes:
     return compressed_bytes
 
 
-class InputModel(Base):
+class InputModel(db.Model):
     """Simulation inputs model"""
 
     __tablename__ = 'Input'
@@ -309,7 +305,7 @@ class InputModel(Base):
             self.compressed_data = compress(value)
 
 
-class EstimatorModel(Base):
+class EstimatorModel(db.Model):
     """Simulation single estimator model"""
 
     __tablename__ = 'Estimator'
@@ -328,7 +324,7 @@ class EstimatorModel(Base):
             self.compressed_data = compress(value)
 
 
-class PageModel(Base):
+class PageModel(db.Model):
     """Estimator single page model"""
 
     __tablename__ = 'Page'
@@ -347,7 +343,7 @@ class PageModel(Base):
             self.compressed_data = compress(value)
 
 
-class LogfilesModel(Base):
+class LogfilesModel(db.Model):
     """Simulation logfiles model"""
 
     __tablename__ = 'Logfiles'
@@ -365,6 +361,6 @@ class LogfilesModel(Base):
             self.compressed_data = compress(value)
 
 
-# def create_models():
-#     """Function creating database's models"""
-#     db.create_all()
+def create_all():
+    """Creates all tables, to be used with Flask app context."""
+    db.create_all()

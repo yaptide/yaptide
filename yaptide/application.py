@@ -3,9 +3,7 @@ import os
 from flask import Flask
 from flask_restful import Api
 from flask_swagger_ui import get_swaggerui_blueprint
-from sqlalchemy import create_engine
-
-from yaptide.persistence import models
+from yaptide.persistence.models import create_all
 from yaptide.persistence.database import db
 from yaptide.routes.main_routes import initialize_routes
 
@@ -34,40 +32,14 @@ def create_app():
 
     app.register_blueprint(swaggerui_blueprint)
 
-    app.logger.info("Initializing database")
-
+    app.logger.info(f"Initializing Flask to use SQLAlchemy ORM @ {app.config['SQLALCHEMY_DATABASE_URI']}")
     db.init_app(app)
 
-    # Find a better solution (maybe with Flask-Migrate)
-    # Uncomment the two lines below to update models
+    # Find a better solution (maybe with Flask-Migrate) to handle migration of data from past versions
     with app.app_context():
-        app.logger.info("Creating models")
-        from yaptide.persistence import models
-        engine = create_engine(app.config['SQLALCHEMY_DATABASE_URI'], echo=True)
-        models.Base.metadata.create_all(bind=engine)
-        #db.create_all()
-        app.logger.info("Models created")
-        # models.create_models()
-
-    db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
-    app.logger.info(f'Connecting to URI: {db_uri}')
-    if not db_uri:
-        app.logger.info(f'Database URI: {db_uri} not set - aborting', err=True)
-    engine = db.create_engine(db_uri, echo=True)
-    try:
-        con = engine.connect()
-
-        #db.create_all(bind=engine)
-
-        metadata = db.MetaData()
-        metadata.create_all(bind=engine)
-        metadata.reflect(bind=engine)
-    except db.exc.OperationalError:
-        app.logger.info(f'Connection to db {db_uri} failed', err=True)
-
-    app.logger.info("Tables in database: %d", len(metadata.tables))
-    for table in metadata.tables:
-        app.logger.info(f"Table: {table}")
+        app.logger.debug("Creating models")
+        create_all()
+        app.logger.debug(f"Created {len(db.metadata.tables)} tables")
 
     api = Api(app)
     initialize_routes(api)
