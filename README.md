@@ -23,11 +23,26 @@ Following instruction will guide you through the process of set up and running t
 
     - If you already use it just start it on port `6379`
     - If not good solution would comes with help of docker, run the following commands:
-      - `$ docker run -dp 6379:6379 redis`
 
-2. Run Celery with `$ celery --app yaptide.celery.worker worker -P threads --loglevel=info`
+    ```
+    docker run --name yaptide_redis -dp 6379:6379 redis
+    ```
+
+2. Run Celery
 
     - You can reuse the same terminal, as for redis, as docker sends redis process to the background
+
+    - for Windows run in Powershell
+
+   ```powershell
+   $env:CELERY_BROKER_URL="redis://yaptide_redis:6379/0"; $env:CELERY_RESULT_BACKEND="redis://yaptide_redis:6379/0"; celery --app yaptide.celery.worker worker -P threads --loglevel=info
+    ```
+
+    - for Linux run in bash
+
+   ```bash
+   CELERY_BROKER_URL=redis://yaptide_redis:6379/0 CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0 celery --app yaptide.celery.worker worker -P threads --loglevel=info
+    ```
 
 3. In new terminal set FLASK_APP env variable ([explanation](https://flask.palletsprojects.com/en/2.0.x/cli/)):
 
