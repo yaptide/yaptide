@@ -55,11 +55,26 @@ Following instruction will guide you through the process of set up and running t
    - For Windows run:
 
    ```powershell
-   $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; flask --app yaptide.application run
+   $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///" + (Get-Location).Path + "\test.db"; flask --app yaptide.application run
+   ```
+   For unknown reasons in Windows full absolute path is required.
+
+   To get more debugging you can also force SQLALCHEMY to use `echo` mode by setting `SQLALCHEMY_ECHO` environment variable to `True`.
+
+   - For Linux run:
+
+   ```bash
+   FLASK_SQLALCHEMY_ECHO=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" ; flask --app yaptide.application run
    ```
 
-    - By default the app will re-create the database with each run, dropping it in the process.
-    - To persist the database between runs this `with app.app_context(): models.create_models()` in yaptide/application.py inside the `create_app` factory.
+   - For Windows run:
+
+   ```powershell
+   $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///" + (Get-Location).Path + "\test.db"; flask --app yaptide.application run
+   ```
+
+   - To include debugging messages from flask, add `--debug` option to the command.
+   - By default the app will re-create the database with each run, dropping it in the process.
 
 ## Building/Running with Docker
 
