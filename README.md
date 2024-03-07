@@ -74,7 +74,6 @@ Following instruction will guide you through the process of set up and running t
    ```
 
    - To include debugging messages from flask, add `--debug` option to the command.
-   - By default the app will re-create the database with each run, dropping it in the process.
 
 ## Building/Running with Docker
 
