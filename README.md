@@ -49,7 +49,7 @@ Following instruction will guide you through the process of set up and running t
    - For Linux run:
 
    ```bash
-   FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" ; flask --app yaptide.application run
+   FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" flask --app yaptide.application run
    ```
 
    - For Windows run:
@@ -64,7 +64,7 @@ Following instruction will guide you through the process of set up and running t
    - For Linux run:
 
    ```bash
-   FLASK_SQLALCHEMY_ECHO=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" ; flask --app yaptide.application run
+   FLASK_SQLALCHEMY_ECHO=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" flask --app yaptide.application run
    ```
 
    - For Windows run:
