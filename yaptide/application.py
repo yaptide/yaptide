@@ -1,6 +1,7 @@
 import logging
 import os
 import subprocess
+import shutil
 
 from flask import Flask
 from flask_restful import Api
@@ -51,11 +52,20 @@ def create_app():
     return app
 
 
+def find_git_executable():
+    """Function returns git executable path or None"""
+    git_path = shutil.which('git')
+    return git_path
+
+
 def check_submodules():
     """Function checking the status of Git submodules"""
     try:
-        result = subprocess.run(["/usr/bin/git", "submodule", "status"], capture_output=True, text=True, check=True)
+        git_path = find_git_executable()
+        if git_path is None:
+            raise RuntimeError("Git executable not found.")
 
+        result = subprocess.run([git_path, "submodule", "status"], capture_output=True, text=True, check=True)
         for line in result.stdout.splitlines():
             if line.startswith('-') or line.startswith('+'):
                 raise RuntimeError("Submodules are missing! Please use: git submodule update --init --recursive")
