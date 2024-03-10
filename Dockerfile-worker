@@ -1,4 +1,5 @@
 FROM python:3.10-slim
+ARG POETRY_VERSION=1.8.2
 
 # install gfortran via apt and clean cache
 # skipcq: DOK-DL3008
@@ -22,9 +23,11 @@ ENV TOPAS_G4_DATA_DIR="/simulators/geant4_files_path"
 RUN chgrp -R 0 /usr/local/app && \
     chmod -R g=u /usr/local/app
 
-# install dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+# Copy poetry configuration files
+COPY poetry.lock poetry.toml pyproject.toml ./
+# Install poetry and project dependencies, we also disabled virtualenv creation
+ENV POETRY_VIRTUALENVS_CREATE=false
+RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main
 
 # Copy worker script
 COPY run_worker.sh .

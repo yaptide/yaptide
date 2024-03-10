@@ -20,6 +20,8 @@ env:
 jobs:
   build-and-test:
     runs-on:  ${{ matrix.platform }}
+    env:
+      POETRY_VIRTUALENVS_CREATE: false
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11']
@@ -38,15 +40,16 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Install dependencies for production
+      - name: Update pip and install poetry
         run: |
           python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
-
+          pip install poetry
+      - name: Install dependencies for production
+        run: |
+          poetry install --only main
       - name: Install dependencies for tests
         run: |
-          pip install -r requirements-test.txt
+          poetry install --only test
 
       - name: Run main tests on Linux
         if: matrix.platform == 'ubuntu-latest'
@@ -92,8 +95,8 @@ jobs:
       - name: Install dependencies for production and test
         run: |
           python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-test.txt
+          pip install poetry
+          poetry install --only main,test
 
       - name: Install deepsource CLI
         run: curl https://deepsource.io/cli | sh

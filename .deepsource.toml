@@ -9,8 +9,8 @@ test_patterns = [
 name = "python"
 enabled = true
 dependency_file_paths = [
-  "requirements.txt",
-  "requirements-test.txt"
+  "poetry.lock",
+  "pyproject.toml",
 ]
 
   [analyzers.meta]
