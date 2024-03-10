@@ -34,11 +34,7 @@ def create_app():
     SWAGGER_URL = '/api/docs'
     API_URL = '/static/openapi.yaml'
 
-    swaggerui_blueprint = get_swaggerui_blueprint(
-        SWAGGER_URL,
-        API_URL,
-        config={'app_name': "yaptide"}
-    )
+    swaggerui_blueprint = get_swaggerui_blueprint(SWAGGER_URL, API_URL, config={'app_name': "yaptide"})
 
     app.register_blueprint(swaggerui_blueprint)
 
@@ -54,15 +50,19 @@ def create_app():
 
     return app
 
+
 def check_submodules():
+    """Function checking the status of Git submodules"""
     try:
-        result = subprocess.run(["git", "submodule", "status"], capture_output=True, text=True, check=True)
+        result = subprocess.run(["/usr/bin/git", "submodule", "status"], capture_output=True, text=True, check=True)
 
         for line in result.stdout.splitlines():
             if line.startswith('-') or line.startswith('+'):
-                raise RuntimeError("Submodules are missing! Please clone with submodules or use: git submodule update --init --recursive")
+                raise RuntimeError("Submodules are missing! Please use: git submodule update --init --recursive")
 
     except subprocess.CalledProcessError as e:
-        logging.error(f"Error running 'git submodule status': {e}")
+        logging.error("Error running 'git submodule status': %s", e)
+
+
 if __name__ == "__main__":
     create_app()
