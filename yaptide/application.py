@@ -13,13 +13,12 @@ from yaptide.persistence.database import db
 
 def create_app():
     """Function starting Flask Server"""
+    check_submodules()
+    from yaptide.routes.main_routes import initialize_routes
+
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
-
-    check_submodules()
-
-    from yaptide.routes.main_routes import initialize_routes
 
     # Print env variables
     for item in os.environ.items():
