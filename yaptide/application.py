@@ -1,5 +1,6 @@
 import logging
 import os
+import subprocess
 
 from flask import Flask
 from flask_restful import Api
@@ -15,8 +16,7 @@ def create_app():
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
 
-    if not check_submodules():
-        raise RuntimeError("Submodules are missing! Please clone with submodules or use: git submodule update --init --recursive")
+    check_submodules()
 
     from yaptide.routes.main_routes import initialize_routes
 
@@ -55,12 +55,14 @@ def create_app():
     return app
 
 def check_submodules():
-    with open('.gitmodules') as f:
-        for line in f:
-            if 'path' in line:
-                path = line.split('=')[-1].strip()
-                if not os.path.exists(path):
-                    return False
+    try:
+        result = subprocess.run(["git", "submodule", "status"], capture_output=True, text=True, check=True)
 
+        for line in result.stdout.splitlines():
+            if line.startswith('-') or line.startswith('+'):
+                raise RuntimeError("Submodules are missing! Please clone with submodules or use: git submodule update --init --recursive")
+
+    except subprocess.CalledProcessError as e:
+        logging.error(f"Error running 'git submodule status': {e}")
 if __name__ == "__main__":
     create_app()
