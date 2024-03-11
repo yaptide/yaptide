@@ -208,6 +208,44 @@ To avoid running them manually we strongly recommend to use pre-commit hooks. To
 poetry run pre-commit install
 ```
 
+### Pre-commit Use Cases
+
+### Case 1: All Hooks Pass Successfully
+
+1. **Add or Modify Files**: Make changes to your codebase as usual.
+
+2. **Stage Changes**: Stage the changes you made using `git add`.
+
+3. **Commit Changes**: Commit your changes using `git commit`.
+
+4. **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks.
+
+5. **Success**: If all hooks pass without any issues, the commit proceeds as usual.
+
+6. **Commit Successfully**: Your changes are now committed to the repository with the assurance that they meet the project's coding standards.
+
+### Case 2: Some Hooks Fail
+
+1. **Add or Modify Files**: Make changes to your codebase as usual.
+
+2. **Stage Changes**: Stage the changes you made using `git add`.
+
+3. **Commit Changes**: Attempt to commit your changes using `git commit`.
+
+4. **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks.
+
+5. **Failure**: If one or more hooks fail, pre-commit will abort the commit process.
+
+6. **Review Error Messages**: Read the error messages in the terminal to identify which hooks failed and why.
+
+7. **Fix Issues**: Address the issues reported by the failed hooks. Some hooks automatically format code so you don't have to change anything.
+
+8. **Retry Commit**: Once the issues are fixed, stage the changes again using `git add` and attempt to commit once more.
+
+9. **Success**: If all hooks pass after fixing the issues, the commit proceeds as usual.
+
+10. **Commit Successfully**: Your changes are now committed to the repository with the assurance that they meet the project's coding standards.
+
 ## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
