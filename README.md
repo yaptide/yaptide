@@ -233,6 +233,10 @@ Out main use of pre-comit is yapf which is Python code formatter that automatica
 To manually run all pre-commit hooks on repository use 'pre-commit run --all-files' command.
 If you wnat to run specifik hook use 'pre-commit run <hook_id>'. Each 'hook_id' tag is specified in '.pre-commit-config.yaml' file. It is recommended to use these commands after adding new hook to your config in order to check already existing files.
 
+### Custom hooks
+
+Pre-commit allows creating custom hooks by writing script in preffered language which is supported by pre-commit and adding it to '.pre-commit-config.yaml'. In yaptide we use custom hook which checks for not empty env files. This hook prevents user from commiting and pushing to repository secrets such as passwords.
+
 ## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
