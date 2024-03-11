@@ -226,16 +226,23 @@ poetry run pre-commit install
 
 ### YAPF
 
-Out main use of pre-comit is yapf which is Python code formatter that automatically formats Python code according to predefined style guidelines. We can specify styles for yapf in '[tool/yapf]' section of 'pyproject.toml' file. The goal of using yapf is to always produce code that is following the chosen style guidelines.
+Out main use of pre-comit is yapf which is Python code formatter that automatically formats Python code according to predefined style guidelines. We can specify styles for yapf in `[tool/yapf]` section of `pyproject.toml` file. The goal of using yapf is to always produce code that is following the chosen style guidelines.
 
 ### Running pre-commit manually
 
-To manually run all pre-commit hooks on repository use 'pre-commit run --all-files' command.
-If you wnat to run specifik hook use 'pre-commit run <hook_id>'. Each 'hook_id' tag is specified in '.pre-commit-config.yaml' file. It is recommended to use these commands after adding new hook to your config in order to check already existing files.
+To manually run all pre-commit hooks on repository use:
+```shell
+pre-commit run --all-files
+```
+If you wnat to run specific hook use:
+```shell
+pre-commit run <hook_id>
+```
+ Each `hook_id` tag is specified in `.pre-commit-config.yaml` file. It is recommended to use these commands after adding new hook to your config in order to check already existing files.
 
 ### Custom hooks
 
-Pre-commit allows creating custom hooks by writing script in preffered language which is supported by pre-commit and adding it to '.pre-commit-config.yaml'. In yaptide we use custom hook which checks for not empty env files. This hook prevents user from commiting and pushing to repository secrets such as passwords.
+Pre-commit allows creating custom hooks by writing script in preffered language which is supported by pre-commit and adding it to `.pre-commit-config.yaml`. In yaptide we use custom hook which checks for not empty env files. This hook prevents user from commiting and pushing to repository secrets such as passwords.
 
 ## Credits
 
