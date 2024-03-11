@@ -57,8 +57,6 @@ build-backend = "poetry.core.masonry.api"
 
 # Tooling configuration
 
-[tool.flake8]
-max-line-length = 120
 
 [tool.yapf]
 based_on_style = "pep8"
