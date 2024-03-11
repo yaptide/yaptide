@@ -222,7 +222,16 @@ poetry run pre-commit install
 
 2. **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If one or more hooks fail, pre-commit will abort the commit process.
 
-3. **Fix Issues**: Address the issues reported by the failed hooks. Some hooks automatically format code so you don't have to change anything. Once the issues are fixed,  commit once more.
+3. **Fix Issues**: Address the issues reported by the failed hooks. Some hooks automatically format code so you don't have to change anything. Once the issues are fixed, commit once more.
+
+### YAPF
+
+Out main use of pre-comit is yapf which is Python code formatter that automatically formats Python code according to predefined style guidelines. We can specify styles for yapf in '[tool/yapf]' section of 'pyproject.toml' file. The goal of using yapf is to always produce code that is following the chosen style guidelines.
+
+### Running pre-commit manually
+
+To manually run all pre-commit hooks on repository use 'pre-commit run --all-files' command.
+If you wnat to run specifik hook use 'pre-commit run <hook_id>'. Each 'hook_id' tag is specified in '.pre-commit-config.yaml' file. It is recommended to use these commands after adding new hook to your config in order to check already existing files.
 
 ## Credits
 
