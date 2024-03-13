@@ -109,7 +109,7 @@ jobs:
           S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest --cov=./ --cov-report xml
+        run: poetry run pytest --cov=./ --cov-report xml
 
       - name: Upload coverage report to deepsource
         run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
