@@ -24,7 +24,7 @@ jobs:
       POETRY_VIRTUALENVS_CREATE: false
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
         platform: [ubuntu-latest, windows-latest]
         exclude:
           - python-version: '3.9'
@@ -90,7 +90,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install dependencies for production and test
         run: |
