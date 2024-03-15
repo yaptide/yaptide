@@ -210,19 +210,20 @@ poetry run pre-commit install
 
 ### Pre-commit Use Cases
 
+- **Commit Changes**: Commit your changes using `git commit` in  terminal or using `GUI Git client` in your IDE.
+
 ### Case 1: All Hooks Pass Successfully
 
-1. **Commit Changes**: Commit your changes using `git commit`.
-
-2. **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If all hooks pass without any issues, the commit proceeds as usual.
+-  **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If all hooks pass without any issues, the commit proceeds as usual.
 
 ### Case 2: Some Hooks Fail
 
-1. **Commit Changes**: Attempt to commit your changes using `git commit`.
+- **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If one or more hooks fail, pre-commit will abort the commit process.
 
-2. **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If one or more hooks fail, pre-commit will abort the commit process.
+   - **terminal** - all issues will be listed in terminal with `Failed` flag
+   - **VS Code** - you will get error popup, click on `show command output` alle issues will be presented in the same way as they would appear in the terminal.
 
-3. **Fix Issues**: Address the issues reported by the failed hooks. Some hooks automatically format code so you don't have to change anything. Once the issues are fixed, commit once more.
+- **Fix Issues**: Address the issues reported by the failed hooks. Some hooks automatically format code so you don't have to change anything. Once the issues are fixed, commit once more.
 
 ### YAPF
 
