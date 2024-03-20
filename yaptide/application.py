@@ -1,5 +1,7 @@
 import logging
 import os
+import subprocess
+import shutil
 
 from flask import Flask
 from flask_restful import Api
@@ -7,11 +9,13 @@ from flask_swagger_ui import get_swaggerui_blueprint
 
 from yaptide.persistence import models
 from yaptide.persistence.database import db
-from yaptide.routes.main_routes import initialize_routes
 
 
 def create_app():
     """Function starting Flask Server"""
+    check_submodules()
+    from yaptide.routes.main_routes import initialize_routes
+
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
     logging.info("Creating Flask app %s", flask_name)
@@ -30,11 +34,7 @@ def create_app():
     SWAGGER_URL = '/api/docs'
     API_URL = '/static/openapi.yaml'
 
-    swaggerui_blueprint = get_swaggerui_blueprint(
-        SWAGGER_URL,
-        API_URL,
-        config={'app_name': "yaptide"}
-    )
+    swaggerui_blueprint = get_swaggerui_blueprint(SWAGGER_URL, API_URL, config={'app_name': "yaptide"})
 
     app.register_blueprint(swaggerui_blueprint)
 
@@ -49,6 +49,28 @@ def create_app():
     initialize_routes(api)
 
     return app
+
+
+def find_git_executable():
+    """Function returns git executable path or None"""
+    git_path = shutil.which('git')
+    return git_path
+
+
+def check_submodules():
+    """Function checking the status of Git submodules"""
+    try:
+        git_path = find_git_executable()
+        if git_path is None:
+            raise RuntimeError("Git executable not found.")
+
+        result = subprocess.run([git_path, "submodule", "status"], capture_output=True, text=True, check=True)
+        for line in result.stdout.splitlines():
+            if line.startswith('-') or line.startswith('+'):
+                raise RuntimeError("Submodules are missing! Please use: git submodule update --init --recursive")
+
+    except subprocess.CalledProcessError as e:
+        logging.error("Error running 'git submodule status': %s", e)
 
 
 if __name__ == "__main__":
