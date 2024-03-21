@@ -142,7 +142,7 @@ poetry  install --only main,test
 Run tests on Linux with:
 
 ```shell
-pytest
+poetry run pytest
 ```
 
 on Windows you need to run them one by one:
