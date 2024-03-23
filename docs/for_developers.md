@@ -29,6 +29,14 @@ poetry  install --only main,test
 
 Application consists of multiple components. The simplest way to run the app is to use docker-compose. Following instruction will guide you through the process of set up and running the application.
 
+Here is a flowchart that shows the various dependencies between the different components of the application.
+
+```mermaid
+flowchart LR
+    id0[Redis]-->id1[Celery worker]-->id2[Flask app]
+    id0-->id2
+```
+
 1. Download SHIELD-HIT12A simulator
 
     Currently, we store binaries of three simulators on S3 platform. SHIELD-HIT12A (full version) and Fluka files are encrypted.
