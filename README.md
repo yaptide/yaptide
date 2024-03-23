@@ -17,9 +17,7 @@ git submodule update --init --recursive
 ## Building and running the app
 
 There are two main ways of build and run the app
-- For developers, which is setting up all components manually. It is faster then Docker.
-    - [For Linux developers](./docs/for_linux_developers.md)
-    - [For Windows developers](./docs/for_windows_developers.md)
+- [For developers](./docs/for_developers.md), which is setting up all components manually. It is faster then Docker.
 - [Using Docker](./docs/using_docker.md). Used for the deployment, takes more time.
 
 
