@@ -1,10 +1,10 @@
-## For developers
+# For developers
 
 Project make use of poetry for dependency management. If you do not have it installed, check official [poetry installation guide](https://python-poetry.org/docs/).
 Project is configured to  create virtual environment for you, so you do not need to worry about it.
 Virtual environment is created in `.venv` folder in the root of the project.
 
-### Installing dependencies
+## Installing dependencies
 
 To install all dependencies, run:
 
@@ -25,7 +25,7 @@ If you want to install only main dependencies, you can use:
 poetry  install --only main,test
 ```
 
-### Building and running the app
+## Building and running the app
 
 Application consists of multiple components. The simplest way to run the app is to use docker-compose. Following instruction will guide you through the process of set up and running the application.
 
@@ -83,7 +83,7 @@ Application consists of multiple components. The simplest way to run the app is 
 
     To include debugging messages from flask, add `--debug` option to the command.
 
-### Database
+## Database
 
 To add user, run:
 
@@ -97,14 +97,14 @@ You can use the following command, to get more information:
 $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run ./yaptide/admin/db_manage.py --help
 ```
 
-### Testing
+## Testing
 On Windows you need to run tests one by one:
 
 ```shell
 Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { poetry run pytest $_.FullName }
 ```
 
-### Development
+## Development
 
 To maintain code quality, we use yapf and flake8. You can run them with. To avoid running them manually we strongly recommend to use pre-commit hooks. To install them run:
 

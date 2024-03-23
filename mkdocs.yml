@@ -2,7 +2,7 @@ site_name: Documentation
 site_url: https://yaptide.github.io/yaptide/
 repo_url: https://github.com/yaptide/yaptide
 repo_name: yaptide/yaptide
-copyright: Copyright &copy; 2023 the Yaptide team
+copyright: Copyright &copy; 2024 the Yaptide team
 
 
 theme:
@@ -20,7 +20,9 @@ nav:
   - Overview: index.md
   - Work with documentation: mkdocs.md
   - Jobs and tasks: states.md
-  - Simulator binaries: simulator_binaries.md
+  - Building and running app for Linux developers: for_linux_developers.md
+  - Building and running app for Windows developers: for_windows_developers.md
+  - Building and running app using Docker: using_docker.md
   - Persistent storage: persistency.md
   - Docker images on GHCR: ghcr_packages.md
 - API Reference: swagger.md
