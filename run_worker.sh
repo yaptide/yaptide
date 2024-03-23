@@ -29,4 +29,4 @@ else
     ./yaptide/admin/simulators.py download-fluka --dir /simulators
 fi
 
-celery --app yaptide.celery.worker worker -E --loglevel="$LOG_LEVEL_ROOT" -P eventlet --hostname yaptide-worker
+celery --app yaptide.celery.worker worker --events --loglevel="$LOG_LEVEL_ROOT" --pool eventlet --hostname yaptide-worker

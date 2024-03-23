@@ -1,16 +1,23 @@
 # yaptide backend
 
-## Installation
+## Getting the code
 
-Run: `$ pip install -r requirements.txt`
+Clone the repository including submodules:
 
-Download/update sumbmodules:
+```shell
+git clone --recurse-submodules https://github.com/yaptide/yaptide.git
+```
+
+In case you have used regular `git clone` command, without `--recurse-submodules` option, you can still download the submodules by running:
 
 ```shell
 git submodule update --init --recursive
 ```
 
 ## Running the app
+
+Application consists of multiple components. The simplest way to run the app is to use docker-compose.
+Following instruction will guide you through the process of set up and running the application.
 
 1. Get the redis
 
@@ -153,14 +160,29 @@ Third one setups the environment, runs tests and deletes environment
 
 ## For developers
 
-### installation
+Project make use of poetry for dependency management. If you do not have it installed, check official [poetry installation guide](https://python-poetry.org/docs/).
+Project is configured to  create virtual environment for you, so you do not need to worry about it.
+Virtual environment is created in `.venv` folder in the root of the project.
 
-Alternative method for [installation](#installation) of requirements using **venv**.
+### Installing dependencies
+
+To install all dependencies, run:
 
 ```bash
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
+poetry install
+```
+
+This will install all the dependencies including `test` and `docs` ones.
+If you want to test app, you do not need `docs` dependencies, you can skip them by using:
+
+```bash
+poetry install --without docs
+```
+
+If you want to install only main dependencies, you can use:
+
+```bash
+poetry  install --only main,test
 ```
 
 ### Testing
@@ -177,6 +199,52 @@ on Windows you need to run them one by one:
 Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 ```
 
-# Credits
+### Development
+
+To maintain code quality, we use yapf.
+To avoid running it manually we strongly recommend to use pre-commit hooks. To install it run:
+
+```shell
+poetry run pre-commit install
+```
+
+### Pre-commit Use Cases
+
+- **Commit Changes**: Commit your changes using `git commit` in  terminal or using `GUI Git client` in your IDE.
+
+### Case 1: All Hooks Pass Successfully
+
+-  **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If all hooks pass without any issues, the commit proceeds as usual.
+
+### Case 2: Some Hooks Fail
+
+- **Pre-commit Hooks Run**: Before the commit is finalized, pre-commit will automatically run all configured hooks. If one or more hooks fail, pre-commit will abort the commit process.
+
+   - **terminal** - all issues will be listed in terminal with `Failed` flag
+   - **VS Code** - you will get error popup, click on `show command output` alle issues will be presented in the same way as they would appear in the terminal.
+
+- **Fix Issues**: Address the issues reported by the failed hooks. Some hooks automatically format code so you don't have to change anything. Once the issues are fixed, commit once more.
+
+### YAPF
+
+Out main use of pre-comit is yapf which is Python code formatter that automatically formats Python code according to predefined style guidelines. We can specify styles for yapf in `[tool/yapf]` section of `pyproject.toml` file. The goal of using yapf is to always produce code that is following the chosen style guidelines.
+
+### Running pre-commit manually
+
+To manually run all pre-commit hooks on repository use:
+```shell
+pre-commit run --all-files
+```
+If you wnat to run specific hook use:
+```shell
+pre-commit run <hook_id>
+```
+ Each `hook_id` tag is specified in `.pre-commit-config.yaml` file. It is recommended to use these commands after adding new hook to your config in order to check already existing files.
+
+### Custom hooks
+
+Pre-commit allows creating custom hooks by writing script in preffered language which is supported by pre-commit and adding it to `.pre-commit-config.yaml`. In yaptide we use custom hook which checks for not empty env files. This hook prevents user from commiting and pushing to repository secrets such as passwords.
+
+## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2

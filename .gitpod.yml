@@ -7,9 +7,11 @@ tasks:
       export FLASK_APP=yaptide.application
       export FLASK_DEBUG=1
     init: |
-      pip install -r requirements.txt
+      export POETRY_VIRTUALENVS_CREATE=false
+      export FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///main.db
+      pip install poetry && poetry install --only main
     command: |
-      flask run
+      poetry run flask run
 vscode:
   extensions:
     - ms-python.python
