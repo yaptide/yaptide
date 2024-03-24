@@ -21,7 +21,7 @@ nav:
   - Work with documentation: mkdocs.md
   - Jobs and tasks: states.md
   - Build and run as developers: for_developers.md
-  - Building backend for deployment using Docker: using_docker.md
+  - Building and run using Docker: using_docker.md
   - Persistent storage: persistency.md
   - Docker images on GHCR: ghcr_packages.md
 - API Reference: swagger.md
