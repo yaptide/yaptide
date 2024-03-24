@@ -96,7 +96,7 @@ flowchart LR
         ```
 
 
-    This command will create `db.sqlite` inside `./instance` folder. This is [default flask behaviour](https://flask.palletsprojects.com/en/3.0.x/config/#instance-folders).
+    This command will create `db.sqlite` inside `./instance` folder. This is [default Flask behavior](https://flask.palletsprojects.com/en/3.0.x/config/#instance-folders).
 
     To get more debugging information you can also force SQLALCHEMY to use `echo` mode by setting `SQLALCHEMY_ECHO` environment variable to `True`.
 
