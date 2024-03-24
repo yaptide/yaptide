@@ -79,7 +79,7 @@ flowchart LR
 
     === "Windows (PowerShell)"
         ```powershell
-        $env:CELERY_BROKER_URL="redis://localhost:6379/0"; $env:CELERY_RESULT_BACKEND="redis://localhost:6379/0"; poetry run celery --app yaptide.celery.worker worker -P threads --loglevel=info
+        $env:CELERY_BROKER_URL="redis://localhost:6379/0"; $env:CELERY_RESULT_BACKEND="redis://localhost:6379/0"; poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
         ```
 
 4. Run the app
