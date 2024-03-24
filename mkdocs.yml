@@ -18,10 +18,10 @@ theme:
 nav:
 - Home:
   - Overview: index.md
-  - Work with documentation: mkdocs.md
-  - Jobs and tasks: states.md
   - Build and run as developers: for_developers.md
   - Building and run using Docker: using_docker.md
+  - Work with documentation: mkdocs.md
+  - Jobs and tasks: states.md
   - Persistent storage: persistency.md
   - Docker images on GHCR: ghcr_packages.md
 - API Reference: swagger.md

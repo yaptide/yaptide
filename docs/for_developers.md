@@ -27,7 +27,7 @@ poetry  install --only main,test
 
 ## Building and running the app
 
-Application consists of multiple components.  Following instruction will guide you through the process of set up and running the application.
+Application consists of multiple components. Following instruction will guide you through the process of set up and running the application.
 
 Here is a flowchart that shows the various dependencies between the different components of the application.
 
