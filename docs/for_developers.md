@@ -39,7 +39,7 @@ flowchart LR
 
 1. Download SHIELD-HIT12A simulator
 
-    Currently, we store binaries of three simulators on S3 platform. SHIELD-HIT12A (full version) and Fluka files are encrypted.
+    Currently, we store binaries of simulators on S3 filesystem. SHIELD-HIT12A (full version) and Fluka files are encrypted.
 
     To simply init download process we have to run following commands:
 
