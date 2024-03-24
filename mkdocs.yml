@@ -20,7 +20,7 @@ nav:
   - Overview: index.md
   - Work with documentation: mkdocs.md
   - Jobs and tasks: states.md
-  - Building backend for developers: for_developers.md
+  - Build and run as developers: for_developers.md
   - Building backend for deployment using Docker: using_docker.md
   - Persistent storage: persistency.md
   - Docker images on GHCR: ghcr_packages.md
