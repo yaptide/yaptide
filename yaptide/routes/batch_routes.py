@@ -14,7 +14,7 @@ from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_cluster_by_id,
                                             make_commit_to_db,
                                             update_simulation_state,
-                                            update_task_state)
+                                            update_tasks_states)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
     BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel,
     KeycloakUserModel)
@@ -23,6 +23,7 @@ from yaptide.routes.utils.response_templates import (error_validation_response,
                                                      error_internal_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
 
 
@@ -69,9 +70,8 @@ class JobsBatch(Resource):
                                           sim_type=payload_dict["sim_type"],
                                           input_type=input_type,
                                           title=payload_dict.get("title", ''))
-        update_key = str(uuid.uuid4())
-        simulation.set_update_key(update_key)
         add_object_to_db(simulation)
+        update_key = encode_simulation_auth_token(simulation.id)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 
@@ -200,8 +200,7 @@ class JobsBatch(Resource):
 
         tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
 
-        for task in tasks:
-            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+        update_tasks_states([(task, {"task_state": EntityState.CANCELED.value}) for task in tasks])
 
         return yaptide_response(
             message="",

@@ -104,8 +104,7 @@ def test_create_celery_simulation(db_session: scoped_session, db_good_username: 
                                        user_id=user.id,
                                        input_type=InputType.EDITOR.value,
                                        sim_type=SimulationType.SHIELDHIT.value,
-                                       title='testtitle',
-                                       update_key_hash='testkey')
+                                       title='testtitle')
     db_session.add(simulation)
     db_session.commit()
     assert simulation.id is not None
@@ -137,7 +136,6 @@ def test_create_batch_simulation(db_session: scoped_session, db_good_username: s
                                       input_type=InputType.EDITOR.value,
                                       sim_type=SimulationType.SHIELDHIT.value,
                                       title='testtitle',
-                                      update_key_hash='testkey',
                                       job_dir='testfolder',
                                       array_id=2137,
                                       collect_id=2138)
@@ -168,8 +166,7 @@ def test_celery_task_model_creation_and_update(db_session: scoped_session, db_go
                                        user_id=user.id,
                                        input_type=InputType.EDITOR.value,
                                        sim_type=SimulationType.SHIELDHIT.value,
-                                       title='testtitle',
-                                       update_key_hash='testkey')
+                                       title='testtitle')
     db_session.add(simulation)
     db_session.commit()
 
@@ -230,7 +227,6 @@ def test_batch_task_model_creation_and_update(db_session: scoped_session, db_goo
                                       input_type=InputType.EDITOR.value,
                                       sim_type=SimulationType.SHIELDHIT.value,
                                       title='testtitle',
-                                      update_key_hash='testkey',
                                       job_dir='testfolder',
                                       array_id=2137,
                                       collect_id=2138)
@@ -284,8 +280,7 @@ def test_celery_simulation_with_multiple_tasks(db_session: scoped_session, db_go
                                        user_id=user.id,
                                        input_type=InputType.EDITOR.value,
                                        sim_type=SimulationType.SHIELDHIT.value,
-                                       title='testtitle',
-                                       update_key_hash='testkey')
+                                       title='testtitle')
     db_session.add(simulation)
     db_session.commit()
 
@@ -357,8 +352,7 @@ def test_create_input(db_session: scoped_session, db_good_username: str, db_good
                                        user_id=user.id,
                                        input_type=InputType.EDITOR.value,
                                        sim_type=SimulationType.SHIELDHIT.value,
-                                       title='testtitle',
-                                       update_key_hash='testkey')
+                                       title='testtitle')
     db_session.add(simulation)
     db_session.commit()
 
@@ -385,8 +379,7 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
                                        user_id=user.id,
                                        input_type=InputType.EDITOR.value,
                                        sim_type=SimulationType.SHIELDHIT.value,
-                                       title='testtitle',
-                                       update_key_hash='testkey')
+                                       title='testtitle')
     db_session.add(simulation)
     db_session.commit()
 

@@ -17,7 +17,7 @@ from yaptide.persistence.db_methods import (add_object_to_db,
                                             fetch_pages_by_estimator_id,
                                             make_commit_to_db,
                                             update_simulation_state,
-                                            update_task_state)
+                                            update_tasks_states)
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel,
                                         EstimatorModel, InputModel, PageModel,
                                         UserModel)
@@ -26,6 +26,7 @@ from yaptide.routes.utils.response_templates import (error_internal_response,
                                                      error_validation_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
 
 
@@ -58,9 +59,8 @@ class JobsDirect(Resource):
                                            sim_type=payload_dict["sim_type"],
                                            input_type=input_type,
                                            title=payload_dict.get("title", ''))
-        update_key = str(uuid.uuid4())
-        simulation.set_update_key(update_key)
         add_object_to_db(simulation)
+        update_key = encode_simulation_auth_token(simulation.id)
         logging.info("Simulation %d created and inserted into DB", simulation.id)
         logging.debug("Update key set to %s", update_key)
 
@@ -176,8 +176,7 @@ class JobsDirect(Resource):
 
         if "merge" in result:
             update_simulation_state(simulation=simulation, update_dict=result["merge"])
-            for i, task in enumerate(tasks):
-                update_task_state(task=task, update_dict=result["tasks"][i])
+            update_tasks_states(list(zip(tasks, result["tasks"])))
 
             return yaptide_response(message="", code=200, content=result)
 
