@@ -53,7 +53,7 @@ poetry install --only main,docs
 To build the documentation run the following command:
 
 ```bash
-mkdocs build
+poetry run mkdocs build
 ```
 
 this will generate the documentation in the `site` folder.
@@ -61,7 +61,7 @@ this will generate the documentation in the `site` folder.
 To serve the documentation locally run the following command:
 
 ```bash
-mkdocs serve
+poetry run mkdocs serve
 ```
 
 This will start a local webserver on port 8000. The documentation can be viewed by opening the following url in a browser: http://localhost:8000
@@ -84,7 +84,7 @@ After modification of the Python code one needs to stop the `mkdocs serve` comma
 To regeneate tests coverage one needs to run the following command:
 
 ```bash
-pytest --cov-report html:htmlcov --cov=yaptide
+poetry run pytest --cov-report html:htmlcov --cov=yaptide
 ```
 
 Note that this requires installation of dependencies for the backend and the tests:

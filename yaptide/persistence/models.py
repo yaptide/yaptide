@@ -361,6 +361,6 @@ class LogfilesModel(db.Model):
             self.compressed_data = compress(value)
 
 
-def create_models():
-    """Function creating database's models"""
+def create_all():
+    """Creates all tables, to be used with Flask app context."""
     db.create_all()

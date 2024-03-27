@@ -143,13 +143,14 @@ shieldhit
 
 # database
 yaptide/main.db
+*.db
+*.sqlite
 
 # ide settings
 .vscode/
 
 
 id_ed25519
-*.db
 
 yaptide_tester/output/
 yaptide/data/
