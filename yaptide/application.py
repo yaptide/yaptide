@@ -25,6 +25,12 @@ def create_app():
     for item in app.config.items():
         app.logger.debug("Flask config variable: %s", item)
 
+    if app.config.get('USE_CORS'):
+        app.logger.info("enabling cors")
+        from flask_cors import CORS
+        CORS(app, supports_credentials=True, origins="http://localhost:3000", resources="/*")
+
+    
     SWAGGER_URL = '/api/docs'
     API_URL = '/static/openapi.yaml'
 
