@@ -74,7 +74,7 @@ flowchart LR
 
     === "Linux"
         ```bash
-        PATH=$PATH:bin/ CELERY_BROKER_URL=redis://localhost:6379/0 CELERY_RESULT_BACKEND=redis://localhost:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        PATH=$PATH:bin/ BACKEND_INTERNAL_URL=http://localhost:5000 CELERY_BROKER_URL=redis://localhost:6379/0 CELERY_RESULT_BACKEND=redis://localhost:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
         ```
 
     === "Windows (PowerShell)"
