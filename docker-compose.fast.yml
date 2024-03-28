@@ -1,4 +1,8 @@
-# this file should give much faster starting time but require docker engine v25 (released 2024-01-19)
+# Enhanced Startup Configuration:
+# Requires Docker Engine v25 (2024-01-19). Modifies healthcheck frequency for improved startup times.
+# Initial healthchecks every 5 seconds for the first 30 seconds post-container launch to mitigate delays from container dependencies.
+# Post-initial period, healthchecks revert to standard 30-second intervals.
+
 
 services:
   redis:
