@@ -195,8 +195,8 @@ files = [
 jmespath = ">=0.7.1,<2.0.0"
 python-dateutil = ">=2.1,<3.0.0"
 urllib3 = [
-    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
     {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""},
+    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
 ]
 
 [package.extras]
@@ -1778,20 +1778,20 @@ tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
 name = "pymchelper"
-version = "2.6.4"
+version = "2.7.0"
 description = "Python toolkit for SHIELD-HIT12A and FLUKA"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "pymchelper-2.6.4-py2.py3-none-any.whl", hash = "sha256:3719260921b613802b9eff7392c98696d3375acba0d63fdd1ddbc21347aa2de4"},
-    {file = "pymchelper-2.6.4.tar.gz", hash = "sha256:ddf4ae5db8129385c8aac673d36192ffc8cfa9e0e64953bae5629da3ab3a3922"},
+    {file = "pymchelper-2.7.0-py2.py3-none-any.whl", hash = "sha256:217895b277b2746af6aef07f67b098cfc139168cc894e490e4cf9997f92109c1"},
+    {file = "pymchelper-2.7.0.tar.gz", hash = "sha256:ac1747c87aeac8f078fed47f269324291261c41a232db749ca755f306ee406e9"},
 ]
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.20,<1.26.0", markers = "python_version == \"3.9\""},
     {version = ">=1.21", markers = "python_version == \"3.10\""},
     {version = ">=1.23.3", markers = "python_version == \"3.11\""},
+    {version = ">=1.20,<1.26.0", markers = "python_version == \"3.9\""},
 ]
 
 [package.extras]
@@ -2642,4 +2642,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "bab1d4bc6b4e4793faf5bf0742ff6f94c6624cea3dabeb0686252a53424306ac"
+content-hash = "edc10b98488fe94819758685b9559f109660351bc07267d6e68a381c8141aa19"
