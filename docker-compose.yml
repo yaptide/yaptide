@@ -1,3 +1,5 @@
+# this docker compose should be compatible also with older (<=v24) version of docker engine
+
 services:
   redis:
     image: redis:7-alpine

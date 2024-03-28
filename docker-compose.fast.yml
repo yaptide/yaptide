@@ -1,0 +1,22 @@
+# this file should give much faster starting time but require docker engine v25 (released 2024-01-19)
+
+services:
+  redis:
+    healthcheck:
+      start_period: 30s
+      start_interval: 5s
+
+  postgresql:
+    healthcheck:
+      start_period: 30s
+      start_interval: 5s
+
+  yaptide_flask:
+    healthcheck:
+      start_period: 30s
+      start_interval: 5s
+
+  yaptide_worker:
+    healthcheck:
+      start_period: 30s
+      start_interval: 5s
