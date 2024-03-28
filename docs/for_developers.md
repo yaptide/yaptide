@@ -74,7 +74,7 @@ flowchart LR
 
     === "Linux"
         ```bash
-        CELERY_BROKER_URL=redis://localhost:6379/0 CELERY_RESULT_BACKEND=redis://localhost:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        PATH=$PATH:bin/ CELERY_BROKER_URL=redis://localhost:6379/0 CELERY_RESULT_BACKEND=redis://localhost:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
         ```
 
     === "Windows (PowerShell)"
@@ -87,7 +87,7 @@ flowchart LR
     === "Linux"
 
         ```bash
-        FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" poetry run flask --app yaptide.application run
+        FLASK_USE_CORS=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" CELERY_BROKER_URL=redis://localhost:6379/0 CELERY_RESULT_BACKEND=redis://localhost:6379/0 poetry run flask --app yaptide.application run
         ```
 
     === "Windows (PowerShell)"
