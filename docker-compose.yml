@@ -62,6 +62,8 @@ services:
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
+    healthcheck:
+      test: ["CMD-SHELL", "celery --app yaptide.celery.worker inspect ping"]
     depends_on:
       redis:
         condition: service_healthy
