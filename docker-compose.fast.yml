@@ -18,5 +18,5 @@ services:
 
   yaptide_worker:
     healthcheck:
-      start_period: 30s
+      start_period: 60s
       start_interval: 5s
