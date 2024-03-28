@@ -1,91 +1,86 @@
-version: "3.4"
-
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: yaptide_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
 
-    redis:
-        image: redis:7-alpine
-        container_name: yaptide_redis
-        healthcheck:
-            test: ["CMD", "redis-cli", "ping"]
+  postgresql:
+    image: postgres:latest
+    container_name: yaptide_postgresql
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
+      POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
 
-    postgresql:
-        image: postgres:latest
-        container_name: yaptide_postgresql
-        environment:
-            POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
-            POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
-            PGDATA: /var/lib/postgresql/data/pgdata
-        volumes:
-            - data:/var/lib/postgresql/data
-        ports:
-            - 5432:5432
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
-            # start_period: 30s
-            # retries: 5
+  yaptide_flask:
+    build:
+      context: .
+      dockerfile: Dockerfile-flask
+    image: yaptide_flask
+    container_name: yaptide_flask
+    environment:
+      - FLASK_DEBUG=1
+      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
+      - CERT_AUTH_URL=${CERT_AUTH_URL:-}
+      - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-}
+      - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
+      - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
+      - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgresql:
+        condition: service_healthy
 
-    yaptide_flask:
-        build:
-            context: .
-            dockerfile: Dockerfile-flask
-        image: yaptide_flask
-        container_name: yaptide_flask
-        environment:
-            - FLASK_DEBUG=1
-            - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-            - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
-            - CERT_AUTH_URL=${CERT_AUTH_URL:-}
-            - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-}
-            - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
-            - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
-            - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
-        depends_on:
-            redis:
-                condition: service_healthy
-            postgresql:
-                condition: service_healthy
+  yaptide_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile-worker
+    image: yaptide_worker
+    container_name: yaptide_worker
+    volumes:
+      - simulators:/simulators:rw
+    deploy:
+      resources:
+        limits:
+          # the explanation of below syntax: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
+          cpus: ${MAX_CORES-1.0}
+    env_file: .env
+    environment:
+      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
+      - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
+      - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
+    depends_on:
+      redis:
+        condition: service_healthy
+      yaptide_flask:
+        condition: service_healthy
 
-    yaptide_worker:
-        build:
-            context: .
-            dockerfile: Dockerfile-worker
-        image: yaptide_worker
-        container_name: yaptide_worker
-        volumes:
-            - simulators:/simulators:rw
-        deploy:
-            resources:
-                limits:
-                    # the explanation of below syntax: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
-                    cpus: ${MAX_CORES-1.0}
-        env_file: .env
-        environment:
-            - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-            - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
-            - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
-            - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
-        depends_on:
-            redis:
-                condition: service_healthy
-            yaptide_flask:
-                condition: service_healthy
-
-    nginx:
-        image: yaptide_nginx
-        container_name: yaptide_nginx
-        build:
-            context: .
-            dockerfile: Dockerfile-nginx
-        ports:
-            - 5000:5000
-            - 8443:8443
-        depends_on:
-            yaptide_flask:
-                condition: service_healthy
-            yaptide_worker:
-                condition: service_healthy
+  nginx:
+    image: yaptide_nginx
+    container_name: yaptide_nginx
+    build:
+      context: .
+      dockerfile: Dockerfile-nginx
+    ports:
+      - 5000:5000
+      - 8443:8443
+    depends_on:
+      yaptide_flask:
+        condition: service_healthy
+      yaptide_worker:
+        condition: service_healthy
 
 volumes:
-    data:
-    simulators:
+  data:
+  simulators:
