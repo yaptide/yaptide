@@ -44,7 +44,7 @@ black = "24.3.0"
 mkdocs = "1.5.3"
 mkdocs-coverage = "1.0.0"
 mkdocstrings = {version = ">=0.18", extras = ["python"]}
-mkdocs-material = "9.5.16"
+mkdocs-material = "9.5.17"
 mkdocs-gen-files = "0.5.0"
 mkdocs-literate-nav = "0.6.1"
 mkdocs-section-index = "0.3.8"
