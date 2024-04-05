@@ -24,7 +24,7 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Approve certain sets of PRs
-        if: ${{contains(steps.dependabot-metadata.outputs.dependency-names, 'boto3') && steps.dependabot-metadata.outputs.update-type == 'version-update:semver-patch'}}
+        if: ${{contains(steps.metadata.outputs.dependency-names, 'boto3') && steps.metadata.outputs.update-type == 'version-update:semver-patch'}}
         run: |
           gh pr checkout "$PR_URL" # sets the upstream metadata for `gh pr status`
           if [ "$(gh pr status --json reviewDecision -q .currentBranch.reviewDecision)" != "APPROVED" ];
