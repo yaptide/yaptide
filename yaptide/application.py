@@ -5,11 +5,17 @@ from flask_restful import Api
 from flask_swagger_ui import get_swaggerui_blueprint
 from yaptide.persistence.models import create_all
 from yaptide.persistence.database import db
-from yaptide.routes.main_routes import initialize_routes
+from yaptide.admin import git_submodules
 
 
 def create_app():
     """Function starting Flask Server"""
+    git_submodules.check_submodules()
+
+    # Main_routes is importing (in-directly) the converter module which is cloned as submodule.
+    # Lack of this submodule would result in the ModuleNotFoundError.
+    from yaptide.routes.main_routes import initialize_routes
+
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
     app.logger.info("Creating Flask app %s", flask_name)
