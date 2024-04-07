@@ -111,7 +111,7 @@ flowchart LR
         ```
 
 
-    To include debugging messages from flask, add `--debug` option to the command.
+    To include debugging messages from flask, add `--debug` option to the command. Include this flag to suppress CORS errors that appear in browser when running frontend. 
 
 ## Database
 
