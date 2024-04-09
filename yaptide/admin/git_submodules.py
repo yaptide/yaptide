@@ -1,7 +1,7 @@
 import subprocess
 import shutil
 import logging
-import os
+from pathlib import Path
 
 
 def find_git_executable():
@@ -20,8 +20,11 @@ def check_submodules_folders_exist():
                 submodule_path = line.split('=')[-1].strip()
 
                 # Check if folder exists and is not empty
-                if not os.path.exists(submodule_path) or not os.listdir(submodule_path):
-                    raise RuntimeError("Submodules are missing! Please use: git submodule update --init --recursive")
+                if not Path(submodule_path).exists() or not list(Path(submodule_path).iterdir()):
+                    submodule_name = submodule_path.split("/")[-1]
+                    raise RuntimeError(
+                        f"Submodule: '{submodule_name}' is missing! Please use: git submodule update --init --recursive"
+                    )
 
 
 def check_submodules():
@@ -38,7 +41,9 @@ def check_submodules():
         result = subprocess.run([git_path, "submodule", "status"], capture_output=True, text=True, check=True)
         for line in result.stdout.splitlines():
             if line.startswith('-') or line.startswith('+'):
-                raise RuntimeError("Submodules are missing! Please use: git submodule update --init --recursive")
+                submodule_name = line.split()[-1]
+                raise RuntimeError(
+                    f"Submodule: '{submodule_name}' is missing! Please use: git submodule update --init --recursive")
 
     except subprocess.CalledProcessError as e:
         logging.error("Error running 'git submodule status': %s", e)

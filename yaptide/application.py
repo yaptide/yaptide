@@ -12,7 +12,7 @@ def create_app():
     """Function starting Flask Server"""
     git_submodules.check_submodules()
 
-    # Main_routes is importing (in-directly) the converter module which is cloned as submodule.
+    # Main_routes module is importing (in-directly) the converter module which is cloned as submodule.
     # Lack of this submodule would result in the ModuleNotFoundError.
     from yaptide.routes.main_routes import initialize_routes
 
