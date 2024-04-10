@@ -111,7 +111,9 @@ flowchart LR
         ```
 
 
-    To include debugging messages from flask, add `--debug` option to the command. Include this flag to suppress CORS errors that appear in browser when running frontend. 
+    To include debugging messages from flask, add `--debug` option to the command.
+
+    While running backend and frontend, developer may encounter [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To get rid of CORS add ```USE_CORS=True``` in .env file.
 
 ## Database
 
