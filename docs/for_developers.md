@@ -113,7 +113,7 @@ flowchart LR
 
     To include debugging messages from flask, add `--debug` option to the command.
 
-    While running backend and frontend, developer may encounter [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To get rid of CORS add ```USE_CORS=True``` in .env file.
+    While running backend and frontend, developer may encounter [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To get rid of CORS add ```FLASK_USE_CORS=True``` in .env file. Also pay attention if your frontend runs on ```http://localhost:3000```, because right now cors_config in application.py specifies this url .
 
 ## Database
 
