@@ -79,7 +79,7 @@ flowchart LR
 
     === "Windows (PowerShell)"
         ```powershell
-        $env:CELERY_BROKER_URL="redis://localhost:6379/0"; $env:CELERY_RESULT_BACKEND="redis://localhost:6379/0"; poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        $env:PATH+="\bin\"; $env:BACKEND_INTERNAL_URL=http://localhost:5000; $env:CELERY_BROKER_URL="redis://localhost:6379/0"; $env:CELERY_RESULT_BACKEND="redis://localhost:6379/0"; poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
         ```
 
 4. Run the app
@@ -92,7 +92,7 @@ flowchart LR
 
     === "Windows (PowerShell)"
         ```powershell
-        $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; poetry run flask --app yaptide.application run
+        $env:FLASK_USE_CORS="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:CELERY_BROKER_URL="redis://localhost:6379/0"; $env:CELERY_RESULT_BACKEND="redis://localhost:6379/0"; poetry run flask --app yaptide.application run
         ```
 
 
@@ -110,7 +110,7 @@ flowchart LR
         $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite://db.sqlite"; poetry run flask --app yaptide.application run
         ```
 
-
+    While running backend and frontend, developer may encounter [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To resolve these CORS issues, one should set FLASK_USE_CORS=True in the `.env` file.  Also pay attention if your frontend runs on ```http://localhost:3000```, because right now cors_config in application.py specifies this url .
     To include debugging messages from flask, add `--debug` option to the command.
 
     While running backend and frontend, developer may encounter [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To get rid of CORS add ```FLASK_USE_CORS=True``` in .env file. Also pay attention if your frontend runs on ```http://localhost:3000```, because right now cors_config in application.py specifies this url .
