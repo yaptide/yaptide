@@ -126,7 +126,7 @@ To add user, run:
 
 === "Windows (PowerShell)"
     ```powershell
-    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run ./yaptide/admin/db_manage.py add-user admin --password password
+    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run .\yaptide\admin\b_manage.py add-user admin --password password
     ```
 
 You can use the following command, to get more information:
@@ -138,7 +138,7 @@ You can use the following command, to get more information:
 
 === "Windows (PowerShell)"
     ```powershell
-    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run ./yaptide/admin/db_manage.py --help
+    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run .\yaptide\admin\db_manage.py --help
     ```
 
 ## Testing
