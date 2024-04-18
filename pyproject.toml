@@ -23,7 +23,7 @@ redis = "5.0.3"
 requests = "2.31.0"
 sqlalchemy = "2.0.29"
 werkzeug = "3.0.2"
-boto3 = "1.34.85"
+boto3 = "1.34.86"
 cryptography = "42.0.5"
 psycopg = {version = "3.1.18", extras = ["binary"]}
 
