@@ -195,8 +195,8 @@ files = [
 jmespath = ">=0.7.1,<2.0.0"
 python-dateutil = ">=2.1,<3.0.0"
 urllib3 = [
-    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
     {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""},
+    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
 ]
 
 [package.extras]
@@ -1744,30 +1744,30 @@ tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
 name = "pymchelper"
-version = "2.7.1"
+version = "2.7.2"
 description = "Python toolkit for SHIELD-HIT12A and FLUKA"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "pymchelper-2.7.1-py2.py3-none-any.whl", hash = "sha256:f2e4a5c2c60e4a3d1c58ffd0d048c52e0623511ee605112a982622a866153ffb"},
-    {file = "pymchelper-2.7.1.tar.gz", hash = "sha256:fc1da2ee36b51fb86d5e0bcb7e842c5573c8095aea78015d41f0fe2ce3b568ac"},
+    {file = "pymchelper-2.7.2-py2.py3-none-any.whl", hash = "sha256:c73859b34a7d886777f5c6baea9549ea02c400fa77c694abd8ada41ad235aef1"},
+    {file = "pymchelper-2.7.2.tar.gz", hash = "sha256:f7444ed51970640fa63735b019141a93a82bcee2a91cf3e59606d8d5387daea5"},
 ]
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.20,<1.26.0", markers = "python_version == \"3.9\""},
     {version = ">=1.21", markers = "python_version == \"3.10\""},
     {version = ">=1.23.3", markers = "python_version == \"3.11\""},
+    {version = ">=1.26", markers = "python_version == \"3.12\""},
     {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
 ]
 
 [package.extras]
-dicom = ["pydicom", "pydicom (>=2.3.1)"]
+dicom = ["pydicom"]
 excel = ["xlwt"]
-full = ["bashplotlib", "h5py", "hipsterplot", "matplotlib", "pydicom", "pydicom (>=2.3.1)", "pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "scipy", "xlwt"]
+full = ["bashplotlib", "h5py", "hipsterplot", "matplotlib", "pydicom", "pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "pytrip98 (>=3.9.1)", "scipy", "xlwt"]
 hdf = ["h5py"]
 image = ["matplotlib"]
-pytrip = ["pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "scipy"]
+pytrip = ["pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "pytrip98 (>=3.9.1)", "scipy"]
 
 [[package]]
 name = "pymdown-extensions"
@@ -2567,4 +2567,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "3963a2089f268ecbca10f7f5ac7a2999b7cae8884530031d6817200b598d37da"
+content-hash = "5d7759c4d64c3c4ecb80199959499e635a4b503e9a6161c5d1af99ac81192853"
