@@ -7,7 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.9"
-celery = "5.3.6"
+celery = "5.4.0"
 click = "8.1.7"
 decorator = "5.1.1"
 environs = "11.0.0"
