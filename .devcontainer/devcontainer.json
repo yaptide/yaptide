@@ -6,9 +6,9 @@
 	"image": "mcr.microsoft.com/devcontainers/python:1-3.12-bullseye",
 	"features": {
 		"ghcr.io/warrenbuckley/codespace-features/sqlite:1": {},
-		"ghcr.io/itsmechlark/features/redis-server:1": {
-			"version": "latest"
-		}
+		"ghcr.io/itsmechlark/features/redis-server:1": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers-contrib/features/poetry:2": {}
 	}
 
 	// Features to add to the dev container. More info: https://containers.dev/features.
