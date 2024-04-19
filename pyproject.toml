@@ -52,10 +52,7 @@ mkdocs-render-swagger-plugin = "0.1.1"
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-
 # Tooling configuration
-
-
 [tool.yapf]
 based_on_style = "pep8"
 column_limit = 120
