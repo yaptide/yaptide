@@ -1,15 +1,15 @@
 image: ubuntu:latest
 
 tasks:
-  - env:
-      FLASK_APP=yaptide.application
-      FLASK_DEBUG=1
-      POETRY_VIRTUALENVS_CREATE=false
-      FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///main.db
-    init: |
-      pip install poetry && poetry install --only main
-    command: |
-      poetry run flask run
+  - name: Prepare
+    env:
+      FLASK_APP: yaptide.application
+      FLASK_DEBUG: 1
+      POETRY_VIRTUALENVS_CREATE: false
+      FLASK_SQLALCHEMY_DATABASE_URI: sqlite:///main.db
+    init: pip install poetry && poetry install --only main
+    command: poetry run flask run
+
 vscode:
   extensions:
     - ms-python.python
