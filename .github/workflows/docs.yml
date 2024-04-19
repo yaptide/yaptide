@@ -61,7 +61,7 @@ jobs:
             S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
             S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
             S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest --cov-report html:htmlcov --cov=yaptide
+        run: poetry run pytest --cov-report html:htmlcov --cov=yaptide
       - name: Install dependencies for documentation
         run: poetry install --only docs
       - name: Build site
