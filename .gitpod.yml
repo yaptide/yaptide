@@ -1,8 +1,7 @@
 image: ubuntu:latest
 
 tasks:
-  - before:
-    env:
+  - env:
       FLASK_APP=yaptide.application
       FLASK_DEBUG=1
       POETRY_VIRTUALENVS_CREATE=false
