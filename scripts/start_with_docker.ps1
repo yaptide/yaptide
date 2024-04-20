@@ -1,21 +1,20 @@
-#!/bin/bash
-
 # check which docker version we have installed
-docker_version=$(docker -v | awk '{print $3}' | cut -d, -f1)
+$dockerVersion = docker -v | Select-String -Pattern "\d+\.\d+\.\d+" | ForEach-Object {$_.Matches.Groups[0].Value}
 
 # print the docker version
-echo "Docker version: $docker_version"
+Write-Host "Docker version: $dockerVersion"
 
 # build the containers
-echo "Building containers:"
-docker compose --file docker-compose.yml --build
+Write-Host "Building containers:"
+docker compose --file docker-compose.yml build
 
 # try fast version, which should run on docker 25.0 and above
-echo "Trying to bring up containers with fast version of the command:"
-docker compose --file docker-compose.yml --file docker-compose.fast.yml up  --detach
+Write-Host "Trying to bring up containers with fast version of the command:"
+$fastCmd = { docker compose --file docker-compose.yml --file docker-compose.fast.yml up --detach }
+Invoke-Command -ScriptBlock $fastCmd
 
 # if the fast version failed, try the slow version
-if [ $? -ne 0 ]; then
-  echo "Fast version failed, trying slow version:"
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "Fast version failed, trying slow version:"
   docker compose --file docker-compose.yml up --detach
-fi
+}

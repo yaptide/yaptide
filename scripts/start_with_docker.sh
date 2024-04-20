@@ -8,7 +8,7 @@ echo "Docker version: $docker_version"
 
 # build the containers
 echo "Building containers:"
-docker compose --file docker-compose.yml --build
+docker compose --file docker-compose.yml build
 
 # try fast version, which should run on docker 25.0 and above
 echo "Trying to bring up containers with fast version of the command:"
