@@ -1,4 +1,4 @@
-image: ubuntu:latest
+image: gitpod/workspace-python-3.12
 
 tasks:
   - name: Prepare
