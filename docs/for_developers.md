@@ -43,15 +43,30 @@ flowchart LR
 
     To simply init download process we have to run following commands:
 
-    ```bash
-    poetry run ./yaptide/admin/simulators.py download-shieldhit --dir bin
-    ```
+    === "Linux"
+
+        ```bash
+        poetry run ./yaptide/admin/simulators.py download-shieldhit --dir bin
+        ```
+
+    === "Windows (PowerShell)"
+        ```powershell
+        poetry run .\yaptide\admin\simulators.py download-shieldhit --dir bin
+        ```
 
     To get full instruction of command usage we can type
 
-    ```bash
-    poetry run ./yaptide/admin/simulators.py
-    ```
+    === "Linux"
+
+        ```bash
+        poetry run ./yaptide/admin/simulators.py
+        ```
+
+    === "Windows (PowerShell)"
+        ```powershell
+        poetry run .\yaptide\admin\simulators.py
+        ```
+
 
 2. Get the redis
     If you already use it just start it on port `6379`
@@ -113,7 +128,6 @@ flowchart LR
     While running backend and frontend, developer may encounter [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To resolve these CORS issues, one should set FLASK_USE_CORS=True in the `.env` file.  Also pay attention if your frontend runs on ```http://localhost:3000```, because right now cors_config in application.py specifies this url .
     To include debugging messages from flask, add `--debug` option to the command.
 
-    While running backend and frontend, developer may encounter [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To get rid of CORS add ```FLASK_USE_CORS=True``` in .env file. Also pay attention if your frontend runs on ```http://localhost:3000```, because right now cors_config in application.py specifies this url .
 
 ## Database
 
