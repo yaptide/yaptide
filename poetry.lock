@@ -163,17 +163,17 @@ files = [
 
 [[package]]
 name = "boto3"
-version = "1.34.84"
+version = "1.34.88"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.34.84-py3-none-any.whl", hash = "sha256:7a02f44af32095946587d748ebeb39c3fa15b9d7275307ff612a6760ead47e04"},
-    {file = "boto3-1.34.84.tar.gz", hash = "sha256:91e6343474173e9b82f603076856e1d5b7b68f44247bdd556250857a3f16b37b"},
+    {file = "boto3-1.34.88-py3-none-any.whl", hash = "sha256:1bd4cef11b7c5f293cede50f3d33ca89fe3413c51f1864f40163c56a732dd6b3"},
+    {file = "boto3-1.34.88.tar.gz", hash = "sha256:168894499578a9d69d6f7deb5811952bf4171c51b95749a9aef32cf67bc71f87"},
 ]
 
 [package.dependencies]
-botocore = ">=1.34.84,<1.35.0"
+botocore = ">=1.34.88,<1.35.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -204,13 +204,13 @@ crt = ["awscrt (==0.20.9)"]
 
 [[package]]
 name = "celery"
-version = "5.3.6"
+version = "5.4.0"
 description = "Distributed Task Queue."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "celery-5.3.6-py3-none-any.whl", hash = "sha256:9da4ea0118d232ce97dff5ed4974587fb1c0ff5c10042eb15278487cdd27d1af"},
-    {file = "celery-5.3.6.tar.gz", hash = "sha256:870cc71d737c0200c397290d730344cc991d13a057534353d124c9380267aab9"},
+    {file = "celery-5.4.0-py3-none-any.whl", hash = "sha256:369631eb580cf8c51a82721ec538684994f8277637edde2dfc0dacd73ed97f64"},
+    {file = "celery-5.4.0.tar.gz", hash = "sha256:504a19140e8d3029d5acad88330c541d4c3f64c789d85f94756762d8bca7e706"},
 ]
 
 [package.dependencies]
@@ -226,7 +226,7 @@ vine = ">=5.1.0,<6.0"
 
 [package.extras]
 arangodb = ["pyArango (>=2.0.2)"]
-auth = ["cryptography (==41.0.5)"]
+auth = ["cryptography (==42.0.5)"]
 azureblockblob = ["azure-storage-blob (>=12.15.0)"]
 brotli = ["brotli (>=1.0.0)", "brotlipy (>=0.7.0)"]
 cassandra = ["cassandra-driver (>=3.25.0,<4)"]
@@ -236,22 +236,23 @@ couchbase = ["couchbase (>=3.0.0)"]
 couchdb = ["pycouchdb (==1.14.2)"]
 django = ["Django (>=2.2.28)"]
 dynamodb = ["boto3 (>=1.26.143)"]
-elasticsearch = ["elastic-transport (<=8.10.0)", "elasticsearch (<=8.11.0)"]
+elasticsearch = ["elastic-transport (<=8.13.0)", "elasticsearch (<=8.13.0)"]
 eventlet = ["eventlet (>=0.32.0)"]
+gcs = ["google-cloud-storage (>=2.10.0)"]
 gevent = ["gevent (>=1.5.0)"]
 librabbitmq = ["librabbitmq (>=2.0.0)"]
 memcache = ["pylibmc (==1.6.3)"]
 mongodb = ["pymongo[srv] (>=4.0.2)"]
-msgpack = ["msgpack (==1.0.7)"]
-pymemcache = ["python-memcached (==1.59)"]
+msgpack = ["msgpack (==1.0.8)"]
+pymemcache = ["python-memcached (>=1.61)"]
 pyro = ["pyro4 (==4.82)"]
-pytest = ["pytest-celery (==0.0.0)"]
+pytest = ["pytest-celery[all] (>=1.0.0)"]
 redis = ["redis (>=4.5.2,!=4.5.5,<6.0.0)"]
 s3 = ["boto3 (>=1.26.143)"]
 slmq = ["softlayer-messaging (>=1.0.3)"]
 solar = ["ephem (==4.1.5)"]
 sqlalchemy = ["sqlalchemy (>=1.4.48,<2.1)"]
-sqs = ["boto3 (>=1.26.143)", "kombu[sqs] (>=5.3.0)", "pycurl (>=7.43.0.5)", "urllib3 (>=1.26.16)"]
+sqs = ["boto3 (>=1.26.143)", "kombu[sqs] (>=5.3.4)", "pycurl (>=7.43.0.5)", "urllib3 (>=1.26.16)"]
 tblib = ["tblib (>=1.3.0)", "tblib (>=1.5.0)"]
 yaml = ["PyYAML (>=3.10)"]
 zookeeper = ["kazoo (>=1.3.1)"]
@@ -1318,13 +1319,13 @@ mkdocs = ">=1.0.3"
 
 [[package]]
 name = "mkdocs-material"
-version = "9.5.17"
+version = "9.5.18"
 description = "Documentation that simply works"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "mkdocs_material-9.5.17-py3-none-any.whl", hash = "sha256:14a2a60119a785e70e765dd033e6211367aca9fc70230e577c1cf6a326949571"},
-    {file = "mkdocs_material-9.5.17.tar.gz", hash = "sha256:06ae1275a72db1989cf6209de9e9ecdfbcfdbc24c58353877b2bb927dbe413e4"},
+    {file = "mkdocs_material-9.5.18-py3-none-any.whl", hash = "sha256:1e0e27fc9fe239f9064318acf548771a4629d5fd5dfd45444fd80a953fe21eb4"},
+    {file = "mkdocs_material-9.5.18.tar.gz", hash = "sha256:a43f470947053fa2405c33995f282d24992c752a50114f23f30da9d8d0c57e62"},
 ]
 
 [package.dependencies]
@@ -1454,40 +1455,6 @@ files = [
 
 [package.dependencies]
 setuptools = "*"
-
-[[package]]
-name = "numpy"
-version = "1.25.2"
-description = "Fundamental package for array computing in Python"
-optional = false
-python-versions = ">=3.9"
-files = [
-    {file = "numpy-1.25.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:db3ccc4e37a6873045580d413fe79b68e47a681af8db2e046f1dacfa11f86eb3"},
-    {file = "numpy-1.25.2-cp310-cp310-macosx_11_0_arm64.whl", hash = "sha256:90319e4f002795ccfc9050110bbbaa16c944b1c37c0baeea43c5fb881693ae1f"},
-    {file = "numpy-1.25.2-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:dfe4a913e29b418d096e696ddd422d8a5d13ffba4ea91f9f60440a3b759b0187"},
-    {file = "numpy-1.25.2-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:f08f2e037bba04e707eebf4bc934f1972a315c883a9e0ebfa8a7756eabf9e357"},
-    {file = "numpy-1.25.2-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:bec1e7213c7cb00d67093247f8c4db156fd03075f49876957dca4711306d39c9"},
-    {file = "numpy-1.25.2-cp310-cp310-win32.whl", hash = "sha256:7dc869c0c75988e1c693d0e2d5b26034644399dd929bc049db55395b1379e044"},
-    {file = "numpy-1.25.2-cp310-cp310-win_amd64.whl", hash = "sha256:834b386f2b8210dca38c71a6e0f4fd6922f7d3fcff935dbe3a570945acb1b545"},
-    {file = "numpy-1.25.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:c5462d19336db4560041517dbb7759c21d181a67cb01b36ca109b2ae37d32418"},
-    {file = "numpy-1.25.2-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:c5652ea24d33585ea39eb6a6a15dac87a1206a692719ff45d53c5282e66d4a8f"},
-    {file = "numpy-1.25.2-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:0d60fbae8e0019865fc4784745814cff1c421df5afee233db6d88ab4f14655a2"},
-    {file = "numpy-1.25.2-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:60e7f0f7f6d0eee8364b9a6304c2845b9c491ac706048c7e8cf47b83123b8dbf"},
-    {file = "numpy-1.25.2-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:bb33d5a1cf360304754913a350edda36d5b8c5331a8237268c48f91253c3a364"},
-    {file = "numpy-1.25.2-cp311-cp311-win32.whl", hash = "sha256:5883c06bb92f2e6c8181df7b39971a5fb436288db58b5a1c3967702d4278691d"},
-    {file = "numpy-1.25.2-cp311-cp311-win_amd64.whl", hash = "sha256:5c97325a0ba6f9d041feb9390924614b60b99209a71a69c876f71052521d42a4"},
-    {file = "numpy-1.25.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:b79e513d7aac42ae918db3ad1341a015488530d0bb2a6abcbdd10a3a829ccfd3"},
-    {file = "numpy-1.25.2-cp39-cp39-macosx_11_0_arm64.whl", hash = "sha256:eb942bfb6f84df5ce05dbf4b46673ffed0d3da59f13635ea9b926af3deb76926"},
-    {file = "numpy-1.25.2-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:3e0746410e73384e70d286f93abf2520035250aad8c5714240b0492a7302fdca"},
-    {file = "numpy-1.25.2-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:d7806500e4f5bdd04095e849265e55de20d8cc4b661b038957354327f6d9b295"},
-    {file = "numpy-1.25.2-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:8b77775f4b7df768967a7c8b3567e309f617dd5e99aeb886fa14dc1a0791141f"},
-    {file = "numpy-1.25.2-cp39-cp39-win32.whl", hash = "sha256:2792d23d62ec51e50ce4d4b7d73de8f67a2fd3ea710dcbc8563a51a03fb07b01"},
-    {file = "numpy-1.25.2-cp39-cp39-win_amd64.whl", hash = "sha256:76b4115d42a7dfc5d485d358728cdd8719be33cc5ec6ec08632a5d6fca2ed380"},
-    {file = "numpy-1.25.2-pp39-pypy39_pp73-macosx_10_9_x86_64.whl", hash = "sha256:1a1329e26f46230bf77b02cc19e900db9b52f398d6722ca853349a782d4cff55"},
-    {file = "numpy-1.25.2-pp39-pypy39_pp73-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:4c3abc71e8b6edba80a01a52e66d83c5d14433cbcd26a40c329ec7ed09f37901"},
-    {file = "numpy-1.25.2-pp39-pypy39_pp73-win_amd64.whl", hash = "sha256:1b9735c27cea5d995496f46a8b1cd7b408b3f34b6d50459d9ac8fe3a20cc17bf"},
-    {file = "numpy-1.25.2.tar.gz", hash = "sha256:fd608e19c8d7c55021dffd43bfe5492fab8cc105cc8986f813f8c3c048b38760"},
-]
 
 [[package]]
 name = "numpy"
@@ -1792,29 +1759,30 @@ tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
 name = "pymchelper"
-version = "2.7.0"
+version = "2.7.2"
 description = "Python toolkit for SHIELD-HIT12A and FLUKA"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "pymchelper-2.7.0-py2.py3-none-any.whl", hash = "sha256:217895b277b2746af6aef07f67b098cfc139168cc894e490e4cf9997f92109c1"},
-    {file = "pymchelper-2.7.0.tar.gz", hash = "sha256:ac1747c87aeac8f078fed47f269324291261c41a232db749ca755f306ee406e9"},
+    {file = "pymchelper-2.7.2-py2.py3-none-any.whl", hash = "sha256:c73859b34a7d886777f5c6baea9549ea02c400fa77c694abd8ada41ad235aef1"},
+    {file = "pymchelper-2.7.2.tar.gz", hash = "sha256:f7444ed51970640fa63735b019141a93a82bcee2a91cf3e59606d8d5387daea5"},
 ]
 
 [package.dependencies]
 numpy = [
     {version = ">=1.21", markers = "python_version == \"3.10\""},
     {version = ">=1.23.3", markers = "python_version == \"3.11\""},
-    {version = ">=1.20,<1.26.0", markers = "python_version == \"3.9\""},
+    {version = ">=1.26", markers = "python_version == \"3.12\""},
+    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
 ]
 
 [package.extras]
-dicom = ["pydicom", "pydicom (>=2.3.1)"]
+dicom = ["pydicom"]
 excel = ["xlwt"]
-full = ["bashplotlib", "h5py", "hipsterplot", "matplotlib", "pydicom", "pydicom (>=2.3.1)", "pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "scipy", "xlwt"]
+full = ["bashplotlib", "h5py", "hipsterplot", "matplotlib", "pydicom", "pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "pytrip98 (>=3.9.1)", "scipy", "xlwt"]
 hdf = ["h5py"]
 image = ["matplotlib"]
-pytrip = ["pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "scipy"]
+pytrip = ["pytrip98", "pytrip98 (<3.9.0)", "pytrip98 (>=3.6.1)", "pytrip98 (>=3.6.1,<3.9.0)", "pytrip98 (>=3.8.0)", "pytrip98 (>=3.8.0,<3.9.0)", "pytrip98 (>=3.9.1)", "scipy"]
 
 [[package]]
 name = "pymdown-extensions"
@@ -2238,48 +2206,6 @@ botocore = ">=1.33.2,<2.0a.0"
 crt = ["botocore[crt] (>=1.33.2,<2.0a.0)"]
 
 [[package]]
-name = "scipy"
-version = "1.12.0"
-description = "Fundamental algorithms for scientific computing in Python"
-optional = false
-python-versions = ">=3.9"
-files = [
-    {file = "scipy-1.12.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:78e4402e140879387187f7f25d91cc592b3501a2e51dfb320f48dfb73565f10b"},
-    {file = "scipy-1.12.0-cp310-cp310-macosx_12_0_arm64.whl", hash = "sha256:f5f00ebaf8de24d14b8449981a2842d404152774c1a1d880c901bf454cb8e2a1"},
-    {file = "scipy-1.12.0-cp310-cp310-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:e53958531a7c695ff66c2e7bb7b79560ffdc562e2051644c5576c39ff8efb563"},
-    {file = "scipy-1.12.0-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:5e32847e08da8d895ce09d108a494d9eb78974cf6de23063f93306a3e419960c"},
-    {file = "scipy-1.12.0-cp310-cp310-musllinux_1_1_x86_64.whl", hash = "sha256:4c1020cad92772bf44b8e4cdabc1df5d87376cb219742549ef69fc9fd86282dd"},
-    {file = "scipy-1.12.0-cp310-cp310-win_amd64.whl", hash = "sha256:75ea2a144096b5e39402e2ff53a36fecfd3b960d786b7efd3c180e29c39e53f2"},
-    {file = "scipy-1.12.0-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:408c68423f9de16cb9e602528be4ce0d6312b05001f3de61fe9ec8b1263cad08"},
-    {file = "scipy-1.12.0-cp311-cp311-macosx_12_0_arm64.whl", hash = "sha256:5adfad5dbf0163397beb4aca679187d24aec085343755fcdbdeb32b3679f254c"},
-    {file = "scipy-1.12.0-cp311-cp311-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:c3003652496f6e7c387b1cf63f4bb720951cfa18907e998ea551e6de51a04467"},
-    {file = "scipy-1.12.0-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:8b8066bce124ee5531d12a74b617d9ac0ea59245246410e19bca549656d9a40a"},
-    {file = "scipy-1.12.0-cp311-cp311-musllinux_1_1_x86_64.whl", hash = "sha256:8bee4993817e204d761dba10dbab0774ba5a8612e57e81319ea04d84945375ba"},
-    {file = "scipy-1.12.0-cp311-cp311-win_amd64.whl", hash = "sha256:a24024d45ce9a675c1fb8494e8e5244efea1c7a09c60beb1eeb80373d0fecc70"},
-    {file = "scipy-1.12.0-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:e7e76cc48638228212c747ada851ef355c2bb5e7f939e10952bc504c11f4e372"},
-    {file = "scipy-1.12.0-cp312-cp312-macosx_12_0_arm64.whl", hash = "sha256:f7ce148dffcd64ade37b2df9315541f9adad6efcaa86866ee7dd5db0c8f041c3"},
-    {file = "scipy-1.12.0-cp312-cp312-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:9c39f92041f490422924dfdb782527a4abddf4707616e07b021de33467f917bc"},
-    {file = "scipy-1.12.0-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:a7ebda398f86e56178c2fa94cad15bf457a218a54a35c2a7b4490b9f9cb2676c"},
-    {file = "scipy-1.12.0-cp312-cp312-musllinux_1_1_x86_64.whl", hash = "sha256:95e5c750d55cf518c398a8240571b0e0782c2d5a703250872f36eaf737751338"},
-    {file = "scipy-1.12.0-cp312-cp312-win_amd64.whl", hash = "sha256:e646d8571804a304e1da01040d21577685ce8e2db08ac58e543eaca063453e1c"},
-    {file = "scipy-1.12.0-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:913d6e7956c3a671de3b05ccb66b11bc293f56bfdef040583a7221d9e22a2e35"},
-    {file = "scipy-1.12.0-cp39-cp39-macosx_12_0_arm64.whl", hash = "sha256:bba1b0c7256ad75401c73e4b3cf09d1f176e9bd4248f0d3112170fb2ec4db067"},
-    {file = "scipy-1.12.0-cp39-cp39-manylinux_2_17_aarch64.manylinux2014_aarch64.whl", hash = "sha256:730badef9b827b368f351eacae2e82da414e13cf8bd5051b4bdfd720271a5371"},
-    {file = "scipy-1.12.0-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6546dc2c11a9df6926afcbdd8a3edec28566e4e785b915e849348c6dd9f3f490"},
-    {file = "scipy-1.12.0-cp39-cp39-musllinux_1_1_x86_64.whl", hash = "sha256:196ebad3a4882081f62a5bf4aeb7326aa34b110e533aab23e4374fcccb0890dc"},
-    {file = "scipy-1.12.0-cp39-cp39-win_amd64.whl", hash = "sha256:b360f1b6b2f742781299514e99ff560d1fe9bd1bff2712894b52abe528d1fd1e"},
-    {file = "scipy-1.12.0.tar.gz", hash = "sha256:4bf5abab8a36d20193c698b0f1fc282c1d083c94723902c447e5d2f1780936a3"},
-]
-
-[package.dependencies]
-numpy = ">=1.22.4,<1.29.0"
-
-[package.extras]
-dev = ["click", "cython-lint (>=0.12.2)", "doit (>=0.36.0)", "mypy", "pycodestyle", "pydevtool", "rich-click", "ruff", "types-psutil", "typing_extensions"]
-doc = ["jupytext", "matplotlib (>2)", "myst-nb", "numpydoc", "pooch", "pydata-sphinx-theme (==0.9.0)", "sphinx (!=4.1.0)", "sphinx-design (>=0.2.0)"]
-test = ["asv", "gmpy2", "hypothesis", "mpmath", "pooch", "pytest", "pytest-cov", "pytest-timeout", "pytest-xdist", "scikit-umfpack", "threadpoolctl"]
-
-[[package]]
 name = "setuptools"
 version = "69.5.1"
 description = "Easily download, build, install, upgrade, and uninstall Python packages"
@@ -2656,4 +2582,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "189910bd7efb242027b7ef3b131aeafbb2d192f8d9e7491327b2cd1101a35304"
+content-hash = "3e044a8f523190d03835e94ba9bf1016e52c96dad3a5c960291e3fec12188070"
