@@ -1,17 +1,16 @@
-# dedicated image with python 3.9 installed
-image:
-  file: .gitpod.dockerfile
+image: gitpod/workspace-python-3.12
 
 tasks:
-  - before: |
-      export FLASK_APP=yaptide.application
-      export FLASK_DEBUG=1
-    init: |
-      export POETRY_VIRTUALENVS_CREATE=false
-      export FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///main.db
-      pip install poetry && poetry install --only main
-    command: |
-      poetry run flask run
+  - name: Prepare
+    env:
+      FLASK_APP: yaptide.application
+      FLASK_DEBUG: 1
+      POETRY_VIRTUALENVS_CREATE: false
+      FLASK_SQLALCHEMY_DATABASE_URI: sqlite:///main.db
+    init: pip install poetry && poetry install --only main
+    command: poetry run flask run
+
 vscode:
   extensions:
     - ms-python.python
+    - ms-python.debugpy

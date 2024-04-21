@@ -51,8 +51,5 @@ RUN python3 -c "import os; content = open('yaptide/admin/simulator_storage.py', 
 # skipcq: DOK-W1001
 RUN chmod +x run_worker.sh yaptide/admin/simulators.py
 
-# Health check
-HEALTHCHECK --start-period=30s CMD celery --app yaptide.celery.worker inspect ping
-
 # Set the script as the entry point, Windows users require to run the script via bash, as `./` does not work
 ENTRYPOINT ["bash", "run_worker.sh"]
