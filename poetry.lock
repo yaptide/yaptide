@@ -195,8 +195,8 @@ files = [
 jmespath = ">=0.7.1,<2.0.0"
 python-dateutil = ">=2.1,<3.0.0"
 urllib3 = [
-    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
     {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""},
+    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
 ]
 
 [package.extras]
@@ -1361,13 +1361,13 @@ dev = ["coverage", "flake8", "mypy", "pyyaml"]
 
 [[package]]
 name = "mkdocs-section-index"
-version = "0.3.8"
+version = "0.3.9"
 description = "MkDocs plugin to allow clickable sections that lead to an index page"
 optional = false
-python-versions = ">=3.7"
+python-versions = ">=3.8"
 files = [
-    {file = "mkdocs_section_index-0.3.8-py3-none-any.whl", hash = "sha256:823d298d78bc1e73e23678ff60889f3c369c2167b03dba73fea88bd0e268a60d"},
-    {file = "mkdocs_section_index-0.3.8.tar.gz", hash = "sha256:bbd209f0da79441baf136ef3a9c40665bb9681d1fb62c73ca2f116fd1388a404"},
+    {file = "mkdocs_section_index-0.3.9-py3-none-any.whl", hash = "sha256:5e5eb288e8d7984d36c11ead5533f376fdf23498f44e903929d72845b24dfe34"},
+    {file = "mkdocs_section_index-0.3.9.tar.gz", hash = "sha256:b66128d19108beceb08b226ee1ba0981840d14baf8a652b6c59e650f3f92e4f8"},
 ]
 
 [package.dependencies]
@@ -1756,10 +1756,10 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
     {version = ">=1.21", markers = "python_version == \"3.10\""},
     {version = ">=1.23.3", markers = "python_version == \"3.11\""},
     {version = ">=1.26", markers = "python_version == \"3.12\""},
+    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
 ]
 
 [package.extras]
@@ -2568,4 +2568,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "92f8ba6273a157152bf845e393fe0251c3ddf585e1bfe3f549de67c52c46fe36"
+content-hash = "b2590cd8f1c85d370470f03a6c02eca5498aa0608f1bf653484ed209c33d4515"
