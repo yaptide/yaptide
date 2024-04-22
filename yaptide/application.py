@@ -35,7 +35,7 @@ def create_app():
         app.logger.info("enabling cors")
         from flask_cors import CORS
         cors_config = {
-            "origins": ["http://127.0.0.1:3000","http://localhost:3000"],
+            "origins": ["http://127.0.0.1:3000", "http://localhost:3000"],
             "supports_credentials": True,
             "resources": {
                 r"/*": {
