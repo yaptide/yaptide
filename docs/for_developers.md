@@ -24,6 +24,7 @@ If you want to install only main dependencies, you can use:
 ```bash
 poetry  install --only main,test
 ```
+(There can't be space after comma in above command)
 
 ## Building and running the app
 
@@ -43,15 +44,32 @@ flowchart LR
 
     To simply init download process we have to run following commands:
 
-    ```bash
-    poetry run ./yaptide/admin/simulators.py download-shieldhit --dir bin
-    ```
+    === "Linux"
+
+        ```bash
+        poetry run yaptide/admin/simulators.py download-shieldhit --dir bin
+        ```
+
+    === "Windows (PowerShell)"
+
+        ```powershell
+        poetry run yaptide\admin\simulators.py download-shieldhit --dir bin
+        ```
 
     To get full instruction of command usage we can type
 
-    ```bash
-    poetry run ./yaptide/admin/simulators.py
-    ```
+    === "Linux"
+
+        ```bash
+        poetry run yaptide/admin/simulators.py
+        ```
+
+    === "Windows (PowerShell)"
+
+        ```powershell
+        poetry run yaptide\admin\simulators.py
+        ```
+
 
 2. Get the redis
     If you already use it just start it on port `6379`
@@ -73,13 +91,15 @@ flowchart LR
     You can reuse the same terminal, as for redis, as docker sends redis process to the background
 
     === "Linux"
+
         ```bash
-        CELERY_BROKER_URL=redis://localhost:6379/0 CELERY_RESULT_BACKEND=redis://localhost:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        PATH=$PATH:bin BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
         ```
 
     === "Windows (PowerShell)"
+
         ```powershell
-        $env:CELERY_BROKER_URL="redis://localhost:6379/0"; $env:CELERY_RESULT_BACKEND="redis://localhost:6379/0"; poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
         ```
 
 4. Run the app
@@ -87,12 +107,13 @@ flowchart LR
     === "Linux"
 
         ```bash
-        FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" poetry run flask --app yaptide.application run
+        FLASK_USE_CORS=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run flask --app yaptide.application run
         ```
 
     === "Windows (PowerShell)"
+
         ```powershell
-        $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; poetry run flask --app yaptide.application run
+        $env:FLASK_USE_CORS="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run flask --app yaptide.application run
         ```
 
 
@@ -101,42 +122,50 @@ flowchart LR
     To get more debugging information you can also force SQLALCHEMY to use `echo` mode by setting `SQLALCHEMY_ECHO` environment variable to `True`.
 
     === "Linux"
+
         ```bash
-        FLASK_SQLALCHEMY_ECHO=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" poetry run flask --app yaptide.application run
+        FLASK_SQLALCHEMY_ECHO=True FLASK_USE_CORS=True FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite" CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run flask --app yaptide.application run
         ```
 
     === "Windows (PowerShell)"
+
         ```powershell
-        $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite://db.sqlite"; poetry run flask --app yaptide.application run
+        $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_USE_CORS="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run flask --app yaptide.application run
         ```
-
-
+    
     To include debugging messages from flask, add `--debug` option to the command.
+
+    While running backend and frontend, developer may encounter [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To resolve these CORS issues, one should set FLASK_USE_CORS=True in the `.env` file (notice that it's already included in above command).  Also pay attention if your frontend runs on ```http://127.0.0.1:3000``` or ```http://localhost:3000```, because right now cors_config in application.py specifies these URLs.
+
 
 ## Database
 
 To add user, run:
 
 === "Linux"
+
     ```bash
-    FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite" poetry run ./yaptide/admin/db_manage.py add-user admin --password password
+    FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite" poetry run yaptide/admin/db_manage.py add-user admin --password password
     ```
 
 === "Windows (PowerShell)"
+
     ```powershell
-    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run ./yaptide/admin/db_manage.py add-user admin --password password
+    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run yaptide\admin\db_manage.py add-user admin --password password
     ```
 
 You can use the following command, to get more information:
 
 === "Linux"
+
     ```bash
-    FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite" poetry run ./yaptide/admin/db_manage.py --help
+    FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite" poetry run yaptide/admin/db_manage.py --help
     ```
 
 === "Windows (PowerShell)"
+
     ```powershell
-    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run ./yaptide/admin/db_manage.py --help
+    $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite"; poetry run yaptide\admin\db_manage.py --help
     ```
 
 ## Testing
@@ -144,6 +173,7 @@ You can use the following command, to get more information:
 To run tests use:
 
 === "Linux"
+
     ```shell
     poetry run pytest
     ```
