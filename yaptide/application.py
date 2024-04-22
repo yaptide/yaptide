@@ -39,7 +39,7 @@ def create_app():
             "supports_credentials": True,
             "resources": {
                 r"/*": {
-                    "origins": ["http://127.0.0.1:3000","http://localhost:3000"]
+                    "origins": ["http://127.0.0.1:3000", "http://localhost:3000"]
                 }
             },
             "allow_headers": ["Content-Type", "Authorization"],
