@@ -45,7 +45,7 @@ mkdocstrings = {version = ">=0.18", extras = ["python"]}
 mkdocs-material = "9.5.18"
 mkdocs-gen-files = "0.5.0"
 mkdocs-literate-nav = "0.6.1"
-mkdocs-section-index = "0.3.8"
+mkdocs-section-index = "0.3.9"
 mkdocs-render-swagger-plugin = "0.1.1"
 
 [build-system]
