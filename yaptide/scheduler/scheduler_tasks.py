@@ -15,7 +15,7 @@ def save_tasks_progres_from_redis_job(app):
     messages = redis_client.lpop('task_updates', count = 1000)
     # Queue can be empty if there are no tasks to update
     if messages == None or len(messages) == 0:
-        logging.info('No tasks received from redis')
+        app.logger.debug('No simulation tasks in queue. Skipping')
         return
     
     start = datetime.now()
@@ -31,13 +31,13 @@ def save_tasks_progres_from_redis_job(app):
             task_id = payload_dict["task_id"]
             task = fetch_task_by_sim_id_and_task_id(sim_id = sim_id, task_id = task_id)
             if not task:
-                logging.warning(f"Simulation {sim_id}: task {payload_dict['task_id']} does not exist")
+                app.logger.warning(f"Simulation {sim_id}: task {payload_dict['task_id']} does not exist")
                 continue
             tasks_to_update.append((task, payload_dict["update_dict"]))
         # Batch update of all accepted tasks
         update_tasks_states(tasks_to_update)
     finish = datetime.now()
     elapsed = (finish - start).total_seconds()
-    logging.info(f"Tasks processed: {len(messages)}, tasks updated: {len(tasks_to_update)}, time elapsed: {elapsed}s")
-    logging.info("Successfully updated tasks")
+    app.logger.info(f"Tasks processed: {len(messages)}, tasks updated: {len(tasks_to_update)}, time elapsed: {elapsed}s")
+    app.logger.info("Successfully updated tasks")
 

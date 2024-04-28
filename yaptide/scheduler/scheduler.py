@@ -7,6 +7,7 @@ scheduler = APScheduler()
 def run_scheduler(app):
     scheduler.init_app(app)
     scheduler.start()
+    
     with app.app_context():
         scheduler.add_job(
             id="save_tasks_progres_from_redis",
@@ -14,3 +15,6 @@ def run_scheduler(app):
             trigger="interval",
             seconds=2,
             args=(scheduler.app,))
+        if scheduler.get_job("save_tasks_progres_from_redis") is not None:
+            app.logger.info("scheduled job: save_tasks_progres_from_redis_job")
+        
