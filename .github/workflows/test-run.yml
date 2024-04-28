@@ -24,7 +24,7 @@ jobs:
       POETRY_VIRTUALENVS_CREATE: false
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11']
+        python-version: ['3.9', '3.10', '3.11', '3.12']
         platform: [ubuntu-latest, windows-latest]
         exclude:
           - python-version: '3.9'
@@ -90,7 +90,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: Install dependencies for production and test
         run: |
@@ -109,7 +109,7 @@ jobs:
           S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest --cov=./ --cov-report xml
+        run: poetry run pytest --cov=./ --cov-report xml
 
       - name: Upload coverage report to deepsource
         run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml

@@ -1,29 +1,26 @@
-version: "3.4"
+# this docker compose should be compatible also with older (<=v24) version of docker engine
 
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: yaptide_redis
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
 
-    redis:
-        image: redis:7-alpine
-        container_name: yaptide_redis
-        healthcheck:
-            test: ["CMD", "redis-cli", "ping"]
-
-    postgresql:
-        image: postgres:latest
-        container_name: yaptide_postgresql
-        environment:
-            POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
-            POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
-            POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
-            PGDATA: /var/lib/postgresql/data/pgdata
-        volumes:
-            - data:/var/lib/postgresql/data
-        ports:
-            - 5432:5432
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
-            # start_period: 30s
-            # retries: 5
+  postgresql:
+    image: postgres:16-alpine
+    container_name: yaptide_postgresql
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
+      POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-yaptide_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - data:/var/lib/postgresql/data
+    ports:
+      - 5432:5432
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h $${POSTGRES_HOST:-postgresql} -p $${POSTGRES_PORT:-5432} -U $${POSTGRES_USER:-yaptide_user}"]
 
     yaptide_flask:
         build:
@@ -72,6 +69,7 @@ services:
                 condition: service_healthy
             yaptide_flask:
                 condition: service_healthy
+
     nginx:
         image: yaptide_nginx
         container_name: yaptide_nginx

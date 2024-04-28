@@ -1,4 +1,4 @@
-FROM python:3.10-slim
+FROM python:3.12-slim
 ARG POETRY_VERSION=1.8.2
 
 # install gfortran via apt and clean cache
@@ -35,6 +35,9 @@ COPY run_worker.sh .
 # copy yaptide source code
 COPY yaptide ./yaptide
 
+# copy .gitsubmodules file to check if submodules are cloned correctly
+COPY .gitmodules ./
+
 # Some of our developers use Windows to run Docker, their bash scripts have CRLF line endings
 # therefore when copied to the container they are not executable. This is a workaround to fix that.
 # skipcq: DOK-W1001
@@ -47,9 +50,6 @@ RUN python3 -c "import os; content = open('yaptide/admin/simulator_storage.py', 
 # Make the scripts executable
 # skipcq: DOK-W1001
 RUN chmod +x run_worker.sh yaptide/admin/simulators.py
-
-# Health check
-HEALTHCHECK --start-period=30s CMD celery --app yaptide.celery.worker inspect ping
 
 # Set the script as the entry point, Windows users require to run the script via bash, as `./` does not work
 ENTRYPOINT ["bash", "run_worker.sh"]

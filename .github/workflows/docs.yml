@@ -43,7 +43,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
-            python-version: '3.11'
+            python-version: '3.12'
       - name: Update pip and install poetry
         run: |
           python3 -m pip install --upgrade pip
@@ -61,13 +61,13 @@ jobs:
             S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
             S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
             S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest --cov-report html:htmlcov --cov=yaptide
+        run: poetry run pytest --cov-report html:htmlcov --cov=yaptide
       - name: Install dependencies for documentation
         run: poetry install --only docs
       - name: Build site
         run: mkdocs build
       - name: Setup Pages
-        uses: actions/configure-pages@v4
+        uses: actions/configure-pages@v5
       - name: Upload artifact if on master
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-pages-artifact@v3

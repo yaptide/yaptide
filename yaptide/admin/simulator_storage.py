@@ -60,10 +60,10 @@ def extract_shieldhit_from_zip(archive_path: Path, unpacking_dir: Path, member_n
 
 def download_shieldhit_demo_version(destination_dir: Path) -> bool:
     """Download shieldhit demo version from shieldhit.org"""
-    demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.0.1.tar.gz'
+    demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.1.0.tar.gz'
     # check if working on Windows
     if platform.system() == 'Windows':
-        demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.0.1.zip'
+        demo_version_url = 'https://shieldhit.org/download/DEMO/shield_hit12a_win64_demo_v1.1.0.zip'
 
     # create temporary directory and download
     # Create a temporary file to store the downloaded binary data
