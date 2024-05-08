@@ -163,17 +163,17 @@ files = [
 
 [[package]]
 name = "boto3"
-version = "1.34.99"
+version = "1.34.100"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.34.99-py3-none-any.whl", hash = "sha256:b54084d000483b578757df03ce39a819fbba47071c9aa98611beb8806bcecd45"},
-    {file = "boto3-1.34.99.tar.gz", hash = "sha256:6f600b3fe0bda53476395c902d9af5a47294c93ec52a9cdc2b926a9dc705ce79"},
+    {file = "boto3-1.34.100-py3-none-any.whl", hash = "sha256:bbe2bb0dfcd92380da2a2fa2c2f586ba06c118b796380b2d0f3d0ebd103ec28d"},
+    {file = "boto3-1.34.100.tar.gz", hash = "sha256:016f6d66900bb1a835dea2063f1e91fc7057dbf7fb7df8add0706f0da9492631"},
 ]
 
 [package.dependencies]
-botocore = ">=1.34.99,<1.35.0"
+botocore = ">=1.34.100,<1.35.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -182,21 +182,21 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.34.99"
+version = "1.34.100"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "botocore-1.34.99-py3-none-any.whl", hash = "sha256:18c68bdeb0ffb73290912b0c96204fc36d3128f00a00b5cdc35ac34d66225f1c"},
-    {file = "botocore-1.34.99.tar.gz", hash = "sha256:cafe569e2136cb33cb0e5dd32fb1c0e1503ddc1413d3be215df8ddf05e69137a"},
+    {file = "botocore-1.34.100-py3-none-any.whl", hash = "sha256:ee516fb9e9e906d311f2a9921afaf79c594db239a5b4b626e89e6960401aad0b"},
+    {file = "botocore-1.34.100.tar.gz", hash = "sha256:513bea60c6531af8e1ae1fdb2947e3ef99712f39c58f4656b5efef9cb6f75a13"},
 ]
 
 [package.dependencies]
 jmespath = ">=0.7.1,<2.0.0"
 python-dateutil = ">=2.1,<3.0.0"
 urllib3 = [
-    {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""},
     {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
+    {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""},
 ]
 
 [package.extras]
@@ -1770,10 +1770,10 @@ files = [
 
 [package.dependencies]
 numpy = [
+    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
     {version = ">=1.21", markers = "python_version == \"3.10\""},
     {version = ">=1.23.3", markers = "python_version == \"3.11\""},
     {version = ">=1.26", markers = "python_version == \"3.12\""},
-    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
 ]
 
 [package.extras]
@@ -2582,4 +2582,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "b43e7b31f6aa8398ce450d2c8f6014baed49b6abc708b9059bfc1173cbd5812a"
+content-hash = "0ffc841f06b54fef12cda7001428f02fea2c4eb6e762cbbffe98cf3536052856"
