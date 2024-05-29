@@ -8,8 +8,8 @@ import subprocess
 from typing import Generator
 import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
-
 from yaptide.application import create_app
+from yaptide.persistence.database import db
 
 
 @pytest.fixture(scope='session')
@@ -190,17 +190,17 @@ def modify_tmpdir(tmpdir_factory):
 
     # Restore the original TMPDIR value after the tests are done
     if original_tmpdir is None:
-        del os.environ['TMP']
+        del os.environ['TMPDIR']
     else:
-        os.environ['TMP'] = original_tmpdir
+        os.environ['TMPDIR'] = original_tmpdir
     if original_temp is None:
         del os.environ['TEMP']
     else:
         os.environ['TEMP'] = original_temp
     if original_tmp is None:
-        del os.environ['TMPDIR']
+        del os.environ['TMP']
     else:
-        os.environ['TMPDIR'] = original_tmp
+        os.environ['TMP'] = original_tmp
 
 
 @pytest.fixture(scope="function")
@@ -222,8 +222,6 @@ def app(tmp_path):
     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 
     logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    
-    from yaptide.persistence.database import db
     app = create_app()
     with app.app_context():
         db.drop_all()

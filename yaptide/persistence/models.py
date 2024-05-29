@@ -97,7 +97,6 @@ class SimulationModel(db.Model):
 
     __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
 
-
     def update_state(self, update_dict: dict) -> bool:
         """
         Updating database is more costly than a simple query.
@@ -192,8 +191,8 @@ class TaskModel(db.Model):
             self.simulated_primaries = update_dict["simulated_primaries"]
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
-            # if self.task_state == EntityState.COMPLETED.value:
-            #     self.simulated_primaries = self.requested_primaries
+            if self.task_state == EntityState.COMPLETED.value:
+                self.simulated_primaries = self.requested_primaries
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None
