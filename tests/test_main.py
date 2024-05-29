@@ -21,7 +21,7 @@ def client(app):
     _client = app.test_client()
     yield _client
 
-
+    
 def test_app_started(client):
     """Test if the app started."""
     resp = client.get("/")

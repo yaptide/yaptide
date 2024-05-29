@@ -10,7 +10,6 @@ import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 
 from yaptide.application import create_app
-from yaptide.persistence.database import db
 
 
 @pytest.fixture(scope='session')
@@ -223,12 +222,12 @@ def app(tmp_path):
     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 
     logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
+    
+    from yaptide.persistence.database import db
     app = create_app()
     with app.app_context():
         db.drop_all()
         db.create_all()
-
     yield app
 
     # clean up the database

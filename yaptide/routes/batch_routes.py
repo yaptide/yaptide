@@ -23,6 +23,7 @@ from yaptide.routes.utils.response_templates import (error_validation_response,
                                                      error_internal_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
 
 
@@ -69,9 +70,8 @@ class JobsBatch(Resource):
                                           sim_type=payload_dict["sim_type"],
                                           input_type=input_type,
                                           title=payload_dict.get("title", ''))
-        update_key = str(uuid.uuid4())
-        simulation.set_update_key(update_key)
         add_object_to_db(simulation)
+        update_key = encode_simulation_auth_token(simulation.id)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 
