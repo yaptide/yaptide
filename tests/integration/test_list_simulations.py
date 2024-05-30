@@ -96,3 +96,4 @@ def test_list_simulations(celery_app,
     assert data["page_count"] == 3
     assert len(data["simulations"]) == 1
     assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation
+    sleep(5)
