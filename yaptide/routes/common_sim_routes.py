@@ -151,9 +151,8 @@ class ResultsResource(Resource):
         # but tasks didnt' sent their completion status or simulated_primaries = requested_primaries.
         # To avoid this, we update simulation tasks by their final status
         tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
-        update_dicts = [(task, {"task_state": EntityState.COMPLETED.value }) for task in tasks]
-        for i in update_dicts:
-            update_task_state(i)
+        for task in tasks:
+            update_task_state(task, {"task_state": EntityState.COMPLETED.value})
 
         return yaptide_response(message="Results saved", code=202)
 
