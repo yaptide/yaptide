@@ -8,7 +8,7 @@ SECRET_KEY_TOKEN_REFRESH = token_hex(256)
 _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
 _Keycloak_Token_Expiration_Time = 30  # minutes
-_Simulation_Token_Expiration_time = 7  #days
+_Simulation_Token_Expiration_time = 7  # days
 
 
 def encode_auth_token(user_id: int,

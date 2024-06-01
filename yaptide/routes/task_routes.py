@@ -31,7 +31,7 @@ class TasksResource(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        #Check if update_dict is a valid JWT token that is assigned to requested simulation_id
+        # Check if update_dict is a valid JWT token that is assigned to requested simulation_id
         sim_id: int = payload_dict["simulation_id"]
         simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
         if not simulation:
