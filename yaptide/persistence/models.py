@@ -196,8 +196,8 @@ class TaskModel(db.Model):
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         self.update_time(update_dict)
 
-
     def update_time(self, update_dict):
+        """Updates time-related fields"""
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None
         if have_estim_time and end_time_not_set:
