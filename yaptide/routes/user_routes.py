@@ -8,8 +8,7 @@ from sqlalchemy import asc, desc
 
 from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
 
 DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
 DEFAULT_PAGE_IDX = 1  # default page index
@@ -72,10 +71,12 @@ class UserSimulations(Resource):
                         'input_type': simulation.input_type,
                         'sim_type': simulation.sim_type
                     }
-                }
-                for simulation in simulations],
-            'page_count': pagination.pages,
-            'simulations_count': pagination.total,
+                } for simulation in simulations
+            ],
+            'page_count':
+            pagination.pages,
+            'simulations_count':
+            pagination.total,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)
 

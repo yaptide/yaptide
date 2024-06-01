@@ -7,14 +7,9 @@ from flask import Flask
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation_with_flask(celery_app,
-                                   celery_worker,
-                                   client: Flask,
-                                   db_good_username: str,
-                                   db_good_password: str,
-                                   small_simulation_payload: dict,
-                                   add_simulators_to_path_variable,
-                                   shieldhit_binary_installed):
+def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_good_username: str,
+                                   db_good_password: str, small_simulation_payload: dict,
+                                   add_simulators_to_path_variable, shieldhit_binary_installed):
     """Test we can run simulations"""
     client.put("/auth/register",
                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
@@ -27,9 +22,7 @@ def test_run_simulation_with_flask(celery_app,
     assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
 
     logging.info("Sending job submition request on /jobs/direct endpoint")
-    resp = client.post("/jobs/direct",
-                       data=json.dumps(small_simulation_payload),
-                       content_type='application/json')
+    resp = client.post("/jobs/direct", data=json.dumps(small_simulation_payload), content_type='application/json')
 
     assert resp.status_code == 202  # skipcq: BAN-B101
     jobs_direct_data = json.loads(resp.data.decode())
@@ -50,15 +43,15 @@ def test_run_simulation_with_flask(celery_app,
     assert {"message", "input"} == set(inputs_data.keys())
     assert {"input_type", "input_files", "input_json", "number_of_all_primaries"} == set(inputs_data["input"].keys())
     required_converted_files = {"beam.dat", "detect.dat", "geo.dat", "info.json", "mat.dat"}
-    assert required_converted_files == required_converted_files.intersection(set(inputs_data["input"]["input_files"].keys()))
+    assert required_converted_files == required_converted_files.intersection(
+        set(inputs_data["input"]["input_files"].keys()))
     requested_primaries = small_simulation_payload["input_json"]["beam"]["numberOfParticles"]
     requested_primaries /= small_simulation_payload["ntasks"]
 
     max_number_of_attempts = 200
     for i in range(max_number_of_attempts):
         logging.info("Sending check job status request on /jobs endpoint, attempt %d", i)
-        resp = client.get("/jobs",
-                          query_string={"job_id": job_id})
+        resp = client.get("/jobs", query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101
         jobs_data = json.loads(resp.data.decode())
 
@@ -70,7 +63,8 @@ def test_run_simulation_with_flask(celery_app,
         if jobs_data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
             # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
-            assert any(task["task_state"] in {"RUNNING", "PENDING", "COMPLETED"} for task in jobs_data["job_tasks_status"])
+            assert any(task["task_state"] in {"RUNNING", "PENDING", "COMPLETED"}
+                       for task in jobs_data["job_tasks_status"])
 
             # check if during execution we have non-empty start_time  and empty end_time
             resp = client.get("/user/simulations")
@@ -90,8 +84,10 @@ def test_run_simulation_with_flask(celery_app,
                 logging.info("Expecting simulated_primaries: %s", requested_primaries)
                 logging.info("Got requested_primaries: %s", task["requested_primaries"])
                 logging.info("Got simulated_primaries: %s", task["simulated_primaries"])
-                assert task["requested_primaries"] == requested_primaries, f"Requested primaries should be equal to {requested_primaries}"
-                assert task["simulated_primaries"] == requested_primaries, f"Simulated primaries should be equal to {requested_primaries}"
+                assert task[
+                    "requested_primaries"] == requested_primaries, f"Requested primaries should be equal to {requested_primaries}"
+                assert task[
+                    "simulated_primaries"] == requested_primaries, f"Simulated primaries should be equal to {requested_primaries}"
         if jobs_data['job_state'] in ['COMPLETED', 'FAILED']:
             assert jobs_data['job_state'] == 'COMPLETED'
             logging.info("Job completed, exiting loop")

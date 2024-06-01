@@ -85,8 +85,8 @@ class YaptideTester:
 
     def __init__(self, host: str, port: int, username: str, password: str):
         self.endpoints = Endpoints(host, port)
-        self.session = YaptideTesterSession(
-            self.endpoints.http_auth_login, self.endpoints.http_auth_logout, username, password)
+        self.session = YaptideTesterSession(self.endpoints.http_auth_login, self.endpoints.http_auth_logout, username,
+                                            password)
 
     def run_tests(self, sim_n: int, flags: dict):  # skipcq: PY-R1000
         """Function running all important tests - might be extended in future"""
@@ -197,8 +197,8 @@ class YaptideTester:
                             return
                         if res_json.get('job_state') == "FAILED":
                             print("FAILED")
-                            res: requests.Response = self.session.get(
-                                self.endpoints.http_logfiles, params={"job_id": job_id})
+                            res: requests.Response = self.session.get(self.endpoints.http_logfiles,
+                                                                      params={"job_id": job_id})
                             res_json: dict = res.json()
                             if res.status_code != 200:
                                 print(res_json)
@@ -220,10 +220,11 @@ class YaptideTester:
         """Example checking backend jobs with pagination"""
         order_by = "start_time"
         order_type = "descend"
-        res: requests.Response = self.session.get(self.endpoints.http_list_sims, params={
-            "order_by": order_by,
-            "order_type": order_type,
-        })
+        res: requests.Response = self.session.get(self.endpoints.http_list_sims,
+                                                  params={
+                                                      "order_by": order_by,
+                                                      "order_type": order_type,
+                                                  })
         res_json: dict = res.json()
         if res.status_code != 200:
             print(res_json)
@@ -231,13 +232,14 @@ class YaptideTester:
         simulations_count = res_json["simulations_count"]
         print(f"Number of user simulations in database: {simulations_count}")
         page_size = int(math.sqrt(simulations_count))
-        for i in range(math.ceil(simulations_count/page_size)):
-            res: requests.Response = self.session.get(self.endpoints.http_list_sims, params={
-                "page_size": page_size,
-                "page_idx": i,
-                "order_by": order_by,
-                "order_type": order_type,
-            })
+        for i in range(math.ceil(simulations_count / page_size)):
+            res: requests.Response = self.session.get(self.endpoints.http_list_sims,
+                                                      params={
+                                                          "page_size": page_size,
+                                                          "page_idx": i,
+                                                          "order_by": order_by,
+                                                          "order_type": order_type,
+                                                      })
             res_json: dict = res.json()
             for sim in res_json['simulations']:
                 print(sim)
@@ -273,11 +275,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     tester = YaptideTester(host=args.host, port=args.port, username=args.username, password=args.password)
-    tester.run_tests(sim_n=args.sim_n, flags={
-        "do_monitor": args.do_monitor,
-        "test_jsons": args.test_jsons,
-        "test_files": args.test_files,
-        "run_direct": args.run_direct,
-        "run_batch": args.run_batch,
-        "all": args.all
-    })
+    tester.run_tests(sim_n=args.sim_n,
+                     flags={
+                         "do_monitor": args.do_monitor,
+                         "test_jsons": args.test_jsons,
+                         "test_files": args.test_files,
+                         "run_direct": args.run_direct,
+                         "run_batch": args.run_batch,
+                         "all": args.all
+                     })

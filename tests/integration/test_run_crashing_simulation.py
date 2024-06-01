@@ -7,15 +7,9 @@ from flask import Flask
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation_with_flask_crashing(celery_app,
-                                            celery_worker,
-                                            client: Flask,
-                                            db_good_username: str,
-                                            db_good_password: str,
-                                            payload_files_dict_data: dict,
-                                            modify_tmpdir,
-                                            add_simulators_to_path_variable,
-                                            shieldhit_binary_installed):
+def test_run_simulation_with_flask_crashing(celery_app, celery_worker, client: Flask, db_good_username: str,
+                                            db_good_password: str, payload_files_dict_data: dict, modify_tmpdir,
+                                            add_simulators_to_path_variable, shieldhit_binary_installed):
     """Test we can run simulations"""
     client.put("/auth/register",
                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
@@ -33,9 +27,7 @@ def test_run_simulation_with_flask_crashing(celery_app,
     payload_dict_with_broken_input["input_files"]["mat.dat"] = ""
 
     logging.info("Sending job submition request on /jobs/direct endpoint")
-    resp = client.post("/jobs/direct",
-                       data=json.dumps(payload_dict_with_broken_input),
-                       content_type='application/json')
+    resp = client.post("/jobs/direct", data=json.dumps(payload_dict_with_broken_input), content_type='application/json')
 
     assert resp.status_code == 202  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
@@ -50,14 +42,14 @@ def test_run_simulation_with_flask_crashing(celery_app,
     assert {"input_type", "input_files", "number_of_all_primaries"} == set(data["input"].keys())
     required_converted_files = {"beam.dat", "detect.dat", "geo.dat", "info.json", "mat.dat"}
     assert required_converted_files == required_converted_files.intersection(set(data["input"]["input_files"].keys()))
-    
+
     counter = 0
     wait_this_long = 30
     while True:
         if counter > wait_this_long:
             logging.error("Job did not crash in %d seconds - aborting", wait_this_long)
             assert False
-        counter+=1
+        counter += 1
         logging.debug("Sending check job status request on /jobs endpoint, attempt %d", counter)
         resp = client.get("/jobs", query_string={"job_id": job_id})
         assert resp.status_code == 200  # skipcq: BAN-B101

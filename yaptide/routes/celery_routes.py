@@ -8,22 +8,15 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results,
-                                               run_job)
-from yaptide.persistence.db_methods import (add_object_to_db,
-                                            fetch_celery_simulation_by_job_id,
-                                            fetch_celery_tasks_by_sim_id,
-                                            fetch_estimators_by_sim_id,
-                                            fetch_pages_by_estimator_id,
-                                            make_commit_to_db,
-                                            update_simulation_state,
+from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results, run_job)
+from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
+                                            fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
+                                            fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
                                             update_task_state)
-from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel,
-                                        EstimatorModel, InputModel, PageModel,
+from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_internal_response,
-                                                     error_validation_response,
+from yaptide.routes.utils.response_templates import (error_internal_response, error_validation_response,
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
@@ -112,8 +105,7 @@ class JobsDirect(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -121,9 +113,7 @@ class JobsDirect(Resource):
                                         "job_tasks_status": job_tasks_status,
                                     })
 
-        job_info = {
-            "job_state": simulation.job_state
-        }
+        job_info = {"job_state": simulation.job_state}
         status_counter = Counter([task["task_state"] for task in job_tasks_status])
         if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
             job_info["job_state"] = EntityState.PENDING.value
@@ -151,16 +141,13 @@ class JobsDirect(Resource):
 
         job_id = params_dict['job_id']
 
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(
-            job_id=job_id, user=user)
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
         simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value,
-                                    EntityState.CANCELED.value,
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value,
                                     EntityState.UNKNOWN.value):
             return yaptide_response(message=f"Cannot cancel job which is in {simulation.job_state} state",
                                     code=200,
@@ -222,7 +209,8 @@ class ResultsDirect(Resource):
                 }
                 result_estimators.append(estimator_dict)
             return yaptide_response(message=f"Results for job: {job_id}",
-                                    code=200, content={"estimators": result_estimators})
+                                    code=200,
+                                    content={"estimators": result_estimators})
 
         result: dict = get_job_results(job_id=job_id)
         if "estimators" not in result:
@@ -234,8 +222,7 @@ class ResultsDirect(Resource):
             estimator.data = estimator_dict["metadata"]
             add_object_to_db(estimator)
             for page_dict in estimator_dict["pages"]:
-                page = PageModel(estimator_id=estimator.id,
-                                 page_number=int(page_dict["metadata"]["page_number"]))
+                page = PageModel(estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
                 page.data = page_dict
                 add_object_to_db(page, False)
             make_commit_to_db()

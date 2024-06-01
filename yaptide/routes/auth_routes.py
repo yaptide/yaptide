@@ -4,8 +4,7 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, ValidationError, fields
 
-from yaptide.persistence.db_methods import (add_object_to_db,
-                                            fetch_yaptide_user_by_username)
+from yaptide.persistence.db_methods import (add_object_to_db, fetch_yaptide_user_by_username)
 from yaptide.persistence.models import YaptideUserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (  # skipcq: FLK-E101
@@ -75,14 +74,12 @@ class AuthLogIn(Resource):
             access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
             refresh_token, refresh_exp = encode_auth_token(user_id=user.id, is_refresh=True)
 
-            resp = yaptide_response(
-                message='Successfully logged in',
-                code=202,
-                content={
-                    'access_exp': int(access_exp.timestamp()*1000),
-                    'refresh_exp': int(refresh_exp.timestamp()*1000),
-                }
-            )
+            resp = yaptide_response(message='Successfully logged in',
+                                    code=202,
+                                    content={
+                                        'access_exp': int(access_exp.timestamp() * 1000),
+                                        'refresh_exp': int(refresh_exp.timestamp() * 1000),
+                                    })
             resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
             resp.set_cookie('refresh_token', refresh_token, httponly=True, samesite='Lax', expires=refresh_exp)
             return resp
@@ -99,11 +96,9 @@ class AuthRefresh(Resource):
     def get(user: YaptideUserModel):
         """Method refreshing token"""
         access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
-        resp = yaptide_response(
-            message='User refreshed',
-            code=200,
-            content={'access_exp': int(access_exp.timestamp()*1000)}
-        )
+        resp = yaptide_response(message='User refreshed',
+                                code=200,
+                                content={'access_exp': int(access_exp.timestamp() * 1000)})
         resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
         return resp
 
@@ -115,11 +110,7 @@ class AuthStatus(Resource):
     @requires_auth()
     def get(user: YaptideUserModel):
         """Method returning user's status"""
-        return yaptide_response(
-            message='User status',
-            code=200,
-            content={'username': user.username}
-        )
+        return yaptide_response(message='User status', code=200, content={'username': user.username})
 
 
 class AuthLogOut(Resource):

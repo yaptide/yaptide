@@ -8,8 +8,7 @@ services:
       test: ["CMD", "redis-cli", "ping"]
 
   postgresql:
-    # image: postgres:16-alpine
-    image: postgres:latest
+    image: postgres:16-alpine
     container_name: yaptide_postgresql
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
@@ -30,7 +29,6 @@ services:
         image: yaptide_flask
         container_name: yaptide_flask
         environment:
-            # - FLASK_DEBUG=1
             - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
             - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
             - CERT_AUTH_URL=${CERT_AUTH_URL:-}
@@ -38,8 +36,6 @@ services:
             - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
             - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
             - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
-            # - FLASK_SCHEDULER_API_ENABLED=True
-            # - REDIS_URL=redis://redis:6379/0
         depends_on:
             redis:
                 condition: service_healthy
@@ -64,7 +60,6 @@ services:
             - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
             - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
             - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
-            # - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
             - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
         healthcheck:
             test: ["CMD-SHELL", "celery --app yaptide.celery.worker inspect ping"]

@@ -31,8 +31,7 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
     context = ssl.SSLContext()
 
     req = request.Request(results_url,
-                          json.dumps(dict_to_send).encode(),
-                          {'Content-Type': 'application/json'},
+                          json.dumps(dict_to_send).encode(), {'Content-Type': 'application/json'},
                           method='POST')
 
     try:
@@ -46,13 +45,9 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-        handlers=[
-            logging.StreamHandler()
-        ]
-    )
+    logging.basicConfig(level=logging.INFO,
+                        format="%(asctime)s %(levelname)s %(message)s",
+                        handlers=[logging.StreamHandler()])
     parser = argparse.ArgumentParser()
     parser.add_argument("--output_dir", type=str)
     parser.add_argument("--sim_id", type=int)
@@ -64,9 +59,7 @@ if __name__ == "__main__":
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
 
-    send_simulation_results(
-        output_Path=Path(args.output_dir),
-        simulation_id=args.sim_id,
-        update_key=args.update_key,
-        backend_url=args.backend_url
-    )
+    send_simulation_results(output_Path=Path(args.output_dir),
+                            simulation_id=args.sim_id,
+                            update_key=args.update_key,
+                            backend_url=args.backend_url)
