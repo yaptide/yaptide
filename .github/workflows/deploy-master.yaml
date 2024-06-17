@@ -40,7 +40,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           provenance: false
           context: .
@@ -80,7 +80,7 @@ jobs:
           images: ${{ env.REGISTRY }}/${{ env.FLASK_IMAGE_NAME }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           provenance: false
           context: .
