@@ -48,7 +48,7 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
     requested_primaries = small_simulation_payload["input_json"]["beam"]["numberOfParticles"]
     requested_primaries /= small_simulation_payload["ntasks"]
 
-    max_number_of_attempts = 200
+    max_number_of_attempts = 20
     for i in range(max_number_of_attempts):
         logging.info("Sending check job status request on /jobs endpoint, attempt %d", i)
         resp = client.get("/jobs", query_string={"job_id": job_id})

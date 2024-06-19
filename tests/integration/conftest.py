@@ -9,7 +9,7 @@ from typing import Generator
 import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
-from yaptide.persistence.database import db
+import pytest
 
 
 @pytest.fixture(scope='session')
@@ -48,6 +48,17 @@ def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, 
                 if "filter" in quantity:
                     del quantity["filter"]
     yield payload_dict
+
+# @pytest.fixture(scope='session')
+# def celery_enable_logging():
+#     # type: () -> bool
+#     """You can override this fixture to enable logging."""
+#     return True
+
+
+
+
+
 
 
 @pytest.fixture(scope='session')
@@ -120,40 +131,39 @@ def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
     os.environ['PATH'] = original_path
 
 
-@pytest.fixture(scope='function')
-def celery_app():
-    """
-    Create celery app for testing, we reuse the one from yaptide.celery.worker module.
-    The choice of broker and backend is important, as we don't want to run external redis server.
-    That is being configured via environment variables in pytest.ini file.
-    """
-    logging.info("Creating celery app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    from yaptide.celery.worker import celery_app as app
-    # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
-    app.conf.task_default_pool = 'eventlet'
-    yield app
+# @pytest.fixture(scope='function')
+# def celery_app():
+#     """
+#     Create celery app for testing, we reuse the one from yaptide.celery.worker module.
+#     The choice of broker and backend is important, as we don't want to run external redis server.
+#     That is being configured via environment variables in pytest.ini file.
+#     """
+#     logging.info("Creating celery app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+#     from yaptide.celery.worker import celery_app as app
+#     # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
+#     app.conf.task_default_pool = 'eventlet'
+#     yield app
 
 
-@pytest.fixture(scope="function")
-def celery_worker_parameters() -> Generator[dict, None, None]:
-    """
-    Default celery worker parameters cause problems with finding "ping task" module, as being described here:
-    https://github.com/celery/celery/issues/4851#issuecomment-604073785
-    To solve that issue we disable the ping check.
-    Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
+# @pytest.fixture(scope="function")
+# def celery_worker_parameters() -> Generator[dict, None, None]:
+#     """
+#     Default celery worker parameters cause problems with finding "ping task" module, as being described here:
+#     https://github.com/celery/celery/issues/4851#issuecomment-604073785
+#     To solve that issue we disable the ping check.
+#     Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
 
-    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
-    """
-    logging.info("Creating celery worker parameters for testing")
+#     Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
+#     """
+#     logging.info("Creating celery worker parameters for testing")
 
-    # get current logging level
-    log_level = logging.getLogger().getEffectiveLevel()
+#     # get current logging level
+#     log_level = logging.getLogger().getEffectiveLevel()
 
-    yield {
-        "perform_ping_check": False,
-        "concurrency": 2,
-        "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
-    }
+#     yield {
+#         "perform_ping_check": False,
+#         "concurrency": 2,
+#     }
 
 
 @pytest.fixture(scope='function')
@@ -203,25 +213,40 @@ def modify_tmpdir(tmpdir_factory):
         os.environ['TMP'] = original_tmp
 
 
+# @pytest.fixture(scope='session')
+# def celery_includes():
+#     return [
+#         'yaptide.celery.tasks'
+#     ]
+
+# @pytest.fixture(scope='session')
+# def celery_config():
+#     return {
+#         'broker_url': 'memory://',
+#         'result_backend': 'redis://'
+#     }
+
+
 @pytest.fixture(scope="function")
 def app(tmp_path):
     """Create Flask app for testing"""
     # for some unknown reasons Flask live server and celery won't work with the default in-memory database
     # so we need to create a temporary database file
     # for each new test a new temporary directory is created
-    sqlite_db_path = Path(tmp_path) / 'main.db'
-    # ensure the sqlite file doesn't exist, remove if exists
-    if sqlite_db_path.exists():
-        logging.info("Removing old sqlite database file %s", sqlite_db_path)
-        sqlite_db_path.unlink()
+    # sqlite_db_path = Path(tmp_path) / 'main.db'
+    # # ensure the sqlite file doesn't exist, remove if exists
+    # if sqlite_db_path.exists():
+    #     logging.info("Removing old sqlite database file %s", sqlite_db_path)
+    #     sqlite_db_path.unlink()
 
-    # Store the original TMPDIR value
-    old_db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
-    new_db_uri = f'sqlite:///{tmp_path}/main.db'
-    logging.debug("Replacing old value %s of FLASK_SQLALCHEMY_DATABASE_URI with %s", old_db_uri, new_db_uri)
-    os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
+    # # Store the original TMPDIR value
+    # old_db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
+    # new_db_uri = f'sqlite:///{tmp_path}/main.db'
+    # logging.debug("Replacing old value %s of FLASK_SQLALCHEMY_DATABASE_URI with %s", old_db_uri, new_db_uri)
+    # os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 
     logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    from yaptide.persistence.database import db
     app = create_app()
     with app.app_context():
         db.drop_all()
@@ -233,10 +258,10 @@ def app(tmp_path):
         db.drop_all()
 
     # revert the FLASK_SQLALCHEMY_DATABASE_URI to the original value
-    if old_db_uri is None:
-        del os.environ['FLASK_SQLALCHEMY_DATABASE_URI']
-    else:
-        os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = old_db_uri
+    # if old_db_uri is None:
+    #     del os.environ['FLASK_SQLALCHEMY_DATABASE_URI']
+    # else:
+    #     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = old_db_uri
 
 
 def pytest_collection_modifyitems(config, items):  # skipcq: PYL-W0613
