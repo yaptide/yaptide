@@ -4,10 +4,13 @@ import logging
 from time import sleep
 import pytest  # skipcq: PY-W2000
 from flask import Flask
-from celery import Celery
 from yaptide.admin import git_submodules
+import os
 
 from yaptide.routes.user_routes import DEFAULT_PAGE_SIZE
+
+from yaptide.celery.worker import celery_app
+
 
 # @pytest.fixture
 # def default_worker_app(default_worker_app: Celery) -> Celery:
