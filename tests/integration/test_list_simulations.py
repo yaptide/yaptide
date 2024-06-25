@@ -4,25 +4,8 @@ import logging
 from time import sleep
 import pytest  # skipcq: PY-W2000
 from flask import Flask
-from yaptide.admin import git_submodules
-import os
-
 from yaptide.routes.user_routes import DEFAULT_PAGE_SIZE
 
-from yaptide.celery.worker import celery_app
-
-
-# @pytest.fixture
-# def default_worker_app(default_worker_app: Celery) -> Celery:
-#     git_submodules.check_submodules()
-#     app = Celery("celery", include=['yaptide.celery.tasks'])
-#     return app
-
-# @pytest.fixture
-# def celery_backend_cluster(celery_redis_backend: RedisTestBackend) -> CeleryBackendCluster:
-#     cluster = CeleryBackendCluster(celery_redis_backend)
-#     yield cluster
-#     cluster.teardown()
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
 def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_username: str, db_good_password: str,
@@ -114,4 +97,3 @@ def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_user
     assert data["page_count"] == 3
     assert len(data["simulations"]) == 1
     assert data["simulations"][0]["start_time"] == start_time_of_newest_simulation
-    # sleep(5)
