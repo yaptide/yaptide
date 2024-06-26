@@ -5,7 +5,7 @@ import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
 
-# skipcq: PYL-W0622
+# skipcq: PY-W2000
 from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters, celery_enable_logging, use_celery_app_trap, celery_includes, celery_worker_pool, celery_worker_parameters
 
 

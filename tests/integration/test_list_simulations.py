@@ -7,7 +7,7 @@ from flask import Flask
 
 from yaptide.routes.user_routes import DEFAULT_PAGE_SIZE
 
-# skipcq: PYL-W0622
+# skipcq: PY-W2000
 from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters, celery_enable_logging, use_celery_app_trap, celery_includes, celery_worker_pool, celery_worker_parameters
 
 
