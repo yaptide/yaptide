@@ -8,9 +8,7 @@ import subprocess
 from typing import Generator
 import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
-
 from yaptide.application import create_app
-from yaptide.persistence.database import db
 
 
 @pytest.fixture(scope='session')
@@ -72,14 +70,14 @@ def shieldhit_binary_installed(shieldhit_binary_filename):
 
 
 @pytest.fixture(scope='session')
-def yaptide_bin_dir() -> Generator[Path, None, None]:
+def yaptide_bin_dir():
     """directory with simulators executable files"""
     project_main_dir = Path(__file__).resolve().parent.parent.parent
     yield project_main_dir / 'bin'
 
 
 @pytest.fixture(scope='function')
-def add_simulators_to_path_variable(yaptide_bin_dir: Path):
+def add_simulators_to_path_variable(yaptide_bin_dir):
     """Adds bin directory with simulators executable file to PATH"""
     logging.info("Adding %s to PATH", yaptide_bin_dir)
 
@@ -121,37 +119,15 @@ def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
     os.environ['PATH'] = original_path
 
 
-@pytest.fixture(scope='function')
-def celery_app():
-    """
-    Create celery app for testing, we reuse the one from yaptide.celery.worker module.
-    The choice of broker and backend is important, as we don't want to run external redis server.
-    That is being configured via environment variables in pytest.ini file.
-    """
-    logging.info("Creating celery app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-    from yaptide.celery.worker import celery_app as app
-    # choose eventlet as a default pool, as it is the only one properly supporting cancellation of tasks
-    app.conf.task_default_pool = 'eventlet'
-    yield app
-
-
 @pytest.fixture(scope="function")
 def celery_worker_parameters() -> Generator[dict, None, None]:
-    """
-    Default celery worker parameters cause problems with finding "ping task" module, as being described here:
-    https://github.com/celery/celery/issues/4851#issuecomment-604073785
-    To solve that issue we disable the ping check.
-    Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
-
-    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
-    """
+    """Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc."""
     logging.info("Creating celery worker parameters for testing")
 
     # get current logging level
     log_level = logging.getLogger().getEffectiveLevel()
 
     yield {
-        "perform_ping_check": False,
         "concurrency": 2,
         "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
     }
@@ -191,17 +167,17 @@ def modify_tmpdir(tmpdir_factory):
 
     # Restore the original TMPDIR value after the tests are done
     if original_tmpdir is None:
-        del os.environ['TMP']
+        del os.environ['TMPDIR']
     else:
-        os.environ['TMP'] = original_tmpdir
+        os.environ['TMPDIR'] = original_tmpdir
     if original_temp is None:
         del os.environ['TEMP']
     else:
         os.environ['TEMP'] = original_temp
     if original_tmp is None:
-        del os.environ['TMPDIR']
+        del os.environ['TMP']
     else:
-        os.environ['TMPDIR'] = original_tmp
+        os.environ['TMP'] = original_tmp
 
 
 @pytest.fixture(scope="function")
@@ -223,7 +199,7 @@ def app(tmp_path):
     os.environ['FLASK_SQLALCHEMY_DATABASE_URI'] = new_db_uri
 
     logging.info("Creating Flask app for testing, time = %s", datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
-
+    from yaptide.persistence.database import db
     app = create_app()
     with app.app_context():
         db.drop_all()

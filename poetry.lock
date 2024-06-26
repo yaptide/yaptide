@@ -1849,20 +1849,6 @@ tomli = {version = ">=1", markers = "python_version < \"3.11\""}
 dev = ["argcomplete", "attrs (>=19.2)", "hypothesis (>=3.56)", "mock", "pygments (>=2.7.2)", "requests", "setuptools", "xmlschema"]
 
 [[package]]
-name = "pytest-celery"
-version = "0.0.0"
-description = "pytest-celery a shim pytest plugin to enable celery.contrib.pytest"
-optional = false
-python-versions = "*"
-files = [
-    {file = "pytest-celery-0.0.0.tar.gz", hash = "sha256:cfd060fc32676afa1e4f51b2938f903f7f75d952186b8c6cf631628c4088f406"},
-    {file = "pytest_celery-0.0.0-py2.py3-none-any.whl", hash = "sha256:63dec132df3a839226ecb003ffdbb0c2cb88dd328550957e979c942766578060"},
-]
-
-[package.dependencies]
-celery = ">=4.4.0"
-
-[[package]]
 name = "pytest-cov"
 version = "5.0.0"
 description = "Pytest plugin for measuring coverage."
@@ -2563,4 +2549,4 @@ testing = ["big-O", "jaraco.functools", "jaraco.itertools", "more-itertools", "p
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.9"
-content-hash = "58d03d23bdd19e35ae78bad38553bce6f9de56a850b48c0eb4d39378903956fc"
+content-hash = "597460f344da16ea2d3f02b230eae50ddbe0e75fddc629d8d382d073d34bcbf3"
