@@ -121,9 +121,7 @@ def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
 
 @pytest.fixture(scope="function")
 def celery_worker_parameters() -> Generator[dict, None, None]:
-    """
-    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
-    """
+    """Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc."""
     logging.info("Creating celery worker parameters for testing")
 
     # get current logging level
