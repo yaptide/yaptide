@@ -9,7 +9,7 @@ from typing import Generator
 import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
-from celery.contrib.pytest import *
+
 
 
 @pytest.fixture(scope='session')

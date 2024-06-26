@@ -19,6 +19,7 @@ from celery import group, chord
 # that will create a `celery_app` instance
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters,celery_enable_logging, use_celery_app_trap, celery_includes, celery_worker_pool, celery_worker_parameters
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
