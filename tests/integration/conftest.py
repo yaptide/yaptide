@@ -11,7 +11,6 @@ from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_w
 from yaptide.application import create_app
 
 
-
 @pytest.fixture(scope='session')
 def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, None, None]:
     """Small simulation payload for testing purposes"""
