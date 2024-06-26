@@ -11,11 +11,6 @@ from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_w
 from yaptide.application import create_app
 
 
-@pytest.fixture(scope='session')
-def celery_enable_logging():
-    return True
-
-
 @pytest.fixture(scope="function")
 def celery_worker_parameters() -> Generator[dict, None, None]:
     """
