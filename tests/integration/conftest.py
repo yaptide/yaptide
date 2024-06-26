@@ -12,6 +12,31 @@ from yaptide.application import create_app
 
 
 @pytest.fixture(scope='session')
+def celery_enable_logging():
+    return True
+
+
+@pytest.fixture(scope="function")
+def celery_worker_parameters() -> Generator[dict, None, None]:
+    """
+    Default celery worker parameters cause problems with finding "ping task" module, as being described here:
+    https://github.com/celery/celery/issues/4851#issuecomment-604073785
+    To solve that issue we disable the ping check.
+    Another solution would be to do `from celery.contrib.testing.tasks import ping` but current one is more elegant.
+    Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc.
+    """
+    logging.info("Creating celery worker parameters for testing")
+
+    # get current logging level
+    log_level = logging.getLogger().getEffectiveLevel()
+
+    yield {
+        "concurrency": 2,
+        "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
+    }
+
+
+@pytest.fixture(scope='session')
 def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, None, None]:
     """Small simulation payload for testing purposes"""
     payload_dict = copy.deepcopy(payload_editor_dict_data)

@@ -20,13 +20,13 @@ from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
 
 from celery import group, chord
 # skipcq: PY-W2000
-from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters, celery_enable_logging, use_celery_app_trap, celery_includes, celery_worker_pool, celery_worker_parameters
+from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters, use_celery_app_trap, celery_includes, celery_worker_pool
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
 def test_celery_run_simulation_for_shieldhit(celery_app, celery_worker, payload_editor_dict_data: dict, client,
-                                             add_simulators_to_path_variable, modify_tmpdir,
-                                             shieldhit_binary_installed):
+                                             add_simulators_to_path_variable, modify_tmpdir, shieldhit_binary_installed,
+                                             celery_enable_logging):
     """Test run_simulation task with SHIELD-HIT12A binary
     Current Windows demo version version of SHIELD-HIT12A has a bug, so it cannot parse more elaborated input files.
     Parser relies on rewind function, which does not work properly on Windows, see:
