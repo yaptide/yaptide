@@ -6,18 +6,14 @@ import pytest  # skipcq: PY-W2000
 from flask import Flask
 
 from yaptide.routes.user_routes import DEFAULT_PAGE_SIZE
-from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters,celery_enable_logging, use_celery_app_trap, celery_includes, celery_worker_pool, celery_worker_parameters
+
+# skipcq: PYL-W0622
+from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_parameters, celery_enable_logging, use_celery_app_trap, celery_includes, celery_worker_pool, celery_worker_parameters
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_list_simulations(celery_app,
-                          celery_worker,
-                          client: Flask,
-                          db_good_username: str,
-                          db_good_password: str,
-                          small_simulation_payload: dict,
-                          add_simulators_to_path_variable,
-                          shieldhit_binary_installed):
+def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_username: str, db_good_password: str,
+                          small_simulation_payload: dict, add_simulators_to_path_variable, shieldhit_binary_installed):
     """Test we can run simulations"""
     client.put("/auth/register",
                data=json.dumps(dict(username=db_good_username, password=db_good_password)),
@@ -33,9 +29,7 @@ def test_list_simulations(celery_app,
     # by default we have 6 simulations per page, therefore we need to send 7 to test pagination
     number_of_simulations = 7
     for _ in range(number_of_simulations):
-        resp = client.post("/jobs/direct",
-                           data=json.dumps(small_simulation_payload),
-                           content_type='application/json')
+        resp = client.post("/jobs/direct", data=json.dumps(small_simulation_payload), content_type='application/json')
 
         assert resp.status_code == 202  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
@@ -73,7 +67,12 @@ def test_list_simulations(celery_app,
     # check first page with 3 items out of 7
     page_size = 3
     resp = client.get("/user/simulations",
-                      query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "descend"})
+                      query_string={
+                          "page_size": page_size,
+                          "page_idx": 1,
+                          "order_by": "start_time",
+                          "order_type": "descend"
+                      })
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     logging.info("descending order, page 1")
@@ -88,7 +87,12 @@ def test_list_simulations(celery_app,
 
     # check second page with 1 item out of 7, not different ordering
     resp = client.get("/user/simulations",
-                      query_string={"page_size": page_size, "page_idx": 3, "order_by": "start_time", "order_type": "ascend"})
+                      query_string={
+                          "page_size": page_size,
+                          "page_idx": 3,
+                          "order_by": "start_time",
+                          "order_type": "ascend"
+                      })
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     logging.info("ascending order, page 3")
