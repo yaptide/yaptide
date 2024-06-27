@@ -13,12 +13,14 @@ import platform
 import numpy as np
 import pytest  # skipcq: PY-W2000
 
-from celery import group, chord
-
 # note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
 # that will create a `celery_app` instance
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+
+from celery import group, chord
+# skipcq: PY-W2000
+from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_enable_logging, celery_parameters, use_celery_app_trap, celery_includes, celery_worker_pool
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")

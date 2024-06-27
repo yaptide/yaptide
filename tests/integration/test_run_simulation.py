@@ -5,6 +5,9 @@ import pytest  # skipcq: PY-W2000
 from time import sleep
 from flask import Flask
 
+# skipcq: PY-W2000
+from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_enable_logging, celery_parameters, use_celery_app_trap, celery_includes, celery_worker_pool
+
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
 def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_good_username: str,
