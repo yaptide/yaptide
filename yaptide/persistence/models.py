@@ -177,7 +177,7 @@ class TaskModel(db.Model):
 
     __mapper_args__ = {"polymorphic_identity": "Task", "polymorphic_on": platform, "with_polymorphic": "*"}
 
-    def update_state(self, update_dict: dict):
+    def update_state(self, update_dict: dict):  # skipcq: PY-R1000
         """
         Updating database is more costly than a simple query.
         Therefore we check first if update is needed and
