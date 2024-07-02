@@ -41,7 +41,7 @@ def encode_auth_token(user_id: int,
 def encode_simulation_auth_token(simulation_id: int):
     """Function that encodes JWT token for simulation 'update_key'"""
     secret = SECRET_KEY_TOKEN
-    exp = datetime.utcnow() + timedelta(days=_Simulation_Token_Expiration_time)
+    exp = datetime.utcnow() + timedelta(minutes=_Simulation_Token_Expiration_time)
     try:
         payload = {
             'exp': exp,  # Token Expiration Time
