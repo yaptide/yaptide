@@ -101,15 +101,14 @@ class UserSimulations(Resource):
         job_id = params_dict['job_id']
         simulation = fetch_simulation_by_job_id(job_id)
 
-        if simulation == None:
+        if simulation is None:
             return yaptide_response(message=f'Simulation with job_id={job_id} do not exist', code=404)
 
         # Simulation has to be completed/cancelled before deleting it.
         if simulation.job_state in (EntityState.UNKNOWN.value, EntityState.PENDING.value, EntityState.RUNNING.value):
-            return yaptide_response(
-                message=
-                f'Simulation with job_id={job_id} is currently running. Please cancel simulation or wait for it to finish',
-                code=403)
+            return yaptide_response(message=f'''Simulation with job_id={job_id} is currently running.
+                  Please cancel simulation or wait for it to finish''',
+                                    code=403)
 
         estimators: list[EstimatorModel] = fetch_estimators_by_sim_id(sim_id=simulation.id)
         if len(estimators) > 0:
