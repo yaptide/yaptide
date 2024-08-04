@@ -8,8 +8,14 @@ from sqlalchemy import asc, desc
 
 from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
+from yaptide.persistence.db_methods import (
+    delete_object_from_db,
+    fetch_estimators_by_sim_id,
+    fetch_simulation_by_job_id,
+)
+from yaptide.persistence.models import EstimatorModel
+from yaptide.utils.enums import EntityState
 
 DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
 DEFAULT_PAGE_IDX = 1  # default page index
@@ -39,6 +45,7 @@ class UserSimulations(Resource):
         page_idx = fields.Integer(load_default=DEFAULT_PAGE_IDX)
         order_by = fields.String(load_default=OrderBy.START_TIME.value)
         order_type = fields.String(load_default=OrderType.DESCEND.value)
+        job_id = fields.String()
 
     @staticmethod
     @requires_auth()
@@ -72,12 +79,46 @@ class UserSimulations(Resource):
                         'input_type': simulation.input_type,
                         'sim_type': simulation.sim_type
                     }
-                }
-                for simulation in simulations],
-            'page_count': pagination.pages,
-            'simulations_count': pagination.total,
+                } for simulation in simulations
+            ],
+            'page_count':
+            pagination.pages,
+            'simulations_count':
+            pagination.total,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)
+
+    @staticmethod
+    @requires_auth()
+    def delete(user: UserModel):
+        """Method deleting simulation from database"""
+        schema = UserSimulations.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return error_validation_response(content=errors)
+        params_dict: dict = schema.load(request.args)
+
+        job_id = params_dict['job_id']
+        simulation = fetch_simulation_by_job_id(job_id)
+
+        if simulation == None:
+            return yaptide_response(message=f'Simulation with job_id={job_id} do not exist', code=404)
+
+        # Simulation has to be completed/cancelled before deleting it.
+        if simulation.job_state in (EntityState.UNKNOWN.value, EntityState.PENDING.value, EntityState.RUNNING.value):
+            return yaptide_response(
+                message=
+                f'Simulation with job_id={job_id} is currently running. Please cancel simulation or wait for it to finish',
+                code=403)
+
+        estimators: list[EstimatorModel] = fetch_estimators_by_sim_id(sim_id=simulation.id)
+        if len(estimators) > 0:
+            for estimator in estimators:
+                delete_object_from_db(estimator)
+
+        delete_object_from_db(simulation)
+
+        return yaptide_response(message=f'Simulation with job_id={job_id} successfully deleted from database', code=200)
 
 
 class UserUpdate(Resource):
