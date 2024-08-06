@@ -8,17 +8,15 @@ from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import get_job_results
 from yaptide.persistence.db_methods import (
-    add_object_to_db, fetch_cluster_by_id,
-    fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
-    fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
-    fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
-    fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
-from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
-                                        LogfilesModel, PageModel, UserModel)
+    add_object_to_db, fetch_cluster_by_id, fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
+    fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
+    fetch_simulation_by_job_id, fetch_simulation_by_sim_id, fetch_tasks_by_sim_id, make_commit_to_db,
+    update_simulation_state, update_task_state)
+from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.routes.utils.tokens import decode_auth_token
 from yaptide.utils.enums import EntityState
 
 
@@ -56,8 +54,7 @@ class JobsResource(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -65,9 +62,7 @@ class JobsResource(Resource):
                                         "job_tasks_status": job_tasks_status,
                                     })
 
-        job_info = {
-            "job_state": simulation.job_state
-        }
+        job_info = {"job_state": simulation.job_state}
         status_counter = Counter([task["task_state"] for task in job_tasks_status])
         if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
             job_info["job_state"] = EntityState.PENDING.value
@@ -108,7 +103,8 @@ class ResultsResource(Resource):
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         for estimator_dict in payload_dict["estimators"]:
@@ -121,8 +117,8 @@ class ResultsResource(Resource):
                 add_object_to_db(estimator)
 
             for page_dict in estimator_dict["pages"]:
-                page = fetch_page_by_est_id_and_page_number(
-                    est_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
+                page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
+                                                            page_number=int(page_dict["metadata"]["page_number"]))
 
                 page_existed = bool(page)
                 if not page_existed:
@@ -136,11 +132,17 @@ class ResultsResource(Resource):
 
         make_commit_to_db()
         logging.debug("Marking simulation as completed")
-        update_dict = {
-            "job_state": EntityState.COMPLETED.value,
-            "end_time": datetime.utcnow().isoformat(sep=" ")
-        }
+        update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         update_simulation_state(simulation=simulation, update_dict=update_dict)
+
+        logging.debug("Marking simulation tasks as completed")
+
+        # If simulation is too short, it can happen that the simulation completes,
+        # but tasks didnt' sent their completion status or simulated_primaries = requested_primaries.
+        # To avoid this, we update simulation tasks by their final status
+        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
+        for task in tasks:
+            update_task_state(task, {"task_state": EntityState.COMPLETED.value})
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
@@ -186,8 +188,7 @@ class ResultsResource(Resource):
                 estimator.data = estimator_dict["metadata"]
                 add_object_to_db(estimator)
                 for page_dict in estimator_dict["pages"]:
-                    page = PageModel(estimator_id=estimator.id,
-                                     page_number=int(page_dict["metadata"]["page_number"]))
+                    page = PageModel(estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
                     page.data = page_dict
                     add_object_to_db(page, False)
                 make_commit_to_db()
@@ -204,7 +205,8 @@ class ResultsResource(Resource):
                 "pages": [page.data for page in pages]
             }
             result_estimators.append(estimator_dict)
-        return yaptide_response(message=f"Results for job: {job_id}", code=200,
+        return yaptide_response(message=f"Results for job: {job_id}",
+                                code=200,
                                 content={"estimators": result_estimators})
 
 
@@ -265,7 +267,8 @@ class LogfilesResource(Resource):
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         logfiles = LogfilesModel(simulation_id=simulation.id)
