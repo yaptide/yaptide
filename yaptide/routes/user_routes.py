@@ -113,7 +113,7 @@ class UserSimulations(Resource):
         estimators: list[EstimatorModel] = fetch_estimators_by_sim_id(sim_id=simulation.id)
         if len(estimators) > 0:
             for estimator in estimators:
-                delete_object_from_db(estimator)
+                delete_object_from_db(estimator, make_commit=False)
 
         delete_object_from_db(simulation)
 
