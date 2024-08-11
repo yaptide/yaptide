@@ -5,7 +5,7 @@
 Clone the repository:
 
 ```shell
-git cloneF https://github.com/yaptide/yaptide.git
+git clone https://github.com/yaptide/yaptide.git
 ```
 
 ## Building and running the app
