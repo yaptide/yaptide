@@ -5,7 +5,6 @@ from yaptide.persistence.models import (
     YaptideUserModel,
     CelerySimulationModel,
 )
-from yaptide.routes.user_routes import UserSimulations
 import json
 
 
