@@ -25,8 +25,8 @@ def run_before_tests(db_session: scoped_session, db_good_username: str, db_good_
                                content_type='application/json')
     data = json.loads(resp.data.decode())
     assert {'refresh_exp', 'access_exp', 'message'} == set(data.keys())
-    assert resp.status_code == 202  # skipcq: BAN-B101
-    assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
+    assert resp.status_code == 202
+    assert resp.headers['Set-Cookie']
 
     
     # Create a simulation
