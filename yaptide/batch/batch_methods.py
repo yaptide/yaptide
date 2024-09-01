@@ -6,6 +6,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
+import requests
 
 import pymchelper
 from fabric import Connection, Result
@@ -13,12 +14,15 @@ from paramiko import RSAKey
 
 from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
+from yaptide.persistence.db_methods import fetch_cluster_by_id, fetch_user_by_id
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel)
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
 
+from yaptide.celery.worker import celery_app
 
-def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
+
+def get_connection(user: dict, cluster: dict) -> Connection:
     """Returns connection object to cluster"""
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
@@ -32,8 +36,8 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     return con
 
 
-def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cluster: ClusterModel, sim_id: int,
-               update_key: str) -> dict:
+@celery_app.task()
+def submit_job(payload_dict: dict, files_dict: dict, user: dict, cluster: dict, sim_id: int, update_key: str) -> dict:
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
 
@@ -97,6 +101,21 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
         logging.debug("Sbatch stdout: %s", submit_stdout)
         logging.debug("Sbatch stderr: %s", submit_stderr)
         return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
+        # todo make request about failed job
+
+    # TODO make request about successful job and send job_dir, array_id, collect_id, s
+    # flask_url = os.environ.get("BACKEND_INTERNAL_URL")
+    # dict_to_send = {
+    #     "message": "Job submitted",
+    #     "job_dir": job_dir,
+    #     "array_id": array_id,
+    #     "collect_id": collect_id,
+    #     "submit_stdout": submit_stdout,
+    #     "sh_files": sh_files
+    # }
+
+    # res: requests.Response = requests.Session().post(url=f"{flask_url}/batchfeedback", json=dict_to_send)
+
     return {
         "message": "Job submitted",
         "job_dir": job_dir,
