@@ -67,8 +67,10 @@ class JobsDirect(Resource):
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 
         # submit the asynchronous job to celery
-        simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"],
+        res = run_job.delay(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"], simulation,
                                       payload_dict["sim_type"])
+        
+        simulation.simulation_id = res.get()
 
         # create tasks in the database in the default PENDING state
         for i in range(payload_dict["ntasks"]):
