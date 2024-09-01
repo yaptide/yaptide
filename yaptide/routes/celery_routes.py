@@ -1,9 +1,10 @@
+import json
 import logging
 import uuid
 from collections import Counter
 from datetime import datetime
 
-from flask import request
+from flask import request, jsonify
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
@@ -65,9 +66,11 @@ class JobsDirect(Resource):
         logging.debug("Update key set to %s", update_key)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+        logging.info(jsonify(simulation))
+        logging.info(json.dumps(simulation))
 
         # submit the asynchronous job to celery
-        res = run_job.delay(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"], simulation,
+        res = run_job.delay(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"], json.dumps(jsonify(simulation).text),
                                       payload_dict["sim_type"])
         
         simulation.simulation_id = res.get()
