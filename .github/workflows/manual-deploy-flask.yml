@@ -12,17 +12,17 @@ env:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    
+
     # Only run if it is a PR and the comment contains /deploy
     if: github.event.issue.pull_request && contains(github.event.comment.body, '/deploy-flask')
-       
+
     # when we run this action as depenabot, we need to give it write permissions to the package registry and to the statuses
     permissions:
       contents: read
       packages: write
       statuses: write
       pull-requests: write
-    
+
     steps:
       - name: Get branch of PR
         uses: xt0rted/pull-request-comment-branch@v2
@@ -37,7 +37,6 @@ jobs:
 
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Login to GitHub Container Registry
