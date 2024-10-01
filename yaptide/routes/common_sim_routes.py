@@ -137,12 +137,6 @@ class ResultsResource(Resource):
 
         logging.debug("Marking simulation tasks as completed")
 
-        # If simulation is too short, it can happen that the simulation completes,
-        # but tasks didnt' sent their completion status or simulated_primaries = requested_primaries.
-        # To avoid this, we update simulation tasks by their final status
-        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
-        for task in tasks:
-            update_task_state(task, {"task_state": EntityState.COMPLETED.value})
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
