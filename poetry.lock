@@ -714,13 +714,13 @@ tests = ["environs[django]", "pytest"]
 
 [[package]]
 name = "eventlet"
-version = "0.36.1"
+version = "0.37.0"
 description = "Highly concurrent networking library"
 optional = false
 python-versions = ">=3.7"
 files = [
-    {file = "eventlet-0.36.1-py3-none-any.whl", hash = "sha256:e42d0f73b718e654c223a033b8692d1a94d778a6c1deb6c3d21442746f3f727f"},
-    {file = "eventlet-0.36.1.tar.gz", hash = "sha256:d227fe76a63d9e6a6cef53beb8ad0b2dc40a5e7737c801f4b474cfae1db07bc5"},
+    {file = "eventlet-0.37.0-py3-none-any.whl", hash = "sha256:801ac231401e41f33a799457c78fdbfabc1c2f28bf9346d4ec4188e9aebc2067"},
+    {file = "eventlet-0.37.0.tar.gz", hash = "sha256:fa49bf5a549cdbaa06919679979ea022ac8f8f3cf0499f26849a1cd8e64c30b1"},
 ]
 
 [package.dependencies]
@@ -2559,4 +2559,4 @@ test = ["big-O", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-it
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "7fad5e7749ebc67f3d516bf19dd00bc6f3f56ba0edcc8cf41c4eca6857921cae"
+content-hash = "928c26d9da476192223ce8fec7ebe682bfc51bce54cbe1e661ac0327a3d166f6"
