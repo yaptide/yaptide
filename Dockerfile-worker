@@ -35,9 +35,6 @@ COPY run_worker.sh .
 # copy yaptide source code
 COPY yaptide ./yaptide
 
-# copy .gitsubmodules file to check if submodules are cloned correctly
-COPY .gitmodules ./
-
 # Some of our developers use Windows to run Docker, their bash scripts have CRLF line endings
 # therefore when copied to the container they are not executable. This is a workaround to fix that.
 # skipcq: DOK-W1001

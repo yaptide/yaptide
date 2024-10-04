@@ -2,17 +2,13 @@ import copy
 import json
 import logging
 import re
-import sys
 from enum import Enum, auto
 from pathlib import Path
 
 from pymchelper.estimator import Estimator
 from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
-
-# dirty hack needed to properly handle relative imports in the converter submodule
-sys.path.append("yaptide/converter")
-from ..converter.converter.api import (get_parser_from_str, run_parser)  # skipcq: FLK-E402
+from converter.api import (get_parser_from_str, run_parser)
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
