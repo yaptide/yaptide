@@ -9,11 +9,7 @@ from sqlalchemy import asc, desc
 from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
-from yaptide.persistence.db_methods import (
-    delete_object_from_db,
-    fetch_estimators_by_sim_id,
-    fetch_simulation_by_job_id,
-)
+from yaptide.persistence.db_methods import (delete_object_from_db, fetch_simulation_by_job_id)
 from yaptide.persistence.models import EstimatorModel
 from yaptide.utils.enums import EntityState
 
@@ -110,13 +106,7 @@ class UserSimulations(Resource):
                   Please cancel simulation or wait for it to finish''',
                                     code=403)
 
-        estimators: list[EstimatorModel] = fetch_estimators_by_sim_id(sim_id=simulation.id)
-        if len(estimators) > 0:
-            for estimator in estimators:
-                delete_object_from_db(estimator, make_commit=False)
-
         delete_object_from_db(simulation)
-
         return yaptide_response(message=f'Simulation with job_id={job_id} successfully deleted from database', code=200)
 
 
