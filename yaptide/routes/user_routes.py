@@ -10,7 +10,6 @@ from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
 from yaptide.persistence.db_methods import (delete_object_from_db, fetch_simulation_by_job_id)
-from yaptide.persistence.models import EstimatorModel
 from yaptide.utils.enums import EntityState
 
 DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
