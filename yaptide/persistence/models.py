@@ -94,9 +94,10 @@ class SimulationModel(db.Model):
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
     update_key_hash: Column[str] = db.Column(db.String,
                                              doc="Update key shared by tasks granting access to update themselves")
-    tasks = relationship("TaskModel")
+    tasks = relationship("TaskModel", cascade="delete")
     estimators = relationship("EstimatorModel", cascade="delete")
     inputs = relationship("InputModel", cascade="delete")
+    logfiles = relationship("LogfilesModel", cascade="delete")
 
     __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
 

@@ -33,20 +33,23 @@ class OrderBy(Enum):
 class UserSimulations(Resource):
     """Class responsible for returning user's simulations' basic infos"""
 
-    class APIParametersSchema(Schema):
-        """Class specifies API parameters"""
+    class GetAPIParametersSchema(Schema):
+        """Class specifies Get API parameters"""
 
         page_size = fields.Integer(load_default=DEFAULT_PAGE_SIZE)
         page_idx = fields.Integer(load_default=DEFAULT_PAGE_IDX)
         order_by = fields.String(load_default=OrderBy.START_TIME.value)
         order_type = fields.String(load_default=OrderType.DESCEND.value)
-        job_id = fields.String()
+
+    class DeleteAPIParametersSchema(Schema):
+        """Schema for DELETE method parameters"""
+        job_id = fields.String(required=True)  # job_id is mandatory for DELETE
 
     @staticmethod
     @requires_auth()
     def get(user: UserModel):
         """Method returning simulations from the database"""
-        schema = UserSimulations.APIParametersSchema()
+        schema = UserSimulations.GetAPIParametersSchema()
         params_dict: dict = schema.load(request.args)
         logging.info('User %s requested simulations with parameters: %s', user.username, params_dict)
 
@@ -87,7 +90,7 @@ class UserSimulations(Resource):
     @requires_auth()
     def delete(user: UserModel):
         """Method deleting simulation from database"""
-        schema = UserSimulations.APIParametersSchema()
+        schema = UserSimulations.DeleteAPIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return error_validation_response(content=errors)
