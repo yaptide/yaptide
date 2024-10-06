@@ -43,7 +43,7 @@ class UserSimulations(Resource):
 
     class DeleteAPIParametersSchema(Schema):
         """Schema for DELETE method parameters"""
-        
+
         job_id = fields.String(required=True)  # job_id is mandatory for DELETE
 
     @staticmethod
@@ -102,9 +102,10 @@ class UserSimulations(Resource):
 
         if simulation is None:
             return yaptide_response(message=f'Simulation with job_id={job_id} do not exist', code=404)
-        
+
         if simulation.user_id != user.id:
-                return yaptide_response(message='Unauthorized: You do not have permission to delete this simulation', code=401)
+            return yaptide_response(message='Unauthorized: You do not have permission to delete this simulation',
+                                    code=401)
 
         # Simulation has to be completed/cancelled before deleting it.
         if simulation.job_state in (EntityState.UNKNOWN.value, EntityState.PENDING.value, EntityState.RUNNING.value):
