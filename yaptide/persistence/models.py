@@ -9,6 +9,7 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from yaptide.persistence.database import db
 from yaptide.utils.enums import EntityState, PlatformType
+from dataclasses import dataclass
 
 
 class UserModel(db.Model):
@@ -66,6 +67,7 @@ class ClusterModel(db.Model):
     simulations = relationship("BatchSimulationModel")
 
 
+@dataclass
 class SimulationModel(db.Model):
     """Simulation model"""
 
@@ -130,6 +132,7 @@ class SimulationModel(db.Model):
         return db_commit_required
 
 
+@dataclass
 class CelerySimulationModel(SimulationModel):
     """Celery simulation model"""
 
