@@ -6,7 +6,8 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
-import requests
+
+from flask import current_app as app
 
 import pymchelper
 from fabric import Connection, Result
@@ -19,7 +20,10 @@ from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, Keyc
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
 
-from yaptide.celery.worker import celery_app
+from yaptide.admin.db_manage import TableTypes, connect_to_db
+import sqlalchemy as db
+from yaptide.persistence.models import UserModel, KeycloakUserModel
+from yaptide.utils.async_worker import celery_app
 
 
 def get_connection(user: dict, cluster: dict) -> Connection:
@@ -37,11 +41,47 @@ def get_connection(user: dict, cluster: dict) -> Connection:
 
 
 @celery_app.task()
-def submit_job(payload_dict: dict, files_dict: dict, user: dict, cluster: dict, sim_id: int, update_key: str) -> dict:
+def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str) -> dict:
     """Submits job to cluster"""
+    
+    app.logger.info('celery worker log info')
+    app.logger.debug('celery worker log debug')
+    app.logger.error('celery worker log error')
+    app.logger.warning('celery worker log warning')
+    
+    logging.info('celery worker log info')
+    logging.debug('celery worker log debug')
+    logging.error('celery worker log error')
+    logging.warning('celery worker log warning')
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
+    try:
+        con, metadata, _ = connect_to_db()
+    except:
+        app.logger.error('Async worker couldn\'t connect to db')
+        #TODO send reqest to end simulation in db or cancel directly ?????
+    
+    users = metadata.tables[TableTypes.User.name]
+    keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
+    stmt = db.select(users, keycloackUsers).select_from(users).join(keycloackUsers, KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
+    
+    try:
+        user = con.execute(stmt).first()
+    except:
+        app.logger.error(f'Error getting user object wiht id: {userId} from database')
+    
+    
+    clusters = metadata.tables[TableTypes.Cluster.name]
+    print(clusters)
+    stmt = db.select(clusters).filter_by(id=clusterId)
+    try:
+        cluster: ClusterModel = con.execute(stmt).first()
+    except:
+        app.logger.error(f'Error getting cluster object with id: {clusterId} from database')
+
+    
 
     if user.cert is None or user.private_key is None:
+        #TODO don't return cancel simulation
         return {"message": f"User {user.username} has no certificate or private key"}
     con = get_connection(user=user, cluster=cluster)
 
@@ -100,8 +140,8 @@ def submit_job(payload_dict: dict, files_dict: dict, user: dict, cluster: dict, 
         logging.debug("Job submission failed")
         logging.debug("Sbatch stdout: %s", submit_stdout)
         logging.debug("Sbatch stderr: %s", submit_stderr)
-        return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
         # todo make request about failed job
+        return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
 
     # TODO make request about successful job and send job_dir, array_id, collect_id, s
     # flask_url = os.environ.get("BACKEND_INTERNAL_URL")

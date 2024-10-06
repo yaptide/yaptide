@@ -24,3 +24,8 @@ services:
     healthcheck:
       start_period: 60s
       start_interval: 5s
+  
+  yaptide_async_worker:
+    healthcheck:
+      start_period: 60s
+      start_interval: 5s

@@ -1,0 +1,29 @@
+FROM python:3.12-slim
+ARG POETRY_VERSION=1.8.2
+
+# set max celery task time to 10 hours
+ENV CELERYD_TIME_LIMIT=36000
+
+# set working directory
+WORKDIR /usr/local/app
+
+# openshift permissions
+RUN chgrp -R 0 /usr/local/app && \
+    chmod -R g=u /usr/local/app
+
+# Copy poetry configuration files
+COPY poetry.lock poetry.toml pyproject.toml ./
+# Install poetry and project dependencies, we also disabled virtualenv creation
+ENV POETRY_VIRTUALENVS_CREATE=false
+RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main
+
+# copy yaptide source code
+COPY yaptide ./yaptide
+
+# copy .gitsubmodules file to check if submodules are cloned correctly
+COPY .gitmodules ./
+
+# Set the script as the entry point, Windows users require to run the script via bash, as `./` does not work
+# celery --app yaptide.celery.worker worker --events --loglevel="$LOG_LEVEL_ROOT" --hostname yaptide-worker
+
+CMD ["sh", "-c", "celery --app yaptide.utils.async_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-async-worker"]
