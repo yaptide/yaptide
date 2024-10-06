@@ -74,8 +74,8 @@ class JobsBatch(Resource):
 
         submission = submit_job.delay(payload_dict=payload_dict,
                                       files_dict=input_dict["input_files"],
-                                      user=dict(user),
-                                      cluster=dict(cluster),
+                                      userId=user.id,
+                                      clusterId=cluster.id,
                                       sim_id=simulation.id,
                                       update_key=update_key)
 
