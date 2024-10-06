@@ -44,11 +44,6 @@ def get_connection(user: dict, cluster: dict) -> Connection:
 def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str) -> dict:
     """Submits job to cluster"""
     
-    app.logger.info('celery worker log info')
-    app.logger.debug('celery worker log debug')
-    app.logger.error('celery worker log error')
-    app.logger.warning('celery worker log warning')
-    
     logging.info('celery worker log info')
     logging.debug('celery worker log debug')
     logging.error('celery worker log error')
@@ -57,7 +52,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     try:
         con, metadata, _ = connect_to_db()
     except:
-        app.logger.error('Async worker couldn\'t connect to db')
+        logging.error('Async worker couldn\'t connect to db')
         #TODO send reqest to end simulation in db or cancel directly ?????
     
     users = metadata.tables[TableTypes.User.name]
@@ -67,7 +62,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     try:
         user = con.execute(stmt).first()
     except:
-        app.logger.error(f'Error getting user object wiht id: {userId} from database')
+        logging.error(f'Error getting user object wiht id: {userId} from database')
     
     
     clusters = metadata.tables[TableTypes.Cluster.name]
@@ -76,7 +71,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     try:
         cluster: ClusterModel = con.execute(stmt).first()
     except:
-        app.logger.error(f'Error getting cluster object with id: {clusterId} from database')
+        logging.error(f'Error getting cluster object with id: {clusterId} from database')
 
     
 
