@@ -17,7 +17,7 @@
 	"forwardPorts": [5000, 6000, 6379, 8443],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "git submodule update --init --recursive && poetry install"
+	"postCreateCommand": "poetry install"
 
 	// Configure tool-specific properties.
 	// "customizations": {},

@@ -2,16 +2,10 @@
 import json
 from pathlib import Path
 import pytest
-import sys
-
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, convert_editor_dict_to_files_dict,
                                      adjust_primaries_in_editor_dict, adjust_primaries_in_files_dict,
                                      write_simulation_input_files, get_json_type, JSON_TYPE)
-
-# dirty hack needed to properly handle relative imports in the converter submodule
-converter_path = Path(__file__).resolve().parent.parent / "yaptide" / "converter"
-sys.path.append(str(converter_path))
-from converter.api import get_parser_from_str, run_parser  # skipcq: FLK-E402
+from converter.api import (get_parser_from_str, run_parser)
 
 
 @pytest.mark.parametrize("json_fixture",

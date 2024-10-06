@@ -2,16 +2,10 @@
 
 ## Getting the code
 
-Clone the repository including submodules:
+Clone the repository:
 
 ```shell
-git clone --recurse-submodules https://github.com/yaptide/yaptide.git
-```
-
-In case you have used regular `git clone` command, without `--recurse-submodules` option, you can still download the submodules by running:
-
-```shell
-git submodule update --init --recursive
+git clone https://github.com/yaptide/yaptide.git
 ```
 
 ## Building and running the app
