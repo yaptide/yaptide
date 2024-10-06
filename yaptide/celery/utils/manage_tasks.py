@@ -6,17 +6,13 @@ from celery.result import AsyncResult
 from yaptide.celery.tasks import merge_results, run_single_simulation
 from yaptide.celery.worker import celery_app
 from yaptide.utils.enums import EntityState
-from yaptide.persistence.models import SimulationModel
 
-from yaptide.celery.worker import celery_app
 
-@celery_app.task()
-def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, simulation: SimulationModel, sim_type: str = 'shieldhit') -> str:
+def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, sim_type: str = 'shieldhit') -> str:
     """Runs asynchronous simulation job"""
     logging.debug("Starting run_simulation task for %d tasks", ntasks)
     logging.debug("Simulation id: %d", simulation_id)
     logging.debug("Update key: %s", update_key)
-    sim = simulation
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,  # simulation input, keys: filenames, values: file contents

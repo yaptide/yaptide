@@ -20,10 +20,7 @@ RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only 
 # copy yaptide source code
 COPY yaptide ./yaptide
 
-# copy .gitsubmodules file to check if submodules are cloned correctly
-COPY .gitmodules ./
-
 # Set the script as the entry point, Windows users require to run the script via bash, as `./` does not work
 # celery --app yaptide.celery.worker worker --events --loglevel="$LOG_LEVEL_ROOT" --hostname yaptide-worker
 
-CMD ["sh", "-c", "celery --app yaptide.utils.async_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-async-worker"]
+CMD ["sh", "-c", "celery --app yaptide.utils.async_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-async-worker -Q async"]
