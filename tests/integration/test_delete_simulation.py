@@ -8,7 +8,7 @@ from yaptide.persistence.models import (
 import json
 
 
-@pytest.fixture
+@pytest.fixture(scope="function")
 def setup_data(db_session: scoped_session, db_good_username: str, db_good_password: str, client):
     # Create user
     user = YaptideUserModel(username=db_good_username)
