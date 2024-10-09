@@ -8,8 +8,9 @@ from sqlalchemy import asc, desc
 
 from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
+from yaptide.persistence.db_methods import (delete_object_from_db, fetch_simulation_by_job_id)
+from yaptide.utils.enums import EntityState
 
 DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
 DEFAULT_PAGE_IDX = 1  # default page index
@@ -32,19 +33,24 @@ class OrderBy(Enum):
 class UserSimulations(Resource):
     """Class responsible for returning user's simulations' basic infos"""
 
-    class APIParametersSchema(Schema):
-        """Class specifies API parameters"""
+    class GetAPIParametersSchema(Schema):
+        """Class specifies Get API parameters"""
 
         page_size = fields.Integer(load_default=DEFAULT_PAGE_SIZE)
         page_idx = fields.Integer(load_default=DEFAULT_PAGE_IDX)
         order_by = fields.String(load_default=OrderBy.START_TIME.value)
         order_type = fields.String(load_default=OrderType.DESCEND.value)
 
+    class DeleteAPIParametersSchema(Schema):
+        """Schema for DELETE method parameters"""
+
+        job_id = fields.String(required=True)  # job_id is mandatory for DELETE
+
     @staticmethod
     @requires_auth()
     def get(user: UserModel):
         """Method returning simulations from the database"""
-        schema = UserSimulations.APIParametersSchema()
+        schema = UserSimulations.GetAPIParametersSchema()
         params_dict: dict = schema.load(request.args)
         logging.info('User %s requested simulations with parameters: %s', user.username, params_dict)
 
@@ -72,12 +78,43 @@ class UserSimulations(Resource):
                         'input_type': simulation.input_type,
                         'sim_type': simulation.sim_type
                     }
-                }
-                for simulation in simulations],
-            'page_count': pagination.pages,
-            'simulations_count': pagination.total,
+                } for simulation in simulations
+            ],
+            'page_count':
+            pagination.pages,
+            'simulations_count':
+            pagination.total,
         }
         return yaptide_response(message='User Simulations', code=200, content=result)
+
+    @staticmethod
+    @requires_auth()
+    def delete(user: UserModel):
+        """Method deleting simulation from database"""
+        schema = UserSimulations.DeleteAPIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return error_validation_response(content=errors)
+        params_dict: dict = schema.load(request.args)
+
+        job_id = params_dict['job_id']
+        simulation = fetch_simulation_by_job_id(job_id)
+
+        if simulation is None:
+            return yaptide_response(message=f'Simulation with job_id={job_id} do not exist', code=404)
+
+        if simulation.user_id != user.id:
+            return yaptide_response(message='Unauthorized: You do not have permission to delete this simulation',
+                                    code=401)
+
+        # Simulation has to be completed/cancelled before deleting it.
+        if simulation.job_state in (EntityState.UNKNOWN.value, EntityState.PENDING.value, EntityState.RUNNING.value):
+            return yaptide_response(message=f'''Simulation with job_id={job_id} is currently running.
+                  Please cancel simulation or wait for it to finish''',
+                                    code=403)
+
+        delete_object_from_db(simulation)
+        return yaptide_response(message=f'Simulation with job_id={job_id} successfully deleted from database', code=200)
 
 
 class UserUpdate(Resource):

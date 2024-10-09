@@ -94,8 +94,10 @@ class SimulationModel(db.Model):
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
     update_key_hash: Column[str] = db.Column(db.String,
                                              doc="Update key shared by tasks granting access to update themselves")
-    tasks = relationship("TaskModel")
-    estimators = relationship("EstimatorModel")
+    tasks = relationship("TaskModel", cascade="delete")
+    estimators = relationship("EstimatorModel", cascade="delete")
+    inputs = relationship("InputModel", cascade="delete")
+    logfiles = relationship("LogfilesModel", cascade="delete")
 
     __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
 
@@ -313,6 +315,7 @@ class EstimatorModel(db.Model):
     simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
     name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Estimator metadata")
+    pages = relationship("PageModel", cascade="delete")
 
     @property
     def data(self):
