@@ -12,6 +12,8 @@ import click
 import sqlalchemy as db
 from werkzeug.security import generate_password_hash
 
+from yaptide.persistence.models import SimulationModel, UserModel
+
 
 class TableTypes(Enum):
     """Enum for table names used in ORM"""
@@ -172,11 +174,25 @@ def list_tasks():
 
 @run.command
 @click.option('-v', '--verbose', count=True)
-def list_simulations(verbose):
+@click.option('user','--user', default='')
+@click.option('auth_provider', '--auth-provider')
+def list_simulations(verbose, user, auth_provider):
     """List simulations"""
+    if bool(auth_provider) != bool(user):
+        raise click.UsageError("Both --user and --auth-provider must be provided together or neither.")
+    username = user
+    
     con, metadata, _ = connect_to_db(verbose=verbose)
     simulations = metadata.tables[TableTypes.Simulation.name]
+    users = metadata.tables[TableTypes.User.name]
+    
+    if not user_exists(username, auth_provider, users, con):
+        click.echo(f"Aborting, user {username} does not exist")
+        raise click.Abort()
+    
     stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time)
+    if username:
+        stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time).select_from(simulations).join(users, SimulationModel.user_id == UserModel.id).filter_by(username=username)
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
