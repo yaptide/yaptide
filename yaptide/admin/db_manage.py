@@ -12,8 +12,6 @@ import click
 import sqlalchemy as db
 from werkzeug.security import generate_password_hash
 
-from yaptide.persistence.models import SimulationModel, UserModel
-
 
 class TableTypes(Enum):
     """Enum for table names used in ORM"""
@@ -160,11 +158,26 @@ def remove_user(name, auth_provider):
 
 
 @run.command
-def list_tasks():
+@click.option('user','--user', default='')
+@click.option('auth_provider', '--auth-provider')
+def list_tasks(user, auth_provider):
     """List tasks"""
+    if bool(auth_provider) != bool(user):
+        raise click.UsageError("Both --user and --auth-provider must be provided together or neither.")
+    username = user
+    
     con, metadata, _ = connect_to_db()
     tasks = metadata.tables[TableTypes.Task.name]
+    users = metadata.tables[TableTypes.User.name]
+    simulations = metadata.tables[TableTypes.Simulation.name]
+    if user and not user_exists(username, auth_provider, users, con):
+        click.echo(f"Aborting, user {username} does not exist")
+        raise click.Abort()
+    
     stmt = db.select(tasks.c.simulation_id, tasks.c.task_id)
+    if(username):
+        stmt = db.select(tasks.c.simulation_id, tasks.c.task_id).select_from(tasks).join(simulations, tasks.c.simulation_id == simulations.c.id).join(users, simulations.c.user_id == users.c.id).filter_by(username=username, auth_provider=auth_provider)
+    print(stmt)
     all_tasks = con.execute(stmt).all()
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
@@ -186,13 +199,13 @@ def list_simulations(verbose, user, auth_provider):
     simulations = metadata.tables[TableTypes.Simulation.name]
     users = metadata.tables[TableTypes.User.name]
     
-    if not user_exists(username, auth_provider, users, con):
+    if user and not user_exists(username, auth_provider, users, con):
         click.echo(f"Aborting, user {username} does not exist")
         raise click.Abort()
     
     stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time)
     if username:
-        stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time).select_from(simulations).join(users, SimulationModel.user_id == UserModel.id).filter_by(username=username)
+        stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time).select_from(simulations).join(users, simulations.c.user_id == users.c.id).filter_by(username=username, auth_provider=auth_provider)
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
