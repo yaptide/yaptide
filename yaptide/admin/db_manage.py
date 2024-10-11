@@ -194,6 +194,27 @@ def list_tasks(user, auth_provider):
 
 
 @run.command
+@click.argument('task_id')
+@click.option('-v', '--verbose', count=True)
+def remove_task(task_id, verbose):
+    """Delete task"""
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Deleting task: {task_id}')
+    tasks = metadata.tables[TableTypes.Task.name]
+
+    stmt = db.select(tasks).filter_by(task_id=task_id)
+    task_found = con.execute(stmt).all()
+    if not task_found:
+        click.echo(f"Aborting, task {task_id} does not exist")
+        raise click.Abort()
+
+    query = db.delete(tasks).where(tasks.c.task_id == task_id)
+    con.execute(query)
+    con.commit()
+    click.echo(f'Successfully deleted task: {task_id}')
+
+
+@run.command
 @click.option('-v', '--verbose', count=True)
 @click.option('user', '--user', default='')
 @click.option('auth_provider', '--auth-provider')
@@ -228,6 +249,27 @@ def list_simulations(verbose, user, auth_provider):
         user_column = f" username {sim.username}" if not user else ''
         click.echo(
             f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};{user_column}")
+
+
+@run.command
+@click.argument('simulation_id')
+@click.option('-v', '--verbose', count=True)
+def remove_simulation(simulation_id, verbose):
+    """Delete simulation"""
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Deleting simulation: {simulation_id}')
+    simulations = metadata.tables[TableTypes.Simulation.name]
+
+    stmt = db.select(simulations).filter_by(id=simulation_id)
+    simulation_found = con.execute(stmt).all()
+    if not simulation_found:
+        click.echo(f"Aborting, simulation {simulation_id} does not exist")
+        raise click.Abort()
+
+    query = db.delete(simulations).where(simulations.c.id == simulation_id)
+    con.execute(query)
+    con.commit()
+    click.echo(f'Successfully deleted simulation: {simulation_id}')
 
 
 @run.command
