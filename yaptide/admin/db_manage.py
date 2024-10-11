@@ -168,11 +168,12 @@ def list_tasks(user, auth_provider):
     users = metadata.tables[TableTypes.User.name]
     simulations = metadata.tables[TableTypes.Simulation.name]
 
-    stmt = db.select(users).filter_by(username=user)
-    users_found = con.execute(stmt).all()
-    if not len(users_found) > 0:
-        click.echo(f"Aborting, user {user} does not exist")
-        raise click.Abort()
+    if user:
+        stmt = db.select(users).filter_by(username=user)
+        users_found = con.execute(stmt).all()
+        if not len(users_found) > 0:
+            click.echo(f"Aborting, user {user} does not exist")
+            raise click.Abort()
 
     filter_args = {}
 
@@ -181,7 +182,7 @@ def list_tasks(user, auth_provider):
     if auth_provider:
         filter_args['auth_provider'] = auth_provider
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id).select_from(tasks).join(
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username).select_from(tasks).join(
         simulations,
         tasks.c.simulation_id == simulations.c.id).join(users,
                                                         simulations.c.user_id == users.c.id).filter_by(**filter_args)
@@ -189,7 +190,8 @@ def list_tasks(user, auth_provider):
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
     for task in all_tasks:
-        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id}")
+        user_column = f" username {task.username}" if not user else ''
+        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id};{user_column}")
 
 
 @run.command
@@ -203,11 +205,12 @@ def list_simulations(verbose, user, auth_provider):
     simulations = metadata.tables[TableTypes.Simulation.name]
     users = metadata.tables[TableTypes.User.name]
 
-    stmt = db.select(users).filter_by(username=user)
-    users_found = con.execute(stmt).all()
-    if not len(users_found) > 0:
-        click.echo(f"Aborting, user {user} does not exist")
-        raise click.Abort()
+    if user:
+        stmt = db.select(users).filter_by(username=user)
+        users_found = con.execute(stmt).all()
+        if not len(users_found) > 0:
+            click.echo(f"Aborting, user {user} does not exist")
+            raise click.Abort()
 
     filter_args = {}
 
@@ -216,14 +219,17 @@ def list_simulations(verbose, user, auth_provider):
     if auth_provider:
         filter_args['auth_provider'] = auth_provider
 
-    stmt = db.select(simulations.c.id, simulations.c.job_id,
-                     simulations.c.start_time, simulations.c.end_time).select_from(simulations).join(
+    stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time,
+                     simulations.c.end_time, users.c.username).select_from(simulations).join(
                          users, simulations.c.user_id == users.c.id).filter_by(**filter_args)
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
+    user_column = ''
     for sim in sims:
-        click.echo(f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};")
+        user_column = f" username {sim.username}" if not user else ''
+        click.echo(
+            f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};{user_column}")
 
 
 @run.command
