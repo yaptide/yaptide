@@ -158,26 +158,33 @@ def remove_user(name, auth_provider):
 
 
 @run.command
-@click.option('user','--user', default='')
+@click.option('user', '--user', default='')
 @click.option('auth_provider', '--auth-provider')
 def list_tasks(user, auth_provider):
     """List tasks"""
-    if bool(auth_provider) != bool(user):
-        raise click.UsageError("Both --user and --auth-provider must be provided together or neither.")
-    username = user
-    
+
     con, metadata, _ = connect_to_db()
     tasks = metadata.tables[TableTypes.Task.name]
     users = metadata.tables[TableTypes.User.name]
     simulations = metadata.tables[TableTypes.Simulation.name]
-    if user and not user_exists(username, auth_provider, users, con):
-        click.echo(f"Aborting, user {username} does not exist")
+
+    stmt = db.select(users).filter_by(username=user)
+    users_found = con.execute(stmt).all()
+    if not len(users_found) > 0:
+        click.echo(f"Aborting, user {user} does not exist")
         raise click.Abort()
-    
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id)
-    if(username):
-        stmt = db.select(tasks.c.simulation_id, tasks.c.task_id).select_from(tasks).join(simulations, tasks.c.simulation_id == simulations.c.id).join(users, simulations.c.user_id == users.c.id).filter_by(username=username, auth_provider=auth_provider)
-    print(stmt)
+
+    filter_args = {}
+
+    if user:
+        filter_args['username'] = user
+    if auth_provider:
+        filter_args['auth_provider'] = auth_provider
+
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id).select_from(tasks).join(
+        simulations,
+        tasks.c.simulation_id == simulations.c.id).join(users,
+                                                        simulations.c.user_id == users.c.id).filter_by(**filter_args)
     all_tasks = con.execute(stmt).all()
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
@@ -187,25 +194,31 @@ def list_tasks(user, auth_provider):
 
 @run.command
 @click.option('-v', '--verbose', count=True)
-@click.option('user','--user', default='')
+@click.option('user', '--user', default='')
 @click.option('auth_provider', '--auth-provider')
 def list_simulations(verbose, user, auth_provider):
     """List simulations"""
-    if bool(auth_provider) != bool(user):
-        raise click.UsageError("Both --user and --auth-provider must be provided together or neither.")
-    username = user
-    
+
     con, metadata, _ = connect_to_db(verbose=verbose)
     simulations = metadata.tables[TableTypes.Simulation.name]
     users = metadata.tables[TableTypes.User.name]
-    
-    if user and not user_exists(username, auth_provider, users, con):
-        click.echo(f"Aborting, user {username} does not exist")
+
+    stmt = db.select(users).filter_by(username=user)
+    users_found = con.execute(stmt).all()
+    if not len(users_found) > 0:
+        click.echo(f"Aborting, user {user} does not exist")
         raise click.Abort()
-    
-    stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time)
-    if username:
-        stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time).select_from(simulations).join(users, simulations.c.user_id == users.c.id).filter_by(username=username, auth_provider=auth_provider)
+
+    filter_args = {}
+
+    if user:
+        filter_args['username'] = user
+    if auth_provider:
+        filter_args['auth_provider'] = auth_provider
+
+    stmt = db.select(simulations.c.id, simulations.c.job_id,
+                     simulations.c.start_time, simulations.c.end_time).select_from(simulations).join(
+                         users, simulations.c.user_id == users.c.id).filter_by(**filter_args)
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
