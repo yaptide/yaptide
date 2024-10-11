@@ -162,7 +162,6 @@ def remove_user(name, auth_provider):
 @click.option('auth_provider', '--auth-provider')
 def list_tasks(user, auth_provider):
     """List tasks"""
-
     con, metadata, _ = connect_to_db()
     tasks = metadata.tables[TableTypes.Task.name]
     users = metadata.tables[TableTypes.User.name]
@@ -200,7 +199,6 @@ def list_tasks(user, auth_provider):
 @click.option('auth_provider', '--auth-provider')
 def list_simulations(verbose, user, auth_provider):
     """List simulations"""
-
     con, metadata, _ = connect_to_db(verbose=verbose)
     simulations = metadata.tables[TableTypes.Simulation.name]
     users = metadata.tables[TableTypes.User.name]
