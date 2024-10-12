@@ -158,7 +158,7 @@ def remove_user(name, auth_provider):
 
 
 @run.command
-@click.option('user', '--user', default='')
+@click.option('user', '--user')
 @click.option('auth_provider', '--auth-provider')
 def list_tasks(user, auth_provider):
     """List tasks"""
@@ -216,7 +216,7 @@ def remove_task(task_id, verbose):
 
 @run.command
 @click.option('-v', '--verbose', count=True)
-@click.option('user', '--user', default='')
+@click.option('user', '--user')
 @click.option('auth_provider', '--auth-provider')
 def list_simulations(verbose, user, auth_provider):
     """List simulations"""
