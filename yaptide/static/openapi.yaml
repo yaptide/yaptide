@@ -883,6 +883,10 @@ paths:
           name: job_id
           schema:
             type: string
+        - in: query
+          name: estimator_name
+          schema:
+            type: string
       responses:
         '200':
           description: Includes results of the simulation

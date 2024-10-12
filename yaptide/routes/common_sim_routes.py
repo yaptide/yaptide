@@ -1,21 +1,21 @@
 import logging
 from collections import Counter
 from datetime import datetime
+from typing import Union
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import get_job_results
-from yaptide.persistence.db_methods import (
-    add_object_to_db, fetch_cluster_by_id,
-    fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
-    fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
-    fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
-    fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
-from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
-                                        LogfilesModel, PageModel, UserModel)
+from yaptide.persistence.db_methods import (add_object_to_db, fetch_cluster_by_id,
+                                            fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
+                                            fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
+                                            fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
+                                            fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
+                                            fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+from yaptide.persistence.models import (BatchSimulationModel, CelerySimulationModel, EstimatorModel, LogfilesModel,
+                                        PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
@@ -56,8 +56,7 @@ class JobsResource(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value,
-                                    EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -65,9 +64,7 @@ class JobsResource(Resource):
                                         "job_tasks_status": job_tasks_status,
                                     })
 
-        job_info = {
-            "job_state": simulation.job_state
-        }
+        job_info = {"job_state": simulation.job_state}
         status_counter = Counter([task["task_state"] for task in job_tasks_status])
         if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
             job_info["job_state"] = EntityState.PENDING.value
@@ -121,8 +118,8 @@ class ResultsResource(Resource):
                 add_object_to_db(estimator)
 
             for page_dict in estimator_dict["pages"]:
-                page = fetch_page_by_est_id_and_page_number(
-                    est_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
+                page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
+                                                            page_number=int(page_dict["metadata"]["page_number"]))
 
                 page_existed = bool(page)
                 if not page_existed:
@@ -136,10 +133,7 @@ class ResultsResource(Resource):
 
         make_commit_to_db()
         logging.debug("Marking simulation as completed")
-        update_dict = {
-            "job_state": EntityState.COMPLETED.value,
-            "end_time": datetime.utcnow().isoformat(sep=" ")
-        }
+        update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         update_simulation_state(simulation=simulation, update_dict=update_dict)
         return yaptide_response(message="Results saved", code=202)
 
@@ -147,24 +141,20 @@ class ResultsResource(Resource):
         """Class specifies API parameters"""
 
         job_id = fields.String()
+        estimator_name = fields.String(load_default=None)
 
     @staticmethod
-    @requires_auth()
-    def get(user: UserModel):
-        """Method returning job status and results"""
-        schema = ResultsResource.APIParametersSchema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        param_dict: dict = schema.load(request.args)
+    def _get_single_estimator(sim_id, estimator_name):
+        estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
+        if not estimator:
+            return yaptide_response(message="Estimator not found", code=404)
 
-        job_id = param_dict['job_id']
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
-        if not is_owned:
-            return yaptide_response(message=error_message, code=res_code)
+        pages = fetch_pages_by_estimator_id(est_id=estimator.id)
+        estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
+        return yaptide_response(message=f"Estimator '{estimator_name}' found", code=200, content=estimator_dict)
 
-        simulation = fetch_simulation_by_job_id(job_id=job_id)
-
+    @staticmethod
+    def _get_all_estimators(user: UserModel, simulation: Union[BatchSimulationModel, CelerySimulationModel], job_id):
         estimators = fetch_estimators_by_sim_id(sim_id=simulation.id)
         if len(estimators) == 0:
             if not isinstance(simulation, BatchSimulationModel):  # also CODE TO REMOVE
@@ -186,8 +176,7 @@ class ResultsResource(Resource):
                 estimator.data = estimator_dict["metadata"]
                 add_object_to_db(estimator)
                 for page_dict in estimator_dict["pages"]:
-                    page = PageModel(estimator_id=estimator.id,
-                                     page_number=int(page_dict["metadata"]["page_number"]))
+                    page = PageModel(estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
                     page.data = page_dict
                     add_object_to_db(page, False)
                 make_commit_to_db()
@@ -204,8 +193,34 @@ class ResultsResource(Resource):
                 "pages": [page.data for page in pages]
             }
             result_estimators.append(estimator_dict)
-        return yaptide_response(message=f"Results for job: {job_id}", code=200,
+        return yaptide_response(message=f"Results for job: {job_id}",
+                                code=200,
                                 content={"estimators": result_estimators})
+
+    @staticmethod
+    @requires_auth()
+    def get(user: UserModel):
+        """Method returning job status and results"""
+        schema = ResultsResource.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        param_dict: dict = schema.load(request.args)
+
+        job_id = param_dict['job_id']
+        estimator_name = param_dict['estimator_name']
+
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
+
+        # if estimator name is provided, return specific estimator
+        if estimator_name:
+            return ResultsResource._get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
+
+        return ResultsResource._get_all_estimators(user=user, simulation=simulation, job_id=job_id)
 
 
 class InputsResource(Resource):
