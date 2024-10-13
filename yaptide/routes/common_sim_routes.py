@@ -170,7 +170,10 @@ class ResultsResource(Resource):
     @requires_auth()
     def get(user: UserModel):
         """Method returning job status and results.
-        If `estimator_name` parameter is provided, the response will include results only for that specific estimator, otherwise it will return all estimators for the given job."""
+        If `estimator_name` parameter is provided,
+        the response will include results only for that specific estimator,
+        otherwise it will return all estimators for the given job.
+        """
         schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
