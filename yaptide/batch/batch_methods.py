@@ -43,37 +43,36 @@ def get_connection(user: dict, cluster: dict) -> Connection:
 @celery_app.task()
 def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str) -> dict:
     """Submits job to cluster"""
-    
+
     logging.info('celery worker log info')
     logging.debug('celery worker log debug')
     logging.error('celery worker log error')
     logging.warning('celery worker log warning')
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
-        con, metadata, _ = connect_to_db()
+        db_con, metadata, _ = connect_to_db()
     except:
         logging.error('Async worker couldn\'t connect to db')
         #TODO send reqest to end simulation in db or cancel directly ?????
-    
+
     users = metadata.tables[TableTypes.User.name]
     keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
-    stmt = db.select(users, keycloackUsers).select_from(users).join(keycloackUsers, KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
-    
+    stmt = db.select(users,
+                     keycloackUsers).select_from(users).join(keycloackUsers,
+                                                             KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
+
     try:
-        user = con.execute(stmt).first()
+        user = db_con.execute(stmt).first()
     except:
         logging.error(f'Error getting user object wiht id: {userId} from database')
-    
-    
+
     clusters = metadata.tables[TableTypes.Cluster.name]
     print(clusters)
     stmt = db.select(clusters).filter_by(id=clusterId)
     try:
-        cluster: ClusterModel = con.execute(stmt).first()
+        cluster: ClusterModel = db_con.execute(stmt).first()
     except:
         logging.error(f'Error getting cluster object with id: {clusterId} from database')
-
-    
 
     if user.cert is None or user.private_key is None:
         #TODO don't return cancel simulation

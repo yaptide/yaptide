@@ -79,19 +79,19 @@ class JobsBatch(Resource):
                                       sim_id=simulation.id,
                                       update_key=update_key)
 
-        result = submission.get()
+        # result = submission.get()
 
-        required_keys = {"job_dir", "array_id", "collect_id"}
-        if required_keys != required_keys.intersection(set(result.keys())):
-            delete_object_from_db(simulation)
-            return yaptide_response(message="Job submission failed", code=500, content=result)
+        # required_keys = {"job_dir", "array_id", "collect_id"}
+        # if required_keys != required_keys.intersection(set(result.keys())):
+        #     delete_object_from_db(simulation)
+        #     return yaptide_response(message="Job submission failed", code=500, content=result)
 
         #TODO case when job submission fails - not here because async submission
 
-        simulation.job_dir = result.pop("job_dir", None)
-        simulation.array_id = result.pop("array_id", None)
-        simulation.collect_id = result.pop("collect_id", None)
-        result["job_id"] = simulation.job_id
+        # simulation.job_dir = result.pop("job_dir", None)
+        # simulation.array_id = result.pop("array_id", None)
+        # simulation.collect_id = result.pop("collect_id", None)
+        # result["job_id"] = simulation.job_id
 
         for i in range(payload_dict["ntasks"]):
             task = BatchTaskModel(simulation_id=simulation.id, task_id=str(i + 1))
@@ -103,7 +103,7 @@ class JobsBatch(Resource):
         if simulation.update_state({"job_state": EntityState.PENDING.value}):
             make_commit_to_db()
 
-        return yaptide_response(message="Job waiting for submission", code=202, content=result)
+        return yaptide_response(message="Job waiting for submission", code=202, content={'job_id': simulation.job_id})
 
     class APIParametersSchema(Schema):
         """Class specifies API parameters"""
