@@ -98,12 +98,25 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
         sleep(0.5)
     assert i < max_number_of_attempts - 1, "Job did not finish in time"
 
-    logging.info("Fetching results from /results endpoint")
+    # Test the results endpoint without estimator_name
+    logging.info("Fetching results from /results endpoint without estimator_name")
     resp = client.get("/results", query_string={"job_id": job_id})
     results_data: dict = json.loads(resp.data.decode())
 
     assert resp.status_code == 200  # skipcq: BAN-B101
     assert {"message", "estimators"} == set(results_data.keys())
+
+    # Test the results endpoint with a specific estimator_name
+    estimator_name = results_data["estimators"][0]["name"]
+    logging.info("Fetching results from /results endpoint with estimator_name '%s'", estimator_name)
+    resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": estimator_name})
+    results_data_for_specific_estimator: dict = json.loads(resp.data.decode())
+
+    assert resp.status_code == 200  # skipcq: BAN-B101
+    assert {"message", "metadata", "name", "pages"} == set(results_data_for_specific_estimator.keys())
+    assert estimator_name == results_data_for_specific_estimator["name"]
+    assert results_data["estimators"][0]["metadata"] == results_data_for_specific_estimator["metadata"]
+    assert results_data["estimators"][0]["pages"] == results_data_for_specific_estimator["pages"]
 
     resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101

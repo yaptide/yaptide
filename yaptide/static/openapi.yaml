@@ -877,14 +877,18 @@ paths:
   /results:
     description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
     get:
-      summary: Allows getting results of the simulation
+      summary: Allows getting results of the simulation. If `estimator_name` parameter is provided, the response will include results only for that specific estimator, otherwise it will return all estimators for the given job.
       parameters:
         - in: query
           name: job_id
+          required: true
+          description: ID of the job to retrieve results for
           schema:
             type: string
         - in: query
           name: estimator_name
+          required: false
+          description: Name of a specific estimator to retrieve results for
           schema:
             type: string
       responses:

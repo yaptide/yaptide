@@ -7,15 +7,12 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.batch.batch_methods import get_job_results
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_cluster_by_id,
-                                            fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
-                                            fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
+from yaptide.persistence.db_methods import (add_object_to_db, fetch_estimator_by_sim_id_and_est_name,
+                                            fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
                                             fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
                                             fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
                                             fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
-from yaptide.persistence.models import (BatchSimulationModel, CelerySimulationModel, EstimatorModel, LogfilesModel,
-                                        PageModel, UserModel)
+from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
@@ -78,6 +75,32 @@ class JobsResource(Resource):
         job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
+
+
+def get_single_estimator(sim_id: int, estimator_name: str):
+    """Retrieve a single estimator by simulation ID and estimator name"""
+    estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
+    if not estimator:
+        return yaptide_response(message="Estimator not found", code=404)
+
+    pages = fetch_pages_by_estimator_id(est_id=estimator.id)
+    estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
+    return yaptide_response(message=f"Estimator '{estimator_name}' found", code=200, content=estimator_dict)
+
+
+def get_all_estimators(sim_id: int, job_id: str):
+    """Retrieve all estimators for a given simulation ID"""
+    estimators = fetch_estimators_by_sim_id(sim_id=sim_id)
+    if len(estimators) == 0:
+        return yaptide_response(message="Results are unavailable", code=404)
+
+    logging.debug("Returning results from database")
+    result_estimators = []
+    for estimator in estimators:
+        pages = fetch_pages_by_estimator_id(est_id=estimator.id)
+        estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
+        result_estimators.append(estimator_dict)
+    return yaptide_response(message=f"Results for job: {job_id}", code=200, content={"estimators": result_estimators})
 
 
 class ResultsResource(Resource):
@@ -144,63 +167,10 @@ class ResultsResource(Resource):
         estimator_name = fields.String(load_default=None)
 
     @staticmethod
-    def _get_single_estimator(sim_id, estimator_name):
-        estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
-        if not estimator:
-            return yaptide_response(message="Estimator not found", code=404)
-
-        pages = fetch_pages_by_estimator_id(est_id=estimator.id)
-        estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
-        return yaptide_response(message=f"Estimator '{estimator_name}' found", code=200, content=estimator_dict)
-
-    @staticmethod
-    def _get_all_estimators(user: UserModel, simulation: Union[BatchSimulationModel, CelerySimulationModel], job_id):
-        estimators = fetch_estimators_by_sim_id(sim_id=simulation.id)
-        if len(estimators) == 0:
-            if not isinstance(simulation, BatchSimulationModel):  # also CODE TO REMOVE
-                return yaptide_response(message="Results are unavailable", code=404)
-            # Code below is for backward compatibility with old method of saving results
-            # later on we are going to remove it because it's functionality will be covered
-            # by the post method
-            # BEGIN CODE TO REMOVE
-
-            cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
-
-            result: dict = get_job_results(simulation=simulation, user=user, cluster=cluster)
-            if "estimators" not in result:
-                logging.debug("Results for job %s are unavailable", job_id)
-                return yaptide_response(message="Results are unavailable", code=404, content=result)
-
-            for estimator_dict in result["estimators"]:
-                estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
-                estimator.data = estimator_dict["metadata"]
-                add_object_to_db(estimator)
-                for page_dict in estimator_dict["pages"]:
-                    page = PageModel(estimator_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"]))
-                    page.data = page_dict
-                    add_object_to_db(page, False)
-                make_commit_to_db()
-            estimators = fetch_estimators_by_sim_id(sim_id=simulation.id)
-            # END CODE TO REMOVE
-
-        logging.debug("Returning results from database")
-        result_estimators = []
-        for estimator in estimators:
-            pages = fetch_pages_by_estimator_id(est_id=estimator.id)
-            estimator_dict = {
-                "metadata": estimator.data,
-                "name": estimator.name,
-                "pages": [page.data for page in pages]
-            }
-            result_estimators.append(estimator_dict)
-        return yaptide_response(message=f"Results for job: {job_id}",
-                                code=200,
-                                content={"estimators": result_estimators})
-
-    @staticmethod
     @requires_auth()
     def get(user: UserModel):
-        """Method returning job status and results"""
+        """Method returning job status and results.
+        If `estimator_name` parameter is provided, the response will include results only for that specific estimator, otherwise it will return all estimators for the given job."""
         schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -218,9 +188,9 @@ class ResultsResource(Resource):
 
         # if estimator name is provided, return specific estimator
         if estimator_name:
-            return ResultsResource._get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
+            return get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
 
-        return ResultsResource._get_all_estimators(user=user, simulation=simulation, job_id=job_id)
+        return get_all_estimators(sim_id=simulation.id, job_id=job_id)
 
 
 class InputsResource(Resource):
