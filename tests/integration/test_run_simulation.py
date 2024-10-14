@@ -118,6 +118,10 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
     assert results_data["estimators"][0]["metadata"] == results_data_for_specific_estimator["metadata"]
     assert results_data["estimators"][0]["pages"] == results_data_for_specific_estimator["pages"]
 
+    # Test the results endpoint with a nonexistent estiimator_name
+    resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": "nonexistent_estimator"})
+    assert resp.status_code == 404  # skipcq: BAN-B101
+
     resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101
     simulations_data = json.loads(resp.data.decode())

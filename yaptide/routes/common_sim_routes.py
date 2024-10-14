@@ -85,10 +85,12 @@ def get_single_estimator(sim_id: int, estimator_name: str):
 
     pages = fetch_pages_by_estimator_id(est_id=estimator.id)
     estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
-    return yaptide_response(message=f"Estimator '{estimator_name}' found", code=200, content=estimator_dict)
+    return yaptide_response(message=f"Estimator '{estimator_name}' for simulation: {sim_id}",
+                            code=200,
+                            content=estimator_dict)
 
 
-def get_all_estimators(sim_id: int, job_id: str):
+def get_all_estimators(sim_id: int):
     """Retrieve all estimators for a given simulation ID"""
     estimators = fetch_estimators_by_sim_id(sim_id=sim_id)
     if len(estimators) == 0:
@@ -100,7 +102,9 @@ def get_all_estimators(sim_id: int, job_id: str):
         pages = fetch_pages_by_estimator_id(est_id=estimator.id)
         estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
         result_estimators.append(estimator_dict)
-    return yaptide_response(message=f"Results for job: {job_id}", code=200, content={"estimators": result_estimators})
+    return yaptide_response(message=f"Results for simulation: {sim_id}",
+                            code=200,
+                            content={"estimators": result_estimators})
 
 
 class ResultsResource(Resource):
@@ -193,7 +197,7 @@ class ResultsResource(Resource):
         if estimator_name:
             return get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
 
-        return get_all_estimators(sim_id=simulation.id, job_id=job_id)
+        return get_all_estimators(sim_id=simulation.id)
 
 
 class InputsResource(Resource):

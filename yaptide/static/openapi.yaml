@@ -1259,7 +1259,7 @@ components:
         task_state:
           type: string
           enum: [PENDING, RUNNING, COMPLETED, FAILED]
-    Estimators:
+    Estimator:
       type: object
       description: dictionary of estimators with names as keys and values as dictionaries with estimator parameters
 
