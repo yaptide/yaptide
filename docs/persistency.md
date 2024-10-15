@@ -197,6 +197,7 @@ The `db_manage.py` script provides several commands to manage the database. Belo
 
 - **remove_task**
   - Arguments:
+    - `simulation_id`
     - `task_id`
   - Options:
     - `-v`, `--verbose`

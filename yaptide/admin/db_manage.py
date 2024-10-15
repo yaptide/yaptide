@@ -194,15 +194,18 @@ def list_tasks(user, auth_provider):
 
 
 @run.command
+@click.argument('simulation_id')
 @click.argument('task_id')
 @click.option('-v', '--verbose', count=True)
-def remove_task(task_id, verbose):
+def remove_task(simulation_id, task_id, verbose):
     """Delete task"""
     con, metadata, _ = connect_to_db(verbose=verbose)
-    click.echo(f'Deleting task: {task_id}')
+    click.echo(f'Deleting task: {task_id} from simulation: {simulation_id}')
     tasks = metadata.tables[TableTypes.Task.name]
+    simulation_id = int(simulation_id)
+    task_id = int(task_id)
 
-    stmt = db.select(tasks).filter_by(task_id=task_id)
+    stmt = db.select(tasks).filter_by(task_id=task_id, simulation_id=simulation_id)
     task_found = con.execute(stmt).all()
     if not task_found:
         click.echo(f"Aborting, task {task_id} does not exist")
@@ -256,7 +259,8 @@ def list_simulations(verbose, user, auth_provider):
 @click.option('-v', '--verbose', count=True)
 def remove_simulation(simulation_id, verbose):
     """Delete simulation"""
-    con, metadata, _ = connect_to_db(verbose=verbose)
+    simulation_id = int(simulation_id)
+    con, metadata, engine = connect_to_db(verbose=verbose)
     click.echo(f'Deleting simulation: {simulation_id}')
     simulations = metadata.tables[TableTypes.Simulation.name]
 
@@ -266,7 +270,16 @@ def remove_simulation(simulation_id, verbose):
         click.echo(f"Aborting, simulation {simulation_id} does not exist")
         raise click.Abort()
 
+    # Session = sessionmaker(bind=engine)
+    # session = Session()
+
+    # simulation = session.query(simulations).filter_by(id=simulation_id).first()
+    # print(simulation)
+    # session.delete(simulation)
+    # session.commit()
     query = db.delete(simulations).where(simulations.c.id == simulation_id)
+    print(query)
+
     con.execute(query)
     con.commit()
     click.echo(f'Successfully deleted simulation: {simulation_id}')
