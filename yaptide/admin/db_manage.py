@@ -260,7 +260,7 @@ def list_simulations(verbose, user, auth_provider):
 def remove_simulation(simulation_id, verbose):
     """Delete simulation"""
     simulation_id = int(simulation_id)
-    con, metadata, engine = connect_to_db(verbose=verbose)
+    con, metadata, _ = connect_to_db(verbose=verbose)
     click.echo(f'Deleting simulation: {simulation_id}')
     simulations = metadata.tables[TableTypes.Simulation.name]
 
@@ -270,15 +270,7 @@ def remove_simulation(simulation_id, verbose):
         click.echo(f"Aborting, simulation {simulation_id} does not exist")
         raise click.Abort()
 
-    # Session = sessionmaker(bind=engine)
-    # session = Session()
-
-    # simulation = session.query(simulations).filter_by(id=simulation_id).first()
-    # print(simulation)
-    # session.delete(simulation)
-    # session.commit()
     query = db.delete(simulations).where(simulations.c.id == simulation_id)
-    print(query)
 
     con.execute(query)
     con.commit()
