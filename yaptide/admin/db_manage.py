@@ -158,30 +158,123 @@ def remove_user(name, auth_provider):
 
 
 @run.command
-def list_tasks():
+@click.option('user', '--user')
+@click.option('auth_provider', '--auth-provider')
+def list_tasks(user, auth_provider):
     """List tasks"""
     con, metadata, _ = connect_to_db()
     tasks = metadata.tables[TableTypes.Task.name]
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id)
+    users = metadata.tables[TableTypes.User.name]
+    simulations = metadata.tables[TableTypes.Simulation.name]
+
+    if user:
+        stmt = db.select(users).filter_by(username=user)
+        users_found = con.execute(stmt).all()
+        if not len(users_found) > 0:
+            click.echo(f"Aborting, user {user} does not exist")
+            raise click.Abort()
+
+    filter_args = {}
+
+    if user:
+        filter_args['username'] = user
+    if auth_provider:
+        filter_args['auth_provider'] = auth_provider
+
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username).select_from(tasks).join(
+        simulations,
+        tasks.c.simulation_id == simulations.c.id).join(users,
+                                                        simulations.c.user_id == users.c.id).filter_by(**filter_args)
     all_tasks = con.execute(stmt).all()
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
     for task in all_tasks:
-        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id}")
+        user_column = f" username {task.username}" if not user else ''
+        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id};{user_column}")
+
+
+@run.command
+@click.argument('simulation_id')
+@click.argument('task_id')
+@click.option('-v', '--verbose', count=True)
+def remove_task(simulation_id, task_id, verbose):
+    """Delete task"""
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Deleting task: {task_id} from simulation: {simulation_id}')
+    tasks = metadata.tables[TableTypes.Task.name]
+    simulation_id = int(simulation_id)
+    task_id = int(task_id)
+
+    stmt = db.select(tasks).filter_by(task_id=task_id, simulation_id=simulation_id)
+    task_found = con.execute(stmt).all()
+    if not task_found:
+        click.echo(f"Aborting, task {task_id} does not exist")
+        raise click.Abort()
+
+    query = db.delete(tasks).where(tasks.c.task_id == task_id)
+    con.execute(query)
+    con.commit()
+    click.echo(f'Successfully deleted task: {task_id}')
 
 
 @run.command
 @click.option('-v', '--verbose', count=True)
-def list_simulations(verbose):
+@click.option('user', '--user')
+@click.option('auth_provider', '--auth-provider')
+def list_simulations(verbose, user, auth_provider):
     """List simulations"""
     con, metadata, _ = connect_to_db(verbose=verbose)
     simulations = metadata.tables[TableTypes.Simulation.name]
-    stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time)
+    users = metadata.tables[TableTypes.User.name]
+
+    if user:
+        stmt = db.select(users).filter_by(username=user)
+        users_found = con.execute(stmt).all()
+        if not len(users_found) > 0:
+            click.echo(f"Aborting, user {user} does not exist")
+            raise click.Abort()
+
+    filter_args = {}
+
+    if user:
+        filter_args['username'] = user
+    if auth_provider:
+        filter_args['auth_provider'] = auth_provider
+
+    stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time,
+                     simulations.c.end_time, users.c.username).select_from(simulations).join(
+                         users, simulations.c.user_id == users.c.id).filter_by(**filter_args)
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
+    user_column = ''
     for sim in sims:
-        click.echo(f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};")
+        user_column = f" username {sim.username}" if not user else ''
+        click.echo(
+            f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};{user_column}")
+
+
+@run.command
+@click.argument('simulation_id')
+@click.option('-v', '--verbose', count=True)
+def remove_simulation(simulation_id, verbose):
+    """Delete simulation"""
+    simulation_id = int(simulation_id)
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    click.echo(f'Deleting simulation: {simulation_id}')
+    simulations = metadata.tables[TableTypes.Simulation.name]
+
+    stmt = db.select(simulations).filter_by(id=simulation_id)
+    simulation_found = con.execute(stmt).all()
+    if not simulation_found:
+        click.echo(f"Aborting, simulation {simulation_id} does not exist")
+        raise click.Abort()
+
+    query = db.delete(simulations).where(simulations.c.id == simulation_id)
+
+    con.execute(query)
+    con.commit()
+    click.echo(f'Successfully deleted simulation: {simulation_id}')
 
 
 @run.command
