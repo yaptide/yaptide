@@ -875,9 +875,9 @@ paths:
 
 # Result Routes
   /results:
-    description: Now it works properly only for simulations run on direct. Fetching results from batch will always end up with getting response with 400 status code.
     get:
-      summary: Allows getting results of the simulation. If `estimator_name` parameter is provided, the response will include results only for that specific estimator, otherwise it will return all estimators for the given job.
+      summary: Allows getting results of the simulation.
+      description: If `estimator_name` is provided, the response will include results only for that specific estimator, otherwise it will return all estimators for the given job.
       parameters:
         - in: query
           name: job_id
@@ -897,15 +897,21 @@ paths:
           content:
             application/json:
               schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  estimators:
-                    type: array
-                    items:
-                      $ref: '#/components/schemas/Estimator'
-                    description: list of resulting estimators
+                oneOf:
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                      estimators:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Estimator'
+                  - type: object
+                    properties:
+                      message:
+                        type: string
+                      estimator:
+                          $ref: '#/components/schemas/Estimator'
         '400':
           description: Bad Request - Missing parameters
           content:
@@ -1261,7 +1267,21 @@ components:
           enum: [PENDING, RUNNING, COMPLETED, FAILED]
     Estimator:
       type: object
-      description: dictionary of estimators with names as keys and values as dictionaries with estimator parameters
+      description: Estimator object includes estimator's name, associated metadata, and list of pages.
+      properties:
+        name:
+          type: string
+          description: The name of the estimator
+        metadata:
+          type: object
+          description: Metadata for the estimator
+        pages:
+          type: array
+          description: List of pages
+          items:
+            type: object
+            description: Page object
+
 
 security:
   - basicAuth: []  # <-- use the same name here
