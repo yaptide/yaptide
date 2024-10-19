@@ -166,7 +166,7 @@ docker exec -it yaptide_flask ./yaptide/admin/db_manage.py list-users
 In Yaptide flask-migrate is responsible for modyfing database after each change to `models.py` and keeping track of versions of database (new version comes after each modification of models.py).
 
 ### Development steps
-For development running yaptide_postgres is required
+For development running yaptide_postgres in docker is required
 
 1. Depending on whether development happens locally or yap-dev export `FLASK_SQLALCHEMY_DATABASE_URI` or define it before each `flask db` command execution:
 
@@ -176,8 +176,9 @@ For development running yaptide_postgres is required
       `FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@localhost:5432/${POSTGRES_DB:-yaptide_db}`
 
       e.g. for local development `FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://yaptide_user:yaptide_password@localhost:5432/yaptide_db`
-1. When first time using flask migrate during database running on docker on local machine, run `flask --app yaptide.application db 06c32cf470e7` (first version)
-1. run `flask --app yaptide.application db migrate`.
+1. When first time using flask migrate during database running on docker on local machine, run `flask --app yaptide.application db stamp 06c32cf470e7` (first version)
+1. Do modifications `models.py`
+1. Run `flask --app yaptide.application db migrate`.
     - In case of error `ERROR [flask_migrate] Error: Target database is not up to date` run
     `flask --app yaptide.application db stamp head`
 1. There will be generated file named after currnet version in migrations/versions
