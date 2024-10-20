@@ -1,0 +1,73 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.17.10
+    container_name: yaptide_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "9200:9200"
+#    networks:
+#      - logging_net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep '\"status\":\"green\"' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:7.17.10
+    container_name: yaptide_logstash
+    ports:
+      - "5044:5044"
+      - "9600:9600" # API for logstash metrics
+      - "7000:7000" # custom gelf input for logs
+      - "24224:24224"
+    volumes:
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+#    networks:
+#      - logging_net
+    # depends_on:
+    #   elasticsearch:
+    #     condition: service_healthy
+    # healthcheck:
+    #   test: ["CMD-SHELL", "curl -f http://localhost:9600/_node/stats || exit 1"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+
+  # Extend existing services to route logs to Logstash
+  yaptide_flask:
+    logging:
+      driver: "fluentd"
+      options:
+        fluentd-address: "127.0.0.1:24224"
+        tag: "my_app_logs"
+    # depends_on:
+    #   logstash:
+    #     condition: service_healthy
+
+
+### TODO check if 127.0.0.1 should be used instead of names
+
+  # yaptide_worker:
+  #   logging:
+  #     driver: "gelf"
+  #     options:
+  #       gelf-address: "udp://yaptide_logstash:7000"
+  #   depends_on:
+  #     logstash:
+  #       condition: service_healthy
+
+  # nginx:
+  #   logging:
+  #     driver: "gelf"
+  #     options:
+  #       gelf-address: "udp://yaptide_logstash:7000"
+  #   depends_on:
+  #     logstash:
+  #       condition: service_healthy
+
+# networks:
+#   logging_net:
+#     external: false
