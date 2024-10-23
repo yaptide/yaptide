@@ -7,18 +7,26 @@ from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
 
+from flask import current_app as app
+
 import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
 
 from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
+from yaptide.persistence.db_methods import fetch_cluster_by_id, fetch_user_by_id
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel)
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
 
+from yaptide.admin.db_manage import TableTypes, connect_to_db
+import sqlalchemy as db
+from yaptide.persistence.models import UserModel, KeycloakUserModel
+from yaptide.utils.async_worker import celery_app
 
-def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
+
+def get_connection(user: dict, cluster: dict) -> Connection:
     """Returns connection object to cluster"""
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
@@ -32,12 +40,42 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     return con
 
 
-def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cluster: ClusterModel, sim_id: int,
-               update_key: str) -> dict:
+@celery_app.task()
+def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str) -> dict:
     """Submits job to cluster"""
+
+    logging.info('celery worker log info')
+    logging.debug('celery worker log debug')
+    logging.error('celery worker log error')
+    logging.warning('celery worker log warning')
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
+    try:
+        db_con, metadata, _ = connect_to_db()
+    except:
+        logging.error('Async worker couldn\'t connect to db')
+        #TODO send reqest to end simulation in db or cancel directly ?????
+
+    users = metadata.tables[TableTypes.User.name]
+    keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
+    stmt = db.select(users,
+                     keycloackUsers).select_from(users).join(keycloackUsers,
+                                                             KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
+
+    try:
+        user = db_con.execute(stmt).first()
+    except:
+        logging.error(f'Error getting user object wiht id: {userId} from database')
+
+    clusters = metadata.tables[TableTypes.Cluster.name]
+    print(clusters)
+    stmt = db.select(clusters).filter_by(id=clusterId)
+    try:
+        cluster: ClusterModel = db_con.execute(stmt).first()
+    except:
+        logging.error(f'Error getting cluster object with id: {clusterId} from database')
 
     if user.cert is None or user.private_key is None:
+        #TODO don't return cancel simulation
         return {"message": f"User {user.username} has no certificate or private key"}
     con = get_connection(user=user, cluster=cluster)
 
@@ -96,7 +134,22 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
         logging.debug("Job submission failed")
         logging.debug("Sbatch stdout: %s", submit_stdout)
         logging.debug("Sbatch stderr: %s", submit_stderr)
+        # todo make request about failed job
         return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
+
+    # TODO make request about successful job and send job_dir, array_id, collect_id, s
+    # flask_url = os.environ.get("BACKEND_INTERNAL_URL")
+    # dict_to_send = {
+    #     "message": "Job submitted",
+    #     "job_dir": job_dir,
+    #     "array_id": array_id,
+    #     "collect_id": collect_id,
+    #     "submit_stdout": submit_stdout,
+    #     "sh_files": sh_files
+    # }
+
+    # res: requests.Response = requests.Session().post(url=f"{flask_url}/batchfeedback", json=dict_to_send)
+
     return {
         "message": "Job submitted",
         "job_dir": job_dir,
