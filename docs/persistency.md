@@ -166,8 +166,9 @@ docker exec -it yaptide_flask ./yaptide/admin/db_manage.py list-users
 In Yaptide flask-migrate is responsible for modyfing database after each change to `models.py` and keeping track of versions of database (new version comes after each modification of models.py).
 
 ### Development steps
-For development running yaptide_postgres in docker is required
+For development running yaptide_postgres in docker is required. It's recommended to do development on local machine.
 
+1. Make sure all poetry dependencies are installed. Run `poetry shell` in terminal.
 1. Depending on whether development happens locally or yap-dev export `FLASK_SQLALCHEMY_DATABASE_URI` or define it before each `flask db` command execution:
 
 
@@ -175,8 +176,17 @@ For development running yaptide_postgres in docker is required
 
       `FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@localhost:5432/${POSTGRES_DB:-yaptide_db}`
 
-      e.g. for local development `FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://yaptide_user:yaptide_password@localhost:5432/yaptide_db`
-1. When first time using flask migrate during database running on docker on local machine, run `flask --app yaptide.application db stamp 06c32cf470e7` (first version)
+      e.g. for local development `export FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://yaptide_user:yaptide_password@localhost:5432/yaptide_db`
+
+1. Now is the tricky part about stamping docker volume of database with corresponding version from migrate/versions. We have two options.
+
+
+    a) Recommended method. Delete container, image and then volume of database on local machine (alternatively in docker-compose.yml edit database to use volume with different name, this will create new volume and old one won't get deleted). Run `scripts/start_with_docker.sh`. This will create database that for sure reflects what's in models.py. Then to mark database with version from migrations/versions, run `flask --app yaptide.application db stamp head`. This will save id of newest version of database in alembic_version table. **Be cautios as this option is only for development on local machine.**
+
+    b) Developer should be aware of from which commit (more specifically which version of models.py) volume for postgres was created. Then should run `flask --app yaptide.application db stamp {adequate version from migrations/versions}`. Stamp command saves version_id in table called alembic_version. Alembic_version is point of refference for flask db upgrade and downgrade commands. Here's couple examples of how to choose version to be stamped;
+    - if volume was created long time ago before beginning using flask-migrate then
+
+When first time using flask migrate during database running on docker on local machine, run `flask --app yaptide.application db stamp 06c32cf470e7` (first version). This will put version 06c32cf470e7 into alembic_version table in your database.
 1. Do modifications `models.py`
 1. Run `flask --app yaptide.application db migrate`.
     - In case of error `ERROR [flask_migrate] Error: Target database is not up to date` run
@@ -184,6 +194,13 @@ For development running yaptide_postgres in docker is required
 1. There will be generated file named after currnet version in migrations/versions
 1. Check the file, there might be some `None` values which needs to be changed. Pasting script in chat gpt might be helpful to identify some potential problems.
 1. then run `flask --app yaptide.application db upgrade`
+1. To undo changes and go back to previous version run `flask --app yaptide.application db downgrade`
+1. Commit and push
+
+### Testing on yap-dev
+1. Pull changes to repository on yap-dev.
+1. Copy volume of postgres database.
+1. In docker-compose.yml modify database configuration to use volume with differnet name
 
 
 
