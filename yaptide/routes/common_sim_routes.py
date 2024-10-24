@@ -13,7 +13,8 @@ from yaptide.persistence.db_methods import (
     fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
     fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
     fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state,
+    update_task_state)
 from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
                                         LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
@@ -141,6 +142,14 @@ class ResultsResource(Resource):
             "end_time": datetime.utcnow().isoformat(sep=" ")
         }
         update_simulation_state(simulation=simulation, update_dict=update_dict)
+        
+        # If simulation is too short, it can happen that the simulation completes,
+        # but tasks didnt' sent their completion status or simulated_primaries = requested_primaries.
+        # To avoid this, we update simulation tasks by their final status
+        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
+        for task in tasks:
+            update_task_state(task, {"task_state": EntityState.COMPLETED.value})
+        
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
