@@ -6,6 +6,7 @@ from flask_swagger_ui import get_swaggerui_blueprint
 from yaptide.persistence.models import create_all
 from yaptide.persistence.database import db
 from yaptide.routes.main_routes import initialize_routes
+from flask_migrate import Migrate
 
 
 def create_app():
@@ -60,6 +61,7 @@ def create_app():
         create_all()
         app.logger.debug(f"Created {len(db.metadata.tables)} tables")
 
+    migrate = Migrate(app, db)
     api = Api(app)
     initialize_routes(api)
 
