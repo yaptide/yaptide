@@ -299,6 +299,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+    delete:
+      summary: Allows for deleting simulation.
+      parameters:
+        - in: query
+          name: job_id
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Simulation was succesfully deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '400':
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - User does not have permission to delete this simulation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - The simulation is currently running, needs to be canceled or completed before deletion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: Not Found - The simulation with the provided job_id does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
   /user/clusters:
     description: Returns available clusters
     get:
