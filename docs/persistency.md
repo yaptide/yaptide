@@ -166,12 +166,12 @@ docker exec -it yaptide_flask ./yaptide/admin/db_manage.py list-users
 In Yaptide flask-migrate is responsible for modyfing database after each change to `models.py` and keeping track of versions of database (new version comes after each modification of models.py).
 
 ### Development steps
-For development - running yaptide_postgres in docker is required. It's recommended to do development on local machine.
+For development - running yaptide_postgres in docker is required (Flask-migrate can be used on sqlite daatbase we use in development but it's postgres database on production we want to migrate). It's recommended to do development on local machine.
 
 1. Make sure all poetry dependencies are installed. Run `poetry shell` in terminal.
 2. Calling `flask db` commands will require `FLASK_SQLALCHEMY_DATABASE_URI` variable to be defined before each execution:
 
-    - The general pattern for `FLASK_SQLALCHEMY_DATABASE_URI` is taken from docker-compose (there is only postgres changed to localhost):
+    - The general pattern for `FLASK_SQLALCHEMY_DATABASE_URI` is taken from docker-compose (there is only `postgres` changed to localhost or 127.0.0.1 ):
 
       `FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@localhost:5432/${POSTGRES_DB:-yaptide_db}`
 
@@ -219,28 +219,34 @@ For development - running yaptide_postgres in docker is required. It's recommend
 1. Run git pull on master.
 2. Backup the production database
   Before applying any migrations, create a backup of the live database:
-    `
-    pg_dump -U <db_user> -h <db_host> -d <db_name> > backup.sql
-    `
+    - `
+      pg_dump -U <db_user> -h <db_host> -d <db_name> > backup.sql
+      `
+
+    Alterniative is making copy of volume:
+    - `
+        docker run --rm -v yaptide_data:/var/lib/postgresql/data -v /home/ubuntu/backup:/backup busybox tar czf /backup/yaptide_data_backup.tar.gz -C /var/lib/postgresql/data .
+      `
 3. Again prepare `FLASK_SQLALCHEMY_DATABASE_URI` like above and use it together with each `flask db` command.
 4. Applying the migration in production
     There are two options for applying the migration:
 
-    - Option 1: Execute from outside the Docker container
+    Option 1: Execute from outside the Docker container
 
+      - `
+      FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://<user>:<password>@<db_container_ip>:5432/db_name flask --app yaptide.application db upgrade
       `
-      FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://user:password@<db_container_ip>:5432/db_name flask --app yaptide.application db upgrade
-      `
-    - Option 2: Execute from inside the Flask container
 
-    Access the container and run the upgrade:
-      `
+    Option 2: Execute from inside the Flask container
+
+      Access the container and run the upgrade:
+      - `
       docker exec -it <flask_container> bash
       `
+      - `
+      FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://<user>:<password>@<db_container_ip>:5432/db_name flask --app yaptide.application db upgrade
       `
-      FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://user:password@<db_container_ip>:5432/db_name flask --app yaptide.application db upgrade
-      `
-    Rollback strategy
+5. Rollback strategy
     In case of any issues, you can revert the changes by running:
       `
       flask --app yaptide.application db downgrade
@@ -253,7 +259,7 @@ For development - running yaptide_postgres in docker is required. It's recommend
     - Ensure any functionality affected by the migration is working.
 
 
-5. In case of restoring database from backup, run:
+6. In case of restoring database from backup, run:
     - `
       psql -U <db_user> -h <db_host> -c "DROP DATABASE IF EXISTS <db_name>;"
       `
@@ -264,6 +270,11 @@ For development - running yaptide_postgres in docker is required. It's recommend
 
     - `
       psql -U <db_user> -h <db_host> -d <db_name> -f backup.sql
+      `
+
+    If copy of volume was made instead of backup.sql, run:
+    - `
+      docker run --rm -v yaptide_data:/var/lib/postgresql/data -v /home/ubuntu/backup:/backup busybox tar xzf /backup/yaptide_data_backup.tar.gz -C /var/lib/postgresql/data
       `
 
 
