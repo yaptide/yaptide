@@ -4,12 +4,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: yaptide_redis
+    restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
 
   postgresql:
     image: postgres:16-alpine
     container_name: yaptide_postgresql
+    restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
       POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
@@ -28,6 +30,7 @@ services:
       dockerfile: Dockerfile-flask
     image: yaptide_flask
     container_name: yaptide_flask
+    restart: always
     environment:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
@@ -48,6 +51,7 @@ services:
       dockerfile: Dockerfile-worker
     image: yaptide_worker
     container_name: yaptide_worker
+    restart: always
     volumes:
       - simulators:/simulators:rw
     deploy:
@@ -72,6 +76,7 @@ services:
   nginx:
     image: yaptide_nginx
     container_name: yaptide_nginx
+    restart: always
     build:
       context: .
       dockerfile: Dockerfile-nginx
