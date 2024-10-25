@@ -2,11 +2,11 @@ import os
 
 from flask import Flask
 from flask_restful import Api
+from flask_migrate import Migrate
 from flask_swagger_ui import get_swaggerui_blueprint
 from yaptide.persistence.models import create_all
 from yaptide.persistence.database import db
 from yaptide.routes.main_routes import initialize_routes
-from flask_migrate import Migrate
 
 
 def create_app():

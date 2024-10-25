@@ -1,3 +1,6 @@
+# ---------- IMPORTANT ------------
+# Read documentation in persistency.md. It contains information about database development with flask-migrate.
+
 import gzip
 import json
 from datetime import datetime
@@ -9,9 +12,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from yaptide.persistence.database import db
 from yaptide.utils.enums import EntityState, PlatformType
-
-# ---------- IMPORTANT ------------
-# read documentation in persistency.md. It contains information about database development with flask-migrate
 
 
 class UserModel(db.Model):
