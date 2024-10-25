@@ -146,7 +146,7 @@ Then you can use the following command to get the DB URL.
 docker exec -it yaptide_flask bash -c "cd /usr/local/app && python -c 'from yaptide.application import create_app; app = create_app(); app.app_context().push() or print(app.extensions[\"sqlalchemy\"].engine.url.render_as_string(hide_password=False))'"
 ```
 
-The code above is implemented as a handy onliner, the code may look tricky, epecially the `app.app_context().push() or` part.
+The code above is implemented as a handy onliner, the code may look tricky, especially the `app.app_context().push() or` part.
 The reason for that hacking is simple. Regular methods to get the DB URL require the application context. This is usually achieved using `with app.app_context():` construct, which is not possible in the oneliner.
 
 Knowing the DB URL, you can connect to the DB using any DB client, e.g. `psql` or `pgadmin`. You can also use the `db_manage.py` script from the `yaptide/admin` directory. For example, to list all users in the DB, you can use the following command from outside the container:
@@ -285,3 +285,66 @@ Pgadminer is tool that lets user browse database through graphical interface. It
 ssh -L 9999:localhost:9999 <remote_host>
 ```
 then open in browser localhost:9999. Log in with credentials set in compose file. rightclick on servers -> register -> server -> fill necessary fields general and connection tabs.
+
+## commands in db_manage.py
+
+The `db_manage.py` script provides several commands to manage the database. Below is a list of available commands along with their arguments and options:
+
+- **list_users**
+  - Printed columns: `username`, `auth_provider`
+  - Options:
+    - `-v`, `--verbose`
+
+- **add_user**
+  - Arguments:
+    - `name`
+  - Options:
+    - `--password` (default: '')
+    - `-v`, `--verbose`
+
+- **update_user**
+  - Arguments:
+    - `name`
+  - Options:
+    - `--password` (default: '')
+    - `-v`, `--verbose`
+
+- **remove_user**
+  - Arguments:
+    - `name`
+    - `auth_provider`
+
+- **list_tasks**
+  - Printed columns: `simulation_id`, `task_id`, `task_state`, `username`
+  - Options:
+    - `--user`
+    - `--auth-provider`
+
+- **remove_task**
+  - Arguments:
+    - `simulation_id`
+    - `task_id`
+  - Options:
+    - `-v`, `--verbose`
+
+- **list_simulations**
+    - Printed columns: `id`, `job_id`, `start_time`, `end_time`, `username`
+  - Options:
+    - `-v`, `--verbose`
+    - `--user`
+    - `--auth-provider`
+
+- **remove_simulation**
+  - Arguments:
+    - `simulation_id`
+  - Options:
+    - `-v`, `--verbose`
+
+- **add_cluster**
+  - Arguments:
+    - `cluster_name`
+  - Options:
+    - `-v`, `--verbose`
+
+- **list_clusters**
+  - Columns: `id`, `cluster_name`
