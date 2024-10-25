@@ -1,3 +1,6 @@
+# ---------- IMPORTANT ------------
+# Read documentation in persistency.md. It contains information about database development with flask-migrate.
+
 import gzip
 import json
 from datetime import datetime
