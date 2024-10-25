@@ -83,8 +83,6 @@ services:
     ports:
       - 5000:5000
       - 8443:8443
-    volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/nginx.conf:ro
     depends_on:
       yaptide_flask:
         condition: service_healthy
