@@ -22,3 +22,4 @@ repos:
         entry: python3 .pre_commit_hooks/check_not_empty_files.py
         types: [dotenv]
         stages: [commit, push, manual]
+exclude: migrations

@@ -4,6 +4,9 @@ test_patterns = [
   "tests/**/test*.py"
 ]
 
+exclude_patterns = [
+  "migrations/**"
+]
 
 [[analyzers]]
 name = "python"
