@@ -61,7 +61,7 @@ def create_app():
         create_all()
         app.logger.debug(f"Created {len(db.metadata.tables)} tables")
 
-    migrate = Migrate(app, db)
+    Migrate(app, db)
     api = Api(app)
     initialize_routes(api)
 
