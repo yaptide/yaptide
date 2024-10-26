@@ -1,5 +1,7 @@
 from flask import Response, make_response
 import html
+
+
 def yaptide_response(message: str, code: int, content: dict = None) -> Response:
     """Function returning Response object"""
     response_dict = {'message': html.escape(message)}
