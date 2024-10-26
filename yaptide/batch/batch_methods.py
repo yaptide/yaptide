@@ -77,6 +77,9 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
                                                  con=con)
 
     array_id = collect_id = None
+    if not submit_file.startswith(job_dir):
+        logging.error("Invalid submit file path: %s", submit_file)
+        return {"message": "Job submission failed due to invalid submit file path"}
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
     submit_stdout = fabric_result.stdout
     submit_stderr = fabric_result.stderr
