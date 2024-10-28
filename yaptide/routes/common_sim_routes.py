@@ -211,14 +211,15 @@ class ResultsResource(Resource):
             return get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
 
         estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation.id, est_name=estimator_name)
-        if single_page != None:
+        if single_page is not None:
             page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=single_page)
             result = {"page": page.data}
-            return yaptide_response(message=f"Page retrieved successfully", code=200, content=result)
+            return yaptide_response(message="Page retrieved successfully", code=200, content=result)
         if len(page_numbers) > 0:
             pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator_id, page_numbers=page_numbers)
             result = {"pages": [page.data for page in pages]}
-            return yaptide_response(message=f"Pages retrieved successfully", code=200, content=result)
+            return yaptide_response(message="Pages retrieved successfully", code=200, content=result)
+        return yaptide_response(message="Wrong parameters", code=400, content=errors)
 
 
 class InputsResource(Resource):

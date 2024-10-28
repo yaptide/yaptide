@@ -1,21 +1,16 @@
-import logging
-from collections import Counter
-from datetime import datetime
-from typing import Union
-
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (fetch_pages_metadata_by_sim_id_and_est_name, fetch_simulation_by_job_id)
-from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
+from yaptide.persistence.models import UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
-from yaptide.utils.enums import EntityState
 
 
 class PagesResource(Resource):
+    """Class responsible for retrieving pages metadata"""
 
     class APIParametersSchema(Schema):
         """Class specifies API parameters"""
