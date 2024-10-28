@@ -1,3 +1,6 @@
+# ---------- IMPORTANT ------------
+# Read documentation in persistency.md. It contains information about database development with flask-migrate.
+
 import gzip
 import json
 from datetime import datetime
@@ -161,7 +164,7 @@ class TaskModel(db.Model):
     __tablename__ = 'Task'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer,
-                                           db.ForeignKey('Simulation.id'),
+                                           db.ForeignKey('Simulation.id', ondelete="CASCADE"),
                                            doc="Simulation job ID (foreign key)")
 
     task_id: Column[int] = db.Column(db.Integer, nullable=False, doc="Task ID")
@@ -294,7 +297,7 @@ class InputModel(db.Model):
 
     __tablename__ = 'Input'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id', ondelete="CASCADE"))
     compressed_data: Column[bytes] = db.Column(db.LargeBinary)
 
     @property
@@ -312,7 +315,9 @@ class EstimatorModel(db.Model):
 
     __tablename__ = 'Estimator'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
+    simulation_id: Column[int] = db.Column(db.Integer,
+                                           db.ForeignKey('Simulation.id', ondelete="CASCADE"),
+                                           nullable=False)
     name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Estimator metadata")
     pages = relationship("PageModel", cascade="delete")
@@ -332,7 +337,7 @@ class PageModel(db.Model):
 
     __tablename__ = 'Page'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'), nullable=False)
+    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id', ondelete="CASCADE"), nullable=False)
     page_number: Column[int] = db.Column(db.Integer, nullable=False, doc="Page number")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Page json object - data, axes and metadata")
 
@@ -351,7 +356,9 @@ class LogfilesModel(db.Model):
 
     __tablename__ = 'Logfiles'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
+    simulation_id: Column[int] = db.Column(db.Integer,
+                                           db.ForeignKey('Simulation.id', ondelete="CASCADE"),
+                                           nullable=False)
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Json object containing logfiles")
 
     @property
