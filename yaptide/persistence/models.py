@@ -340,6 +340,7 @@ class PageModel(db.Model):
     estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id', ondelete="CASCADE"), nullable=False)
     page_number: Column[int] = db.Column(db.Integer, nullable=False, doc="Page number")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Page json object - data, axes and metadata")
+    page_dimension: Column[int] = db.Column(db.Integer, nullable=False, doc="Dimension of data")
 
     @property
     def data(self):

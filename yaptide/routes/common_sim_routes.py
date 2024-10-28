@@ -5,13 +5,13 @@ from typing import Union
 
 from flask import request
 from flask_restful import Resource
-from marshmallow import Schema, fields
+from marshmallow import INCLUDE, Schema, fields
 
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_estimator_by_sim_id_and_est_name,
-                                            fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
-                                            fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
-                                            fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-                                            fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+from yaptide.persistence.db_methods import (
+    add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_id_by_sim_id_and_est_name,
+    fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number,
+    fetch_pages_by_est_id_and_page_numbers, fetch_pages_by_estimator_id, fetch_simulation_by_job_id,
+    fetch_simulation_by_sim_id, fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
 from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -151,7 +151,9 @@ class ResultsResource(Resource):
                 page_existed = bool(page)
                 if not page_existed:
                     # create new page
-                    page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
+                    page = PageModel(page_number=int(page_dict["metadata"]["page_number"]),
+                                     estimator_id=estimator.id,
+                                     page_dimension=int(page_dict['dimensions']))
                 # we always update the data
                 page.data = page_dict
                 if not page_existed:
@@ -169,6 +171,11 @@ class ResultsResource(Resource):
 
         job_id = fields.String()
         estimator_name = fields.String(load_default=None)
+        single_page = fields.Integer(load_default=None)
+
+        class Meta:
+            # Include unknown fields
+            unknown = INCLUDE
 
     @staticmethod
     @requires_auth()
@@ -177,6 +184,7 @@ class ResultsResource(Resource):
         If `estimator_name` parameter is provided,
         the response will include results only for that specific estimator,
         otherwise it will return all estimators for the given job.
+        If `single_page` or `page_numbers` are provided, the response will include only specific pages.
         """
         schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -186,6 +194,8 @@ class ResultsResource(Resource):
 
         job_id = param_dict['job_id']
         estimator_name = param_dict['estimator_name']
+        single_page = param_dict.get('single_page')
+        page_numbers = request.args.getlist('page_numbers', type=int)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -194,10 +204,21 @@ class ResultsResource(Resource):
         simulation = fetch_simulation_by_job_id(job_id=job_id)
 
         # if estimator name is provided, return specific estimator
-        if estimator_name:
+        if estimator_name is None:
+            return get_all_estimators(sim_id=simulation.id)
+
+        if single_page is None and len(page_numbers) == 0:
             return get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
 
-        return get_all_estimators(sim_id=simulation.id)
+        estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation.id, est_name=estimator_name)
+        if single_page != None:
+            page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=single_page)
+            result = {"page": page.data}
+            return yaptide_response(message=f"Page retrieved successfully", code=200, content=result)
+        if len(page_numbers) > 0:
+            pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator_id, page_numbers=page_numbers)
+            result = {"pages": [page.data for page in pages]}
+            return yaptide_response(message=f"Pages retrieved successfully", code=200, content=result)
 
 
 class InputsResource(Resource):
