@@ -7,6 +7,7 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import get_job_results
+# skipcq: PY-W2000
 from yaptide.persistence.db_methods import (
     add_object_to_db, fetch_cluster_by_id, fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
     fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
