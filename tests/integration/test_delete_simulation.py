@@ -34,14 +34,12 @@ def setup_data(db_session: scoped_session, db_good_username: str, db_good_passwo
                                                  input_type=InputType.EDITOR.value,
                                                  sim_type=SimulationType.SHIELDHIT.value,
                                                  title='testtitle',
-                                                 update_key_hash='testkey',
                                                  job_state=EntityState.COMPLETED.value)
     simulation_pending = CelerySimulationModel(job_id='test_job_pending',
                                                user_id=user.id,
                                                input_type=InputType.EDITOR.value,
                                                sim_type=SimulationType.SHIELDHIT.value,
                                                title='testtitle',
-                                               update_key_hash='testkey',
                                                job_state=EntityState.PENDING.value)
     db_session.add(simulation_completed)
     db_session.add(simulation_pending)
