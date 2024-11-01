@@ -214,8 +214,8 @@ files = [
 jmespath = ">=0.7.1,<2.0.0"
 python-dateutil = ">=2.1,<3.0.0"
 urllib3 = [
-    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
     {version = ">=1.25.4,<2.2.0 || >2.2.0,<3", markers = "python_version >= \"3.10\""},
+    {version = ">=1.25.4,<1.27", markers = "python_version < \"3.10\""},
 ]
 
 [package.extras]
@@ -1947,10 +1947,10 @@ files = [
 
 [package.dependencies]
 numpy = [
-    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
     {version = ">=1.21", markers = "python_version == \"3.10\""},
     {version = ">=1.23.3", markers = "python_version == \"3.11\""},
     {version = ">=1.26", markers = "python_version == \"3.12\""},
+    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
 ]
 
 [package.extras]
@@ -2629,13 +2629,13 @@ files = [
 
 [[package]]
 name = "werkzeug"
-version = "3.0.6"
+version = "3.1.0"
 description = "The comprehensive WSGI web application library."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "werkzeug-3.0.6-py3-none-any.whl", hash = "sha256:1bc0c2310d2fbb07b1dd1105eba2f7af72f322e1e455f2f93c993bee8c8a5f17"},
-    {file = "werkzeug-3.0.6.tar.gz", hash = "sha256:a8dd59d4de28ca70471a34cba79bed5f7ef2e036a76b3ab0835474246eb41f8d"},
+    {file = "werkzeug-3.1.0-py3-none-any.whl", hash = "sha256:208a2e31a4a54c8b3d2244f2079ca1d3851629a7a7d546646059c64fb746023a"},
+    {file = "werkzeug-3.1.0.tar.gz", hash = "sha256:6f2a0d38f25ba5a75c36c45b4ae350c7a23b57e3b974e9eb2d6851f2c648c00d"},
 ]
 
 [package.dependencies]
@@ -2760,4 +2760,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "4942fc5440ae2a006000ee547895869d6c8fcce1e479684e2cf5a4d0ce19d178"
+content-hash = "a2fa4620994404384c97fc62c993d033935314b224481d8d8a3160c90369c48f"
