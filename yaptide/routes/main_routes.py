@@ -8,7 +8,6 @@ from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
-from yaptide.routes.batch_routes_feedback import BatchFeedback
 
 
 class HelloWorld(Resource):
@@ -49,4 +48,3 @@ def initialize_routes(api: Api):
     api.add_resource(AuthKeycloak, "/auth/keycloak")
 
     api.add_resource(Clusters, "/clusters")
-    api.add_resource(BatchFeedback, "/batchfeedback")
