@@ -129,17 +129,11 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
     log_level = logging.getLogger().getEffectiveLevel()
 
     yield {
-        'queues': 'simulations',
         "concurrency": 2,
         "loglevel": log_level,  # set celery simulation-worker log level to the same as the one used by pytest
+        "queues": ('simulations'),
+        'perform_ping_check': False  # it's crucial for tests to pass. There is bug in celery related to using queues.
     }
-
-
-# @pytest.fixture(scope='session')
-# def celery_includes():
-#     return [
-#         'yaptide.celery.tasks'
-#     ]
 
 
 @pytest.fixture(scope='function')

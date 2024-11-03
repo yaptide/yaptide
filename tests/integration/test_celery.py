@@ -17,7 +17,6 @@ import pytest  # skipcq: PY-W2000
 # that will create a `celery_app` instance
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
-from yaptide.celery.simulation_worker import celery_app
 
 from celery import group, chord
 # skipcq: PY-W2000
@@ -66,7 +65,7 @@ def test_celery_run_simulation_for_shieldhit(celery_app, celery_worker, payload_
             sim_type='shieldhit') for i in range(payload_dict["ntasks"])
     ])
 
-    workflow = chord(map_group, merge_results.s())
+    workflow = chord(map_group, merge_results.s().set(queue="simulations"))
     job = workflow.delay()
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
@@ -112,7 +111,7 @@ def test_celery_run_simulation_for_fluka_mock(celery_app, celery_worker, payload
             sim_type='fluka') for i in range(payload_dict["ntasks"])
     ])
 
-    workflow = chord(map_group, merge_results.s())
+    workflow = chord(map_group, merge_results.s().set(queue="simulations"))
     job = workflow.delay()
     logging.info("Waiting for run_simulation task to finish")
     result: dict = job.wait()
