@@ -9,6 +9,7 @@ from typing import Generator
 import pytest
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
+from yaptide.celery.simulation_worker import celery_app
 
 
 @pytest.fixture(scope='session')
@@ -121,16 +122,24 @@ def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
 
 @pytest.fixture(scope="function")
 def celery_worker_parameters() -> Generator[dict, None, None]:
-    """Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc."""
-    logging.info("Creating celery worker parameters for testing")
+    """Here we could as well configure other fixture simulation-worker parameters, like app, pool, loglevel, etc."""
+    logging.info("Creating celery simulation-worker parameters for testing")
 
     # get current logging level
     log_level = logging.getLogger().getEffectiveLevel()
 
     yield {
+        'queues': 'simulations',
         "concurrency": 2,
-        "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
+        "loglevel": log_level,  # set celery simulation-worker log level to the same as the one used by pytest
     }
+
+
+# @pytest.fixture(scope='session')
+# def celery_includes():
+#     return [
+#         'yaptide.celery.tasks'
+#     ]
 
 
 @pytest.fixture(scope='function')

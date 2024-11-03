@@ -11,7 +11,7 @@ from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
                                        get_tmp_dir, read_file, read_file_offline, read_fluka_file)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
-from yaptide.celery.worker import celery_app
+from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)

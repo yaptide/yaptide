@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import tempfile
+import requests
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
@@ -23,7 +24,7 @@ from yaptide.utils.sim_utils import write_simulation_input_files
 from yaptide.admin.db_manage import TableTypes, connect_to_db
 import sqlalchemy as db
 from yaptide.persistence.models import UserModel, KeycloakUserModel
-from yaptide.utils.async_worker import celery_app
+from yaptide.utils.helper_worker import celery_app
 
 
 def get_connection(user: dict, cluster: dict) -> Connection:
@@ -40,14 +41,15 @@ def get_connection(user: dict, cluster: dict) -> Connection:
     return con
 
 
+def post_update(dict_to_send):
+    flask_url = os.environ.get("BACKEND_INTERNAL_URL")
+    return requests.Session().post(url=f"{flask_url}/jobs", json=dict_to_send)
+
+
 @celery_app.task()
 def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str) -> dict:
     """Submits job to cluster"""
 
-    logging.info('celery worker log info')
-    logging.debug('celery worker log debug')
-    logging.error('celery worker log error')
-    logging.warning('celery worker log warning')
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
         db_con, metadata, _ = connect_to_db()
@@ -75,7 +77,14 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
         logging.error(f'Error getting cluster object with id: {clusterId} from database')
 
     if user.cert is None or user.private_key is None:
-        #TODO don't return cancel simulation
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "log": {
+                "error": f"User {user.username} has no certificate or private key"
+            }
+        }
+        post_update(dict_to_send)
         return {"message": f"User {user.username} has no certificate or private key"}
     con = get_connection(user=user, cluster=cluster)
 
@@ -86,7 +95,12 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     job_dir = f"{scratch}/yaptide_runs/{utc_now}"
     logging.debug("Job directory: %s", job_dir)
 
-    con.run(f"mkdir -p {job_dir}")
+    try:
+        con.run(f"mkdir -p {job_dir}")
+    except:
+        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value}
+        post_update(dict_to_send)
+        return
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         logging.debug("Preparing simulation input in: %s", tmp_dir_path)
         zip_path = Path(tmp_dir_path) / "input.zip"
@@ -149,15 +163,16 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     # }
 
     # res: requests.Response = requests.Session().post(url=f"{flask_url}/batchfeedback", json=dict_to_send)
-
-    return {
-        "message": "Job submitted",
+    dict_to_send = {
+        "sim_id": sim_id,
         "job_dir": job_dir,
         "array_id": array_id,
         "collect_id": collect_id,
         "submit_stdout": submit_stdout,
         "sh_files": sh_files
     }
+    post_update(dict_to_send)
+    return
 
 
 def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_key: str,

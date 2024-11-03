@@ -13,10 +13,11 @@ import platform
 import numpy as np
 import pytest  # skipcq: PY-W2000
 
-# note that the imports below will in turn call `from yaptide.celery.worker import celery_app`
+# note that the imports below will in turn call `from yaptide.celery.simulation_worker import celery_app`
 # that will create a `celery_app` instance
 from yaptide.celery.tasks import run_single_simulation, merge_results
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries
+from yaptide.celery.simulation_worker import celery_app
 
 from celery import group, chord
 # skipcq: PY-W2000

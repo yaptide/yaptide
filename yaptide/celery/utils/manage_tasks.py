@@ -4,7 +4,7 @@ from celery import chord, group
 from celery.result import AsyncResult
 
 from yaptide.celery.tasks import merge_results, run_single_simulation
-from yaptide.celery.worker import celery_app
+from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 
 
