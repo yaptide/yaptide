@@ -12,7 +12,7 @@ from yaptide.application import create_app
 from yaptide.celery.simulation_worker import celery_app
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, None, None]:
     """Small simulation payload for testing purposes"""
     payload_dict = copy.deepcopy(payload_editor_dict_data)
@@ -50,7 +50,7 @@ def small_simulation_payload(payload_editor_dict_data: dict) -> Generator[dict, 
     yield payload_dict
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def shieldhit_binary_installed(shieldhit_binary_filename):
     """Checks if SHIELD-HIT12A binary is installed and installs it if necessary"""
     download_dir = Path(__file__).resolve().parent.parent.parent / 'bin'
@@ -70,7 +70,7 @@ def shieldhit_binary_installed(shieldhit_binary_filename):
         )
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def yaptide_bin_dir():
     """directory with simulators executable files"""
     project_main_dir = Path(__file__).resolve().parent.parent.parent
@@ -95,7 +95,7 @@ def add_simulators_to_path_variable(yaptide_bin_dir):
     os.environ['PATH'] = original_path
 
 
-@pytest.fixture(scope='session')
+@pytest.fixture(scope='function')
 def yaptide_fake_dir() -> Generator[Path, None, None]:
     """directory with mocks of simulator executable files"""
     project_main_dir = Path(__file__).resolve().parent.parent.parent
@@ -137,7 +137,7 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
 
 
 @pytest.fixture(scope='function')
-def modify_tmpdir(tmpdir_factory):
+def modify_tmpdir(tmpdir_factory, monkeypatch):
     """
     In yaptide some of the modules (pymchelper?) uses temporary directories to store files.
     This is convenient in production, but in testing we want to have a control over the temporary directory path.
@@ -153,34 +153,9 @@ def modify_tmpdir(tmpdir_factory):
     # Get the temporary directory path from the tmpdir fixture
     tmpdir = tmpdir_factory.getbasetemp()
 
-    # Store the original TMPDIR value
-    original_tmpdir = os.environ.get('TMPDIR')
-    original_temp = os.environ.get('TEMP')
-    original_tmp = os.environ.get('TMP')
-
-    # Set the TMPDIR environment variable to the temporary directory path
-    logging.info("Replacing old value %s of TMPDIR with %s", original_tmpdir, tmpdir)
-    os.environ['TMPDIR'] = str(tmpdir)
-    logging.info("Replacing old value %s of TEMP with %s", original_temp, tmpdir)
-    os.environ['TEMP'] = str(tmpdir)
-    logging.info("Replacing old value %s of TMP with %s", original_tmp, tmpdir)
-    os.environ['TMP'] = str(tmpdir)
-
-    yield
-
-    # Restore the original TMPDIR value after the tests are done
-    if original_tmpdir is None:
-        del os.environ['TMPDIR']
-    else:
-        os.environ['TMPDIR'] = original_tmpdir
-    if original_temp is None:
-        del os.environ['TEMP']
-    else:
-        os.environ['TEMP'] = original_temp
-    if original_tmp is None:
-        del os.environ['TMP']
-    else:
-        os.environ['TMP'] = original_tmp
+    monkeypatch.setenv('TMPDIR', tmpdir)
+    monkeypatch.setenv('TEMP', tmpdir)
+    monkeypatch.setenv('TMP', tmpdir)
 
 
 @pytest.fixture(scope="function")
