@@ -34,8 +34,8 @@ Here is a flowchart that shows the various dependencies between the different co
 
 ```mermaid
 flowchart LR
-    id0[Redis]-->id1[Celery simulation worker]-->id2[Flask app]
-    id0-->id2
+    id0[Redis]-->id1[Celery worker]-->id2[Flask app]
+    id2-->id0
 ```
 
 1. Download SHIELD-HIT12A simulator

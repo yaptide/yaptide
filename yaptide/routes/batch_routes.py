@@ -12,6 +12,7 @@ from yaptide.persistence.db_methods import (add_object_to_db, delete_object_from
                                             update_task_state)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
     BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel, KeycloakUserModel)
+from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, error_internal_response,
                                                      yaptide_response)
@@ -63,9 +64,8 @@ class JobsBatch(Resource):
                                           sim_type=payload_dict["sim_type"],
                                           input_type=input_type,
                                           title=payload_dict.get("title", ''))
-        update_key = str(uuid.uuid4())
-        simulation.set_update_key(update_key)
         add_object_to_db(simulation)
+        update_key = encode_simulation_auth_token(simulation.id)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 

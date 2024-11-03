@@ -1,10 +1,10 @@
 from flask import request
 from flask_restful import Resource
 
-from yaptide.persistence.db_methods import (fetch_simulation_by_sim_id,
-                                            fetch_task_by_sim_id_and_task_id,
+from yaptide.persistence.db_methods import (fetch_simulation_by_sim_id, fetch_task_by_sim_id_and_task_id,
                                             update_task_state)
 from yaptide.routes.utils.response_templates import yaptide_response
+from yaptide.routes.utils.tokens import decode_auth_token
 
 
 class TasksResource(Resource):
@@ -35,7 +35,8 @@ class TasksResource(Resource):
         if not simulation:
             return yaptide_response(message=f"Simulation {sim_id} does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         task = fetch_task_by_sim_id_and_task_id(sim_id=simulation.id, task_id=payload_dict["task_id"])

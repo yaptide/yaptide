@@ -17,6 +17,7 @@ from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel, Lo
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.routes.utils.tokens import decode_auth_token
 from yaptide.utils.enums import EntityState
 
 
@@ -121,7 +122,8 @@ class ResultsResource(Resource):
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         for estimator_dict in payload_dict["estimators"]:
@@ -151,6 +153,9 @@ class ResultsResource(Resource):
         logging.debug("Marking simulation as completed")
         update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         update_simulation_state(simulation=simulation, update_dict=update_dict)
+
+        logging.debug("Marking simulation tasks as completed")
+
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
@@ -275,7 +280,8 @@ class LogfilesResource(Resource):
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         logfiles = LogfilesModel(simulation_id=simulation.id)

@@ -1,3 +1,6 @@
+# ---------- IMPORTANT ------------
+# Read documentation in persistency.md. It contains information about database development with flask-migrate.
+
 import gzip
 import json
 from datetime import datetime
@@ -94,20 +97,13 @@ class SimulationModel(db.Model):
                                        nullable=False,
                                        default=EntityState.UNKNOWN.value,
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
-    update_key_hash: Column[str] = db.Column(db.String,
-                                             doc="Update key shared by tasks granting access to update themselves")
-    tasks = relationship("TaskModel")
-    estimators = relationship("EstimatorModel")
+
+    tasks = relationship("TaskModel", cascade="delete")
+    estimators = relationship("EstimatorModel", cascade="delete")
+    inputs = relationship("InputModel", cascade="delete")
+    logfiles = relationship("LogfilesModel", cascade="delete")
 
     __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
-
-    def set_update_key(self, update_key: str):
-        """Sets hashed update key"""
-        self.update_key_hash = generate_password_hash(update_key)
-
-    def check_update_key(self, update_key: str) -> bool:
-        """Checks update key correctness"""
-        return check_password_hash(self.update_key_hash, update_key)
 
     def update_state(self, update_dict: dict) -> bool:
         """
@@ -175,7 +171,7 @@ class TaskModel(db.Model):
     __tablename__ = 'Task'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     simulation_id: Column[int] = db.Column(db.Integer,
-                                           db.ForeignKey('Simulation.id'),
+                                           db.ForeignKey('Simulation.id', ondelete="CASCADE"),
                                            doc="Simulation job ID (foreign key)")
 
     task_id: Column[int] = db.Column(db.Integer, nullable=False, doc="Task ID")
@@ -203,7 +199,7 @@ class TaskModel(db.Model):
 
     __mapper_args__ = {"polymorphic_identity": "Task", "polymorphic_on": platform, "with_polymorphic": "*"}
 
-    def update_state(self, update_dict: dict):
+    def update_state(self, update_dict: dict):  # skipcq: PY-R1000
         """
         Updating database is more costly than a simple query.
         Therefore we check first if update is needed and
@@ -217,6 +213,8 @@ class TaskModel(db.Model):
             self.simulated_primaries = update_dict["simulated_primaries"]
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
+            if self.task_state == EntityState.COMPLETED.value:
+                self.simulated_primaries = self.requested_primaries
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None
@@ -308,7 +306,7 @@ class InputModel(db.Model):
 
     __tablename__ = 'Input'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'))
+    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id', ondelete="CASCADE"))
     compressed_data: Column[bytes] = db.Column(db.LargeBinary)
 
     @property
@@ -326,9 +324,12 @@ class EstimatorModel(db.Model):
 
     __tablename__ = 'Estimator'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
+    simulation_id: Column[int] = db.Column(db.Integer,
+                                           db.ForeignKey('Simulation.id', ondelete="CASCADE"),
+                                           nullable=False)
     name: Column[str] = db.Column(db.String, nullable=False, doc="Estimator name")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Estimator metadata")
+    pages = relationship("PageModel", cascade="delete")
 
     @property
     def data(self):
@@ -345,7 +346,7 @@ class PageModel(db.Model):
 
     __tablename__ = 'Page'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id'), nullable=False)
+    estimator_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Estimator.id', ondelete="CASCADE"), nullable=False)
     page_number: Column[int] = db.Column(db.Integer, nullable=False, doc="Page number")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Page json object - data, axes and metadata")
 
@@ -364,7 +365,9 @@ class LogfilesModel(db.Model):
 
     __tablename__ = 'Logfiles'
     id: Column[int] = db.Column(db.Integer, primary_key=True)
-    simulation_id: Column[int] = db.Column(db.Integer, db.ForeignKey('Simulation.id'), nullable=False)
+    simulation_id: Column[int] = db.Column(db.Integer,
+                                           db.ForeignKey('Simulation.id', ondelete="CASCADE"),
+                                           nullable=False)
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Json object containing logfiles")
 
     @property
