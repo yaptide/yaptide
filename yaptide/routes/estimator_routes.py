@@ -21,7 +21,6 @@ class EstimatorResource(Resource):
     @requires_auth()
     def get(user: UserModel):
         """Method returning estimator names for specific simulation"""
-
         schema = EstimatorResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -39,6 +38,6 @@ class EstimatorResource(Resource):
         if not estimator_names:
             return yaptide_response(message="Estimators not found", code=404)
 
-        return yaptide_response(message=f"List of estimator names for specific simulation",
+        return yaptide_response(message="List of estimator names for specific simulation",
                                 code=200,
                                 content={"estimator_names": estimator_names})
