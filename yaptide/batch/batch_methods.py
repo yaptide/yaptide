@@ -48,7 +48,8 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
-        db_con, metadata, _ = connect_to_db()
+        db_con, metadata, _ = connect_to_db(
+        )  # Connection to database and quering objects looks like that because celery task works outside flask context
     except:
         logging.error('Async worker couldn\'t connect to db')
 
@@ -146,26 +147,15 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
         dict_to_send = {
             "sim_id": sim_id,
             "job_state": EntityState.FAILED.value,
-            "submit_stdout": {
-                "error": f"User {user.username} has no certificate or private key",
+            "log": {
+                "message": "Job submission failed",
+                "submit_stdout": submit_stdout,
                 "sh_files": sh_files
             }
         }
         post_update(dict_to_send)
-        return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
+        return
 
-    # TODO make request about successful job and send job_dir, array_id, collect_id, s
-    # flask_url = os.environ.get("BACKEND_INTERNAL_URL")
-    # dict_to_send = {
-    #     "message": "Job submitted",
-    #     "job_dir": job_dir,
-    #     "array_id": array_id,
-    #     "collect_id": collect_id,
-    #     "submit_stdout": submit_stdout,
-    #     "sh_files": sh_files
-    # }
-
-    # res: requests.Response = requests.Session().post(url=f"{flask_url}/batchfeedback", json=dict_to_send)
     dict_to_send = {
         "sim_id": sim_id,
         "job_dir": job_dir,
