@@ -6,10 +6,9 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
-from yaptide.persistence.db_methods import (add_object_to_db, delete_object_from_db, fetch_all_clusters,
-                                            fetch_batch_simulation_by_job_id, fetch_batch_tasks_by_sim_id,
-                                            fetch_cluster_by_id, make_commit_to_db, update_simulation_state,
-                                            update_task_state)
+from yaptide.persistence.db_methods import (add_object_to_db, fetch_all_clusters, fetch_batch_simulation_by_job_id,
+                                            fetch_batch_tasks_by_sim_id, fetch_cluster_by_id, make_commit_to_db,
+                                            update_simulation_state, update_task_state)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
     BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel, KeycloakUserModel)
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
@@ -18,7 +17,6 @@ from yaptide.routes.utils.response_templates import (error_validation_response, 
                                                      yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.utils.enums import EntityState, PlatformType
-import time
 
 
 class JobsBatch(Resource):
@@ -58,6 +56,7 @@ class JobsBatch(Resource):
 
         # create a new simulation in the database, not waiting for the job to finish
         job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid.uuid4()) + PlatformType.BATCH.value
+        # skipqc: PYL-E1123
         simulation = BatchSimulationModel(user_id=user.id,
                                           cluster_id=cluster.id,
                                           job_id=job_id,
@@ -69,29 +68,12 @@ class JobsBatch(Resource):
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 
-        # result = submit_job(payload_dict=payload_dict, files_dict=input_dict["input_files"], user=user,
-        #                     cluster=cluster, sim_id=simulation.id, update_key=update_key)
-
-        submission = submit_job.delay(payload_dict=payload_dict,
-                                      files_dict=input_dict["input_files"],
-                                      userId=user.id,
-                                      clusterId=cluster.id,
-                                      sim_id=simulation.id,
-                                      update_key=update_key)
-
-        # result = submission.get()
-
-        # required_keys = {"job_dir", "array_id", "collect_id"}
-        # if required_keys != required_keys.intersection(set(result.keys())):
-        #     delete_object_from_db(simulation)
-        #     return yaptide_response(message="Job submission failed", code=500, content=result)
-
-        #TODO case when job submission fails - not here because async submission
-
-        # simulation.job_dir = result.pop("job_dir", None)
-        # simulation.array_id = result.pop("array_id", None)
-        # simulation.collect_id = result.pop("collect_id", None)
-        # result["job_id"] = simulation.job_id
+        submit_job.delay(payload_dict=payload_dict,
+                         files_dict=input_dict["input_files"],
+                         userId=user.id,
+                         clusterId=cluster.id,
+                         sim_id=simulation.id,
+                         update_key=update_key)
 
         for i in range(payload_dict["ntasks"]):
             task = BatchTaskModel(simulation_id=simulation.id, task_id=str(i + 1))

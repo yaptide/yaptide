@@ -80,6 +80,7 @@ class JobsResource(Resource):
 
     @staticmethod
     def post():
+        """Handles requests for updating simulation informations in db"""
         payload_dict: dict = request.get_json(force=True)
         sim_id: int = payload_dict["sim_id"]
         app.logger.info(f"sim_id {sim_id}")

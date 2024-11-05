@@ -8,7 +8,7 @@ import subprocess
 from typing import Generator
 import pytest
 # skipcq: PY-W2000
-from celery.contrib.pytest import celery_app, celery_worker, celery_enable_logging, celery_config, celery_parameters, use_celery_app_trap, celery_includes, celery_worker_pool
+from celery.contrib.pytest import celery_app, celery_worker, celery_enable_logging, celery_config, celery_parameters, use_celery_app_trap
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
 
@@ -137,11 +137,6 @@ def celery_worker_parameters() -> Generator[dict, None, None]:
     }
 
 
-@pytest.fixture(scope='session')
-def celery_enable_logging():
-    return True
-
-
 @pytest.fixture(scope='function')
 def modify_tmpdir(tmpdir_factory):
     """
@@ -191,6 +186,7 @@ def modify_tmpdir(tmpdir_factory):
 
 @pytest.fixture(autouse=True)
 def clear_celery_queue(celery_app):
+    """Clears task queue from celery tasks after each test"""
     yield
     celery_app.control.purge()
 

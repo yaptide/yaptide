@@ -152,6 +152,7 @@ class BatchSimulationModel(SimulationModel):
     __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
     def update_state(self, update_dict):
+        """Used to update fields in BatchSimulation. Returns boolean value if commit to database is reuqired"""
         db_commit_required = super().update_state(update_dict)
         if "job_dir" in update_dict and self.job_dir != update_dict["job_dir"]:
             self.job_dir = update_dict["job_dir"]

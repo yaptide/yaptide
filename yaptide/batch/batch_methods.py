@@ -7,8 +7,7 @@ import requests
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
-
-from flask import current_app as app
+import sqlalchemy as db
 
 import pymchelper
 from fabric import Connection, Result
@@ -16,14 +15,11 @@ from paramiko import RSAKey
 
 from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
-from yaptide.persistence.db_methods import fetch_cluster_by_id, fetch_user_by_id
-from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel)
+from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 from yaptide.admin.db_manage import TableTypes, connect_to_db
-import sqlalchemy as db
-from yaptide.persistence.models import UserModel, KeycloakUserModel
 from yaptide.utils.helper_worker import celery_app
 
 
@@ -42,20 +38,19 @@ def get_connection(user: dict, cluster: dict) -> Connection:
 
 
 def post_update(dict_to_send):
+    """For sending requests with information to flask"""
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     return requests.Session().post(url=f"{flask_url}/jobs", json=dict_to_send)
 
 
 @celery_app.task()
-def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str) -> dict:
+def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
     """Submits job to cluster"""
-
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
         db_con, metadata, _ = connect_to_db()
     except:
         logging.error('Async worker couldn\'t connect to db')
-        #TODO send reqest to end simulation in db or cancel directly ?????
 
     users = metadata.tables[TableTypes.User.name]
     keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
@@ -85,7 +80,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
             }
         }
         post_update(dict_to_send)
-        return {"message": f"User {user.username} has no certificate or private key"}
+        return
     con = get_connection(user=user, cluster=cluster)
 
     fabric_result: Result = con.run("echo $SCRATCH", hide=True)
@@ -148,7 +143,15 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
         logging.debug("Job submission failed")
         logging.debug("Sbatch stdout: %s", submit_stdout)
         logging.debug("Sbatch stderr: %s", submit_stderr)
-        # todo make request about failed job
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "submit_stdout": {
+                "error": f"User {user.username} has no certificate or private key",
+                "sh_files": sh_files
+            }
+        }
+        post_update(dict_to_send)
         return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
 
     # TODO make request about successful job and send job_dir, array_id, collect_id, s

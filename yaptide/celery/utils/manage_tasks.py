@@ -24,7 +24,7 @@ def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, 
 
     workflow = chord(map_group,
                      merge_results.s().set(queue="simulations")
-                     )  #For tests to work: putting signature as second task in chord requires specifying queue
+                     )  # For tests to work: putting signature as second task in chord requires specifying queue
 
     job: AsyncResult = workflow.delay()
 
