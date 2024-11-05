@@ -62,7 +62,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     try:
         user = db_con.execute(stmt).first()
     except:
-        logging.error(f'Error getting user object wiht id: {userId} from database')
+        logging.error('Error getting user object wiht id: %s from database', str(userId))
 
     clusters = metadata.tables[TableTypes.Cluster.name]
     print(clusters)
@@ -70,7 +70,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     try:
         cluster: ClusterModel = db_con.execute(stmt).first()
     except:
-        logging.error(f'Error getting cluster object with id: {clusterId} from database')
+        logging.error('Error getting cluster object with id: %s from database', str(clusterId))
 
     if user.cert is None or user.private_key is None:
         dict_to_send = {
