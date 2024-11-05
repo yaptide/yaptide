@@ -23,6 +23,33 @@ from yaptide.admin.db_manage import TableTypes, connect_to_db
 from yaptide.utils.helper_worker import celery_app
 
 
+def get_user(db_con, metadata, userId):
+    """Queries database for user"""
+    users = metadata.tables[TableTypes.User.name]
+    keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
+    stmt = db.select(users,
+                     keycloackUsers).select_from(users).join(keycloackUsers,
+                                                             KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
+    try:
+        user = db_con.execute(stmt).first()
+    except Exception as e:
+        logging.error('Error getting user object wiht id: %s from database', str(userId))
+        return None
+    return user
+
+
+def get_cluster(db_con, metadata, clusterId):
+    """Queries database for user"""
+    clusters = metadata.tables[TableTypes.Cluster.name]
+    stmt = db.select(clusters).filter_by(id=clusterId)
+    try:
+        cluster: ClusterModel = db_con.execute(stmt).first()
+    except Exception as e:
+        logging.error('Error getting cluster object with id: %s from database', str(clusterId))
+        return None
+    return cluster
+
+
 def get_connection(user: dict, cluster: dict) -> Connection:
     """Returns connection object to cluster"""
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
@@ -44,33 +71,18 @@ def post_update(dict_to_send):
 
 
 @celery_app.task()
-def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
+def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int,
+               update_key: str):  # skipcq: PY-R1000
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
         db_con, metadata, _ = connect_to_db(
         )  # Connection to database and quering objects looks like that because celery task works outside flask context
-    except:
+    except Exception as e:
         logging.error('Async worker couldn\'t connect to db')
 
-    users = metadata.tables[TableTypes.User.name]
-    keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
-    stmt = db.select(users,
-                     keycloackUsers).select_from(users).join(keycloackUsers,
-                                                             KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
-
-    try:
-        user = db_con.execute(stmt).first()
-    except:
-        logging.error('Error getting user object wiht id: %s from database', str(userId))
-
-    clusters = metadata.tables[TableTypes.Cluster.name]
-    print(clusters)
-    stmt = db.select(clusters).filter_by(id=clusterId)
-    try:
-        cluster: ClusterModel = db_con.execute(stmt).first()
-    except:
-        logging.error('Error getting cluster object with id: %s from database', str(clusterId))
+    user = get_user(db_con=db_con, metadata=metadata, userId=userId)
+    cluster = get_cluster(db_con=db_con, metadata=metadata, clusterId=clusterId)
 
     if user.cert is None or user.private_key is None:
         dict_to_send = {
@@ -82,9 +94,15 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
         }
         post_update(dict_to_send)
         return
-    con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+    try:
+        con = get_connection(user=user, cluster=cluster)
+        fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+    except Exception as e:
+        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "log": {"error": str(e)}}
+        post_update(dict_to_send)
+        return
+
     scratch = fabric_result.stdout.split()[0]
     logging.debug("Scratch directory: %s", scratch)
 
@@ -93,7 +111,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
 
     try:
         con.run(f"mkdir -p {job_dir}")
-    except:
+    except Exception as e:
         dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value}
         post_update(dict_to_send)
         return

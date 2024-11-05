@@ -93,20 +93,31 @@ flowchart LR
     === "Linux"
 
         ```bash
-        PATH=$PATH:bin BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.celery.simulation_worker worker -P eventlet -Q simulations --loglevel=debug
+        PATH=$PATH:bin BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.celery.simulation_worker worker -P eventlet --queues simulations --loglevel=debug
         ```
 
     === "Windows (PowerShell)"
 
         ```powershell
-        $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.celery.simulation_worker worker -P eventlet --loglevel=debug
+        $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.celery.simulation_worker worker  -P eventlet --queues simulations --loglevel=debug
         ```
 
 
 4. Run Celery helper-woker
-PATH=$PATH:bin BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.utils.helper_worker worker --events --loglevel debug --hostname yaptide-helper-worker -Q helper
 
-4. Run the app
+    === "Linux"
+
+    ```bash
+    PATH=$PATH:bin FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.utils.helper_worker worker --events --loglevel debug --hostname yaptide-helper-worker --queues helper
+    ```
+
+    === "Windows (PowerShell)"
+    ```powershell
+    $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.celery.simulation_worker worker  -P eventlet --queues simulations --loglevel=debug
+    ```
+
+
+5. Run the app
 
     === "Linux"
 

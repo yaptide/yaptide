@@ -2,8 +2,7 @@ FROM python:3.12-slim
 ARG POETRY_VERSION=1.8.2
 
 # set max celery task time to 10 hours
-ENV CELERYD_TIME_LIMIT=36000
-
+ENV CELERYD_TIME_LIMIT=120
 # set working directory
 WORKDIR /usr/local/app
 
@@ -20,4 +19,4 @@ RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only 
 # copy yaptide source code
 COPY yaptide ./yaptide
 
-CMD ["sh", "-c", "celery --app yaptide.utils.helper_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-helper-worker -Q helper"]
+CMD ["sh", "-c", "celery --app yaptide.utils.helper_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-helper-worker --queues helper"]
