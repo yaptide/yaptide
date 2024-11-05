@@ -56,14 +56,13 @@ class JobsBatch(Resource):
 
         # create a new simulation in the database, not waiting for the job to finish
         job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid.uuid4()) + PlatformType.BATCH.value
-        simulation = BatchSimulationModel(
-            user_id=user.id,
-            # skipcq: PYL-E1123
-            cluster_id=cluster.id,  # skipcq: PYL-E1123
-            job_id=job_id,
-            sim_type=payload_dict["sim_type"],
-            input_type=input_type,
-            title=payload_dict.get("title", ''))
+        # skipcq: PYL-E1123
+        simulation = BatchSimulationModel(user_id=user.id,
+                                          cluster_id=cluster.id,
+                                          job_id=job_id,
+                                          sim_type=payload_dict["sim_type"],
+                                          input_type=input_type,
+                                          title=payload_dict.get("title", ''))
         add_object_to_db(simulation)
         update_key = encode_simulation_auth_token(simulation.id)
 
