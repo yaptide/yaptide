@@ -943,6 +943,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
 
+# Estimator Routes
+  /estimators:
+    get:
+      summary: Allows getting names of the estimators for the specific simulation.
+      parameters:
+        - in: query
+          name: job_id
+          required: true
+          description: ID of the job to retrieve results for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Includes estimator names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  estimator_names:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: Job with provided ID does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
 # Task Routes
   /tasks:
     description: Route dedicated for Backend internal communication

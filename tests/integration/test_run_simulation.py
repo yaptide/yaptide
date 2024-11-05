@@ -122,6 +122,15 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
     resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": "nonexistent_estimator"})
     assert resp.status_code == 404  # skipcq: BAN-B101
 
+    # Test /estimators endpoint
+    resp = client.get("/estimators", query_string={"job_id": job_id})
+    estimator_names = json.loads(resp.data.decode())["estimator_names"]
+    assert [estimator["name"] for estimator in results_data["estimators"]] == estimator_names
+
+    # Test /estimators endpoint with wrong job_id
+    resp = client.get("/estimators", query_string={"job_id": job_id + "1234"})
+    assert resp.status_code == 404  # skipcq: BAN-B101
+
     resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101
     simulations_data = json.loads(resp.data.decode())

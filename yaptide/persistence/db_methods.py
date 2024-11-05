@@ -4,13 +4,9 @@ from typing import Union
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (BatchSimulationModel, BatchTaskModel,
-                                        CelerySimulationModel, CeleryTaskModel,
-                                        ClusterModel, EstimatorModel,
-                                        InputModel, KeycloakUserModel,
-                                        LogfilesModel, PageModel,
-                                        SimulationModel, TaskModel, UserModel,
-                                        YaptideUserModel)
+from yaptide.persistence.models import (BatchSimulationModel, BatchTaskModel, CelerySimulationModel, CeleryTaskModel,
+                                        ClusterModel, EstimatorModel, InputModel, KeycloakUserModel, LogfilesModel,
+                                        PageModel, SimulationModel, TaskModel, UserModel, YaptideUserModel)
 
 
 def add_object_to_db(obj: db.Model, make_commit: bool = True) -> None:
@@ -56,6 +52,12 @@ def fetch_simulation_by_job_id(job_id: str) -> Union[BatchSimulationModel, Celer
     SimulationPoly = with_polymorphic(SimulationModel, [BatchSimulationModel, CelerySimulationModel])
     simulation = db.session.query(SimulationPoly).filter_by(job_id=job_id).first()
     return simulation
+
+
+def fetch_simulation_id_by_job_id(job_id: str) -> int:
+    """Fetches simulation by job id"""
+    simulation_id = db.session.query(SimulationModel.id).filter_by(job_id=job_id).first()[0]
+    return simulation_id
 
 
 def fetch_celery_simulation_by_job_id(job_id: str) -> CelerySimulationModel:
@@ -114,6 +116,14 @@ def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
     """Fetches estimators by simulation id"""
     estimators = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id).all()
     return estimators
+
+
+def fetch_estimator_names_by_job_id(job_id: int) -> list[str]:
+    """Fetches estimators by simulation id"""
+    simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+    estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).all()
+    estimator_names = [name for (name, ) in estimator_names_tuples]
+    return estimator_names
 
 
 def fetch_estimator_by_sim_id_and_est_name(sim_id: int, est_name: str) -> EstimatorModel:

@@ -11,7 +11,8 @@ from yaptide.persistence.db_methods import (add_object_to_db, fetch_estimator_by
                                             fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
                                             fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
                                             fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-                                            fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+                                            fetch_simulation_id_by_job_id, fetch_tasks_by_sim_id, make_commit_to_db,
+                                            update_simulation_state)
 from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -191,13 +192,13 @@ class ResultsResource(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        simulation = fetch_simulation_by_job_id(job_id=job_id)
+        simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
 
         # if estimator name is provided, return specific estimator
         if estimator_name:
-            return get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
+            return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
-        return get_all_estimators(sim_id=simulation.id)
+        return get_all_estimators(sim_id=simulation_id)
 
 
 class InputsResource(Resource):
