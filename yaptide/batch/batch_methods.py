@@ -150,7 +150,8 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
             "log": {
                 "message": "Job submission failed",
                 "submit_stdout": submit_stdout,
-                "sh_files": sh_files
+                "sh_files": sh_files,
+                "submit_stderr": submit_stderr
             }
         }
         post_update(dict_to_send)

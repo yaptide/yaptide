@@ -58,6 +58,7 @@ class JobsBatch(Resource):
         job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid.uuid4()) + PlatformType.BATCH.value
         simulation = BatchSimulationModel(
             user_id=user.id,
+            # skipcq: PYL-E1123
             cluster_id=cluster.id,  # skipcq: PYL-E1123
             job_id=job_id,
             sim_type=payload_dict["sim_type"],
