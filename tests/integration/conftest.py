@@ -7,7 +7,7 @@ import platform
 import subprocess
 from typing import Generator
 import pytest
-# skipcq: FLK-E501
+# skipcq: FLK-E501, PY-W2000
 from celery.contrib.pytest import celery_app, celery_worker, celery_enable_logging, celery_config, celery_parameters, use_celery_app_trap
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
