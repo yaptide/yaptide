@@ -1,7 +1,7 @@
 FROM python:3.12-slim
 ARG POETRY_VERSION=1.8.2
 
-# set max celery task time to 10 hours
+# set max celery task time to 2 minutes
 ENV CELERYD_TIME_LIMIT=120
 # set working directory
 WORKDIR /usr/local/app

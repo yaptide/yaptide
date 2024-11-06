@@ -103,7 +103,7 @@ flowchart LR
         ```
 
 
-4. Run Celery helper-woker
+4. Run Celery helper-worker
 
     === "Linux"
 
