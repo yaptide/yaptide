@@ -89,6 +89,7 @@ services:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
     healthcheck:
       test: ["CMD-SHELL", "celery --app yaptide.utils.helper_worker inspect ping"]
