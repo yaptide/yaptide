@@ -31,7 +31,7 @@ def get_user(db_con, metadata, userId):
                      keycloackUsers).select_from(users).join(keycloackUsers,
                                                              KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
     try:
-        user = db_con.execute(stmt).first()
+        user: KeycloakUserModel = db_con.execute(stmt).first()
     except Exception:
         logging.error('Error getting user object wiht id: %s from database', str(userId))
         return None
@@ -50,7 +50,7 @@ def get_cluster(db_con, metadata, clusterId):
     return cluster
 
 
-def get_connection(user: dict, cluster: dict) -> Connection:
+def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
     """Returns connection object to cluster"""
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
@@ -79,7 +79,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
         db_con, metadata, _ = connect_to_db(
         )  # Connection to database and quering objects looks like that because celery task works outside flask context
     except Exception as e:
-        logging.error('Helper worker couldn\'t connect to db. Error message:"%s"', str(e))
+        logging.error('Async worker couldn\'t connect to db. Error message:"%s"', str(e))
 
     user = get_user(db_con=db_con, metadata=metadata, userId=userId)
     cluster = get_cluster(db_con=db_con, metadata=metadata, clusterId=clusterId)

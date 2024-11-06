@@ -70,7 +70,6 @@ class ClusterModel(db.Model):
     simulations = relationship("BatchSimulationModel")
 
 
-@dataclass
 class SimulationModel(db.Model):
     """Simulation model"""
 
@@ -128,7 +127,6 @@ class SimulationModel(db.Model):
         return db_commit_required
 
 
-@dataclass
 class CelerySimulationModel(SimulationModel):
     """Celery simulation model"""
 

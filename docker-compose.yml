@@ -82,8 +82,7 @@ services:
     deploy:
       resources:
         limits:
-          # the explanation of below syntax: https://www.gnu.org/software/bash/manual/html_node/Shell-Parameter-Expansion.html
-          cpus: ${MAX_CORES-1.0}
+          cpus: 1.0
     env_file: .env
     environment:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
