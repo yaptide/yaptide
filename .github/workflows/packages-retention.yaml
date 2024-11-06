@@ -1,4 +1,4 @@
-name: Retention policy for worker and flask GHCR docker packages
+name: Retention policy for simulation worker and flask GHCR docker packages
 
 on:
   schedule:
@@ -10,10 +10,10 @@ jobs:
     name: Cleanup old GHCR docker packages
     runs-on: ubuntu-latest
     steps:
-      - name: Cleanup flask and worker outdated PR packages
+      - name: Cleanup flask and simulation worker outdated PR packages
         uses: snok/container-retention-policy@v2
         with:
-          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-worker
+          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-simulation-worker
           cut-off: 1 day ago UTC
           timestamp-to-use: created_at
           account-type: org
@@ -21,10 +21,10 @@ jobs:
           keep-at-least: 0
           untagged-only: true
           token: ${{ secrets.PAT }}
-      - name: Cleanup flask and worker latest but old PR packages
+      - name: Cleanup flask and simulation worker latest but old PR packages
         uses: snok/container-retention-policy@v2
         with:
-          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-worker
+          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-simulation-worker
           cut-off: 3 days ago UTC
           timestamp-to-use: created_at
           account-type: org
@@ -33,10 +33,10 @@ jobs:
           filter-include-untagged: false
           filter-tags: pr-*
           token: ${{ secrets.PAT }}
-      - name: Cleanup flask and worker outdated master packages
+      - name: Cleanup flask and simulation worker outdated master packages
         uses: snok/container-retention-policy@v2
         with:
-          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-worker
+          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-simulation-worker
           cut-off: 2 days ago UTC
           timestamp-to-use: created_at
           account-type: org

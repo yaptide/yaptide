@@ -34,7 +34,7 @@ Here is a flowchart that shows the various dependencies between the different co
 
 ```mermaid
 flowchart LR
-    id0[Redis]-->id1[Celery worker]-->id2[Flask app]
+    id0[Redis]-->id1[Celery simulation worker]-->id2[Flask app]
     id2-->id0
 ```
 
@@ -86,23 +86,38 @@ flowchart LR
     docker rm -f yaptide_redis
     ```
 
-3. Run Celery
+3. Run Celery simulation-worker
 
     You can reuse the same terminal, as for redis, as docker sends redis process to the background
 
     === "Linux"
 
         ```bash
-        PATH=$PATH:bin BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        PATH=$PATH:bin BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.celery.simulation_worker worker --events -P eventlet --hostname yaptide-simulation-worker --queues simulations --loglevel=debug
         ```
 
     === "Windows (PowerShell)"
 
         ```powershell
-        $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.celery.worker worker -P eventlet --loglevel=debug
+        $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.celery.simulation_worker worker --events -P eventlet --hostname yaptide-simulation-worker --queues simulations --loglevel=debug
         ```
 
-4. Run the app
+
+4. Run Celery helper-worker
+
+    === "Linux"
+
+    ```bash
+    PATH=$PATH:bin FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.utils.helper_worker worker --events --hostname yaptide-helper-worker --queues helper --loglevel=debug
+    ```
+
+    === "Windows (PowerShell)"
+    ```powershell
+    $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.utils.helper_worker worker --events --hostname yaptide-helper-worker --queues helper --loglevel=debug
+    ```
+
+
+5. Run the app
 
     === "Linux"
 
@@ -132,7 +147,7 @@ flowchart LR
         ```powershell
         $env:FLASK_SQLALCHEMY_ECHO="True"; $env:FLASK_USE_CORS="True"; $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run flask --app yaptide.application run
         ```
-    
+
     To include debugging messages from flask, add `--debug` option to the command.
 
     While running backend and frontend, developer may encounter [Cross-Origin Resource Sharing (CORS)](https://developer.mozilla.org/en-US/docs/Web/HTTP/CORS) errors in web browser's console that prevent communication to the server. To resolve these CORS issues, one should set FLASK_USE_CORS=True in the `.env` file (notice that it's already included in above command).  Also pay attention if your frontend runs on ```http://127.0.0.1:3000``` or ```http://localhost:3000```, because right now cors_config in application.py specifies these URLs.

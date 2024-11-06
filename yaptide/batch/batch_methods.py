@@ -3,9 +3,11 @@ import json
 import logging
 import os
 import tempfile
+import requests
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
+import sqlalchemy as db
 
 import pymchelper
 from fabric import Connection, Result
@@ -13,9 +15,39 @@ from paramiko import RSAKey
 
 from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
-from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel)
+from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
+
+from yaptide.admin.db_manage import TableTypes, connect_to_db
+from yaptide.utils.helper_worker import celery_app
+
+
+def get_user(db_con, metadata, userId):
+    """Queries database for user"""
+    users = metadata.tables[TableTypes.User.name]
+    keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
+    stmt = db.select(users,
+                     keycloackUsers).select_from(users).join(keycloackUsers,
+                                                             KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
+    try:
+        user: KeycloakUserModel = db_con.execute(stmt).first()
+    except Exception:
+        logging.error('Error getting user object wiht id: %s from database', str(userId))
+        return None
+    return user
+
+
+def get_cluster(db_con, metadata, clusterId):
+    """Queries database for user"""
+    clusters = metadata.tables[TableTypes.Cluster.name]
+    stmt = db.select(clusters).filter_by(id=clusterId)
+    try:
+        cluster: ClusterModel = db_con.execute(stmt).first()
+    except Exception:
+        logging.error('Error getting cluster object with id: %s from database', str(clusterId))
+        return None
+    return cluster
 
 
 def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
@@ -32,23 +64,57 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     return con
 
 
-def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cluster: ClusterModel, sim_id: int,
-               update_key: str) -> dict:
+def post_update(dict_to_send):
+    """For sending requests with information to flask"""
+    flask_url = os.environ.get("BACKEND_INTERNAL_URL")
+    return requests.Session().post(url=f"{flask_url}/jobs", json=dict_to_send)
+
+
+@celery_app.task()
+def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int,
+               update_key: str):  # skipcq: PY-R1000
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
+    try:
+        db_con, metadata, _ = connect_to_db(
+        )  # Connection to database and quering objects looks like that because celery task works outside flask context
+    except Exception as e:
+        logging.error('Async worker couldn\'t connect to db. Error message:"%s"', str(e))
+
+    user = get_user(db_con=db_con, metadata=metadata, userId=userId)
+    cluster = get_cluster(db_con=db_con, metadata=metadata, clusterId=clusterId)
 
     if user.cert is None or user.private_key is None:
-        return {"message": f"User {user.username} has no certificate or private key"}
-    con = get_connection(user=user, cluster=cluster)
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "log": {
+                "error": f"User {user.username} has no certificate or private key"
+            }
+        }
+        post_update(dict_to_send)
+        return
 
-    fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+    try:
+        con = get_connection(user=user, cluster=cluster)
+        fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+    except Exception as e:
+        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "log": {"error": str(e)}}
+        post_update(dict_to_send)
+        return
+
     scratch = fabric_result.stdout.split()[0]
     logging.debug("Scratch directory: %s", scratch)
 
     job_dir = f"{scratch}/yaptide_runs/{utc_now}"
     logging.debug("Job directory: %s", job_dir)
 
-    con.run(f"mkdir -p {job_dir}")
+    try:
+        con.run(f"mkdir -p {job_dir}")
+    except Exception as e:
+        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value}
+        post_update(dict_to_send)
+        return
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         logging.debug("Preparing simulation input in: %s", tmp_dir_path)
         zip_path = Path(tmp_dir_path) / "input.zip"
@@ -96,15 +162,29 @@ def submit_job(payload_dict: dict, files_dict: dict, user: KeycloakUserModel, cl
         logging.debug("Job submission failed")
         logging.debug("Sbatch stdout: %s", submit_stdout)
         logging.debug("Sbatch stderr: %s", submit_stderr)
-        return {"message": "Job submission failed", "submit_stdout": submit_stdout, "sh_files": sh_files}
-    return {
-        "message": "Job submitted",
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "log": {
+                "message": "Job submission failed",
+                "submit_stdout": submit_stdout,
+                "sh_files": sh_files,
+                "submit_stderr": submit_stderr
+            }
+        }
+        post_update(dict_to_send)
+        return
+
+    dict_to_send = {
+        "sim_id": sim_id,
         "job_dir": job_dir,
         "array_id": array_id,
         "collect_id": collect_id,
         "submit_stdout": submit_stdout,
         "sh_files": sh_files
     }
+    post_update(dict_to_send)
+    return
 
 
 def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_key: str,

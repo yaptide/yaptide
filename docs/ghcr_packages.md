@@ -4,10 +4,10 @@ GitHub Container Registry is an organisation-scoped place where Docker container
 
 ## Deployment
 
-Docker images for backend (Flask) and worker can be automatically built and deployed to ghcr.io registry. Building and deployment are handled by GitHub Actions. There are two methods:
+Docker images for backend (Flask), simulation worker can be automatically built and deployed to ghcr.io registry. Building and deployment are handled by GitHub Actions. There are two methods:
 
 - automatic action triggered after every commit to the master,
-- on-demand action triggered by `/deploy-flask` or `/deploy-worker` comment, typed by user in the Pull Request discussion.
+- on-demand action triggered by `/deploy-flask` or `/deploy-simulation-worker` comment, typed by user in the Pull Request discussion.
 
 Images from master provide a way to quickly deploy stable version of backend part of the yaptide platform. Images from pull request allows for fast way of testing new features proposed in the PR.
 
