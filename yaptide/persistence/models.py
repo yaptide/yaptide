@@ -12,7 +12,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from yaptide.persistence.database import db
 from yaptide.utils.enums import EntityState, PlatformType
-from dataclasses import dataclass
 
 
 class UserModel(db.Model):
