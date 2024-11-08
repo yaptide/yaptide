@@ -145,7 +145,15 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
     array_id = collect_id = None
     if not submit_file.startswith(job_dir):
         logging.error("Invalid submit file path: %s", submit_file)
-        return {"message": "Job submission failed due to invalid submit file path"}
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "log": {
+                "error": f"Job submission failed due to invalid submit file path"
+            }
+        }
+        post_update(dict_to_send)
+        return
     fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
     submit_stdout = fabric_result.stdout
     submit_stderr = fabric_result.stderr
