@@ -71,8 +71,8 @@ def post_update(dict_to_send):
 
 
 @celery_app.task()
-def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int,
-               update_key: str):  # skipcq: PY-R1000
+def submit_job(  # skipcq: PY-R1000
+        payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
@@ -149,7 +149,7 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
             "sim_id": sim_id,
             "job_state": EntityState.FAILED.value,
             "log": {
-                "error": f"Job submission failed due to invalid submit file path"
+                "error": "Job submission failed due to invalid submit file path"
             }
         }
         post_update(dict_to_send)
