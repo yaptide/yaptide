@@ -102,6 +102,9 @@ def check_if_s3_connection_is_working(s3_client: boto3.client) -> bool:
     except EndpointConnectionError as e:
         click.echo(f"Could not connect to the specified endpoint. {e}", err=True)
         return False
+    except ConnectTimeoutError as e:
+        click.echo(f"Connection timeout. {e}", err=True)
+        return False
     except ClientError as e:
         click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}", err=True)
         return False
@@ -346,7 +349,9 @@ def upload_file_to_s3(bucket: str,
         endpoint_url=endpoint,
     )
     if not check_if_s3_connection_is_working(s3_client):
-        click.echo("S3 connection failed", err=True)
+        hostname = endpoint.split('//')[1]
+        ip = socket.gethostbyname(hostname)
+        click.echo(f"S3 connection to {hostname} / {ip} failed", err=True)
         return False
 
     # Check if bucket exists and create if not
@@ -396,7 +401,9 @@ def decrypt_file(file_path: Path, password: str, salt: str) -> bytes:
 def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
     """Validate S3 connection"""
     if not check_if_s3_connection_is_working(s3_client):
-        click.echo("S3 connection failed", err=True)
+        hostname = endpoint.split('//')[1]
+        ip = socket.gethostbyname(hostname)
+        click.echo(f"S3 connection to {hostname} / {ip} failed", err=True)
         return False
 
     # Check if bucket name is valid
