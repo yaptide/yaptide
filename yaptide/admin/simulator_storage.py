@@ -11,7 +11,7 @@ import boto3
 import click
 import cryptography
 import requests
-from botocore.exceptions import (ClientError, EndpointConnectionError, NoCredentialsError)
+from botocore.exceptions import (ClientError, EndpointConnectionError, NoCredentialsError, ConnectTimeoutError)
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -349,6 +349,7 @@ def upload_file_to_s3(bucket: str,
         endpoint_url=endpoint,
     )
     if not check_if_s3_connection_is_working(s3_client):
+        import socket
         hostname = endpoint.split('//')[1]
         ip = socket.gethostbyname(hostname)
         click.echo(f"S3 connection to {hostname} / {ip} failed", err=True)
@@ -401,6 +402,7 @@ def decrypt_file(file_path: Path, password: str, salt: str) -> bytes:
 def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
     """Validate S3 connection"""
     if not check_if_s3_connection_is_working(s3_client):
+        import socket
         hostname = endpoint.split('//')[1]
         ip = socket.gethostbyname(hostname)
         click.echo(f"S3 connection to {hostname} / {ip} failed", err=True)
