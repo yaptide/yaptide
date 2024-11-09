@@ -350,7 +350,7 @@ def upload_file_to_s3(bucket: str,
     )
     if not check_if_s3_connection_is_working(s3_client):
         import socket
-        hostname = s3_client._endpoint.host
+        hostname = s3_client._endpoint.host.strip("https://")
         click.echo(f"S3 connection to {hostname}, checking IP....", err=True)
         ip = socket.gethostbyname(hostname)
         click.echo(f"S3 connection to {hostname} / {ip} failed", err=True)
@@ -404,7 +404,7 @@ def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
     """Validate S3 connection"""
     if not check_if_s3_connection_is_working(s3_client):
         import socket
-        hostname = s3_client._endpoint.host
+        hostname = s3_client._endpoint.host.strip("https://")
         click.echo(f"S3 connection to {hostname}, checking IP....", err=True)
         ip = socket.gethostbyname(hostname)
         click.echo(f"S3 connection to {hostname} / {ip} failed", err=True)
