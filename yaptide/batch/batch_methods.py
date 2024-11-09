@@ -192,6 +192,7 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
     """Prepares script files to run them on cluster"""
     submit_file = f'{job_dir}/yaptide_submitter.sh'
     array_file = f'{job_dir}/array_script.sh'
+
     collect_file = f'{job_dir}/collect_script.sh'
 
     array_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="array_options")
