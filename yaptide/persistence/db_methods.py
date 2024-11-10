@@ -127,7 +127,8 @@ def fetch_estimator_names_by_job_id(job_id: int) -> list[str]:
     or None if no simulation is found for the provided job ID.
     """
     simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
-    if not simulation_id: return None
+    if not simulation_id:
+        return None
     estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).all()
     estimator_names = [name for (name, ) in estimator_names_tuples]
     return estimator_names
