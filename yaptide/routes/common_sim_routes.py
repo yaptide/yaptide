@@ -217,6 +217,8 @@ class ResultsResource(Resource):
             return yaptide_response(message=error_message, code=res_code)
 
         simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+        if not simulation_id:
+            return yaptide_response(message="Simulation does not exist", code=404)
 
         # if estimator name is provided, return specific estimator
         if estimator_name:

@@ -55,9 +55,12 @@ def fetch_simulation_by_job_id(job_id: str) -> Union[BatchSimulationModel, Celer
 
 
 def fetch_simulation_id_by_job_id(job_id: str) -> int:
-    """Fetches simulation by job id"""
-    simulation_id = db.session.query(SimulationModel.id).filter_by(job_id=job_id).first()[0]
-    return simulation_id
+    """Fetches simulation_id by job_id for both Celery and Batch simulations.
+    Returns simulation_id if simulation exists,
+    or None if no simulation is found.
+    """
+    simulation_id = db.session.query(SimulationModel.id).filter_by(job_id=job_id).first()
+    return simulation_id[0] if simulation_id else None
 
 
 def fetch_celery_simulation_by_job_id(job_id: str) -> CelerySimulationModel:
@@ -119,8 +122,12 @@ def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
 
 
 def fetch_estimator_names_by_job_id(job_id: int) -> list[str]:
-    """Fetches estimators by simulation id"""
+    """Fetches estimators names by job id
+    Returns a list of estimator names if the simulation exists,
+    or None if no simulation is found for the provided job ID.
+    """
     simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+    if not simulation_id: return None
     estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).all()
     estimator_names = [name for (name, ) in estimator_names_tuples]
     return estimator_names
