@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime
 from typing import Union
 
-from flask import request
+from flask import request, current_app as app
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
@@ -77,6 +77,25 @@ class JobsResource(Resource):
         job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
+
+    @staticmethod
+    def post():
+        """Handles requests for updating simulation informations in db"""
+        payload_dict: dict = request.get_json(force=True)
+        sim_id: int = payload_dict["sim_id"]
+        app.logger.info(f"sim_id {sim_id}")
+        simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
+
+        if not simulation:
+            app.logger.info(f"sim_id {sim_id} simulation not found ")
+            return yaptide_response(message=f"Simulation {sim_id} does not exist", code=501)
+        update_simulation_state(simulation, payload_dict)
+        if payload_dict["log"]:
+            logfiles = LogfilesModel(simulation_id=simulation.id)
+            logfiles.data = payload_dict["log"]
+            add_object_to_db(logfiles)
+
+        return yaptide_response(message="Task updated", code=202)
 
 
 def get_single_estimator(sim_id: int, estimator_name: str):

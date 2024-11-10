@@ -30,7 +30,7 @@ ENV POETRY_VIRTUALENVS_CREATE=false
 RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main
 
 # Copy worker script
-COPY run_worker.sh .
+COPY run_simulation_worker.sh .
 
 # copy yaptide source code
 COPY yaptide ./yaptide
@@ -38,7 +38,7 @@ COPY yaptide ./yaptide
 # Some of our developers use Windows to run Docker, their bash scripts have CRLF line endings
 # therefore when copied to the container they are not executable. This is a workaround to fix that.
 # skipcq: DOK-W1001
-RUN python3 -c "import os; content = open('run_worker.sh', 'rb').read().replace(b'\r\n', b'\n'); open('run_worker.sh', 'wb').write(content)"
+RUN python3 -c "import os; content = open('run_simulation_worker.sh', 'rb').read().replace(b'\r\n', b'\n'); open('run_simulation_worker.sh', 'wb').write(content)"
 # skipcq: DOK-W1001
 RUN python3 -c "import os; content = open('yaptide/admin/simulators.py', 'rb').read().replace(b'\r\n', b'\n'); open('yaptide/admin/simulators.py', 'wb').write(content)"
 # skipcq: DOK-W1001
@@ -46,7 +46,7 @@ RUN python3 -c "import os; content = open('yaptide/admin/simulator_storage.py', 
 
 # Make the scripts executable
 # skipcq: DOK-W1001
-RUN chmod +x run_worker.sh yaptide/admin/simulators.py
+RUN chmod +x run_simulation_worker.sh yaptide/admin/simulators.py
 
 # Set the script as the entry point, Windows users require to run the script via bash, as `./` does not work
-ENTRYPOINT ["bash", "run_worker.sh"]
+ENTRYPOINT ["bash", "run_simulation_worker.sh"]
