@@ -55,4 +55,4 @@ class EstimatorResource(Resource):
         if len(results) == 0:
             return yaptide_response(message="Pages metadata not found", code=404)
 
-        return yaptide_response(message=f"Estimators metadata", code=200, content={"estimators_metadata": results})
+        return yaptide_response(message="Estimators metadata", code=200, content={"estimators_metadata": results})
