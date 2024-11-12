@@ -26,6 +26,7 @@ class TableTypes(Enum):
     Input = auto()
     Estimator = auto()
     Page = auto()
+    CeleryTask = auto()
 
 
 def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
@@ -186,8 +187,8 @@ def list_tasks(user, auth_provider, sim_id):
     if sim_id:
         filter_args2['simulation_id'] = int(sim_id)
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username,
-                     celeryTasks.c.celery_id).select_from(tasks).filter_by(**filter_args2).join(
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username, celeryTasks.c.celery_id,
+                     tasks.c.task_state).select_from(tasks).filter_by(**filter_args2).join(
                          celeryTasks, celeryTasks.c.id == tasks.c.id).join(
                              simulations, tasks.c.simulation_id == simulations.c.id).join(
                                  users, simulations.c.user_id == users.c.id).filter_by(**filter_args)
@@ -195,11 +196,13 @@ def list_tasks(user, auth_provider, sim_id):
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
     for task in all_tasks:
-        user_column = f" username {task.username}" if not user else ''
-        click.echo(f"""Simulation id {task.simulation_id};
-            Task id ...{task.task_id};
-            Celery_id {task.celery_id if task.celery_id else ""};
-            {user_column}""")
+        simulation_id_col = f"Simulation id {task.simulation_id}"
+        task_id_col = f"Task id ...{task.task_id}"
+        celery_id_col = f"Celery_id {task.celery_id if task.celery_id else " "}"
+        task_state_col = f"task_state {task.task_state}"
+        user_col = f" username {task.username}" if not user else ''
+
+        click.echo('; '.join(simulation_id_col, task_id_col, celery_id_col, task_state_col, user_col))
 
 
 @run.command
