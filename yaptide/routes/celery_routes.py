@@ -24,6 +24,8 @@ from yaptide.utils.enums import EntityState, PlatformType
 from flask import current_app as app
 import redis
 import json
+import pickle
+import base64
 
 
 def condition(item):
@@ -177,16 +179,24 @@ class JobsDirect(Resource):
             def condition(item):
                 # app.logger.info('items: %s', str(item))
                 # app.logger.info('keys %s', str(item.keys()))
+                item_data = json.loads(item)
+                body_encoded = item_data["body"]
+                decoded_body = base64.b64decode(body_encoded)
 
-                headers = item.get('headers')
-                kwargsrepr = headers.get('kwargsrepr')
+                try:
+                    body_data = json.loads(decoded_body)
+                except json.JSONDecodeError:
+                    body_data = pickle.loads(decoded_body)
+                kwargs = body_data[1]
+                simulation_id_redis = kwargs.get("simulation_id")
+
                 # app.logger.info('kwargsrepr %s', str(json.loads(kwargsrepr)))
                 # kwargsrepr = json.loads(kwargsrepr)
                 # app.logger.info('get files_dict %', str(kwargsrepr.get('files_dict',-1)))
 
                 # app.logger.info('kwargsrepr %s', str(kwargsrepr))
 
-                return int(kwargsrepr.get('simulation_id')) == simulation_id
+                return int(simulation_id_redis) == simulation_id
 
             key = "simulations"
             items = client.lrange(key, 0, -1)
