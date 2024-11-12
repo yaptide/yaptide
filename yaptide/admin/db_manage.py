@@ -158,13 +158,15 @@ def remove_user(name, auth_provider):
 
 
 @run.command
+@click.option('sim_id', '--sim_id')
 @click.option('user', '--user')
 @click.option('auth_provider', '--auth-provider')
-def list_tasks(user, auth_provider):
+def list_tasks(user, auth_provider, sim_id):
     """List tasks"""
     con, metadata, _ = connect_to_db()
     tasks = metadata.tables[TableTypes.Task.name]
     users = metadata.tables[TableTypes.User.name]
+    celeryTasks = metadata.tables[TableTypes.CeleryTask.name]
     simulations = metadata.tables[TableTypes.Simulation.name]
 
     if user:
@@ -175,22 +177,28 @@ def list_tasks(user, auth_provider):
             raise click.Abort()
 
     filter_args = {}
+    filter_args2 = {}
 
     if user:
         filter_args['username'] = user
     if auth_provider:
         filter_args['auth_provider'] = auth_provider
+    if sim_id:
+        filter_args2['simulation_id'] = int(sim_id)
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username).select_from(tasks).join(
-        simulations,
-        tasks.c.simulation_id == simulations.c.id).join(users,
-                                                        simulations.c.user_id == users.c.id).filter_by(**filter_args)
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username,
+                     celeryTasks.c.celery_id).select_from(tasks).filter_by(**filter_args2).join(
+                         celeryTasks, celeryTasks.c.id == tasks.c.id).join(
+                             simulations, tasks.c.simulation_id == simulations.c.id).join(
+                                 users, simulations.c.user_id == users.c.id).filter_by(**filter_args)
     all_tasks = con.execute(stmt).all()
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
     for task in all_tasks:
         user_column = f" username {task.username}" if not user else ''
-        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id};{user_column}")
+        click.echo(
+            f"Simulation id {task.simulation_id}; Task id ...{task.task_id}; Celery_id {task.celery_id if task.celery_id else "
+            "};{user_column}")
 
 
 @run.command

@@ -21,6 +21,18 @@ from yaptide.routes.utils.response_templates import (error_internal_response, er
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
+from flask import current_app as app
+import redis
+import json
+
+
+def condition(item):
+    # Define your custom condition here
+    # Example: remove items that are strings and contain 'remove'
+    return isinstance(item, str) and 'remove' in item
+
+
+client = redis.StrictRedis(host='yaptide_redis', decode_responses=True)
 
 
 class JobsDirect(Resource):
@@ -158,9 +170,34 @@ class JobsDirect(Resource):
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
 
         celery_ids = [task.celery_id for task in tasks]
+        app.logger.info("celery_ids %s", str(celery_ids))
 
+        def clear_tasks_from_redis(simulation_id):
+
+            def condition(item):
+                # app.logger.info('items: %s', str(item))
+                # app.logger.info('keys %s', str(item.keys()))
+
+                headers = item.get('headers')
+                kwargsrepr = headers.get('kwargsrepr')
+                # app.logger.info('kwargsrepr %s', str(json.loads(kwargsrepr)))
+                # kwargsrepr = json.loads(kwargsrepr)
+                # app.logger.info('get files_dict %', str(kwargsrepr.get('files_dict',-1)))
+
+                # app.logger.info('kwargsrepr %s', str(kwargsrepr))
+
+                return int(kwargsrepr.get('simulation_id')) == simulation_id
+
+            key = "simulations"
+            items = client.lrange(key, 0, -1)
+            filtered_items = [item for item in items if not condition(item)]
+            client.delete(key)  # Delete existing list
+            for item in filtered_items:
+                client.rpush(key, item)  # Add filtered items back to the list
+
+        clear_tasks_from_redis(simulation.id)
         result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=celery_ids)
-
+        app.logger.info("results %s", str(result))
         if "merge" in result:
             update_simulation_state(simulation=simulation, update_dict=result["merge"])
             for i, task in enumerate(tasks):

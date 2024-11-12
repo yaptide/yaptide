@@ -2,6 +2,7 @@ import logging
 
 from celery import chord, group
 from celery.result import AsyncResult
+from flask import current_app as app
 
 from yaptide.celery.tasks import merge_results, run_single_simulation
 from yaptide.celery.simulation_worker import celery_app
@@ -63,6 +64,8 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
 
     def cancel_task(job_id: str, state_key: str) -> dict:
         """Cancels (if possible) every task in the workflow"""
+        if not job_id:
+            return {state_key: EntityState.UNKNOWN.value, "message": "No celery job_id. Skipping."}
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 
@@ -93,6 +96,42 @@ def get_job_results(job_id: str) -> dict:
     if "result" not in job.info:
         return {}
     return job.info.get("result")
+
+
+def cancel_job2(job_id) -> dict:
+    """Cancels simulation"""
+
+    def cancel_task(job_id: str, state_key: str) -> dict:
+        """Cancels (if possible) every task in the workflow"""
+        if not job_id:
+
+            return {
+                state_key: job_state,
+            }
+        job = AsyncResult(id=job_id, app=celery_app)
+        job_state: str = translate_celery_state_naming(job.state)
+
+        if job_state in [EntityState.CANCELED.value, EntityState.COMPLETED.value, EntityState.FAILED.value]:
+            logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
+            return {state_key: job_state, "message": f"Job already {job_state}"}
+        try:
+            celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
+        except Exception as e:  # skipcq: PYL-W0703
+            logging.error("Cannot cancel job %s, due to %s", job_id, e)
+            return {
+                state_key: job_state,
+                "message": f"Cannot cancel job {job_id}, leaving at current state {job_state}"
+            }
+
+        return {state_key: EntityState.CANCELED.value, "message": f"Job {job_id} canceled"}
+
+    # def remove_unstarted_tasks(merge_id):
+
+    result = {
+        "merge": cancel_task(merge_id, "job_state"),
+        "tasks": [cancel_task(job_id, "task_state") for job_id in celery_ids]
+    }
+    return result
 
 
 def translate_celery_state_naming(job_state: str) -> str:
