@@ -95,22 +95,13 @@ class SimulationModel(db.Model):
                                        nullable=False,
                                        default=EntityState.UNKNOWN.value,
                                        doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')")
-    update_key_hash: Column[str] = db.Column(db.String,
-                                             doc="Update key shared by tasks granting access to update themselves")
+
     tasks = relationship("TaskModel", cascade="delete")
     estimators = relationship("EstimatorModel", cascade="delete")
     inputs = relationship("InputModel", cascade="delete")
     logfiles = relationship("LogfilesModel", cascade="delete")
 
     __mapper_args__ = {"polymorphic_identity": "Simulation", "polymorphic_on": platform, "with_polymorphic": "*"}
-
-    def set_update_key(self, update_key: str):
-        """Sets hashed update key"""
-        self.update_key_hash = generate_password_hash(update_key)
-
-    def check_update_key(self, update_key: str) -> bool:
-        """Checks update key correctness"""
-        return check_password_hash(self.update_key_hash, update_key)
 
     def update_state(self, update_dict: dict) -> bool:
         """
@@ -157,6 +148,20 @@ class BatchSimulationModel(SimulationModel):
 
     __mapper_args__ = {"polymorphic_identity": PlatformType.BATCH.value, "polymorphic_load": "inline"}
 
+    def update_state(self, update_dict):
+        """Used to update fields in BatchSimulation. Returns boolean value if commit to database is reuqired"""
+        db_commit_required = super().update_state(update_dict)
+        if "job_dir" in update_dict and self.job_dir != update_dict["job_dir"]:
+            self.job_dir = update_dict["job_dir"]
+            db_commit_required = True
+        if "array_id" in update_dict and self.array_id != update_dict["array_id"]:
+            self.array_id = update_dict["array_id"]
+            db_commit_required = True
+        if "collect_id" in update_dict and self.collect_id != update_dict["collect_id"]:
+            self.collect_id = update_dict["collect_id"]
+            db_commit_required = True
+        return db_commit_required
+
 
 class TaskModel(db.Model):
     """Simulation task model"""
@@ -192,7 +197,7 @@ class TaskModel(db.Model):
 
     __mapper_args__ = {"polymorphic_identity": "Task", "polymorphic_on": platform, "with_polymorphic": "*"}
 
-    def update_state(self, update_dict: dict):
+    def update_state(self, update_dict: dict):  # skipcq: PY-R1000
         """
         Updating database is more costly than a simple query.
         Therefore we check first if update is needed and
@@ -206,6 +211,8 @@ class TaskModel(db.Model):
             self.simulated_primaries = update_dict["simulated_primaries"]
         if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
             self.task_state = update_dict["task_state"]
+            if self.task_state == EntityState.COMPLETED.value:
+                self.simulated_primaries = self.requested_primaries
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None

@@ -7,6 +7,8 @@ import platform
 import subprocess
 from typing import Generator
 import pytest
+# skipcq: FLK-E501, PY-W2000
+from celery.contrib.pytest import celery_app, celery_worker, celery_enable_logging, celery_config, celery_parameters, use_celery_app_trap
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
 
@@ -121,15 +123,17 @@ def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
 
 @pytest.fixture(scope="function")
 def celery_worker_parameters() -> Generator[dict, None, None]:
-    """Here we could as well configure other fixture worker parameters, like app, pool, loglevel, etc."""
-    logging.info("Creating celery worker parameters for testing")
+    """Here we could as well configure other fixture simulation-worker parameters, like app, pool, loglevel, etc."""
+    logging.info("Creating celery simulation-worker parameters for testing")
 
     # get current logging level
     log_level = logging.getLogger().getEffectiveLevel()
 
     yield {
         "concurrency": 2,
-        "loglevel": log_level,  # set celery worker log level to the same as the one used by pytest
+        "loglevel": log_level,  # set celery simulation-worker log level to the same as the one used by pytest
+        "queues": 'simulations',
+        'perform_ping_check': False  # it's crucial for tests to pass. There is bug in celery related to using queues.
     }
 
 
@@ -178,6 +182,13 @@ def modify_tmpdir(tmpdir_factory):
         del os.environ['TMP']
     else:
         os.environ['TMP'] = original_tmp
+
+
+@pytest.fixture(autouse=True)
+def clear_celery_queue(celery_app):
+    """Clears task queue from celery tasks after each test"""
+    yield
+    celery_app.control.purge()
 
 
 @pytest.fixture(scope="function")

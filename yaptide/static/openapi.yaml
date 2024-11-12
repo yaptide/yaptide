@@ -453,6 +453,19 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
+    post:
+      summary: For updating simulation object in database and uploading error logs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateJob'
+      responses:
+        '202':
+          description: Simulation updated
+        '501':
+          description: Error updating simulation
   /jobs/direct:
     post:
       summary: Allows for submitting jobs to run directly on server.
@@ -971,6 +984,62 @@ paths:
               schema:
                 $ref: '#/components/schemas/BasicResponse'
 
+# Estimator Routes
+  /estimators:
+    get:
+      summary: Allows getting names of the estimators for the specific simulation.
+      parameters:
+        - in: query
+          name: job_id
+          required: true
+          description: ID of the job to retrieve results for
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Includes estimator names
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  estimator_names:
+                    type: array
+                    items:
+                      type: string
+        '400':
+          description: Bad Request - Missing parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '401':
+          description: Unauthorized - Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '403':
+          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '404':
+          description: Job with provided ID does not exist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BasicResponse'
+
 # Task Routes
   /tasks:
     description: Route dedicated for Backend internal communication
@@ -1372,7 +1441,24 @@ components:
     Page:
       type: object
       description: Page object includes .
-
-
+    UpdateJobs:
+      type: object
+      required:
+        - sim_id
+      properties:
+        sim_id:
+          type: integer
+          description: integer, primary key of simulation in database
+        job_dir:
+          type: string
+        array_id:
+          type: integer
+        collect_id:
+          type: integer
+        task_state:
+          enum: [FAILED]
+        log:
+          type: object
+          description: dict that will be uploaded as error log to database
 security:
   - basicAuth: []  # <-- use the same name here

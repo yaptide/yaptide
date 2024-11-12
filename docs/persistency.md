@@ -18,7 +18,6 @@ classDiagram
     input_type: str
     sim_type: str
     job_state: str
-    update_key_hash: str
     tasks
     estimators
   }

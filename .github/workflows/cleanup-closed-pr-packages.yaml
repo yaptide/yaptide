@@ -13,7 +13,7 @@ jobs:
       - name: Cleanup flask and worker packages
         uses: snok/container-retention-policy@v2
         with:
-          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-worker
+          image-names: ${{ github.event.repository.name }}-flask, ${{ github.event.repository.name }}-simulation-worker, ${{ github.event.repository.name }}-helper-worker
           cut-off: now UTC
           timestamp-to-use: created_at
           account-type: org

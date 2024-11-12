@@ -3,7 +3,7 @@ from collections import Counter
 from datetime import datetime
 from typing import Union
 
-from flask import request
+from flask import request, current_app as app
 from flask_restful import Resource
 from marshmallow import INCLUDE, Schema, fields
 
@@ -11,11 +11,13 @@ from yaptide.persistence.db_methods import (
     add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_id_by_sim_id_and_est_name,
     fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number,
     fetch_pages_by_est_id_and_page_numbers, fetch_pages_by_estimator_id, fetch_simulation_by_job_id,
-    fetch_simulation_by_sim_id, fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
+    fetch_simulation_by_sim_id, fetch_simulation_id_by_job_id, fetch_tasks_by_sim_id, make_commit_to_db,
+    update_simulation_state)
 from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.routes.utils.tokens import decode_auth_token
 from yaptide.utils.enums import EntityState
 
 
@@ -76,6 +78,25 @@ class JobsResource(Resource):
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
+    @staticmethod
+    def post():
+        """Handles requests for updating simulation informations in db"""
+        payload_dict: dict = request.get_json(force=True)
+        sim_id: int = payload_dict["sim_id"]
+        app.logger.info(f"sim_id {sim_id}")
+        simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
+
+        if not simulation:
+            app.logger.info(f"sim_id {sim_id} simulation not found ")
+            return yaptide_response(message=f"Simulation {sim_id} does not exist", code=501)
+        update_simulation_state(simulation, payload_dict)
+        if payload_dict["log"]:
+            logfiles = LogfilesModel(simulation_id=simulation.id)
+            logfiles.data = payload_dict["log"]
+            add_object_to_db(logfiles)
+
+        return yaptide_response(message="Task updated", code=202)
+
 
 def get_single_estimator(sim_id: int, estimator_name: str):
     """Retrieve a single estimator by simulation ID and estimator name"""
@@ -132,7 +153,8 @@ class ResultsResource(Resource):
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         for estimator_dict in payload_dict["estimators"]:
@@ -164,6 +186,9 @@ class ResultsResource(Resource):
         logging.debug("Marking simulation as completed")
         update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         update_simulation_state(simulation=simulation, update_dict=update_dict)
+
+        logging.debug("Marking simulation tasks as completed")
+
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
@@ -201,16 +226,18 @@ class ResultsResource(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        simulation = fetch_simulation_by_job_id(job_id=job_id)
+        simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+        if not simulation_id:
+            return yaptide_response(message="Simulation does not exist", code=404)
 
         # if estimator name is provided, return specific estimator
         if estimator_name is None:
-            return get_all_estimators(sim_id=simulation.id)
+            return get_all_estimators(sim_id=simulation_id)
 
         if single_page is None and len(page_numbers) == 0:
-            return get_single_estimator(sim_id=simulation.id, estimator_name=estimator_name)
+            return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
-        estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation.id, est_name=estimator_name)
+        estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
         if single_page is not None:
             page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=single_page)
             result = {"page": page.data}
@@ -279,7 +306,8 @@ class LogfilesResource(Resource):
         if not simulation:
             return yaptide_response(message="Simulation does not exist", code=400)
 
-        if not simulation.check_update_key(payload_dict["update_key"]):
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
         logfiles = LogfilesModel(simulation_id=simulation.id)
