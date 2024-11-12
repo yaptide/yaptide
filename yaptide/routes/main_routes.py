@@ -6,7 +6,6 @@ from yaptide.routes.celery_routes import ConvertResource, JobsDirect
 from yaptide.routes.common_sim_routes import (JobsResource, InputsResource, LogfilesResource, ResultsResource)
 from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
-from yaptide.routes.page_routes import PagesResource
 from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response

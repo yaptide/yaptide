@@ -122,19 +122,6 @@ def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
     return estimators
 
 
-def fetch_estimator_names_by_job_id(job_id: int) -> list[str]:
-    """Fetches estimators names by job id
-    Returns a list of estimator names if the simulation exists,
-    or None if no simulation is found for the provided job ID.
-    """
-    simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
-    if not simulation_id:
-        return None
-    estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).all()
-    estimator_names = [name for (name, ) in estimator_names_tuples]
-    return estimator_names
-
-
 def fetch_estimator_by_sim_id_and_est_name(sim_id: int, est_name: str) -> EstimatorModel:
     """Fetches estimator by simulation id and estimator name"""
     estimator = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id, name=est_name).first()
@@ -167,11 +154,10 @@ def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> P
     return pages
 
 
-def fetch_pages_metadata_by_sim_id_and_est_name(sim_id: int, est_name: str) -> EstimatorModel:
+def fetch_pages_metadata_by_est_id(est_id: str) -> EstimatorModel:
     """Fetches estimator by simulation id and estimator name"""
-    estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=sim_id, est_name=est_name)
     pages_metadata = db.session.query(PageModel.page_number,
-                                      PageModel.page_dimension).filter_by(estimator_id=estimator_id).all()
+                                      PageModel.page_dimension).filter_by(estimator_id=est_id).all()
     return pages_metadata
 
 

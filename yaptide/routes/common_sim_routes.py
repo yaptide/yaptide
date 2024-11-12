@@ -196,7 +196,7 @@ class ResultsResource(Resource):
 
         job_id = fields.String()
         estimator_name = fields.String(load_default=None)
-        single_page = fields.Integer(load_default=None)
+        page_number = fields.Integer(load_default=None)
 
         class Meta:
             # Include unknown fields
@@ -209,7 +209,7 @@ class ResultsResource(Resource):
         If `estimator_name` parameter is provided,
         the response will include results only for that specific estimator,
         otherwise it will return all estimators for the given job.
-        If `single_page` or `page_numbers` are provided, the response will include only specific pages.
+        If `page_number` or `page_numbers` are provided, the response will include only specific pages.
         """
         schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -219,7 +219,7 @@ class ResultsResource(Resource):
 
         job_id = param_dict['job_id']
         estimator_name = param_dict['estimator_name']
-        single_page = param_dict.get('single_page')
+        page_number = param_dict.get('page_number')
         page_numbers = request.args.getlist('page_numbers', type=int)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
@@ -234,12 +234,12 @@ class ResultsResource(Resource):
         if estimator_name is None:
             return get_all_estimators(sim_id=simulation_id)
 
-        if single_page is None and len(page_numbers) == 0:
+        if page_number is None and len(page_numbers) == 0:
             return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
         estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
-        if single_page is not None:
-            page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=single_page)
+        if page_number is not None:
+            page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=page_number)
             result = {"page": page.data}
             return yaptide_response(message="Page retrieved successfully", code=200, content=result)
         if len(page_numbers) > 0:

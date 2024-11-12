@@ -905,7 +905,7 @@ paths:
           schema:
             type: string
         - in: query
-          name: single_page
+          name: page_number
           required: false
           description: Number of a single page to retrieve.
           schema:
@@ -987,7 +987,7 @@ paths:
 # Estimator Routes
   /estimators:
     get:
-      summary: Allows getting names of the estimators for the specific simulation.
+      summary: Allows getting estimators metadata
       parameters:
         - in: query
           name: job_id
@@ -1005,10 +1005,22 @@ paths:
                 properties:
                   message:
                     type: string
-                  estimator_names:
+                  estimators_metadata:
                     type: array
                     items:
-                      type: string
+                      type: object
+                      properties:
+                        name:
+                          type: string
+                        pages_metadata:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              page_number:
+                                type: integer
+                              page_dimension:
+                                type: integer
         '400':
           description: Bad Request - Missing parameters
           content:
