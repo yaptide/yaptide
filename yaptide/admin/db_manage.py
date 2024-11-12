@@ -196,9 +196,10 @@ def list_tasks(user, auth_provider, sim_id):
     click.echo(f"{len(all_tasks)} tasks in DB:")
     for task in all_tasks:
         user_column = f" username {task.username}" if not user else ''
-        click.echo(
-            f"Simulation id {task.simulation_id}; Task id ...{task.task_id}; Celery_id {task.celery_id if task.celery_id else "
-            "};{user_column}")
+        click.echo(f"""Simulation id {task.simulation_id};
+            Task id ...{task.task_id};
+            Celery_id {task.celery_id if task.celery_id else ""};
+            {user_column}""")
 
 
 @run.command
