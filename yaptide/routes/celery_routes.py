@@ -8,11 +8,11 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results, run_job)
+from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results, run_job, get_tasks_from_celery)
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
                                             fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
                                             fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
-                                            update_task_state)
+                                            update_task_state, fetch_task_by_sim_id_and_task_id)
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
@@ -73,14 +73,14 @@ class JobsDirect(Resource):
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
 
-        # submit the asynchronous job to celery
-        simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"],
-                                      payload_dict["sim_type"])
-
         # create tasks in the database in the default PENDING state
         for i in range(payload_dict["ntasks"]):
             task = CeleryTaskModel(simulation_id=simulation.id, task_id=i)
             add_object_to_db(task, make_commit=False)
+        make_commit_to_db()
+        # submit the asynchronous job to celery
+        simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"],
+                                      payload_dict["sim_type"])
 
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict
@@ -169,10 +169,13 @@ class JobsDirect(Resource):
                                         "job_state": simulation.job_state,
                                     })
 
-        tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
+        # tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
+        pairs = get_tasks_from_celery(simulation_id=simulation.id)
+        task_celery_ids = [task[0] for task in pairs]
+        task_ids = [task[1] for task in pairs]
+        app.logger.info("celery_ids %s", str(task_celery_ids))
 
-        celery_ids = [task.celery_id for task in tasks]
-        app.logger.info("celery_ids %s", str(celery_ids))
+        task_redis_ids = []
 
         def clear_tasks_from_redis(simulation_id):
 
@@ -196,21 +199,31 @@ class JobsDirect(Resource):
 
                 # app.logger.info('kwargsrepr %s', str(kwargsrepr))
 
-                return int(simulation_id_redis) == simulation_id
+                if int(simulation_id_redis) == simulation_id:
+                    task_redis_ids.append(int(kwargs.get("task_id")))
+                    return True
+                return False
 
             key = "simulations"
             items = client.lrange(key, 0, -1)
-            filtered_items = [item for item in items if not condition(item)]
+            items_to_delete = [item for item in items if condition(item)]
+            for i in items_to_delete:
+                items.remove(i)
+            for task_id in task_redis_ids:
+                task = fetch_task_by_sim_id_and_task_id(simulation_id, task_id)
+                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
             client.delete(key)  # Delete existing list
-            for item in filtered_items:
+            for item in items:
                 client.rpush(key, item)  # Add filtered items back to the list
 
+        tasks_celery = [fetch_task_by_sim_id_and_task_id(simulation.id, task_id) for task_id in task_ids]
+
         clear_tasks_from_redis(simulation.id)
-        result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=celery_ids)
+        result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=task_celery_ids)
         app.logger.info("results %s", str(result))
         if "merge" in result:
             update_simulation_state(simulation=simulation, update_dict=result["merge"])
-            for i, task in enumerate(tasks):
+            for i, task in enumerate(tasks_celery):
                 update_task_state(task=task, update_dict=result["tasks"][i])
 
             return yaptide_response(message="", code=200, content=result)

@@ -59,6 +59,17 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
     return result
 
 
+def get_tasks_from_celery(simulation_id):
+    """returns celery ids from celery inspect based on simulation_id"""
+    simulation_task_ids = []
+
+    for simulation in celery_app.control.inspect().active(
+    )['celery@yaptide-simulation-worker'] + celery_app.control.inspect().reserved()['celery@yaptide-simulation-worker']:
+        if simulation['kwargs']['simulation_id'] == simulation_id:
+            simulation_task_ids.append((simulation['id'], simulation['kwargs']['task_id']))
+    return simulation_task_ids
+
+
 def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
     """Cancels simulation"""
 
