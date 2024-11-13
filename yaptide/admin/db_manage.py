@@ -175,20 +175,20 @@ def list_tasks(user, auth_provider, sim_id):
             click.echo(f"Aborting, user {user} does not exist")
             raise click.Abort()
 
-    filter_args = {}
-    filter_args2 = {}
+    filter_args_user = {}
+    filter_args_simulation = {}
 
     if user:
-        filter_args['username'] = user
+        filter_args_user['username'] = user
     if auth_provider:
-        filter_args['auth_provider'] = auth_provider
+        filter_args_user['auth_provider'] = auth_provider
     if sim_id:
-        filter_args2['simulation_id'] = int(sim_id)
+        filter_args_simulation['simulation_id'] = int(sim_id)
 
     stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username,
-                     tasks.c.task_state).select_from(tasks).filter_by(**filter_args2).join(
+                     tasks.c.task_state).select_from(tasks).filter_by(**filter_args_simulation).join(
                          simulations, tasks.c.simulation_id == simulations.c.id).join(
-                             users, simulations.c.user_id == users.c.id).filter_by(**filter_args).order_by(
+                             users, simulations.c.user_id == users.c.id).filter_by(**filter_args_user).order_by(
                                  tasks.c.simulation_id, tasks.c.task_id)
     all_tasks = con.execute(stmt).all()
 
