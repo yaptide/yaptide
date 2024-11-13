@@ -12,7 +12,6 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 from yaptide.persistence.database import db
 from yaptide.utils.enums import EntityState, PlatformType
-from flask import current_app as app
 
 
 class UserModel(db.Model):
@@ -261,10 +260,8 @@ class CeleryTaskModel(TaskModel):
 
     def update_state(self, update_dict: dict):
         """Update method for CeleryTaskModel"""
-        app.logger.info("UPDATE STATE FOR CELERY TASK")
         if "celery_id" in update_dict and self.celery_id != update_dict["celery_id"]:
             self.celery_id = update_dict["celery_id"]
-            app.logger.info("UPDATE STATE FOR CELERY TASK celery id %s", update_dict["celery_id"])
         return super().update_state(update_dict)
 
     __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}

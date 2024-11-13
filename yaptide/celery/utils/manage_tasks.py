@@ -13,6 +13,7 @@ from yaptide.utils.enums import EntityState
 
 
 def stop_tasks_in_worker(simulation):
+    """Stops tasks that are running or are reserved in celery"""
     ids_in_worker = get_tasks_from_celery(simulation_id=simulation.id)
     task_ids = [task['task_id'] for task in ids_in_worker]
     celery_ids = [task['celery_id'] for task in ids_in_worker]
@@ -30,6 +31,7 @@ def stop_tasks_in_worker(simulation):
 
 
 def decode_ids(redis_task_items):
+    """Helper function, decodes celery_id and task_id"""
     array_ids = []
     for item in redis_task_items:
         item_data = json.loads(item)
@@ -42,6 +44,7 @@ def decode_ids(redis_task_items):
 
 
 def delete_tasks_from_redis(simulation_id):
+    """Deletes tasks waiting for execution and sets state to Canceled"""
     client = redis.StrictRedis(host='yaptide_redis', decode_responses=True)
 
     key = "simulations"
