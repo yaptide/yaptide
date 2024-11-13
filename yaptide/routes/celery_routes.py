@@ -8,11 +8,10 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results, run_job, get_tasks_from_celery)
+from yaptide.celery.utils.manage_tasks import (get_job_results, run_job, delete_tasks_from_redis, stop_tasks_in_worker)
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
                                             fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
-                                            fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
-                                            update_task_state, fetch_task_by_sim_id_and_task_id)
+                                            fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state)
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
@@ -21,20 +20,6 @@ from yaptide.routes.utils.response_templates import (error_internal_response, er
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
-from flask import current_app as app
-import redis
-import json
-import pickle
-import base64
-
-
-def condition(item):
-    # Define your custom condition here
-    # Example: remove items that are strings and contain 'remove'
-    return isinstance(item, str) and 'remove' in item
-
-
-client = redis.StrictRedis(host='yaptide_redis', decode_responses=True)
 
 
 class JobsDirect(Resource):
@@ -169,65 +154,11 @@ class JobsDirect(Resource):
                                         "job_state": simulation.job_state,
                                     })
 
-        # tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
-        pairs = get_tasks_from_celery(simulation_id=simulation.id)
-        task_celery_ids = [task[0] for task in pairs]
-        task_ids = [task[1] for task in pairs]
-        app.logger.info("celery_ids %s", str(task_celery_ids))
+        delete_tasks_from_redis(simulation.id)
+        result = stop_tasks_in_worker(simulation=simulation)
 
-        task_redis_ids = []
-
-        def clear_tasks_from_redis(simulation_id):
-
-            def condition(item):
-                # app.logger.info('items: %s', str(item))
-                # app.logger.info('keys %s', str(item.keys()))
-                item_data = json.loads(item)
-                body_encoded = item_data["body"]
-                decoded_body = base64.b64decode(body_encoded)
-
-                try:
-                    body_data = json.loads(decoded_body)
-                except json.JSONDecodeError:
-                    body_data = pickle.loads(decoded_body)
-                kwargs = body_data[1]
-                simulation_id_redis = kwargs.get("simulation_id")
-
-                # app.logger.info('kwargsrepr %s', str(json.loads(kwargsrepr)))
-                # kwargsrepr = json.loads(kwargsrepr)
-                # app.logger.info('get files_dict %', str(kwargsrepr.get('files_dict',-1)))
-
-                # app.logger.info('kwargsrepr %s', str(kwargsrepr))
-
-                if int(simulation_id_redis) == simulation_id:
-                    task_redis_ids.append(int(kwargs.get("task_id")))
-                    return True
-                return False
-
-            key = "simulations"
-            items = client.lrange(key, 0, -1)
-            items_to_delete = [item for item in items if condition(item)]
-            for i in items_to_delete:
-                items.remove(i)
-            for task_id in task_redis_ids:
-                task = fetch_task_by_sim_id_and_task_id(simulation_id, task_id)
-                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
-            client.delete(key)  # Delete existing list
-            for item in items:
-                client.rpush(key, item)  # Add filtered items back to the list
-
-        tasks_celery = [fetch_task_by_sim_id_and_task_id(simulation.id, task_id) for task_id in task_ids]
-
-        clear_tasks_from_redis(simulation.id)
-        result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=task_celery_ids)
-        app.logger.info("results %s", str(result))
-        if "merge" in result:
-            update_simulation_state(simulation=simulation, update_dict=result["merge"])
-            for i, task in enumerate(tasks_celery):
-                update_task_state(task=task, update_dict=result["tasks"][i])
-
-            return yaptide_response(message="", code=200, content=result)
-
+        if result:
+            return yaptide_response(message="Simulation cancelled", code=200, content=result)
         return error_internal_response()
 
 

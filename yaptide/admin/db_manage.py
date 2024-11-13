@@ -202,7 +202,7 @@ def list_tasks(user, auth_provider, sim_id):
         task_state_col = f"task_state {task.task_state}"
         user_col = f" username {task.username}" if not user else ''
 
-        click.echo('; '.join(simulation_id_col, task_id_col, celery_id_col, task_state_col, user_col))
+        click.echo('; '.join((simulation_id_col, task_id_col, celery_id_col, task_state_col, user_col)))
 
 
 @run.command
