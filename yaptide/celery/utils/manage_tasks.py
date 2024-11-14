@@ -8,7 +8,12 @@ from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 
 
-def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, sim_type: str = 'shieldhit') -> str:
+def run_job(files_dict: dict,
+            update_key: str,
+            simulation_id: int,
+            ntasks: int,
+            celery_ids: list,
+            sim_type: str = 'shieldhit') -> str:
     """Runs asynchronous simulation job"""
     logging.debug("Starting run_simulation task for %d tasks", ntasks)
     logging.debug("Simulation id: %d", simulation_id)
@@ -19,7 +24,7 @@ def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, 
             task_id=i,
             update_key=update_key,
             simulation_id=simulation_id,
-            sim_type=sim_type) for i in range(ntasks)
+            sim_type=sim_type).set(task_id=celery_ids[i]) for i in range(ntasks)
     ])
 
     workflow = chord(map_group,
@@ -63,6 +68,8 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
 
     def cancel_task(job_id: str, state_key: str) -> dict:
         """Cancels (if possible) every task in the workflow"""
+        if not job_id:
+            return {state_key: EntityState.CANCELED.value, "message": f"Job not yet executing. Canceling."}
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 

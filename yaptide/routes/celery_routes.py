@@ -1,11 +1,11 @@
 import logging
-import uuid
 from collections import Counter
 from datetime import datetime
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
+from uuid import uuid4
 
 from yaptide.celery.tasks import convert_input_files
 from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results, run_job)
@@ -46,7 +46,7 @@ class JobsDirect(Resource):
             return error_validation_response()
 
         # create a new simulation in the database, not waiting for the job to finish
-        job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid.uuid4()) + PlatformType.DIRECT.value
+        job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid4()) + PlatformType.DIRECT.value
         simulation = CelerySimulationModel(user_id=user.id,
                                            job_id=job_id,
                                            sim_type=payload_dict["sim_type"],
@@ -58,15 +58,16 @@ class JobsDirect(Resource):
         logging.debug("Update key set to %s", update_key)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+        # create tasks in the database in the default PENDING state
+        celery_ids = [str(uuid4()) for _ in range(payload_dict["ntasks"])]
+        for i in range(payload_dict["ntasks"]):
+            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i, celery_id=celery_ids[i])
+            add_object_to_db(task, make_commit=False)
+        make_commit_to_db()
 
         # submit the asynchronous job to celery
         simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"],
-                                      payload_dict["sim_type"])
-
-        # create tasks in the database in the default PENDING state
-        for i in range(payload_dict["ntasks"]):
-            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i)
-            add_object_to_db(task, make_commit=False)
+                                      celery_ids, payload_dict["sim_type"])
 
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict
