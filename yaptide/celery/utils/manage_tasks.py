@@ -69,7 +69,7 @@ def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
     def cancel_task(job_id: str, state_key: str) -> dict:
         """Cancels (if possible) every task in the workflow"""
         if not job_id:
-            return {state_key: EntityState.CANCELED.value, "message": f"Job not yet executing. Canceling."}
+            return {state_key: EntityState.CANCELED.value, "message": "Job not yet executing. Canceling."}
         job = AsyncResult(id=job_id, app=celery_app)
         job_state: str = translate_celery_state_naming(job.state)
 
