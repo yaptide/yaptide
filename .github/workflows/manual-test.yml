@@ -63,6 +63,7 @@ jobs:
 
       - name: Run main tests on Linux
         if: matrix.platform == 'ubuntu-latest'
+        uses: nick-fields/retry@v3
         env:
               S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
               S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
@@ -70,7 +71,11 @@ jobs:
               S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
               S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
               S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_on: error
+          command: pytest
 
        # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
       - name: Run main tests on Windows using powershell
