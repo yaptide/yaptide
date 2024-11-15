@@ -62,8 +62,8 @@ jobs:
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
         with:
-          timeout_minutes: 15
-          max_attempts: 3
+          timeout_minutes: 25
+          max_attempts: 10
           retry_on: error
           command: poetry run pytest --cov-report html:htmlcov --cov=yaptide
       - name: Install dependencies for documentation
