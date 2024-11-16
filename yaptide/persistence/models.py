@@ -209,7 +209,9 @@ class TaskModel(db.Model):
             self.requested_primaries = update_dict["requested_primaries"]
         if "simulated_primaries" in update_dict and self.simulated_primaries != update_dict["simulated_primaries"]:
             self.simulated_primaries = update_dict["simulated_primaries"]
-        if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
+        if "task_state" in update_dict and self.task_state != update_dict["task_state"] and not (
+                self.task_state in [EntityState.COMPLETED.value, EntityState.FAILED.value]
+                and update_dict["task_state"] == EntityState.CANCELED.value):
             self.task_state = update_dict["task_state"]
             if self.task_state == EntityState.COMPLETED.value:
                 self.simulated_primaries = self.requested_primaries
