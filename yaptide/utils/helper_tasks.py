@@ -3,7 +3,7 @@ from yaptide.utils.helper_worker import celery_app
 
 
 @celery_app.task
-def terminate_unfinished_tasks(simulation_id):
+def terminate_unfinished_tasks(simulation_id: int):
     """Function for stopping tasks that wasn't finished with first try"""
     number_of_tasks = get_tasks_from_celery(simulation_id)
     previous_number_of_tasks = 0
@@ -17,7 +17,7 @@ def terminate_unfinished_tasks(simulation_id):
                               signal="SIGINT")
 
 
-def get_tasks_from_celery(simulation_id):
+def get_tasks_from_celery(simulation_id: int):
     """returns celery ids from celery based on simulation_id. Can take up to few seconds when celry is busy"""
     simulation_task_ids = []
 

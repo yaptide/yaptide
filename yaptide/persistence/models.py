@@ -163,13 +163,13 @@ class BatchSimulationModel(SimulationModel):
         return db_commit_required
 
 
-def allowed_state_change(current_state, next_state):
+def allowed_state_change(current_state: str, next_state: str):
     """Ensures that no such change like Completed -> Canceled happens"""
     return not (current_state in [EntityState.FAILED.value, EntityState.COMPLETED.value]
                 and next_state in [EntityState.CANCELED])
 
 
-def value_changed(current_value, new_value):
+def value_changed(current_value: str, new_value: str):
     """checks if value from update_dict differs from object in database"""
     return new_value and current_value != new_value
 
