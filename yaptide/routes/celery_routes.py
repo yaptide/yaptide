@@ -1,14 +1,15 @@
 import logging
-import uuid
 from collections import Counter
 from datetime import datetime
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
+from uuid import uuid4
 
+from yaptide.celery.simulation_worker import celery_app
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import (cancel_job, get_job_results, run_job)
+from yaptide.celery.utils.manage_tasks import (get_job_results, run_job)
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
                                             fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
                                             fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
@@ -16,11 +17,11 @@ from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simul
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_internal_response, error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
 
 class JobsDirect(Resource):
@@ -46,7 +47,7 @@ class JobsDirect(Resource):
             return error_validation_response()
 
         # create a new simulation in the database, not waiting for the job to finish
-        job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid.uuid4()) + PlatformType.DIRECT.value
+        job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid4()) + PlatformType.DIRECT.value
         simulation = CelerySimulationModel(user_id=user.id,
                                            job_id=job_id,
                                            sim_type=payload_dict["sim_type"],
@@ -58,15 +59,16 @@ class JobsDirect(Resource):
         logging.debug("Update key set to %s", update_key)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+        # create tasks in the database in the default PENDING state
+        celery_ids = [str(uuid4()) for _ in range(payload_dict["ntasks"])]
+        for i in range(payload_dict["ntasks"]):
+            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i, celery_id=celery_ids[i])
+            add_object_to_db(task, make_commit=False)
+        make_commit_to_db()
 
         # submit the asynchronous job to celery
         simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"],
-                                      payload_dict["sim_type"])
-
-        # create tasks in the database in the default PENDING state
-        for i in range(payload_dict["ntasks"]):
-            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i)
-            add_object_to_db(task, make_commit=False)
+                                      celery_ids, payload_dict["sim_type"])
 
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict
@@ -156,19 +158,22 @@ class JobsDirect(Resource):
                                     })
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
+        celery_ids = [
+            task.celery_id for task in tasks
+            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
+        ]
 
-        celery_ids = [task.celery_id for task in tasks]
+        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
+        # We don't want it to run accidentally.
+        celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
+        celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+        for task in tasks:
+            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
+                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
-        result: dict = cancel_job(merge_id=simulation.merge_id, celery_ids=celery_ids)
-
-        if "merge" in result:
-            update_simulation_state(simulation=simulation, update_dict=result["merge"])
-            for i, task in enumerate(tasks):
-                update_task_state(task=task, update_dict=result["tasks"][i])
-
-            return yaptide_response(message="", code=200, content=result)
-
-        return error_internal_response()
+        terminate_unfinished_tasks.delay(simulation_id=simulation.id)
+        return yaptide_response(message="Cancelled sucessfully", code=200)
 
 
 class ResultsDirect(Resource):

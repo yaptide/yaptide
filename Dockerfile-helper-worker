@@ -19,4 +19,4 @@ RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only 
 # copy yaptide source code
 COPY yaptide ./yaptide
 
-CMD ["sh", "-c", "celery --app yaptide.utils.helper_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-helper-worker --queues helper"]
+CMD ["sh", "-c", "celery --app yaptide.utils.helper_worker worker --events --loglevel ${LOG_LEVEL_ROOT} --hostname yaptide-helper-worker --queues helper,helper-short"]

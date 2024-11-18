@@ -163,6 +163,17 @@ class BatchSimulationModel(SimulationModel):
         return db_commit_required
 
 
+def allowed_state_change(current_state: str, next_state: str):
+    """Ensures that no such change like Completed -> Canceled happens"""
+    return not (current_state in [EntityState.FAILED.value, EntityState.COMPLETED.value]
+                and next_state in [EntityState.CANCELED])
+
+
+def value_changed(current_value: str, new_value: str):
+    """checks if value from update_dict differs from object in database"""
+    return new_value and current_value != new_value
+
+
 class TaskModel(db.Model):
     """Simulation task model"""
 
@@ -205,11 +216,12 @@ class TaskModel(db.Model):
         """
         if self.task_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return
-        if "requested_primaries" in update_dict and self.requested_primaries != update_dict["requested_primaries"]:
+        if value_changed(self.requested_primaries, update_dict.get("requested_primaries")):
             self.requested_primaries = update_dict["requested_primaries"]
-        if "simulated_primaries" in update_dict and self.simulated_primaries != update_dict["simulated_primaries"]:
+        if value_changed(self.simulated_primaries, update_dict.get("simulated_primaries")):
             self.simulated_primaries = update_dict["simulated_primaries"]
-        if "task_state" in update_dict and self.task_state != update_dict["task_state"]:
+        if value_changed(self.task_state, update_dict.get("task_state")) and allowed_state_change(
+                self.task_state, update_dict["task_state"]):
             self.task_state = update_dict["task_state"]
             if self.task_state == EntityState.COMPLETED.value:
                 self.simulated_primaries = self.requested_primaries
