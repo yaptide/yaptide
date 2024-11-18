@@ -17,8 +17,7 @@ from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simul
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_internal_response, error_validation_response,
-                                                     yaptide_response)
+from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
@@ -163,6 +162,8 @@ class JobsDirect(Resource):
             task.celery_id for task in tasks
             if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
         ]
+
+        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceld. We don't want it to run.
         celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
         celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
         update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
@@ -170,7 +171,7 @@ class JobsDirect(Resource):
             if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
                 update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
-        terminate_unfinished_tasks.delay(celery_ids=celery_ids, simulation_id=simulation.id)
+        terminate_unfinished_tasks.delay(simulation_id=simulation.id)
         return yaptide_response(message="Cancelled sucessfully", code=200)
 
 

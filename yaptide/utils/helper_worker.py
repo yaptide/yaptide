@@ -7,6 +7,6 @@ celery_app = Celery("helper_worker",
                             'queue': 'helper'
                         },
                         'yaptide.utils.helper_tasks*': {
-                            'queue': 'helper'
+                            'queue': 'helper-short'
                         }
                     })
