@@ -4,6 +4,7 @@ from yaptide.routes.auth_routes import (AuthLogIn, AuthLogOut, AuthRefresh, Auth
 from yaptide.routes.batch_routes import Clusters, JobsBatch
 from yaptide.routes.celery_routes import ConvertResource, JobsDirect
 from yaptide.routes.common_sim_routes import (JobsResource, InputsResource, LogfilesResource, ResultsResource)
+from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
@@ -48,3 +49,4 @@ def initialize_routes(api: Api):
     api.add_resource(AuthKeycloak, "/auth/keycloak")
 
     api.add_resource(Clusters, "/clusters")
+    api.add_resource(EstimatorResource, "/estimators")
