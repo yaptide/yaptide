@@ -163,7 +163,7 @@ class JobsDirect(Resource):
             if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
         ]
 
-        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceld.
+        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
         # We don't want it to run accidentally.
         celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
         celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
