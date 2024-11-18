@@ -7,6 +7,7 @@ def terminate_unfinished_tasks(simulation_id):
     """Function for stopping tasks that wasn't finished with first try"""
     number_of_tasks = get_tasks_from_celery(simulation_id)
     previous_number_of_tasks = 0
+    # Wait until amount of active tasks doesn't fall
     while number_of_tasks != previous_number_of_tasks:
         previous_number_of_tasks = number_of_tasks
         sleep(1)
