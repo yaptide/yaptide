@@ -1,5 +1,5 @@
 import logging
-from typing import Union
+from typing import Optional, Union
 
 from sqlalchemy.orm import with_polymorphic
 
@@ -54,7 +54,7 @@ def fetch_simulation_by_job_id(job_id: str) -> Union[BatchSimulationModel, Celer
     return simulation
 
 
-def fetch_simulation_id_by_job_id(job_id: str) -> int:
+def fetch_simulation_id_by_job_id(job_id: str) -> Optional[int]:
     """Fetches simulation_id by job_id for both Celery and Batch simulations.
     Returns simulation_id if simulation exists,
     or None if no simulation is found.
@@ -121,7 +121,7 @@ def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
     return estimators
 
 
-def fetch_estimator_names_by_job_id(job_id: int) -> list[str]:
+def fetch_estimator_names_by_job_id(job_id: int) -> Optional[list[str]]:
     """Fetches estimators names by job id
     Returns a list of estimator names if the simulation exists,
     or None if no simulation is found for the provided job ID.

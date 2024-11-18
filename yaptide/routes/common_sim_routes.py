@@ -120,8 +120,11 @@ def get_all_estimators(sim_id: int):
     logging.debug("Returning results from database")
     result_estimators = []
     for estimator in estimators:
-        pages = fetch_pages_by_estimator_id(est_id=estimator.id)
-        estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
+        estimator_dict = {
+            "metadata": estimator.data,
+            "name": estimator.name,
+            "pages": [page.data for page in estimator.pages]
+        }
         result_estimators.append(estimator_dict)
     return yaptide_response(message=f"Results for simulation: {sim_id}",
                             code=200,
