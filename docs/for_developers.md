@@ -108,12 +108,12 @@ flowchart LR
     === "Linux"
 
     ```bash
-    PATH=$PATH:bin FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.utils.helper_worker worker --events --hostname yaptide-helper-worker --queues helper --loglevel=debug
+    PATH=$PATH:bin FLASK_SQLALCHEMY_DATABASE_URI=sqlite:///db.sqlite BACKEND_INTERNAL_URL=http://127.0.0.1:5000 CELERY_BROKER_URL=redis://127.0.0.1:6379/0 CELERY_RESULT_BACKEND=redis://127.0.0.1:6379/0 poetry run celery --app yaptide.utils.helper_worker worker --events --hostname yaptide-helper-worker --queues helper,helper-short --loglevel=debug
     ```
 
     === "Windows (PowerShell)"
     ```powershell
-    $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.utils.helper_worker worker --events --hostname yaptide-helper-worker --queues helper --loglevel=debug
+    $Env:PATH += ";" + (Join-Path -Path (Get-Location) -ChildPath "bin"); $env:FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///db.sqlite"; $env:BACKEND_INTERNAL_URL="http://127.0.0.1:5000"; $env:CELERY_BROKER_URL="redis://127.0.0.1:6379/0"; $env:CELERY_RESULT_BACKEND="redis://127.0.0.1:6379/0"; poetry run celery --app yaptide.utils.helper_worker worker --events --hostname yaptide-helper-worker --queues helper,helper-short --loglevel=debug
     ```
 
 

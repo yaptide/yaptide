@@ -171,28 +171,28 @@ uvloop = ["uvloop (>=0.15.2)"]
 
 [[package]]
 name = "blinker"
-version = "1.8.2"
+version = "1.9.0"
 description = "Fast, simple object-to-object and broadcast signaling"
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "blinker-1.8.2-py3-none-any.whl", hash = "sha256:1779309f71bf239144b9399d06ae925637cf6634cf6bd131104184531bf67c01"},
-    {file = "blinker-1.8.2.tar.gz", hash = "sha256:8f77b09d3bf7c795e969e9486f39c2c5e9c39d4ee07424be2bc594ece9642d83"},
+    {file = "blinker-1.9.0-py3-none-any.whl", hash = "sha256:ba0efaa9080b619ff2f3459d1d500c57bddea4a6b424b60a91141db6fd2f08bc"},
+    {file = "blinker-1.9.0.tar.gz", hash = "sha256:b4ce2265a7abece45e7cc896e98dbebe6cead56bcf805a3d23136d145f5445bf"},
 ]
 
 [[package]]
 name = "boto3"
-version = "1.35.56"
+version = "1.35.64"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "boto3-1.35.56-py3-none-any.whl", hash = "sha256:d04608cf40f429025eb66b52b835bdc333436022918788853ed0bbbba6dd2f09"},
-    {file = "boto3-1.35.56.tar.gz", hash = "sha256:6fcc510a4e747e85f84046b0ba0e5b178e89ba0f8ac9e2b6ebb4cc925c68c23b"},
+    {file = "boto3-1.35.64-py3-none-any.whl", hash = "sha256:cdacf03fc750caa3aa0dbf6158166def9922c9d67b4160999ff8fc350662facc"},
+    {file = "boto3-1.35.64.tar.gz", hash = "sha256:bc3fc12b41fa2c91e51ab140f74fb1544408a2b1e00f88a4c2369a66d18ddf20"},
 ]
 
 [package.dependencies]
-botocore = ">=1.35.56,<1.36.0"
+botocore = ">=1.35.64,<1.36.0"
 jmespath = ">=0.7.1,<2.0.0"
 s3transfer = ">=0.10.0,<0.11.0"
 
@@ -201,13 +201,13 @@ crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.35.56"
+version = "1.35.64"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "botocore-1.35.56-py3-none-any.whl", hash = "sha256:4be97f7bc1fbf33ad71ee1b678cea0ecf9638e61d5f566a46f261cde969dd690"},
-    {file = "botocore-1.35.56.tar.gz", hash = "sha256:8a9e752c8e87a423575ac528340a35d4318b8576ae4c6e0acfe5a3867f6bbccf"},
+    {file = "botocore-1.35.64-py3-none-any.whl", hash = "sha256:bbd96bf7f442b1d5e35b36f501076e4a588c83d8d84a1952e9ee1d767e5efb3e"},
+    {file = "botocore-1.35.64.tar.gz", hash = "sha256:2f95c83f31c9e38a66995c88810fc638c829790e125032ba00ab081a2cf48cb9"},
 ]
 
 [package.dependencies]
@@ -753,13 +753,13 @@ wmi = ["wmi (>=1.5.1)"]
 
 [[package]]
 name = "environs"
-version = "11.0.0"
+version = "11.2.0"
 description = "simplified environment variable parsing"
 optional = false
 python-versions = ">=3.8"
 files = [
-    {file = "environs-11.0.0-py3-none-any.whl", hash = "sha256:e0bcfd41c718c07a7db422f9109e490746450da38793fe4ee197f397b9343435"},
-    {file = "environs-11.0.0.tar.gz", hash = "sha256:069727a8f73d8ba8d033d3cd95c0da231d44f38f1da773bf076cef168d312ee8"},
+    {file = "environs-11.2.0-py3-none-any.whl", hash = "sha256:536fc3572fb32b67896bdf4a9fb77eceeeca85f873123268e3a035804fbff0e3"},
+    {file = "environs-11.2.0.tar.gz", hash = "sha256:87c5759dad117ebd36d8d10a24caf13ec1056b6cd42343a758b08ac6b9195be0"},
 ]
 
 [package.dependencies]
@@ -767,7 +767,7 @@ marshmallow = ">=3.13.0"
 python-dotenv = "*"
 
 [package.extras]
-dev = ["environs[tests]", "pre-commit (>=3.5,<4.0)", "tox"]
+dev = ["environs[tests]", "pre-commit (>=3.5,<5.0)", "tox"]
 django = ["dj-database-url", "dj-email-url", "django-cache-url"]
 tests = ["environs[django]", "pytest"]
 
@@ -841,22 +841,22 @@ typing = ["typing-extensions (>=4.12.2)"]
 
 [[package]]
 name = "flask"
-version = "3.0.3"
+version = "3.1.0"
 description = "A simple framework for building complex web applications."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.9"
 files = [
-    {file = "flask-3.0.3-py3-none-any.whl", hash = "sha256:34e815dfaa43340d1d15a5c3a02b8476004037eb4840b34910c6e21679d288f3"},
-    {file = "flask-3.0.3.tar.gz", hash = "sha256:ceb27b0af3823ea2737928a4d99d125a06175b8512c445cbd9a9ce200ef76842"},
+    {file = "flask-3.1.0-py3-none-any.whl", hash = "sha256:d667207822eb83f1c4b50949b1623c8fc8d51f2341d65f72e1a1815397551136"},
+    {file = "flask-3.1.0.tar.gz", hash = "sha256:5f873c5184c897c8d9d1b05df1e3d01b14910ce69607a117bd3277098a5836ac"},
 ]
 
 [package.dependencies]
-blinker = ">=1.6.2"
+blinker = ">=1.9"
 click = ">=8.1.3"
-importlib-metadata = {version = ">=3.6.0", markers = "python_version < \"3.10\""}
-itsdangerous = ">=2.1.2"
+importlib-metadata = {version = ">=3.6", markers = "python_version < \"3.10\""}
+itsdangerous = ">=2.2"
 Jinja2 = ">=3.1.2"
-Werkzeug = ">=3.0.0"
+Werkzeug = ">=3.1"
 
 [package.extras]
 async = ["asgiref (>=3.2)"]
@@ -1502,13 +1502,13 @@ mkdocs = ">=1.2"
 
 [[package]]
 name = "mkdocstrings"
-version = "0.26.2"
+version = "0.27.0"
 description = "Automatic documentation from sources, for MkDocs."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "mkdocstrings-0.26.2-py3-none-any.whl", hash = "sha256:1248f3228464f3b8d1a15bd91249ce1701fe3104ac517a5f167a0e01ca850ba5"},
-    {file = "mkdocstrings-0.26.2.tar.gz", hash = "sha256:34a8b50f1e6cfd29546c6c09fbe02154adfb0b361bb758834bf56aa284ba876e"},
+    {file = "mkdocstrings-0.27.0-py3-none-any.whl", hash = "sha256:6ceaa7ea830770959b55a16203ac63da24badd71325b96af950e59fd37366332"},
+    {file = "mkdocstrings-0.27.0.tar.gz", hash = "sha256:16adca6d6b0a1f9e0c07ff0b02ced8e16f228a9d65a37c063ec4c14d7b76a657"},
 ]
 
 [package.dependencies]
@@ -2631,13 +2631,13 @@ files = [
 
 [[package]]
 name = "werkzeug"
-version = "3.1.2"
+version = "3.1.3"
 description = "The comprehensive WSGI web application library."
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "werkzeug-3.1.2-py3-none-any.whl", hash = "sha256:4f7d1a5de312c810a8a2c6f0b47e9f6a7cffb7c8322def35e4d4d9841ff85597"},
-    {file = "werkzeug-3.1.2.tar.gz", hash = "sha256:f471a4cd167233077e9d2a8190c3471c5bc520c636a9e3c1e9300c33bced03bc"},
+    {file = "werkzeug-3.1.3-py3-none-any.whl", hash = "sha256:54b78bf3716d19a65be4fceccc0d1d7b89e608834989dfae50ea87564639213e"},
+    {file = "werkzeug-3.1.3.tar.gz", hash = "sha256:60723ce945c19328679790e3282cc758aa4a6040e4bb330f53d30fa546d44746"},
 ]
 
 [package.dependencies]
@@ -2762,4 +2762,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "63c9eb12a59d3e991060cd9f30425e20ef1f43f67d8a3e9cccd2e615b50d9afd"
+content-hash = "4d7e69dd5c77c4a7655c46b2668bd3b55b7733731ab89ed80a89c36af162571a"

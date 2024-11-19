@@ -79,6 +79,7 @@ services:
       dockerfile: Dockerfile-helper-worker
     image: yaptide_helper_worker
     container_name: yaptide_helper_worker
+    restart: unless-stopped
     deploy:
       resources:
         limits:

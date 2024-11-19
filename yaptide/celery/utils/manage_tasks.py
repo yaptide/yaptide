@@ -8,7 +8,12 @@ from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 
 
-def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, sim_type: str = 'shieldhit') -> str:
+def run_job(files_dict: dict,
+            update_key: str,
+            simulation_id: int,
+            ntasks: int,
+            celery_ids: list,
+            sim_type: str = 'shieldhit') -> str:
     """Runs asynchronous simulation job"""
     logging.debug("Starting run_simulation task for %d tasks", ntasks)
     logging.debug("Simulation id: %d", simulation_id)
@@ -19,13 +24,12 @@ def run_job(files_dict: dict, update_key: str, simulation_id: int, ntasks: int, 
             task_id=i,
             update_key=update_key,
             simulation_id=simulation_id,
-            sim_type=sim_type) for i in range(ntasks)
+            sim_type=sim_type).set(task_id=celery_ids[i]) for i in range(ntasks)
     ])
 
-    workflow = chord(map_group,
-                     merge_results.s().set(queue="simulations")
-                     )  # For tests to work: putting signature as second task in chord requires specifying queue
-
+    # By setup of simulation_worker all tasks from yaptide.celery.tasks are directed to simulations queue
+    # For tests to work: putting signature as second task in chord requires specifying queue
+    workflow = chord(map_group, merge_results.s().set(queue="simulations"))
     job: AsyncResult = workflow.delay()
 
     return job.id
@@ -55,35 +59,6 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
         "tasks": [get_task_status(job_id, "task_state") for job_id in celery_ids]
     }
 
-    return result
-
-
-def cancel_job(merge_id: str, celery_ids: list[str]) -> dict:
-    """Cancels simulation"""
-
-    def cancel_task(job_id: str, state_key: str) -> dict:
-        """Cancels (if possible) every task in the workflow"""
-        job = AsyncResult(id=job_id, app=celery_app)
-        job_state: str = translate_celery_state_naming(job.state)
-
-        if job_state in [EntityState.CANCELED.value, EntityState.COMPLETED.value, EntityState.FAILED.value]:
-            logging.warning("Cannot cancel job %s which is already %s", job_id, job_state)
-            return {state_key: job_state, "message": f"Job already {job_state}"}
-        try:
-            celery_app.control.revoke(job_id, terminate=True, signal="SIGINT")
-        except Exception as e:  # skipcq: PYL-W0703
-            logging.error("Cannot cancel job %s, due to %s", job_id, e)
-            return {
-                state_key: job_state,
-                "message": f"Cannot cancel job {job_id}, leaving at current state {job_state}"
-            }
-
-        return {state_key: EntityState.CANCELED.value, "message": f"Job {job_id} canceled"}
-
-    result = {
-        "merge": cancel_task(merge_id, "job_state"),
-        "tasks": [cancel_task(job_id, "task_state") for job_id in celery_ids]
-    }
     return result
 
 
