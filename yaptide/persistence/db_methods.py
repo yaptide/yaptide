@@ -141,9 +141,10 @@ def fetch_estimator_by_sim_id_and_est_name(sim_id: int, est_name: str) -> Estima
     return estimator
 
 
-def fetch_estimator_id_by_sim_id_and_est_name(sim_id: int, est_name: str) -> int:
+def fetch_estimator_id_by_sim_id_and_est_name(sim_id: int, est_name: str) -> int | None:
     """Fetches estimator_id by simulation id and estimator name"""
-    return db.session.query(EstimatorModel.id).filter_by(simulation_id=sim_id, name=est_name).first()[0]
+    estimator = db.session.query(EstimatorModel.id).filter_by(simulation_id=sim_id, name=est_name).first()
+    return estimator[0] if estimator else None
 
 
 def fetch_pages_by_estimator_id(est_id: int) -> list[PageModel]:

@@ -2,7 +2,6 @@ import logging
 from collections import Counter
 from datetime import datetime
 from typing import Union
-from typing import Union
 
 from flask import request, current_app as app
 from flask_restful import Resource
