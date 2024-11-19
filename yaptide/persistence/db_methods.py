@@ -161,9 +161,7 @@ def fetch_page_by_est_id_and_page_number(est_id: int, page_number: int) -> PageM
 def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> PageModel:
     """Fetches page by estimator id and page number"""
     pages = db.session.query(PageModel).filter(
-        and_(
-            PageModel.estimator_id == est_id,  # Ensure you reference the attribute correctly
-            PageModel.page_number.in_(page_numbers))).all()
+        and_(PageModel.estimator_id == est_id, PageModel.page_number.in_(page_numbers))).all()
     return pages
 
 

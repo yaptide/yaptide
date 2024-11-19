@@ -204,7 +204,7 @@ class ResultsResource(Resource):
         page_number = fields.Integer(load_default=None)
 
         class Meta:
-            # Include unknown fields
+            # Include unknown fields. Needed to pass page_numbers as List
             unknown = INCLUDE
 
     @staticmethod

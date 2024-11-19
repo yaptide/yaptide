@@ -1393,7 +1393,7 @@ components:
             description: Page object
     Page:
       type: object
-      description: Page object includes .
+      description: Includes page data.
     UpdateJobs:
       type: object
       required:
