@@ -179,7 +179,8 @@ class ResultsResource(Resource):
                     # create new page
                     page = PageModel(page_number=int(page_dict["metadata"]["page_number"]),
                                      estimator_id=estimator.id,
-                                     page_dimension=int(page_dict['dimensions']))
+                                     page_dimension=int(page_dict['dimensions']),
+                                     page_name=str(page_dict["metadata"]["name"]))
                 # we always update the data
                 page.data = page_dict
                 if not page_existed:

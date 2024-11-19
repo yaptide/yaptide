@@ -44,10 +44,12 @@ class EstimatorResource(Resource):
         for estimator in estimators:
             pages_metadata = fetch_pages_metadata_by_est_id(est_id=estimator.id)
             estimator_dict = {
-                "name": estimator.name,
+                "name":
+                estimator.name,
                 "pages_metadata": [{
                     "page_number": page[0],
-                    "page_dimension": page[1]
+                    "page_name": page[1],
+                    "page_dimension": page[2]
                 } for page in pages_metadata]
             }
             results.append(estimator_dict)

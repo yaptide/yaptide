@@ -229,7 +229,8 @@ class ResultsDirect(Resource):
             for page_dict in estimator_dict["pages"]:
                 page = PageModel(estimator_id=estimator.id,
                                  page_number=int(page_dict["metadata"]["page_number"]),
-                                 page_dimension=int(page_dict['dimensions']))
+                                 page_dimension=int(page_dict['dimensions']),
+                                 page_name=str(page_dict["metadata"]["name"]))
                 page.data = page_dict
                 add_object_to_db(page, False)
             make_commit_to_db()

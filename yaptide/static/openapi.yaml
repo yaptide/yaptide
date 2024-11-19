@@ -905,12 +905,6 @@ paths:
           schema:
             type: string
         - in: query
-          name: estimator_name
-          required: false
-          description: Name of a specific estimator to retrieve results for
-          schema:
-            type: string
-        - in: query
           name: page_number
           required: false
           description: Number of a single page to retrieve.
@@ -1027,6 +1021,8 @@ paths:
                                 type: integer
                               page_dimension:
                                 type: integer
+                              page_name:
+                                type: string
         '400':
           description: Bad Request - Missing parameters
           content:
@@ -1148,67 +1144,6 @@ paths:
                   logfiles:
                     type: object
                     description: dict of log files with names as keys and content as values.
-        '400':
-          description: Bad Request - Missing parameters
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '401':
-          description: Unauthorized - Invalid credentials
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '403':
-          description: Forbidden - User not found, log in required, token refresh required or job with provided ID does not belong to the user
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '404':
-          description: Job with provided ID does not exist
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/BasicResponse'
-  /page:
-    get:
-      summary: Retrieve pages metadata for a specific estimator
-      parameters:
-        - in: query
-          name: job_id
-          schema:
-            type: string
-        - in: query
-          name: estimator_name
-          schema:
-            type: string
-      responses:
-        '200':
-          description: Includes metadata for the specified estimator's pages.
-          content:
-            application/json:
-              schema:
-                type: object
-                properties:
-                  message:
-                    type: string
-                  pages_metadata:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        page_number:
-                          type: integer
-                        page_dimension:
-                          type: string
         '400':
           description: Bad Request - Missing parameters
           content:

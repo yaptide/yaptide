@@ -169,7 +169,7 @@ def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> P
 
 def fetch_pages_metadata_by_est_id(est_id: str) -> EstimatorModel:
     """Fetches estimator by simulation id and estimator name"""
-    pages_metadata = db.session.query(PageModel.page_number,
+    pages_metadata = db.session.query(PageModel.page_number, PageModel.page_name,
                                       PageModel.page_dimension).filter_by(estimator_id=est_id).all()
     return pages_metadata
 
