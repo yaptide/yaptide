@@ -40,16 +40,6 @@ pytest-dotenv = "0.5.2"
 black = "24.10.0"
 
 
-[tool.poetry.group.docs.dependencies]
-mkdocs = "1.5.3"
-mkdocs-coverage = "1.0.0"
-mkdocstrings = {version = ">=0.18", extras = ["python"]}
-mkdocs-material = "9.5.18"
-mkdocs-gen-files = "0.5.0"
-mkdocs-literate-nav = "0.6.1"
-mkdocs-section-index = "0.3.9"
-mkdocs-render-swagger-plugin = "0.1.2"
-
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
