@@ -15,6 +15,10 @@ There are two main ways of build and run the app
 - [Using Docker](https://yaptide.github.io/for_developers/backend/using_docker/). Used for the deployment, takes more time.
 
 
+## User documentation
+
+ - [User documentation](https://yaptide.github.io/docs/)
+
 ## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
