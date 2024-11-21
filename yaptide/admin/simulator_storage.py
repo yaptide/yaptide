@@ -11,18 +11,17 @@ import boto3
 import click
 import cryptography
 import requests
+from botocore.config import Config
 from botocore.exceptions import (ClientError, EndpointConnectionError, NoCredentialsError)
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
-from botocore.config import Config
-
 custom_config = Config(
     read_timeout=10,  # 10 seconds read timeout
     connect_timeout=5,  # 5 seconds connection timeout
     retries={
-        'max_attempts': 10,  # Default max retries for 'adaptive' mode is usually 3
+        'max_attempts': 20,  # Default max retries for 'adaptive' mode is usually 3
         'mode': 'adaptive'  # Adaptive retry mode
     },
 )
@@ -138,7 +137,13 @@ def download_shieldhit_from_s3(
                              config=custom_config)
 
     if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
-        return False
+        s3_client = boto3.client("s3",
+                                 aws_access_key_id=access_key,
+                                 aws_secret_access_key=secret_key,
+                                 endpoint_url="https://149.156.237.14",
+                                 config=custom_config)
+        if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
+            return False
 
     destination_file_path = destination_dir / 'shieldhit'
     # append '.exe' to file name if working on Windows
@@ -201,8 +206,14 @@ def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, s
                              endpoint_url=endpoint,
                              config=custom_config)
 
-    if not validate_connection_data(bucket, key, s3_client):
-        return False
+    if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
+        s3_client = boto3.client("s3",
+                                 aws_access_key_id=access_key,
+                                 aws_secret_access_key=secret_key,
+                                 endpoint_url="https://149.156.237.14",
+                                 config=custom_config)
+        if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
+            return False
 
     # Download TOPAS tar
     topas_temp_file = tempfile.NamedTemporaryFile()
@@ -320,8 +331,14 @@ def download_fluka_from_s3(download_dir: Path, endpoint: str, access_key: str, s
                              endpoint_url=endpoint,
                              config=custom_config)
 
-    if not validate_connection_data(bucket, key, s3_client):
-        return False
+    if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
+        s3_client = boto3.client("s3",
+                                 aws_access_key_id=access_key,
+                                 aws_secret_access_key=secret_key,
+                                 endpoint_url="https://149.156.237.14",
+                                 config=custom_config)
+        if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
+            return False
 
     with tempfile.TemporaryDirectory() as tmpdir_name:
         tmp_dir = Path(tmpdir_name).resolve()
