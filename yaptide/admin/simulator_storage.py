@@ -140,7 +140,7 @@ def download_shieldhit_from_s3(
         s3_client = boto3.client("s3",
                                  aws_access_key_id=access_key,
                                  aws_secret_access_key=secret_key,
-                                 endpoint_url="https://149.156.237.14",
+                                 endpoint_url="https://149.156.237.13",
                                  config=custom_config)
         if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
             return False
@@ -210,7 +210,7 @@ def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, s
         s3_client = boto3.client("s3",
                                  aws_access_key_id=access_key,
                                  aws_secret_access_key=secret_key,
-                                 endpoint_url="https://149.156.237.14",
+                                 endpoint_url="https://149.156.237.13",
                                  config=custom_config)
         if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
             return False
@@ -335,7 +335,7 @@ def download_fluka_from_s3(download_dir: Path, endpoint: str, access_key: str, s
         s3_client = boto3.client("s3",
                                  aws_access_key_id=access_key,
                                  aws_secret_access_key=secret_key,
-                                 endpoint_url="https://149.156.237.14",
+                                 endpoint_url="https://149.156.237.13",
                                  config=custom_config)
         if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
             return False
