@@ -22,10 +22,9 @@ custom_config = Config(
     read_timeout=10,  # 10 seconds read timeout
     connect_timeout=5,  # 5 seconds connection timeout
     retries={
-        'max_attempts': 3,  # Default max retries for 'adaptive' mode is usually 3
+        'max_attempts': 10,  # Default max retries for 'adaptive' mode is usually 3
         'mode': 'adaptive'  # Adaptive retry mode
     },
-    use_dualstack_endpoint=True  # Enable IPv6/IPv4 dual-stack endpoints
 )
 
 
