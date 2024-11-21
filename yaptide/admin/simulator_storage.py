@@ -16,6 +16,18 @@ from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+from botocore.config import Config
+
+custom_config = Config(
+    read_timeout=10,  # 10 seconds read timeout
+    connect_timeout=5,  # 5 seconds connection timeout
+    retries={
+        'max_attempts': 3,  # Default max retries for 'adaptive' mode is usually 3
+        'mode': 'adaptive'  # Adaptive retry mode
+    },
+    use_dualstack_endpoint=True  # Enable IPv6/IPv4 dual-stack endpoints
+)
+
 
 class SimulatorType(IntEnum):
     """Simulator types"""
@@ -123,7 +135,8 @@ def download_shieldhit_from_s3(
     s3_client = boto3.client("s3",
                              aws_access_key_id=access_key,
                              aws_secret_access_key=secret_key,
-                             endpoint_url=endpoint)
+                             endpoint_url=endpoint,
+                             config=custom_config)
 
     if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
         return False
@@ -186,7 +199,8 @@ def download_topas_from_s3(download_dir: Path, endpoint: str, access_key: str, s
     s3_client = boto3.client("s3",
                              aws_access_key_id=access_key,
                              aws_secret_access_key=secret_key,
-                             endpoint_url=endpoint)
+                             endpoint_url=endpoint,
+                             config=custom_config)
 
     if not validate_connection_data(bucket, key, s3_client):
         return False
@@ -304,7 +318,8 @@ def download_fluka_from_s3(download_dir: Path, endpoint: str, access_key: str, s
     s3_client = boto3.client("s3",
                              aws_access_key_id=access_key,
                              aws_secret_access_key=secret_key,
-                             endpoint_url=endpoint)
+                             endpoint_url=endpoint,
+                             config=custom_config)
 
     if not validate_connection_data(bucket, key, s3_client):
         return False
@@ -339,12 +354,11 @@ def upload_file_to_s3(bucket: str,
                       encryption_salt: str = '') -> bool:
     """Upload file to S3 bucket"""
     # Create S3 client
-    s3_client = boto3.client(
-        "s3",
-        aws_access_key_id=access_key,
-        aws_secret_access_key=secret_key,
-        endpoint_url=endpoint,
-    )
+    s3_client = boto3.client("s3",
+                             aws_access_key_id=access_key,
+                             aws_secret_access_key=secret_key,
+                             endpoint_url=endpoint,
+                             config=custom_config)
     if not check_if_s3_connection_is_working(s3_client):
         click.echo("S3 connection failed", err=True)
         return False
