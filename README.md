@@ -1,5 +1,9 @@
 # yaptide backend
 
+## User documentation
+ - [User documentation](https://yaptide.github.io/docs/)
+
+
 ## Getting the code
 
 Clone the repository:
@@ -14,10 +18,6 @@ There are two main ways of build and run the app
 - [For developers](https://yaptide.github.io/for_developers/backend/for_developers/), which is setting up all components manually. It is faster then Docker.
 - [Using Docker](https://yaptide.github.io/for_developers/backend/using_docker/). Used for the deployment, takes more time.
 
-
-## User documentation
-
- - [User documentation](https://yaptide.github.io/docs/)
 
 ## Credits
 
