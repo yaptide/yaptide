@@ -132,6 +132,8 @@ def download_shieldhit_from_s3(
     # append '.exe' to file name if working on Windows
     if platform.system() == 'Windows':
         destination_file_path = destination_dir / 'shieldhit.exe'
+    if not destination_file_path.exists():
+        destination_file_path.mkdir(parents=True, exist_ok=True)
 
     download_and_decrypt_status = download_file(key=key,
                                                 bucket=bucket,
