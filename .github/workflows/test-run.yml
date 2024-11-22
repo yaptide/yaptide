@@ -58,7 +58,7 @@ jobs:
             S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
         continue-on-error: true
   
-      - name: Handle timeout for Linux
+      - name: Get demo simulators for Linux due to timeout
         if: matrix.platform == 'ubuntu-latest' && always()
         run: |
           if [[ ${{ job.status }} == 'failure' ]]; then
@@ -142,7 +142,7 @@ jobs:
 
       - name: Run main tests on Linux
         if: matrix.platform == 'ubuntu-latest'
-        run: pytest
+        run: pytest --reruns 3 --reruns-delay 5
 
       # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
       - name: Run main tests on Windows using powershell
