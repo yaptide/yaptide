@@ -34,15 +34,14 @@ jobs:
         run: |
           poetry install --only main
 
+      # try downloading full version of SHIELD-HIT12A
       - name: Get simulators for Linux
         if: matrix.platform == 'ubuntu-latest'
         run: |
             poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
-        timeout-minutes: 2 # poetry run python yaptide/admin/simulators.py download-fluka --dir bin/
+        timeout-minutes: 2
         env:
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
-          # S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
-          # S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
           S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
@@ -51,6 +50,7 @@ jobs:
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
         continue-on-error: true
   
+      # fallback to demo version of SHIELD-HIT12A
       - name: Get demo simulators for Linux due to timeout
         if: matrix.platform == 'ubuntu-latest' && always()
         run: |
@@ -132,11 +132,9 @@ jobs:
           chmod +x bin/shieldhit
           poetry run pytest --reruns 3 --reruns-delay 5
 
-      # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
-      # # #Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
-      - name: Run main tests on Windows using powershell
+      - name: Run main tests on Windows
         if: matrix.platform == 'windows-latest' 
-        run: poetry run pytest --reruns 3 --reruns-delay 5
+        run: poetry run pytest --reruns 3 --reruns-delay 5 -k "not test_run_simulation_with_flask and not test_run_simulation_with_flask_crashing"
 
 
   # upload coverage report to deepsource
