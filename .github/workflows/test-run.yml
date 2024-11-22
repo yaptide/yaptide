@@ -18,7 +18,7 @@ env:
   S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
 
 jobs:
-  get-simulators-linux:
+  get-simulators:
     env:
       POETRY_VIRTUALENVS_CREATE: false
     runs-on:  ${{ matrix.platform }}
@@ -61,7 +61,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         run: |
           poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
-        timeout-minutes: 3
+        timeout-minutes: 2
         env:
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
@@ -85,26 +85,37 @@ jobs:
           name: simulators-windows
           path: bin/
           retention-days: 1
-  # build-and-test:
-  #   runs-on:  ${{ matrix.platform }}
-  #   env:
-  #     POETRY_VIRTUALENVS_CREATE: false
-  #   strategy:
-  #     matrix:
-  #       python-version: ['3.9', '3.10', '3.11', '3.12']
-  #       platform: ['ubuntu-latest']
-  #       include:
-  #         - python-version: '3.12'
-  #           platform: 'windows-latest'
 
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
+  build-and-test:
+    runs-on:  ${{ matrix.platform }}
+    env:
+      POETRY_VIRTUALENVS_CREATE: false
+    strategy:
+      matrix:
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        platform: ['ubuntu-latest']
+        include:
+          - python-version: '3.12'
+            platform: 'windows-latest'
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: ${{ matrix.python-version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Download simulators
+        uses: actions/download-artifact@v2
+        with:
+          name: simulators-${{ matrix.platform }}
+          path: bin/
+
+      - name: Check what was downloaded
+        run: ls -l bin/
+        
   #     - name: Update pip and install poetry
   #       run: |
   #         python3 -m pip install --upgrade pip
