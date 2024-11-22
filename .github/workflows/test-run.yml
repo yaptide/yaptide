@@ -66,17 +66,7 @@ jobs:
           poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
         timeout-minutes: 2
 
-      - name: Upload artifacts for Linux
-        if: matrix.platform == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: simulators-${{ matrix.platform }}
-          path: bin/
-          if-no-files-found: error
-          retention-days: 1
-
-      - name: Upload artifacts for Windows
-        if: matrix.platform == 'windows-latest'
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: simulators-${{ matrix.platform }}
@@ -112,19 +102,16 @@ jobs:
           name: simulators-${{ matrix.platform }}
           path: bin/
 
-      - name: Check what was downloaded
-        run: ls -l bin/
-
       - name: Update pip and install poetry
         run: |
           python3 -m pip install --upgrade pip
           pip install poetry
+
       - name: Install dependencies for production
-        run: |
-          poetry install --only main
+        run: poetry install --only main
+
       - name: Install dependencies for tests
-        run: |
-          poetry install --only test
+        run: poetry install --only test
 
       - name: Run main tests on Linux
         if: matrix.platform == 'ubuntu-latest'
