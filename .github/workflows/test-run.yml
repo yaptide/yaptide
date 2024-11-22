@@ -49,10 +49,10 @@ jobs:
         run: poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: simulators-linux
-  #         path: bin/
+          path: bin/
 
   # build-and-test:
   #   runs-on:  ${{ matrix.platform }}
