@@ -47,6 +47,7 @@ jobs:
 
       - name: Get simulators
         run: poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
+        timeout-minutes: 1
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
