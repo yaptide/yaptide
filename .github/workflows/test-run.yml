@@ -79,7 +79,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: simulators-linux
+          name: simulators-${{ matrix.platform }}
           path: bin/
           retention-days: 1
 
@@ -87,7 +87,7 @@ jobs:
         if: matrix.platform == 'windows-latest'
         uses: actions/upload-artifact@v4
         with:
-          name: simulators-windows
+          name: simulators-${{ matrix.platform }}
           path: bin/
           retention-days: 1
 
