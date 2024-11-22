@@ -38,12 +38,11 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
             poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
-            poetry run python yaptide/admin/simulators.py download-fluka --dir bin/
-        timeout-minutes: 2
+        timeout-minutes: 2 # poetry run python yaptide/admin/simulators.py download-fluka --dir bin/
         env:
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
-          S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
-          S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
+          # S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
+          # S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
           S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
@@ -131,13 +130,13 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         run: |
           chmod +x bin/shieldhit
-          pytest --reruns 3 --reruns-delay 5
+          poetry run pytest --reruns 3 --reruns-delay 5
 
       # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
+      # # #Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
       - name: Run main tests on Windows using powershell
-        if: matrix.platform == 'windows-latest'
-        run: |
-          Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
+        if: matrix.platform == 'windows-latest' 
+        run: poetry run pytest --reruns 3 --reruns-delay 5
 
 
   # upload coverage report to deepsource
@@ -163,17 +162,18 @@ jobs:
       - name: Install deepsource CLI
         run: curl https://deepsource.io/cli | sh
 
-      # - name: Generate tests coverage report
-      #   env:
-      #     S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-      #     S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-      #     S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-      #     S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-      #     S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-      #     S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-      #   run: poetry run pytest --cov=./ --cov-report xml
+      - name: Download simulators
+        uses: actions/download-artifact@v4
+        with:
+          name: simulators-ubuntu-latest
+          path: bin/
 
-      # - name: Upload coverage report to deepsource
-      #   run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
-      #   env:
-      #     DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+      - name: Generate tests coverage report
+        run: |
+          chmod +x bin/shieldhit
+          poetry run pytest --cov=./ --cov-report xml
+
+      - name: Upload coverage report to deepsource
+        run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
+        env:
+          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
