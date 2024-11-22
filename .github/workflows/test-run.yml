@@ -18,67 +18,15 @@ env:
   S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
 
 jobs:
-  build-and-test:
-    runs-on:  ${{ matrix.platform }}
+  get-simulators-linux:
     env:
-      POETRY_VIRTUALENVS_CREATE: false
-    strategy:
-      matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
-        platform: ['ubuntu-latest']
-        include:
-          - python-version: '3.12'
-            platform: 'windows-latest'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
-      - name: Update pip and install poetry
-        run: |
-          python3 -m pip install --upgrade pip
-          pip install poetry
-      - name: Install dependencies for production
-        run: |
-          poetry install --only main
-      - name: Install dependencies for tests
-        run: |
-          poetry install --only test
-
-      - name: Run main tests on Linux
-        if: matrix.platform == 'ubuntu-latest'
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest
-
-      # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
-      - name: Run main tests on Windows using powershell
-        if: matrix.platform == 'windows-latest'
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
-        run: |
-          Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
-
-
-  # upload coverage report to deepsource
-  report-test-converage-deepsource:
-    needs: build-and-test
+      S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+      S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+      S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+      S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+      S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+      S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -88,26 +36,114 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Install dependencies for production and test
+      - name: Update pip and install poetry
         run: |
           python3 -m pip install --upgrade pip
           pip install poetry
-          poetry install --only main,test
 
-      - name: Install deepsource CLI
-        run: curl https://deepsource.io/cli | sh
+      - name: Install dependencies for production
+        run: |
+          poetry install --only main
 
-      - name: Generate tests coverage report
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: poetry run pytest --cov=./ --cov-report xml
+      - name: Get simulators
+        run: poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
 
-      - name: Upload coverage report to deepsource
-        run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
-        env:
-          DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: simulators-linux
+  #         path: bin/
+
+  # build-and-test:
+  #   runs-on:  ${{ matrix.platform }}
+  #   env:
+  #     POETRY_VIRTUALENVS_CREATE: false
+  #   strategy:
+  #     matrix:
+  #       python-version: ['3.9', '3.10', '3.11', '3.12']
+  #       platform: ['ubuntu-latest']
+  #       include:
+  #         - python-version: '3.12'
+  #           platform: 'windows-latest'
+
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: ${{ matrix.python-version }}
+  #     - name: Update pip and install poetry
+  #       run: |
+  #         python3 -m pip install --upgrade pip
+  #         pip install poetry
+  #     - name: Install dependencies for production
+  #       run: |
+  #         poetry install --only main
+  #     - name: Install dependencies for tests
+  #       run: |
+  #         poetry install --only test
+
+  #     - name: Run main tests on Linux
+  #       if: matrix.platform == 'ubuntu-latest'
+  #       env:
+  #         S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+  #         S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+  #         S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+  #         S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+  #         S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+  #         S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
+  #       run: pytest
+
+  #     # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
+  #     - name: Run main tests on Windows using powershell
+  #       if: matrix.platform == 'windows-latest'
+  #       env:
+  #         S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+  #         S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+  #         S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+  #         S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+  #         S3_SHIELDHIT_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_BUCKET }}
+  #         S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
+  #       run: |
+  #         Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
+
+
+  # # upload coverage report to deepsource
+  # report-test-converage-deepsource:
+  #   needs: build-and-test
+  #   runs-on: ubuntu-latest
+  #   if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+  #   steps:
+  #     - name: Checkout
+  #       uses: actions/checkout@v4
+
+  #     - name: Setup Python
+  #       uses: actions/setup-python@v5
+  #       with:
+  #         python-version: '3.12'
+
+  #     - name: Install dependencies for production and test
+  #       run: |
+  #         python3 -m pip install --upgrade pip
+  #         pip install poetry
+  #         poetry install --only main,test
+
+  #     - name: Install deepsource CLI
+  #       run: curl https://deepsource.io/cli | sh
+
+  #     - name: Generate tests coverage report
+  #       env:
+  #         S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+  #         S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+  #         S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+  #         S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+  #         S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+  #         S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
+  #       run: poetry run pytest --cov=./ --cov-report xml
+
+  #     - name: Upload coverage report to deepsource
+  #       run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
+  #       env:
+  #         DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
