@@ -8,15 +8,6 @@ on:
 
   workflow_dispatch:
 
-env:
-  S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
-  S3_TOPAS_KEY: ${{ vars.S3_TOPAS_KEY }}
-  S3_TOPAS_VERSION: ${{ vars.S3_TOPAS_VERSION }}
-  S3_TOPAS_BUCKET: ${{ vars.S3_TOPAS_BUCKET }}
-  S3_GEANT4_BUCKET: ${{ vars.S3_GEANT4_BUCKET }}
-  S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
-  S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
-
 jobs:
   get-simulators:
     env:
@@ -50,12 +41,15 @@ jobs:
             poetry run python yaptide/admin/simulators.py download-fluka --dir bin/
         timeout-minutes: 2
         env:
-            S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-            S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-            S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-            S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-            S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-            S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
+          S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+          S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
+          S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+          S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
         continue-on-error: true
   
       - name: Get demo simulators for Linux due to timeout
@@ -67,18 +61,11 @@ jobs:
           fi
         timeout-minutes: 2
   
-      - name: Get simulators for Windows
+      - name: Get demo simulator for Windows
         if: matrix.platform == 'windows-latest'
         run: |
-          poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
+          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
         timeout-minutes: 2
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
 
       - name: Upload artifacts for Linux
         if: matrix.platform == 'ubuntu-latest'
@@ -151,40 +138,40 @@ jobs:
           Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 
 
-  # # upload coverage report to deepsource
-  # report-test-converage-deepsource:
-  #   needs: build-and-test
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-  #   steps:
-  #     - name: Checkout
-  #       uses: actions/checkout@v4
+  # upload coverage report to deepsource
+  report-test-converage-deepsource:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-  #     - name: Setup Python
-  #       uses: actions/setup-python@v5
-  #       with:
-  #         python-version: '3.12'
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-  #     - name: Install dependencies for production and test
-  #       run: |
-  #         python3 -m pip install --upgrade pip
-  #         pip install poetry
-  #         poetry install --only main,test
+      - name: Install dependencies for production and test
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install poetry
+          poetry install --only main,test
 
-  #     - name: Install deepsource CLI
-  #       run: curl https://deepsource.io/cli | sh
+      - name: Install deepsource CLI
+        run: curl https://deepsource.io/cli | sh
 
-  #     - name: Generate tests coverage report
-  #       env:
-  #         S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-  #         S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-  #         S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-  #         S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-  #         S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-  #         S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-  #       run: poetry run pytest --cov=./ --cov-report xml
+      # - name: Generate tests coverage report
+      #   env:
+      #     S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+      #     S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+      #     S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+      #     S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+      #     S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+      #     S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
+      #   run: poetry run pytest --cov=./ --cov-report xml
 
-  #     - name: Upload coverage report to deepsource
-  #       run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
-  #       env:
-  #         DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
+      # - name: Upload coverage report to deepsource
+      #   run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml
+      #   env:
+      #     DEEPSOURCE_DSN: ${{ secrets.DEEPSOURCE_DSN }}
