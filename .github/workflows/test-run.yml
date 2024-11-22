@@ -48,7 +48,7 @@ jobs:
         run: |
           poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
           poetry run python yaptide/admin/simulators.py download-fluka --dir bin/
-        timeout-minutes: 3
+        timeout-minutes: 2
         env:
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
@@ -88,6 +88,7 @@ jobs:
 
   build-and-test:
     runs-on:  ${{ matrix.platform }}
+    needs: get-simulators
     env:
       POETRY_VIRTUALENVS_CREATE: false
     strategy:
@@ -108,14 +109,14 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download simulators
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
 
       - name: Check what was downloaded
         run: ls -l bin/
-        
+
   #     - name: Update pip and install poetry
   #       run: |
   #         python3 -m pip install --upgrade pip
