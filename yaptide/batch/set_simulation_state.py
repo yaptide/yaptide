@@ -26,6 +26,7 @@ def send_request(simulation_id: int, backend_url: str, simulation_state: str):
 
 class EntityState(Enum):
     """Job state types"""
+
     UNKNOWN = "UNKNOWN"
     PENDING = "PENDING"
     RUNNING = "RUNNING"
