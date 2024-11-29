@@ -130,11 +130,14 @@ def submit_job(  # skipcq: PY-R1000
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
     RESULT_SENDER_SCRIPT = Path(__file__).parent.resolve() / "result_sender.py"
+    SET_SIMULATION_STATE_SCRIPT = Path(__file__).parent.resolve() / "set_simulation_state.py"
 
     logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
     logging.debug("Transfering result sender script %s to %s", RESULT_SENDER_SCRIPT, job_dir)
     con.put(RESULT_SENDER_SCRIPT, job_dir)
+    logging.debug("Transfering set simulation state script %s to %s", SET_SIMULATION_STATE_SCRIPT, job_dir)
+    con.put(SET_SIMULATION_STATE_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(payload_dict=payload_dict,
                                                  job_dir=job_dir,
@@ -259,10 +262,12 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
         return {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     if collect_state == "RUNNING":
         logging.debug("Collect job is in RUNNING state")
+        return {"job_state": EntityState.MERGING_RUNNING.value}
+    if job_state == "COMPLETED" and collect_state == "PENDING":
+        logging.debug("Collect job is in PENDING state")
+        return {"job_state": EntityState.MERGING_QUEUED.value}
     if job_state == "RUNNING":
         logging.debug("Main job is in RUNNING state")
-    if collect_state == "PENDING":
-        logging.debug("Collect job is in PENDING state")
     if job_state == "PENDING":
         logging.debug("Main job is in PENDING state")
 

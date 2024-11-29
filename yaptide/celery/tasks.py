@@ -7,6 +7,7 @@ from pathlib import Path
 import threading
 from typing import Optional
 
+from yaptide.batch.batch_methods import post_update
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
                                        get_tmp_dir, read_file, read_file_offline, read_fluka_file)
@@ -221,12 +222,16 @@ def merge_results(results: list[dict]) -> dict:
 
     averaged_estimators = None
     simulation_id = results[0].pop("simulation_id", None)
-    update_key = results[0].pop("simulation_id", None)
+    update_key = results[0].pop("update_key", None)
+    state_updated = False
     for i, result in enumerate(results):
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
         if update_key is None:
             update_key = result.pop("update_key", None)
+        if not state_updated and simulation_id is not None:
+            dict_to_send = {"sim_id": simulation_id, "job_state": EntityState.MERGING_RUNNING.value}
+            post_update(dict_to_send)
         if "logfiles" in result:
             logfiles.update(result["logfiles"])
             continue

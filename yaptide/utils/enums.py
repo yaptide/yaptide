@@ -30,6 +30,15 @@ class EntityState(Enum):
     """
     Jobs and tasks in this state are currently running.
     """
+    MERGING_QUEUED = "MERGING_QUEUED"
+    """
+    All the tasks completed they work.
+    The process to merge their output is queued and waiting for execution.
+    """
+    MERGING_RUNNING = "MERGING_RUNNING"
+    """
+    Merging process started its execution and is aggregating the simulation results.
+    """
     CANCELED = "CANCELED"
     """
     Jobs and tasks in this state are canceled.

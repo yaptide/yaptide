@@ -55,7 +55,8 @@ class JobsResource(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value,
+                                    EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -71,6 +72,8 @@ class JobsResource(Resource):
             job_info["job_state"] = EntityState.FAILED.value
         elif status_counter[EntityState.RUNNING.value] > 0:
             job_info["job_state"] = EntityState.RUNNING.value
+        elif status_counter[EntityState.COMPLETED.value] == len(job_tasks_status):
+            job_info["job_state"] = EntityState.MERGING_QUEUED.value
 
         update_simulation_state(simulation=simulation, update_dict=job_info)
 
@@ -90,7 +93,7 @@ class JobsResource(Resource):
             app.logger.info(f"sim_id {sim_id} simulation not found ")
             return yaptide_response(message=f"Simulation {sim_id} does not exist", code=501)
         update_simulation_state(simulation, payload_dict)
-        if payload_dict["log"]:
+        if payload_dict.get("log"):
             logfiles = LogfilesModel(simulation_id=simulation.id)
             logfiles.data = payload_dict["log"]
             add_object_to_db(logfiles)
