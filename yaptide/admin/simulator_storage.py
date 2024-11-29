@@ -128,6 +128,9 @@ def download_shieldhit_from_s3(
     if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
         return False
 
+    if not destination_dir.exists():
+        destination_dir.mkdir(parents=True, exist_ok=True)
+
     destination_file_path = destination_dir / 'shieldhit'
     # append '.exe' to file name if working on Windows
     if platform.system() == 'Windows':

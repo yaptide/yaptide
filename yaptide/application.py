@@ -3,7 +3,6 @@ import os
 from flask import Flask
 from flask_restful import Api
 from flask_migrate import Migrate
-from flask_swagger_ui import get_swaggerui_blueprint
 from yaptide.persistence.models import create_all
 from yaptide.persistence.database import db
 from yaptide.routes.main_routes import initialize_routes
@@ -44,13 +43,6 @@ def create_app():
         }
 
         CORS(app, **cors_config)
-
-    SWAGGER_URL = '/api/docs'
-    API_URL = '/static/openapi.yaml'
-
-    swaggerui_blueprint = get_swaggerui_blueprint(SWAGGER_URL, API_URL, config={'app_name': "yaptide"})
-
-    app.register_blueprint(swaggerui_blueprint)
 
     app.logger.info(f"Initializing Flask to use SQLAlchemy ORM @ {app.config['SQLALCHEMY_DATABASE_URI']}")
     db.init_app(app)
