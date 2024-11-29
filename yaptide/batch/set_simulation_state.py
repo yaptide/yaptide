@@ -4,15 +4,12 @@ import json
 import logging
 import signal
 import ssl
-from pathlib import Path
 from urllib import request
 
 
-def send_request(simulation_id: int, backend_url: str, state: str):
+def send_request(simulation_id: int, backend_url: str, simulation_state: str):
     """Sends simulation state to backend"""
-
-    dict_to_send = {"sim_id": simulation_id, "job_state": state.value}
-
+    dict_to_send = {"sim_id": simulation_id, "job_state": simulation_state.value}
     jobs_url = f"{backend_url}/jobs"
     context = ssl.SSLContext()
 
@@ -28,6 +25,7 @@ def send_request(simulation_id: int, backend_url: str, state: str):
 
 
 class EntityState(Enum):
+    """Job state types"""
     UNKNOWN = "UNKNOWN"
     PENDING = "PENDING"
     RUNNING = "RUNNING"
@@ -52,4 +50,4 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     state = EntityState[args.entityState]
-    send_request(simulation_id=args.sim_id, backend_url=args.backend_url, state=state)
+    send_request(simulation_id=args.sim_id, backend_url=args.backend_url, simulation_state=state)
