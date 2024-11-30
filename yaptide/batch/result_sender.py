@@ -44,7 +44,7 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
 
 def send_simulation_state_update(simulation_id: int, update_key: str, backend_url: str, simulation_state: str):
     """Sends simulation state to backend"""
-    dict_to_send = {"sim_id": simulation_id, "job_state": simulation_state}
+    dict_to_send = {"sim_id": simulation_id, "job_state": simulation_state, "update_key": update_key}
     jobs_url = f"{backend_url}/jobs"
     context = ssl.SSLContext()
 
@@ -84,7 +84,7 @@ if __name__ == "__main__":
                                 update_key=args.update_key,
                                 backend_url=args.backend_url)
     elif args.simulation_state:
-        logging.info("No output_dir provided, sending state MERGING_RUNNING")
+        logging.info("No output_dir provided, sending state %s", args.simulation_state)
         send_simulation_state_update(simulation_id=args.sim_id,
                                      update_key=args.update_key,
                                      backend_url=args.backend_url,
