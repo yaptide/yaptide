@@ -30,8 +30,8 @@ fi
 
 COLLECT_BASH: str = """#!/bin/bash
 {collect_header}
-python3 $ROOT_DIR/result_sender.py --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 ROOT_DIR={root_dir}
+python3 $ROOT_DIR/result_sender.py --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 INPUT_WILDCARD=$ROOT_DIR/workspaces/task_*/*.bdo
 OUTPUT_DIRECTORY=$ROOT_DIR/output
 
