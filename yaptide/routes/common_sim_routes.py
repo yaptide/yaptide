@@ -92,6 +92,11 @@ class JobsResource(Resource):
         if not simulation:
             app.logger.info(f"sim_id {sim_id} simulation not found ")
             return yaptide_response(message=f"Simulation {sim_id} does not exist", code=501)
+
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
+            return yaptide_response(message="Invalid update key", code=400)
+
         update_simulation_state(simulation, payload_dict)
         if payload_dict.get("log"):
             logfiles = LogfilesModel(simulation_id=simulation.id)
