@@ -60,12 +60,10 @@ def send_simulation_state_update(simulation_id: int, update_key: str, backend_ur
 
 
 if __name__ == "__main__":
-    """
-    This script allows sending simulation data (either results or state updates) to a backend server.
-    The user must specify the simulation ID, update_key, and backend URL, and either:
-        - directory containing JSON result files (`--results_dir`) to send simulation results.
-        - simulation state (`--state`) to send a state update.
-    """
+    # This script allows sending simulation data (either results or state updates) to a backend server.
+    # The user must specify the simulation ID, update_key, and backend URL, and either:
+    #    - directory containing JSON result files (`--results_dir`) to send simulation results.
+    #    - simulation state (`--state`) to send a state update.
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
     logging.basicConfig(level=logging.INFO,
