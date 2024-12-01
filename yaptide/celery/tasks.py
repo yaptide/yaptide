@@ -223,15 +223,18 @@ def merge_results(results: list[dict]) -> dict:
     averaged_estimators = None
     simulation_id = results[0].pop("simulation_id", None)
     update_key = results[0].pop("update_key", None)
-    state_updated = False
+    if simulation_id and update_key:
+        dict_to_send = {
+            "sim_id": simulation_id,
+            "job_state": EntityState.MERGING_RUNNING.value,
+            "update_key": update_key
+        }
+        post_update(dict_to_send)
     for i, result in enumerate(results):
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
         if update_key is None:
             update_key = result.pop("update_key", None)
-        if not state_updated and simulation_id is not None:
-            dict_to_send = {"sim_id": simulation_id, "job_state": EntityState.MERGING_RUNNING.value}
-            post_update(dict_to_send)
         if "logfiles" in result:
             logfiles.update(result["logfiles"])
             continue

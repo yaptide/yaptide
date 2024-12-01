@@ -81,7 +81,7 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
 
         if jobs_data["job_state"] in ['MERGING_QUEUED', 'MERGING_RUNNING']:
             # when job is in MERGING_QUEUED state or MERGING_RUNNING, all tasks should be COMPLETED
-            assert any(task["task_state"] in {"COMPLETED"} for task in jobs_data["job_tasks_status"])
+            assert all(task["task_state"] == "COMPLETED" for task in jobs_data["job_tasks_status"])
 
         logging.info("Checking if number of simulated primaries is correct")
         if jobs_data["job_state"] == 'COMPLETED':

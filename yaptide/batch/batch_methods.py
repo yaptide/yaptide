@@ -137,12 +137,12 @@ def submit_job(  # skipcq: PY-R1000
         logging.debug("Transfering simulation input %s to %s", zip_path, job_dir)
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
-    RESULT_SENDER_SCRIPT = Path(__file__).parent.resolve() / "result_sender.py"
+    SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
 
     logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
-    logging.debug("Transfering result sender script %s to %s", RESULT_SENDER_SCRIPT, job_dir)
-    con.put(RESULT_SENDER_SCRIPT, job_dir)
+    logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+    con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(payload_dict=payload_dict,
                                                  job_dir=job_dir,
