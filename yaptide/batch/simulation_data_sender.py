@@ -82,7 +82,7 @@ if __name__ == "__main__":
     logging.info("backend_url %s", args.backend_url)
 
     if args.output_dir:
-        logging.info("Sending simulation results for directory: %s", args.results_dir)
+        logging.info("Sending simulation results for directory: %s", args.output_dir)
         send_simulation_results(output_Path=Path(args.output_dir),
                                 simulation_id=args.sim_id,
                                 update_key=args.update_key,
