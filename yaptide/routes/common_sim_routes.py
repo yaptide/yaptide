@@ -72,7 +72,7 @@ class JobsResource(Resource):
             job_info["job_state"] = EntityState.FAILED.value
         elif status_counter[EntityState.RUNNING.value] > 0:
             job_info["job_state"] = EntityState.RUNNING.value
-        elif status_counter[EntityState.COMPLETED.value] == len(job_tasks_status):
+        elif job_id.endswith("BATCH") and status_counter[EntityState.COMPLETED.value] == len(job_tasks_status):
             job_info["job_state"] = EntityState.MERGING_QUEUED.value
 
         update_simulation_state(simulation=simulation, update_dict=job_info)

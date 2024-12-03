@@ -215,6 +215,21 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
 
 
 @celery_app.task
+def set_merging_queued_state(results: list[dict]) -> list[dict]:
+    logging.debug("send_state")
+    simulation_id = results[0].get("simulation_id", None)
+    update_key = results[0].get("update_key", None)
+    if simulation_id and update_key:
+        dict_to_send = {
+            "sim_id": simulation_id,
+            "job_state": EntityState.MERGING_QUEUED.value,
+            "update_key": update_key
+        }
+        post_update(dict_to_send)
+    return results
+
+
+@celery_app.task
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
