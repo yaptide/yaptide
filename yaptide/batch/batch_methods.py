@@ -88,6 +88,7 @@ def submit_job(  # skipcq: PY-R1000
         dict_to_send = {
             "sim_id": sim_id,
             "job_state": EntityState.FAILED.value,
+            "update_key": update_key,
             "log": {
                 "error": f"User {user.username} has no certificate or private key"
             }
@@ -99,7 +100,14 @@ def submit_job(  # skipcq: PY-R1000
         con = get_connection(user=user, cluster=cluster)
         fabric_result: Result = con.run("echo $SCRATCH", hide=True)
     except Exception as e:
-        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "log": {"error": str(e)}}
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "update_key": update_key,
+            "log": {
+                "error": str(e)
+            }
+        }
         post_update(dict_to_send)
         return
 
@@ -112,7 +120,7 @@ def submit_job(  # skipcq: PY-R1000
     try:
         con.run(f"mkdir -p {job_dir}")
     except Exception as e:
-        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value}
+        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
         post_update(dict_to_send)
         return
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -129,12 +137,12 @@ def submit_job(  # skipcq: PY-R1000
         logging.debug("Transfering simulation input %s to %s", zip_path, job_dir)
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
-    RESULT_SENDER_SCRIPT = Path(__file__).parent.resolve() / "result_sender.py"
+    SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
 
     logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
-    logging.debug("Transfering result sender script %s to %s", RESULT_SENDER_SCRIPT, job_dir)
-    con.put(RESULT_SENDER_SCRIPT, job_dir)
+    logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+    con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(payload_dict=payload_dict,
                                                  job_dir=job_dir,
@@ -148,6 +156,7 @@ def submit_job(  # skipcq: PY-R1000
         dict_to_send = {
             "sim_id": sim_id,
             "job_state": EntityState.FAILED.value,
+            "update_key": update_key,
             "log": {
                 "error": "Job submission failed due to invalid submit file path"
             }
@@ -176,6 +185,7 @@ def submit_job(  # skipcq: PY-R1000
         dict_to_send = {
             "sim_id": sim_id,
             "job_state": EntityState.FAILED.value,
+            "update_key": update_key,
             "log": {
                 "message": "Job submission failed",
                 "submit_stdout": submit_stdout,
@@ -188,6 +198,7 @@ def submit_job(  # skipcq: PY-R1000
 
     dict_to_send = {
         "sim_id": sim_id,
+        "update_key": update_key,
         "job_dir": job_dir,
         "array_id": array_id,
         "collect_id": collect_id,
@@ -259,10 +270,12 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
         return {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     if collect_state == "RUNNING":
         logging.debug("Collect job is in RUNNING state")
+        return {"job_state": EntityState.MERGING_RUNNING.value}
+    if job_state == "COMPLETED" and collect_state == "PENDING":
+        logging.debug("Collect job is in PENDING state")
+        return {"job_state": EntityState.MERGING_QUEUED.value}
     if job_state == "RUNNING":
         logging.debug("Main job is in RUNNING state")
-    if collect_state == "PENDING":
-        logging.debug("Collect job is in PENDING state")
     if job_state == "PENDING":
         logging.debug("Main job is in PENDING state")
 

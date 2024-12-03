@@ -7,6 +7,7 @@ from pathlib import Path
 import threading
 from typing import Optional
 
+from yaptide.batch.batch_methods import post_update
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
                                        get_tmp_dir, read_file, read_file_offline, read_fluka_file)
@@ -214,6 +215,22 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
 
 
 @celery_app.task
+def set_merging_queued_state(results: list[dict]) -> list[dict]:
+    """Celery task to set simulation state as MERGING_QUEUED"""
+    logging.debug("send_state")
+    simulation_id = results[0].get("simulation_id", None)
+    update_key = results[0].get("update_key", None)
+    if simulation_id and update_key:
+        dict_to_send = {
+            "sim_id": simulation_id,
+            "job_state": EntityState.MERGING_QUEUED.value,
+            "update_key": update_key
+        }
+        post_update(dict_to_send)
+    return results
+
+
+@celery_app.task
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
@@ -221,7 +238,14 @@ def merge_results(results: list[dict]) -> dict:
 
     averaged_estimators = None
     simulation_id = results[0].pop("simulation_id", None)
-    update_key = results[0].pop("simulation_id", None)
+    update_key = results[0].pop("update_key", None)
+    if simulation_id and update_key:
+        dict_to_send = {
+            "sim_id": simulation_id,
+            "job_state": EntityState.MERGING_RUNNING.value,
+            "update_key": update_key
+        }
+        post_update(dict_to_send)
     for i, result in enumerate(results):
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
