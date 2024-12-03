@@ -216,6 +216,7 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
 
 @celery_app.task
 def set_merging_queued_state(results: list[dict]) -> list[dict]:
+    """Celery task to set simulation state as MERGING_QUEUED"""
     logging.debug("send_state")
     simulation_id = results[0].get("simulation_id", None)
     update_key = results[0].get("update_key", None)

@@ -3,7 +3,6 @@ import logging
 from celery import chain, chord, group
 from celery.result import AsyncResult
 
-from yaptide.batch.batch_methods import post_update
 from yaptide.celery.tasks import merge_results, run_single_simulation, set_merging_queued_state
 from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
