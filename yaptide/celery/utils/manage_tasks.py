@@ -29,7 +29,10 @@ def run_job(files_dict: dict,
 
     # By setup of simulation_worker all tasks from yaptide.celery.tasks are directed to simulations queue
     # For tests to work: putting signature as second task in chord requires specifying queue
-    workflow = chord(map_group, chain(set_merging_queued_state.s(), merge_results.s().set(queue="simulations")))
+    workflow = chord(
+        map_group,
+        chain(set_merging_queued_state.s().set(queue="simulations"),
+              merge_results.s().set(queue="simulations")))
     job: AsyncResult = workflow.delay()
 
     return job.id
