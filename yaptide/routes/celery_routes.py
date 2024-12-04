@@ -1,6 +1,7 @@
 import logging
 from collections import Counter
 from datetime import datetime
+import subprocess
 
 from flask import request
 from flask_restful import Resource
@@ -165,14 +166,20 @@ class JobsDirect(Resource):
 
         # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
         # We don't want it to run accidentally.
-        celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
-        celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
-        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
-        for task in tasks:
-            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
-                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+        if simulation.sim_type == "shieldhit" and simulation.job_state in (EntityState.RUNNING.value):
+            logging.debug('Inside cancelling shieldhit')
+            for task in tasks:
+                logging.debug("PID: %d", task.sim_pid)
+                subprocess.run(['kill', '-s', 'SIGINT', str(task.sim_pid)], check=True)
+        else:
+            celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
+            celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+            update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+            for task in tasks:
+                if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
+                    update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
-        terminate_unfinished_tasks.delay(simulation_id=simulation.id)
+            terminate_unfinished_tasks.delay(simulation_id=simulation.id)
         return yaptide_response(message="Cancelled sucessfully", code=200)
 
 

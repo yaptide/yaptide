@@ -196,6 +196,10 @@ class TaskModel(db.Model):
                                         nullable=False,
                                         default=EntityState.PENDING.value,
                                         doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
+    sim_pid: Column[int] = db.Column(db.Integer,
+                                     nullable=False,
+                                     default=-1,
+                                     doc='Id of simulator process (at the moment used only in shieldhit)')
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
@@ -225,6 +229,8 @@ class TaskModel(db.Model):
             self.task_state = update_dict["task_state"]
             if self.task_state == EntityState.COMPLETED.value:
                 self.simulated_primaries = self.requested_primaries
+        if value_changed(self.sim_pid, update_dict.get("sim_pid")):
+            self.sim_pid = update_dict["sim_pid"]
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None
