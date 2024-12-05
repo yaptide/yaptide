@@ -1629,13 +1629,13 @@ tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
 name = "pymchelper"
-version = "2.7.2"
+version = "2.7.3"
 description = "Python toolkit for SHIELD-HIT12A and FLUKA"
 optional = false
 python-versions = ">=3.9"
 files = [
-    {file = "pymchelper-2.7.2-py2.py3-none-any.whl", hash = "sha256:c73859b34a7d886777f5c6baea9549ea02c400fa77c694abd8ada41ad235aef1"},
-    {file = "pymchelper-2.7.2.tar.gz", hash = "sha256:f7444ed51970640fa63735b019141a93a82bcee2a91cf3e59606d8d5387daea5"},
+    {file = "pymchelper-2.7.3-py2.py3-none-any.whl", hash = "sha256:c49d0771a8d75087ab828364f46526217b0907e6e3fe4861739029942ae0db71"},
+    {file = "pymchelper-2.7.3.tar.gz", hash = "sha256:2c8d956f6f7cfb935489b8a4f277b6d81d6ee5fe860d8dab0168b7f6ed103c17"},
 ]
 
 [package.dependencies]
@@ -2286,4 +2286,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.13"
-content-hash = "55fb90b576301900fecd33eb2c1629280c20adb9f2b6cdd249224cbed13b9a2d"
+content-hash = "343923aab8cce0614c67d027bf3695770fb19206c38a293de07a86458a786c6b"
