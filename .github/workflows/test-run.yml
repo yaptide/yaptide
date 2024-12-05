@@ -39,7 +39,7 @@ jobs:
         if: matrix.platform == 'ubuntu-latest'
         id: get_simulators
         run: |
-            blah blah poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
+            poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
         timeout-minutes: 2
         env:
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
