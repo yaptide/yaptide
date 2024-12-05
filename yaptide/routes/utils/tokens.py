@@ -31,7 +31,7 @@ def encode_auth_token(user_id: int,
         payload = {
             'exp': exp,  # Token Expiration Time
             'iat': datetime.utcnow(),  # Issued At Time
-            'sub': user_id  # Subject
+            'sub': str(user_id)  # Subject
         }
         return jwt.encode(payload, secret, algorithm='HS256'), exp
     except Exception as e:  # skipcq: PYL-W0703
@@ -46,7 +46,7 @@ def encode_simulation_auth_token(simulation_id: int):
         payload = {
             'exp': exp,  # Token Expiration Time
             'iat': datetime.utcnow(),  # Issued At Time
-            'simulation_id': simulation_id  # Subject
+            'simulation_id': str(simulation_id)  # Subject
         }
         return jwt.encode(payload, secret, algorithm='HS256')
     except Exception as e:  # skipcq: PYL-W0703
@@ -62,7 +62,7 @@ def decode_auth_token(token: str, is_refresh: bool = False, payload_key_to_retur
 
     try:
         payload = jwt.decode(token, secret, algorithms=['HS256'])
-        return payload[payload_key_to_return]
+        return int(payload[payload_key_to_return])
     except jwt.ExpiredSignatureError:
         return 'Signature expired.'
     except jwt.InvalidTokenError:
