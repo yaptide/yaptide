@@ -52,14 +52,15 @@ jobs:
   
       # fallback to demo version of SHIELD-HIT12A
       - name: Get demo simulators for Linux due to timeout
-        if: matrix.platform == 'ubuntu-latest' && always()
+        if: matrix.platform == 'ubuntu-latest'
         run: |
-          if [[ ${{ job.status }} == 'failure' ]]; then
+          echo "Job status is: ${{ job.status }}"
+          if [[ "${{ job.status }}" == "failure" ]]; then
             echo "Retrying due to timeout..."
             poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
           fi
-        timeout-minutes: 2
-  
+        timeout-minutes: 1
+    
       - name: Get demo simulator for Windows
         if: matrix.platform == 'windows-latest'
         run: |
