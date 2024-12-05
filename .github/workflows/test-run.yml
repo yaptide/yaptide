@@ -37,6 +37,7 @@ jobs:
       # try downloading full version of SHIELD-HIT12A
       - name: Get simulators for Linux
         if: matrix.platform == 'ubuntu-latest'
+        id: get_simulators
         run: |
             poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
         timeout-minutes: 2
@@ -49,17 +50,16 @@ jobs:
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
         continue-on-error: true
-  
+
       # fallback to demo version of SHIELD-HIT12A
       - name: Get demo simulators for Linux due to timeout
-        if: matrix.platform == 'ubuntu-latest' && always()
+        if: matrix.platform == 'ubuntu-latest' && steps.get_simulators.outcome == 'failure'
         run: |
-          if [[ ${{ job.status }} == 'failure' ]]; then
-            echo "Retrying due to timeout..."
-            poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
-          fi
-        timeout-minutes: 2
-  
+          echo "Retrying due to timeout..."
+          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
+        timeout-minutes: 1
+
+    
       - name: Get demo simulator for Windows
         if: matrix.platform == 'windows-latest'
         run: |
