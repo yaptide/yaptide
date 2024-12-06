@@ -7,18 +7,17 @@ from flask import request, current_app as app
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_estimator_by_sim_id_and_est_name,
-                                            fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
-                                            fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
-                                            fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-                                            fetch_simulation_id_by_job_id, fetch_tasks_by_sim_id, make_commit_to_db,
-                                            update_simulation_state)
+from yaptide.persistence.db_methods import (
+    add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_by_sim_id_and_file_name,
+    fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number,
+    fetch_pages_by_estimator_id, fetch_simulation_by_job_id, fetch_simulation_by_sim_id, fetch_simulation_id_by_job_id,
+    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
 from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.routes.utils.tokens import decode_auth_token
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import EntityState, SimulationType
 
 
 class JobsResource(Resource):
@@ -55,8 +54,7 @@ class JobsResource(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value,
-                                    EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -109,6 +107,11 @@ class JobsResource(Resource):
 def get_single_estimator(sim_id: int, estimator_name: str):
     """Retrieve a single estimator by simulation ID and estimator name"""
     estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
+
+    if not estimator:
+        # try to fetch estimator by file_name
+        estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, est_name=estimator_name)
+
     if not estimator:
         return yaptide_response(message="Estimator not found", code=404)
 
@@ -168,12 +171,21 @@ class ResultsResource(Resource):
         if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
-        for estimator_dict in payload_dict["estimators"]:
+        for i, estimator_dict in enumerate(payload_dict["estimators"]):
             # We forsee the possibility of the estimator being created earlier as element of partial results
             estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
-
             if not estimator:
-                estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
+                file_name = payload_dict["estimators"][i]["name"]
+                if simulation.sim_type == SimulationType.FLUKA and len(simulation.inputs) > 0:
+                    # Fluka preserves the order of estimators in the input data.
+                    # We can use estimator name from the input data
+                    estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]
+                else:
+                    # ShieldHit does not preserve the order,
+                    # but the estimator_name is equal to file_name without '_' at the end
+                    estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
+
+                estimator = EstimatorModel(name=estimator_name, file_name=file_name, simulation_id=simulation.id)
                 estimator.data = estimator_dict["metadata"]
                 add_object_to_db(estimator)
 
