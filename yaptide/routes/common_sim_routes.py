@@ -176,11 +176,11 @@ class ResultsResource(Resource):
             # We forsee the possibility of the estimator being created earlier as element of partial results
             estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
             if not estimator:
-                file_name = payload_dict["estimators"][i]["name"]
-                if simulation.sim_type == SimulationType.FLUKA and len(simulation.inputs) > 0:
+                file_name = estimator_dict["name"]
+                if simulation.sim_type == SimulationType.FLUKA.value and len(simulation.inputs) > 0:
                     # Fluka preserves the order of estimators in the input data.
                     # We can use estimator name from the input data
-                    estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]
+                    estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
                 else:
                     # ShieldHit does not preserve the order,
                     # but the estimator_name is equal to file_name without '_' at the end
