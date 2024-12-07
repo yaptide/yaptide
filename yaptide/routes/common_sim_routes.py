@@ -54,7 +54,8 @@ class JobsResource(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value,
+                                    EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value):
             return yaptide_response(message=f"Job state: {simulation.job_state}",
                                     code=200,
                                     content={
@@ -110,7 +111,7 @@ def get_single_estimator(sim_id: int, estimator_name: str):
 
     if not estimator:
         # try to fetch estimator by file_name
-        estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, est_name=estimator_name)
+        estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_name)
 
     if not estimator:
         return yaptide_response(message="Estimator not found", code=404)
