@@ -150,7 +150,7 @@ def prepare_create_or_update_estimator_in_db(sim_id: int, name: str, estimator_d
 
 
 def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
-    """ Prepares page objects for insertion or update without committing to the database"""
+    """Prepares page objects for insertion or update without committing to the database"""
     estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
     for page_dict in estimator_dict["pages"]:
         page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
