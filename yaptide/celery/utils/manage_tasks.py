@@ -1,9 +1,9 @@
 import logging
 
-from celery import chord, group
+from celery import chain, chord, group
 from celery.result import AsyncResult
 
-from yaptide.celery.tasks import merge_results, run_single_simulation
+from yaptide.celery.tasks import merge_results, run_single_simulation, set_merging_queued_state
 from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 
@@ -29,7 +29,10 @@ def run_job(files_dict: dict,
 
     # By setup of simulation_worker all tasks from yaptide.celery.tasks are directed to simulations queue
     # For tests to work: putting signature as second task in chord requires specifying queue
-    workflow = chord(map_group, merge_results.s().set(queue="simulations"))
+    workflow = chord(
+        map_group,
+        chain(set_merging_queued_state.s().set(queue="simulations"),
+              merge_results.s().set(queue="simulations")))
     job: AsyncResult = workflow.delay()
 
     return job.id

@@ -62,7 +62,7 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
         # and that there is no results, logfiles and input files here
         assert set(jobs_data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(jobs_data["job_tasks_status"]) == small_simulation_payload["ntasks"]
-        logging.debug("Job state: %s", jobs_data["job_state"])
+        logging.info("Job state: %s", jobs_data["job_state"])
         if jobs_data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
             # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
@@ -78,6 +78,10 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
             start_time = simulations_data["simulations"][0]["start_time"]
             logging.info("start_time: %s", start_time)
             assert start_time is not None
+
+        if jobs_data["job_state"] in ['MERGING_QUEUED', 'MERGING_RUNNING']:
+            # when job is in MERGING_QUEUED state or MERGING_RUNNING, all tasks should be COMPLETED
+            assert all(task["task_state"] == "COMPLETED" for task in jobs_data["job_tasks_status"])
 
         logging.info("Checking if number of simulated primaries is correct")
         if jobs_data["job_state"] == 'COMPLETED':
