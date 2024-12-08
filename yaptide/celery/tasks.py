@@ -193,7 +193,11 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
     # run the simulation
     logging.info("Running Fluka process in %s", tmp_work_dir)
     process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
-        dir_path=Path(tmp_work_dir), command_as_list=command_as_list)
+        dir_path=Path(tmp_work_dir),
+        command_as_list=command_as_list,
+        task_id=task_id,
+        update_key=update_key,
+        simulation_id=simulation_id)
     logging.info("Fluka process finished with status %s", process_exit_success)
 
     # terminate monitoring process
@@ -266,6 +270,7 @@ def merge_results(results: list[dict]) -> dict:
             logging.debug(total_particles)
             # There is nothing to average yet
             continue
+
         new_particles = int(result.get("estimators", [])[0]["metadata"]["number_of_primaries"])
         logging.debug("Avereging results from %d particles", new_particles)
         averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), total_particles,
