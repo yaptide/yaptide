@@ -17,7 +17,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.routes.utils.tokens import decode_auth_token
-from yaptide.utils.enums import EntityState, SimulationType
+from yaptide.utils.enums import EntityState, InputType
 
 
 class JobsResource(Resource):
@@ -110,10 +110,6 @@ def get_single_estimator(sim_id: int, estimator_name: str):
     estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
 
     if not estimator:
-        # try to fetch estimator by file_name
-        estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_name)
-
-    if not estimator:
         return yaptide_response(message="Estimator not found", code=404)
 
     pages = fetch_pages_by_estimator_id(est_id=estimator.id)
@@ -172,19 +168,19 @@ class ResultsResource(Resource):
         if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
+        if simulation.input_type == InputType.EDITOR.value:
+            outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
+            estimator_names = [output["name"] for output in outputs]
+
         for i, estimator_dict in enumerate(payload_dict["estimators"]):
             # We forsee the possibility of the estimator being created earlier as element of partial results
-            estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
+            estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
             if not estimator:
                 file_name = estimator_dict["name"]
-                if simulation.sim_type == SimulationType.FLUKA.value and len(simulation.inputs) > 0:
-                    # Fluka preserves the order of estimators in the input data.
-                    # We can use estimator name from the input data
-                    estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
+                if simulation.input_type == InputType.EDITOR.value and file_name not in estimator_names:
+                    estimator_name = estimator_names[i]
                 else:
-                    # ShieldHit does not preserve the order,
-                    # but the estimator_name is equal to file_name without '_' at the end
-                    estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
+                    estimator_name = file_name
 
                 estimator = EstimatorModel(name=estimator_name, file_name=file_name, simulation_id=simulation.id)
                 estimator.data = estimator_dict["metadata"]
