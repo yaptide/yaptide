@@ -9,7 +9,7 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.orm import sessionmaker
 from yaptide.persistence.models import EstimatorModel, SimulationModel
-from yaptide.utils.enums import SimulationType
+from yaptide.utils.enums import InputType, SimulationType
 
 
 # revision identifiers, used by Alembic.
@@ -35,7 +35,7 @@ def upgrade():
 
         for i, estimator in enumerate(estimators):
             file_name = estimator.name
-            if simulation.sim_type == SimulationType.FLUKA.value and len(simulation.inputs) > 0:
+            if simulation.sim_type == SimulationType.FLUKA.value and simulation.input_type == InputType.EDITOR.value:
                 estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
             else:
                 estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
