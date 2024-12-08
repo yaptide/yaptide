@@ -40,9 +40,16 @@ def upgrade():
             else:
                 estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
 
-            # Update the estimator's name
+            # Update the estimator's name and file_name
             estimator.name = estimator_name
             estimator.file_name = file_name
+
+        if simulation.input_type == InputType.EDITOR.value:
+            outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
+            output_names = [output["name"] for output in outputs]
+            
+            # Reorder estimators to match the output names
+            estimators.sort(key=lambda estimator: output_names.index(estimator.name))
 
     session.commit()
     session.close()

@@ -139,6 +139,28 @@ def get_all_estimators(sim_id: int):
                             content={"estimators": result_estimators})
 
 
+def create_or_update_estimator(sim_id: int, name: str, estimator_dict: dict):
+    estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
+    if not estimator:
+        estimator = EstimatorModel(name=name, file_name=estimator_dict["name"], simulation_id=sim_id)
+        estimator.data = estimator_dict["metadata"]
+        add_object_to_db(estimator)
+
+    for page_dict in estimator_dict["pages"]:
+        page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
+                                                    page_number=int(page_dict["metadata"]["page_number"]))
+
+        page_existed = bool(page)
+        if not page_existed:
+            # create new page
+            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
+        # we always update the data
+        page.data = page_dict
+        if not page_existed:
+            # if page was created, we add it to the session
+            add_object_to_db(page, False)
+
+
 class ResultsResource(Resource):
     """Class responsible for managing results"""
 
@@ -170,35 +192,20 @@ class ResultsResource(Resource):
 
         if simulation.input_type == InputType.EDITOR.value:
             outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
-            estimator_names = [output["name"] for output in outputs]
+            sorted_estimator_names = sorted([output["name"] for output in outputs])
+            for output in outputs:
+                name = output["name"]
+                # estimator_dict is sorted alphabeticaly by names,
+                # thats why we can match indexes from sorted_estimator_names
+                estimator_dict_index = sorted_estimator_names.index(name)
+                estimator_dict = payload_dict["estimators"][estimator_dict_index]
+                create_or_update_estimator(sim_id=simulation.id, name=name, estimator_dict=estimator_dict)
 
-        for i, estimator_dict in enumerate(payload_dict["estimators"]):
-            # We forsee the possibility of the estimator being created earlier as element of partial results
-            estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
-            if not estimator:
-                file_name = estimator_dict["name"]
-                if simulation.input_type == InputType.EDITOR.value and file_name not in estimator_names:
-                    estimator_name = estimator_names[i]
-                else:
-                    estimator_name = file_name
-
-                estimator = EstimatorModel(name=estimator_name, file_name=file_name, simulation_id=simulation.id)
-                estimator.data = estimator_dict["metadata"]
-                add_object_to_db(estimator)
-
-            for page_dict in estimator_dict["pages"]:
-                page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
-                                                            page_number=int(page_dict["metadata"]["page_number"]))
-
-                page_existed = bool(page)
-                if not page_existed:
-                    # create new page
-                    page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
-                # we always update the data
-                page.data = page_dict
-                if not page_existed:
-                    # if page was created, we add it to the session
-                    add_object_to_db(page, False)
+        elif simulation.input_type == InputType.FILES.value:
+            for estimator_dict in payload_dict["estimators"]:
+                create_or_update_estimator(sim_id=simulation.id,
+                                           name=estimator_dict["name"],
+                                           estimator_dict=estimator_dict)
 
         make_commit_to_db()
         logging.debug("Marking simulation as completed")
