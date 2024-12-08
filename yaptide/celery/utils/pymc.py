@@ -112,23 +112,30 @@ def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
     update_fluka_function(str(input_file.resolve()), random_seed)
 
 
-def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
+def execute_simulation_subprocess(dir_path: Path,
+                                  command_as_list: list[str],
+                                  task_id: int,
+                                  update_key: str = '',
+                                  simulation_id: int = Optional[None]) -> tuple[bool, str, str]:
     """Function to execute simulation subprocess."""
     process_exit_success: bool = True
     command_stdout: str = ""
     command_stderr: str = ""
     try:
-        completed_process = subprocess.run(command_as_list,
-                                           check=True,
-                                           cwd=str(dir_path),
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           text=True)
-        logging.info("simulation subprocess with return code %d finished", completed_process.returncode)
+        process = subprocess.Popen(command_as_list,
+                                   cwd=str(dir_path),
+                                   stdout=subprocess.PIPE,
+                                   stderr=subprocess.PIPE,
+                                   text=True)
 
+        pid = process.pid
+        logging.info("sending info to task: %d in simulation: %d with update key: %s to update PID %d", task_id,
+                     simulation_id, update_key, pid)
+        send_task_update(simulation_id, task_id, update_key, {"sim_pid": pid})
         # Capture stdout and stderr
-        command_stdout = completed_process.stdout
-        command_stderr = completed_process.stderr
+        command_stdout, command_stderr = process.communicate()
+
+        logging.info("simulation subprocess with return code %d finished", process.returncode)
 
         process_exit_success = True
 
@@ -169,14 +176,18 @@ def get_fluka_estimators(dir_path: Path) -> dict:
     return estimators_dict
 
 
-def average_values(base_values: List[float], new_values: List[float], count: int) -> List[float]:
+def average_values(base_values: List[float], new_values: List[float], base_particles: int,
+                   new_particles: int) -> List[float]:
     """Average two lists of values"""
-    return [sum(x) / (count + 1) for x in zip(map(lambda x: x * count, base_values), new_values)]
+    total_particles = base_particles + new_particles
+    return [(base_val * base_particles + new_val * new_particles) / total_particles
+            for base_val, new_val in zip(base_values, new_values)]
 
 
-def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
+def average_estimators(base_list: list[dict], list_to_add: list[dict], total_particles: int,
+                       new_particles: int) -> list:
     """Averages estimators from two dicts"""
-    logging.debug("Averaging estimators - already averaged: %d", averaged_count)
+    logging.debug("Averaging estimators - already averaged: %d", total_particles)
     for est_i, estimator_dict in enumerate(list_to_add):
         # check if estimator names are the same and if not, find matching estimator's index in base_list
         if estimator_dict["name"] != base_list[est_i]["name"]:
@@ -189,7 +200,8 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
                                if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
 
             base_list[est_i]["pages"][page_i]["data"]["values"] = average_values(
-                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count)
+                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], total_particles,
+                new_particles)
 
             logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
                           len(page_dict["data"]["values"]))
