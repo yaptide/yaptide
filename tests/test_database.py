@@ -368,7 +368,10 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
         assert estimator.simulation_id == simulation.id
 
         for page_dict in estimator_dict["pages"]:
-            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
+            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]),
+                             estimator_id=estimator.id,
+                             page_dimension=int(page_dict['dimensions']),
+                             page_name=str(page_dict["metadata"]["name"]))
             page.data = page_dict
             db_session.add(page)
             db_session.commit()
