@@ -358,13 +358,16 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
     db_session.commit()
 
     for estimator_dict in result_dict_data["estimators"]:
-        estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
+        file_name = estimator_dict["name"]
+        estimator_name = file_name
+        estimator = EstimatorModel(name=estimator_name, file_name=file_name, simulation_id=simulation.id)
         estimator.data = estimator_dict["metadata"]
         db_session.add(estimator)
         db_session.commit()
 
         assert estimator.id is not None
-        assert estimator.name == estimator_dict["name"]
+        assert estimator.file_name == file_name
+        assert estimator.name == estimator_name
         assert estimator.simulation_id == simulation.id
 
         for page_dict in estimator_dict["pages"]:
@@ -383,7 +386,7 @@ def test_create_result_estimators_and_pages(db_session: scoped_session, db_good_
 
     for estimator_dict in result_dict_data["estimators"]:
         estimator: EstimatorModel = EstimatorModel.query.filter_by(simulation_id=simulation.id,
-                                                                   name=estimator_dict["name"]).first()
+                                                                   file_name=estimator_dict["name"]).first()
         assert estimator is not None
         assert estimator.data == estimator_dict["metadata"]
 
