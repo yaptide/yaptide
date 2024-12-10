@@ -2,7 +2,8 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.persistence.db_methods import (fetch_estimator_names_by_job_id)
+from yaptide.persistence.db_methods import (fetch_estimators_by_sim_id, fetch_pages_metadata_by_est_id,
+                                            fetch_simulation_id_by_job_id)
 from yaptide.persistence.models import (UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -20,7 +21,7 @@ class EstimatorResource(Resource):
     @staticmethod
     @requires_auth()
     def get(user: UserModel):
-        """Method returning estimator names for specific simulation"""
+        """Method returning estimators metadata for specific simulation"""
         schema = EstimatorResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
@@ -33,11 +34,27 @@ class EstimatorResource(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        estimator_names = fetch_estimator_names_by_job_id(job_id=job_id)
+        simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+        if not simulation_id:
+            return yaptide_response(message="Simulation does not exist", code=404)
 
-        if not estimator_names:
-            return yaptide_response(message="Estimators not found", code=404)
+        estimators = fetch_estimators_by_sim_id(sim_id=simulation_id)
+        results = []
 
-        return yaptide_response(message="List of estimator names for specific simulation",
-                                code=200,
-                                content={"estimator_names": estimator_names})
+        for estimator in estimators:
+            pages_metadata = fetch_pages_metadata_by_est_id(est_id=estimator.id)
+            estimator_dict = {
+                "name":
+                estimator.name,
+                "pages_metadata": [{
+                    "page_number": page[0],
+                    "page_name": page[1],
+                    "page_dimension": page[2]
+                } for page in pages_metadata]
+            }
+            results.append(estimator_dict)
+
+        if len(results) == 0:
+            return yaptide_response(message="Pages metadata not found", code=404)
+
+        return yaptide_response(message="Estimators metadata", code=200, content={"estimators_metadata": results})

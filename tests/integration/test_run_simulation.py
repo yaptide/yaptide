@@ -122,14 +122,20 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
     assert results_data["estimators"][0]["metadata"] == results_data_for_specific_estimator["metadata"]
     assert results_data["estimators"][0]["pages"] == results_data_for_specific_estimator["pages"]
 
-    # Test the results endpoint with a nonexistent estiimator_name
+    # Test the results endpoint with a nonexistent estimator_name
     resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": "nonexistent_estimator"})
     assert resp.status_code == 404  # skipcq: BAN-B101
 
+    # Test the results endpoint with a specific page number
+    resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": estimator_name, "page_number": 0})
+    results_data_for_specific_page: dict = json.loads(resp.data.decode())
+    assert results_data["estimators"][0]["pages"][0] == results_data_for_specific_page["page"]
+
     # Test /estimators endpoint
     resp = client.get("/estimators", query_string={"job_id": job_id})
-    estimator_names = json.loads(resp.data.decode())["estimator_names"]
-    assert [estimator["name"] for estimator in results_data["estimators"]] == estimator_names
+    estimators_metadata = json.loads(resp.data.decode())["estimators_metadata"]
+    assert [estimator["name"] for estimator in results_data["estimators"]
+            ] == [estimator_metadata["name"] for estimator_metadata in estimators_metadata]
 
     # Test /estimators endpoint with wrong job_id
     resp = client.get("/estimators", query_string={"job_id": job_id + "1234"})
