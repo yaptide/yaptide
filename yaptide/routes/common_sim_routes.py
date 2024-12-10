@@ -7,18 +7,17 @@ from flask import request, current_app as app
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_estimator_by_sim_id_and_est_name,
-                                            fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
-                                            fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
-                                            fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
-                                            fetch_simulation_id_by_job_id, fetch_tasks_by_sim_id, make_commit_to_db,
-                                            update_simulation_state)
+from yaptide.persistence.db_methods import (
+    add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_by_sim_id_and_file_name,
+    fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number,
+    fetch_pages_by_estimator_id, fetch_simulation_by_job_id, fetch_simulation_by_sim_id, fetch_simulation_id_by_job_id,
+    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
 from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
 from yaptide.routes.utils.tokens import decode_auth_token
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import EntityState, InputType
 
 
 class JobsResource(Resource):
@@ -109,6 +108,7 @@ class JobsResource(Resource):
 def get_single_estimator(sim_id: int, estimator_name: str):
     """Retrieve a single estimator by simulation ID and estimator name"""
     estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
+
     if not estimator:
         return yaptide_response(message="Estimator not found", code=404)
 
@@ -137,6 +137,32 @@ def get_all_estimators(sim_id: int):
     return yaptide_response(message=f"Results for simulation: {sim_id}",
                             code=200,
                             content={"estimators": result_estimators})
+
+
+def prepare_create_or_update_estimator_in_db(sim_id: int, name: str, estimator_dict: dict):
+    """Prepares an estimator object for insertion or update without committing to the database"""
+    estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
+    if not estimator:
+        estimator = EstimatorModel(name=name, file_name=estimator_dict["name"], simulation_id=sim_id)
+        estimator.data = estimator_dict["metadata"]
+        add_object_to_db(estimator, make_commit=False)
+    return estimator
+
+
+def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
+    """Prepares page objects for insertion or update without committing to the database"""
+    estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
+    for page_dict in estimator_dict["pages"]:
+        page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
+                                                    page_number=int(page_dict["metadata"]["page_number"]))
+        page_existed = bool(page)
+        if not page_existed:
+            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
+        # we always update the data
+        page.data = page_dict
+        if not page_existed:
+            # if page was created, we add it to the session
+            add_object_to_db(page, make_commit=False)
 
 
 class ResultsResource(Resource):
@@ -168,30 +194,31 @@ class ResultsResource(Resource):
         if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
-        for estimator_dict in payload_dict["estimators"]:
-            # We forsee the possibility of the estimator being created earlier as element of partial results
-            estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_dict["name"])
+        if simulation.input_type == InputType.EDITOR.value:
+            outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
+            sorted_estimator_names = sorted([output["name"] for output in outputs])
+            for output in outputs:
+                name = output["name"]
+                # estimator_dict is sorted alphabeticaly by names,
+                # thats why we can match indexes from sorted_estimator_names
+                estimator_dict_index = sorted_estimator_names.index(name)
+                estimator_dict = payload_dict["estimators"][estimator_dict_index]
+                prepare_create_or_update_estimator_in_db(sim_id=simulation.id, name=name, estimator_dict=estimator_dict)
+        elif simulation.input_type == InputType.FILES.value:
+            for estimator_dict in payload_dict["estimators"]:
+                prepare_create_or_update_estimator_in_db(sim_id=simulation.id,
+                                                         name=estimator_dict["name"],
+                                                         estimator_dict=estimator_dict)
 
-            if not estimator:
-                estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
-                estimator.data = estimator_dict["metadata"]
-                add_object_to_db(estimator)
-
-            for page_dict in estimator_dict["pages"]:
-                page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
-                                                            page_number=int(page_dict["metadata"]["page_number"]))
-
-                page_existed = bool(page)
-                if not page_existed:
-                    # create new page
-                    page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
-                # we always update the data
-                page.data = page_dict
-                if not page_existed:
-                    # if page was created, we add it to the session
-                    add_object_to_db(page, False)
-
+        # commit estimators
         make_commit_to_db()
+
+        for estimator_dict in payload_dict["estimators"]:
+            prepare_create_or_update_pages_in_db(sim_id=simulation.id, estimator_dict=estimator_dict)
+
+        # commit pages
+        make_commit_to_db()
+
         logging.debug("Marking simulation as completed")
         update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         update_simulation_state(simulation=simulation, update_dict=update_dict)
