@@ -35,7 +35,7 @@ def upgrade():
 
         for i, estimator in enumerate(estimators):
             file_name = estimator.name
-            if simulation.sim_type == SimulationType.FLUKA.value and simulation.input_type == InputType.EDITOR.value:
+            if simulation.sim_type == SimulationType.FLUKA.value and simulation.input_type == InputType.EDITOR.value and simulation.inputs:
                 estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
             else:
                 estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
@@ -44,7 +44,7 @@ def upgrade():
             estimator.name = estimator_name
             estimator.file_name = file_name
 
-        if simulation.input_type == InputType.EDITOR.value:
+        if simulation.input_type == InputType.EDITOR.value and simulation.inputs:
             outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
             output_names = [output["name"] for output in outputs]
             
