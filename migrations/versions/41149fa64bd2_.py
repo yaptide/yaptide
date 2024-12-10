@@ -54,7 +54,7 @@ def upgrade():
                 # Reorder estimators to match the output names
                 estimators.sort(key=lambda estimator: output_names.index(estimator.name))
             except Exception as e:
-                logging.error(f"Failed to reorder estimator with ID {estimator.id}: {e}")    
+                logging.warning(f"Failed to reorder estimator with ID {estimator.id}: {e}")    
     session.commit()
     session.close()
 
