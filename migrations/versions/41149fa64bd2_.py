@@ -37,20 +37,19 @@ def upgrade():
                 file_name = estimator.name
                 if simulation.sim_type == SimulationType.FLUKA.value and simulation.input_type == InputType.EDITOR.value:
                     if simulation.inputs:
-                      estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
+                        estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
                     else:
-                      logging.warning('Missing input info in editor data for estimator %s', estimator.name)
-                      logging.warning('Falling back to file_name as estimator name')
-                      estimator_name = file_name.rstrip('_')
+                        logging.warning('Missing input info in editor data for estimator %s', estimator.name)
+                        logging.warning('Falling back to file_name as estimator name')
                         
                 else:
-                    estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
+                    estimator_name = file_name.rstrip('_')
 
                 # Update the estimator's name and file_name
                 estimator.name = estimator_name
                 estimator.file_name = file_name
         except Exception as e:
-            logging.error(f"Failed to migrate name and file_name for estimator with ID {estimator.id}: {e}")  
+            logging.warning(f"Failed to migrate name and file_name for estimator with ID {estimator.id}: {e}")  
 
         if simulation.input_type == InputType.EDITOR.value:
             try:
