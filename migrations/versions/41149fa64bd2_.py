@@ -36,7 +36,13 @@ def upgrade():
             for i, estimator in enumerate(estimators):
                 file_name = estimator.name
                 if simulation.sim_type == SimulationType.FLUKA.value and simulation.input_type == InputType.EDITOR.value:
-                    estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
+                    if simulation.inputs:
+                      estimator_name = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"][i]["name"]
+                    else:
+                      logging.warning('Missing input info in editor data for estimator %s', estimator.name)
+                      logging.warning('Falling back to file_name as estimator name')
+                      estimator_name = file_name.rstrip('_')
+                        
                 else:
                     estimator_name = file_name[:-1] if file_name[-1] == "_" else file_name
 
