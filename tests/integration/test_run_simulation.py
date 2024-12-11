@@ -131,6 +131,18 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
     results_data_for_specific_page: dict = json.loads(resp.data.decode())
     assert results_data["estimators"][0]["pages"][0] == results_data_for_specific_page["page"]
 
+    # Test the results endpoint with a specific page numbers
+    resp = client.get("/results",
+                      query_string={
+                          "job_id": job_id,
+                          "estimator_name": estimator_name,
+                          "page_numbers": "0-1,3"
+                      })
+    results_data_for_specific_pages: dict = json.loads(resp.data.decode())
+    assert results_data["estimators"][0]["pages"][0] == results_data_for_specific_pages["pages"][0]
+    assert results_data["estimators"][0]["pages"][1] == results_data_for_specific_pages["pages"][1]
+    assert results_data["estimators"][0]["pages"][3] == results_data_for_specific_pages["pages"][2]
+
     # Test /estimators endpoint
     resp = client.get("/estimators", query_string={"job_id": job_id})
     estimators_metadata = json.loads(resp.data.decode())["estimators_metadata"]
