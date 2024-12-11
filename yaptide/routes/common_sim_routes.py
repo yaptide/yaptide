@@ -1,11 +1,10 @@
 import logging
 from collections import Counter
 from datetime import datetime
-from typing import Union
 
 from flask import request, current_app as app
 from flask_restful import Resource
-from marshmallow import INCLUDE, Schema, fields
+from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (
     add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_by_sim_id_and_file_name,
@@ -170,6 +169,7 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
 
 
 def parse_page_numbers(param):
+    """Parses string of page ranges (e.g., '1-3,5') and returns a sorted list of page numbers"""
     pages = set()
     for part in param.split(','):
         if '-' in part:
@@ -285,7 +285,8 @@ class ResultsResource(Resource):
         # if estimator name is provided, return specific estimator
         if estimator_name is None:
             return get_all_estimators(sim_id=simulation_id)
-        elif page_number is None and page_numbers is None:
+
+        if page_number is None and page_numbers is None:
             return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
         estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
