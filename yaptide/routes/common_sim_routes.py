@@ -270,10 +270,6 @@ class ResultsResource(Resource):
         page_number = param_dict.get('page_number')
         page_numbers = param_dict.get('page_numbers')
 
-        print(estimator_name)
-        print(page_number)
-        print(page_numbers)
-
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
