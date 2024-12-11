@@ -149,8 +149,8 @@ def fetch_estimator_by_sim_id_and_file_name(sim_id: int, file_name: str) -> Esti
 
 def fetch_estimator_id_by_sim_id_and_est_name(sim_id: int, est_name: str) -> Optional[int]:
     """Fetches estimator_id by simulation id and estimator name"""
-    estimator = db.session.query(EstimatorModel.id).filter_by(simulation_id=sim_id, name=est_name).first()
-    return estimator[0] if estimator else None
+    estimator_id = db.session.query(EstimatorModel.id).filter_by(simulation_id=sim_id, name=est_name).first()
+    return estimator_id[0] if estimator_id else None
 
 
 def fetch_pages_by_estimator_id(est_id: int) -> list[PageModel]:
