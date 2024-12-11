@@ -14,7 +14,7 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
         return
 
     estimators = []
-    for filename in output_Path.iterdir():
+    for filename in sorted(output_Path.iterdir()):
         if filename.suffix != ".json":
             continue
         with open(filename, "r") as json_file:

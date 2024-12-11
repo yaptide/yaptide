@@ -140,6 +140,12 @@ def fetch_estimator_by_sim_id_and_est_name(sim_id: int, est_name: str) -> Estima
     return estimator
 
 
+def fetch_estimator_by_sim_id_and_file_name(sim_id: int, file_name: str) -> EstimatorModel:
+    """Fetches estimator by simulation id and estimator name"""
+    estimator = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id, file_name=file_name).first()
+    return estimator
+
+
 def fetch_pages_by_estimator_id(est_id: int) -> list[PageModel]:
     """Fetches pages by estimator id"""
     pages = db.session.query(PageModel).filter_by(estimator_id=est_id).all()
