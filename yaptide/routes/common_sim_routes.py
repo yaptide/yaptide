@@ -1,7 +1,7 @@
 import logging
 from collections import Counter
 from datetime import datetime
-from typing import Set
+from typing import List
 
 from flask import request, current_app as app
 from flask_restful import Resource
@@ -169,7 +169,7 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
             add_object_to_db(page, make_commit=False)
 
 
-def parse_page_numbers(param: str) -> Set[int]:
+def parse_page_numbers(param: str) -> List[int]:
     """Parses string of page ranges (e.g., '1-3,5') and returns a sorted list of page numbers"""
     pages = set()
     for part in param.split(','):
