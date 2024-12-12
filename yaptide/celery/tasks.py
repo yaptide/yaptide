@@ -8,6 +8,7 @@ import threading
 from typing import Optional
 
 from yaptide.batch.batch_methods import post_update
+from yaptide.celery.utils.progress.fluka_monitor import read_fluka_file_offline
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
                                        get_tmp_dir, read_file, read_file_offline, read_fluka_file)
@@ -53,7 +54,7 @@ def run_single_simulation(self,
 
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
         logging.debug("Generated input files: %s", files_dict.keys())
-
+        send_task_update(simulation_id, task_id, update_key, {"path_to_sim": tmp_work_dir})
         if sim_type == 'shieldhit':
             simulation_result = run_single_simulation_for_shieldhit(tmp_work_dir, task_id, update_key, simulation_id)
         elif sim_type == 'fluka':
@@ -210,6 +211,9 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
     # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
     # reading of the log file for fluka after simulation was finished
     # fluka copies the file back to main directory from temporary directory
+    if task_monitor:
+        simulated_primaries, requested_primaries = read_fluka_file_offline(task_monitor.path_to_monitor)
+        logging.debug("Simulated primaries: %d, requested primaries: %d", simulated_primaries, requested_primaries)
 
     # both simulation execution and monitoring process are finished now, we can read the estimators
     estimators_dict = get_fluka_estimators(dir_path=Path(tmp_work_dir))

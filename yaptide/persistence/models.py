@@ -200,6 +200,10 @@ class TaskModel(db.Model):
                                      nullable=False,
                                      default=-1,
                                      doc='Id of simulator process (at the moment used only in shieldhit)')
+    path_to_sim: Column[str] = db.Column(db.String,
+                                         nullable=False,
+                                         default='',
+                                         doc='Path to simulation input and output files in tmp directory')
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
@@ -231,6 +235,8 @@ class TaskModel(db.Model):
                 self.simulated_primaries = self.requested_primaries
         if value_changed(self.sim_pid, update_dict.get("sim_pid")):
             self.sim_pid = update_dict["sim_pid"]
+        if value_changed(self.path_to_sim, update_dict.get("path_to_sim")):
+            self.path_to_sim = update_dict["path_to_sim"]
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None

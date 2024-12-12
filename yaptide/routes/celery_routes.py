@@ -1,6 +1,7 @@
 import logging
 from collections import Counter
 from datetime import datetime
+import os
 import subprocess
 
 from flask import request
@@ -21,7 +22,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
-from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.enums import EntityState, PlatformType, SimulationType
 from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
 
@@ -166,11 +167,26 @@ class JobsDirect(Resource):
 
         # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
         # We don't want it to run accidentally.
-        if simulation.sim_type == "shieldhit" and simulation.job_state in (EntityState.RUNNING.value):
-            logging.debug('Inside cancelling shieldhit')
+        if simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
+                EntityState.RUNNING.value):
+            logging.debug('Cancelling shieldhit with fetching data')
+            command_as_list = ['kill', '--signal', 'SIGINT']
             for task in tasks:
-                logging.debug("PID: %d", task.sim_pid)
-                subprocess.run(['kill', '-s', 'SIGINT', str(task.sim_pid)], check=True)
+                command_as_list.append(str(task.sim_pid))
+            logging.debug(command_as_list)
+            subprocess.run(command_as_list, check=True)
+        elif simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (EntityState.RUNNING.value):
+            logging.debug('Cancelling fluka with fetching data')
+            file_name = '/rfluka.stop'
+            for task in tasks:
+                entries = os.listdir(task.path_to_sim)
+                target_folder = [
+                    entry for entry in entries
+                    if entry.startswith('fluka_') and os.path.isdir(os.path.join(task.path_to_sim, entry))
+                ][0]
+                target_path = os.path.join(task.path_to_sim, target_folder)
+                with open(target_path + file_name, 'w') as file:
+                    file.write("")
         else:
             celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
             celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")

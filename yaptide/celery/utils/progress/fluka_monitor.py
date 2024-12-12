@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
+from pathlib import Path
 import re
 import threading
 from typing import Iterator, Optional, Tuple
@@ -13,6 +14,7 @@ from yaptide.utils.enums import EntityState
 S_OK_OUT_INIT = "Total time used for initialization:"
 S_OK_OUT_START = "1NUMBER OF BEAM"
 S_OK_OUT_IN_PROGRESS = " NEXT SEEDS:"
+S_TERMINATED_FROM_OUTSIDE = "  *** RUN TERMINATION FORCED FROM OUTSIDE ***"
 S_OK_OUT_COLLECTED = " All cases handled by Feeder"
 S_OK_OUT_FIN_PRE_CHECK = "End of FLUKA"
 S_OK_OUT_FIN_PATTERN = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
@@ -153,3 +155,28 @@ def read_fluka_out_file(event: threading.Event,
     logging.info("Sending final update for task %d, simulated primaries %d", details.task_id,
                  progress_details.requested_primaries)
     send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+
+
+def read_fluka_file_offline(filepath: Path) -> tuple[int, int]:
+    """Reads fluka out file and returns number of simulated and requested primaries"""
+    simulated_primaries = 0
+    requested_primaries = 0
+    filepath = filepath / f"fl_sim001.out"
+    in_progress = False
+    try:
+        with open(filepath, 'r') as f:
+            for line in f:
+                logging.debug("Parsing line: %s", line.rstrip())
+                if line.startswith(S_TERMINATED_FROM_OUTSIDE) or line.startswith(S_OK_OUT_COLLECTED):
+                    break
+                if in_progress:
+                    simulated_primaries, remaining_particles = parse_progress_remaining_line(line)
+                    if requested_primaries == 0:
+                        requested_primaries = simulated_primaries + remaining_particles
+                    in_progress = False
+                else:
+                    if line.startswith(S_OK_OUT_IN_PROGRESS):
+                        in_progress = True
+    except FileNotFoundError:
+        logging.error("Log file %s not found", filepath)
+    return simulated_primaries, requested_primaries

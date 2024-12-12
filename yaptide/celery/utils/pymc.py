@@ -334,6 +334,7 @@ def read_fluka_file(event: threading.Event,
             return
         try:
             optional_file = get_first_matching_file()
+            logging.info(optional_file)
             if not optional_file:
                 time.sleep(1)
                 continue
