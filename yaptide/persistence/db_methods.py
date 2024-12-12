@@ -1,6 +1,7 @@
 import logging
 from typing import Optional, Union
 
+from sqlalchemy import and_
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
@@ -146,6 +147,12 @@ def fetch_estimator_by_sim_id_and_file_name(sim_id: int, file_name: str) -> Esti
     return estimator
 
 
+def fetch_estimator_id_by_sim_id_and_est_name(sim_id: int, est_name: str) -> Optional[int]:
+    """Fetches estimator_id by simulation id and estimator name"""
+    estimator_id = db.session.query(EstimatorModel.id).filter_by(simulation_id=sim_id, name=est_name).first()
+    return estimator_id[0] if estimator_id else None
+
+
 def fetch_pages_by_estimator_id(est_id: int) -> list[PageModel]:
     """Fetches pages by estimator id"""
     pages = db.session.query(PageModel).filter_by(estimator_id=est_id).all()
@@ -156,6 +163,20 @@ def fetch_page_by_est_id_and_page_number(est_id: int, page_number: int) -> PageM
     """Fetches page by estimator id and page number"""
     page = db.session.query(PageModel).filter_by(estimator_id=est_id, page_number=page_number).first()
     return page
+
+
+def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> PageModel:
+    """Fetches page by estimator id and page number"""
+    pages = db.session.query(PageModel).filter(
+        and_(PageModel.estimator_id == est_id, PageModel.page_number.in_(page_numbers))).all()
+    return pages
+
+
+def fetch_pages_metadata_by_est_id(est_id: str) -> EstimatorModel:
+    """Fetches estimator by simulation id and estimator name"""
+    pages_metadata = db.session.query(PageModel.page_number, PageModel.page_name,
+                                      PageModel.page_dimension).filter_by(estimator_id=est_id).all()
+    return pages_metadata
 
 
 def fetch_all_clusters() -> list[ClusterModel]:

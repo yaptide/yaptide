@@ -1,7 +1,7 @@
 import logging
 from collections import Counter
 from datetime import datetime
-from typing import Union
+from typing import List
 
 from flask import request, current_app as app
 from flask_restful import Resource
@@ -9,7 +9,8 @@ from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (
     add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_by_sim_id_and_file_name,
-    fetch_estimators_by_sim_id, fetch_input_by_sim_id, fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number,
+    fetch_estimator_id_by_sim_id_and_est_name, fetch_estimators_by_sim_id, fetch_input_by_sim_id,
+    fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number, fetch_pages_by_est_id_and_page_numbers,
     fetch_pages_by_estimator_id, fetch_simulation_by_job_id, fetch_simulation_by_sim_id, fetch_simulation_id_by_job_id,
     fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
 from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
@@ -157,12 +158,27 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
                                                     page_number=int(page_dict["metadata"]["page_number"]))
         page_existed = bool(page)
         if not page_existed:
-            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]), estimator_id=estimator.id)
+            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]),
+                             estimator_id=estimator.id,
+                             page_dimension=int(page_dict['dimensions']),
+                             page_name=str(page_dict["metadata"]["name"]))
         # we always update the data
         page.data = page_dict
         if not page_existed:
             # if page was created, we add it to the session
             add_object_to_db(page, make_commit=False)
+
+
+def parse_page_numbers(param: str) -> List[int]:
+    """Parses string of page ranges (e.g., '1-3,5') and returns a sorted list of page numbers"""
+    pages = set()
+    for part in param.split(','):
+        if '-' in part:
+            start, end = map(int, part.split('-'))
+            pages.update(range(start, end + 1))
+        else:
+            pages.add(int(part))
+    return sorted(pages)
 
 
 class ResultsResource(Resource):
@@ -232,6 +248,8 @@ class ResultsResource(Resource):
 
         job_id = fields.String()
         estimator_name = fields.String(load_default=None)
+        page_number = fields.Integer(load_default=None)
+        page_numbers = fields.String(load_default=None)
 
     @staticmethod
     @requires_auth()
@@ -240,6 +258,7 @@ class ResultsResource(Resource):
         If `estimator_name` parameter is provided,
         the response will include results only for that specific estimator,
         otherwise it will return all estimators for the given job.
+        If `page_number` or `page_numbers` are provided, the response will include only specific pages.
         """
         schema = ResultsResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
@@ -249,6 +268,8 @@ class ResultsResource(Resource):
 
         job_id = param_dict['job_id']
         estimator_name = param_dict['estimator_name']
+        page_number = param_dict.get('page_number')
+        page_numbers = param_dict.get('page_numbers')
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -259,10 +280,24 @@ class ResultsResource(Resource):
             return yaptide_response(message="Simulation does not exist", code=404)
 
         # if estimator name is provided, return specific estimator
-        if estimator_name:
+        if estimator_name is None:
+            return get_all_estimators(sim_id=simulation_id)
+
+        if page_number is None and page_numbers is None:
             return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
-        return get_all_estimators(sim_id=simulation_id)
+        estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
+        if page_number is not None:
+            page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=page_number)
+            result = {"page": page.data}
+            return yaptide_response(message="Page retrieved successfully", code=200, content=result)
+
+        if page_numbers is not None:
+            parsed_page_numbers = parse_page_numbers(page_numbers)
+            pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator_id, page_numbers=parsed_page_numbers)
+            result = {"pages": [page.data for page in pages]}
+            return yaptide_response(message="Pages retrieved successfully", code=200, content=result)
+        return yaptide_response(message="Wrong parameters", code=400, content=errors)
 
 
 class InputsResource(Resource):
