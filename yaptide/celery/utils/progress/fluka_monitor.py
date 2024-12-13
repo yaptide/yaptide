@@ -161,7 +161,7 @@ def read_fluka_file_offline(filepath: Path) -> tuple[int, int]:
     """Reads fluka out file and returns number of simulated and requested primaries"""
     simulated_primaries = 0
     requested_primaries = 0
-    filepath = filepath / f"fl_sim001.out"
+    filepath = filepath / "fl_sim001.out"
     in_progress = False
     try:
         with open(filepath, 'r') as f:

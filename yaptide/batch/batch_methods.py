@@ -309,8 +309,8 @@ def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, c
     return {"message": "Results not available"}
 
 
-def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
-               cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel,
+               to_fetch: bool) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
     job_dir = simulation.job_dir
     array_id = simulation.array_id
@@ -318,10 +318,12 @@ def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
 
     try:
         con = get_connection(user=user, cluster=cluster)
-
-        con.run(f'scancel {array_id}')
-        con.run(f'scancel {collect_id}')
-        con.run(f'rm -rf {job_dir}')
+        if to_fetch:
+            con.run(f'scancel --signal SIGINT {array_id}')
+        else:
+            con.run(f'scancel {array_id}')
+            con.run(f'scancel {collect_id}')
+            con.run(f'rm -rf {job_dir}')
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)
         return {"message": "Job cancelation failed"}, 500

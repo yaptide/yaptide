@@ -148,6 +148,7 @@ class JobsBatch(Resource):
         params_dict: dict = schema.load(request.args)
 
         job_id: str = params_dict["job_id"]
+        to_fetch = params_dict.get('to_fetch', True)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -165,16 +166,16 @@ class JobsBatch(Resource):
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
-        result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
+        result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster, to_fetch=to_fetch)
         if status_code != 200:
             return error_internal_response(content=result)
+        if not to_fetch:
+            update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
 
-        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+            tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
 
-        tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
-
-        for task in tasks:
-            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+            for task in tasks:
+                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
         return yaptide_response(message="", code=status_code, content=result)
 

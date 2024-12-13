@@ -88,7 +88,15 @@ python3 $ROOT_DIR/watcher.py \\
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun shieldhit -N $RNG_SEED $WORK_DIR &
+srun shieldhit -N $RNG_SEED $WORK_DIR & eval "export SHIELDHIT_PID_${SLURM_ARRAY_TASK_ID}=$!"
+eval "echo Shieldhit PID: \$SHIELDHIT_PID_${SLURM_ARRAY_TASK_ID}"
+
+sig_handler2()
+{{
+    eval "kill --signal SIGINT \$SHIELDHIT_PID_${SLURM_ARRAY_TASK_ID}"
+}}
+
+trap 'sig_handler2' SIGINT
 
 wait
 """  # skipcq: FLK-E501

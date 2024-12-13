@@ -144,6 +144,7 @@ class JobsDirect(Resource):
         params_dict: dict = schema.load(request.args)
 
         job_id = params_dict['job_id']
+        to_fetch = params_dict.get('to_fetch', True)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -167,7 +168,7 @@ class JobsDirect(Resource):
 
         # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
         # We don't want it to run accidentally.
-        if simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
+        if to_fetch is True and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
                 EntityState.RUNNING.value):
             logging.debug('Cancelling shieldhit with fetching data')
             command_as_list = ['kill', '--signal', 'SIGINT']
@@ -175,7 +176,8 @@ class JobsDirect(Resource):
                 command_as_list.append(str(task.sim_pid))
             logging.debug(command_as_list)
             subprocess.run(command_as_list, check=True)
-        elif simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (EntityState.RUNNING.value):
+        elif to_fetch is True and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (
+                EntityState.RUNNING.value):
             logging.debug('Cancelling fluka with fetching data')
             file_name = '/rfluka.stop'
             for task in tasks:
