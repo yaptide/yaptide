@@ -56,7 +56,6 @@ def test_celery_run_simulation_for_shieldhit(celery_app, celery_worker, payload_
 
     files_dict, _ = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     logging.info("Starting run_simulation task")
-
     map_group = group([
         run_single_simulation.s(
             files_dict=files_dict,

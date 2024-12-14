@@ -94,9 +94,10 @@ def translate_celery_state_naming(job_state: str) -> str:
     return job_state
 
 
-def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int]):
+def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel]):
     """Function cancelling shieldhit processes"""
     command_as_list = ['kill', '--signal', 'SIGINT']
+    celery_ids = []
     for task in tasks:
         if task.task_state == EntityState.RUNNING.value:
             command_as_list.append(str(task.sim_pid))
@@ -108,9 +109,10 @@ def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel], celery_ids: list
     celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
 
 
-def handle_fluka_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int]):
+def handle_fluka_cancellation(tasks: list[CeleryTaskModel]):
     """Function cancelling fluka processes"""
     FILE_NAME = 'rfluka.stop'
+    celery_ids = []
     for task in tasks:
         if task.task_state == EntityState.RUNNING.value:
             try:

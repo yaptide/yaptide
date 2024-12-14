@@ -163,15 +163,14 @@ class JobsDirect(Resource):
                                     })
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
-        celery_ids = []
 
         # handle different simulation types and fetching data (or not)
         if fetch_results and simulation.sim_type == SimulationType.SHIELDHIT.value \
                 and simulation.job_state == EntityState.RUNNING.value:
-            handle_shieldhit_cancellation(tasks, celery_ids)
+            handle_shieldhit_cancellation(tasks)
         elif fetch_results and simulation.sim_type == SimulationType.FLUKA.value \
                 and simulation.job_state == EntityState.RUNNING.value:
-            handle_fluka_cancellation(tasks, celery_ids)
+            handle_fluka_cancellation(tasks)
         else:
             cancel_tasks_without_fetching(simulation, tasks)
 

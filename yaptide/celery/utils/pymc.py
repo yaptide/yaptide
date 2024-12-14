@@ -127,10 +127,9 @@ def execute_simulation_subprocess(dir_path: Path,
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE,
                                    text=True)
-
         pid = process.pid
         logging.info("sending info to task: %d in simulation: %d with update key: %s to update PID %d", task_id,
-                     simulation_id, update_key, pid)
+                     simulation_id or -1, update_key, pid)
         send_task_update(simulation_id, task_id, update_key, {"sim_pid": pid})
         # Capture stdout and stderr
         command_stdout, command_stderr = process.communicate()

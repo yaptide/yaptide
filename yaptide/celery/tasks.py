@@ -258,7 +258,7 @@ def merge_results(results: list[dict]) -> dict:
             "update_key": update_key
         }
         post_update(dict_to_send)
-    total_particles = 0
+    total_primaries = 0
     for result in results:
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
@@ -270,16 +270,16 @@ def merge_results(results: list[dict]) -> dict:
 
         if averaged_estimators is None:
             averaged_estimators: list[dict] = result.get("estimators", [])
-            total_particles += int(averaged_estimators[0]["metadata"]["number_of_primaries"])
-            logging.debug(total_particles)
+            total_primaries += int(averaged_estimators[0]["metadata"]["number_of_primaries"])
+            logging.debug(total_primaries)
             # There is nothing to average yet
             continue
 
         new_particles = int(result.get("estimators", [])[0]["metadata"]["number_of_primaries"])
-        logging.debug("Avereging results from %d particles", new_particles)
-        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), total_particles,
+        logging.debug("Averaging results from %d primaries", new_particles)
+        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), total_primaries,
                                                  new_particles)
-        total_particles += new_particles
+        total_primaries += new_particles
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
