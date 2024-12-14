@@ -89,7 +89,6 @@ trap 'sig_handler' SIGUSR1
 
 # execute simulation
 srun shieldhit -N $RNG_SEED $WORK_DIR & eval "export SHIELDHIT_PID_${SLURM_ARRAY_TASK_ID}=$!"
-eval "echo Shieldhit PID: \$SHIELDHIT_PID_${SLURM_ARRAY_TASK_ID}"
 
 sig_handler2()
 {{

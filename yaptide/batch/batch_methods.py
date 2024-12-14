@@ -15,6 +15,7 @@ from paramiko import RSAKey
 
 from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
+from yaptide.persistence.db_methods import fetch_celery_tasks_by_sim_id
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
@@ -309,8 +310,8 @@ def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, c
     return {"message": "Results not available"}
 
 
-def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel,
-               to_fetch: bool) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
+               cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Dummy version of delete_job"""
     job_dir = simulation.job_dir
     array_id = simulation.array_id
@@ -318,12 +319,33 @@ def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel, cluste
 
     try:
         con = get_connection(user=user, cluster=cluster)
-        if to_fetch:
-            con.run(f'scancel --signal SIGINT {array_id}')
-        else:
-            con.run(f'scancel {array_id}')
-            con.run(f'scancel {collect_id}')
-            con.run(f'rm -rf {job_dir}')
+        con.run(f'scancel {array_id}')
+        con.run(f'scancel {collect_id}')
+        con.run(f'rm -rf {job_dir}')
+    except Exception as e:  # skipcq: PYL-W0703
+        logging.error(e)
+        return {"message": "Job cancelation failed"}, 500
+
+    return {"message": "Job canceled"}, 200
+
+
+def fetch_results_without_stopping(simulation: BatchSimulationModel, user: KeycloakUserModel,
+                                   cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+    """Function that stops simulation without cancelling collection job"""
+    array_id = simulation.array_id
+    tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
+    try:
+        con = get_connection(user=user, cluster=cluster)
+        i = 1
+        fetch_str = 'scancel --signal=SIGINT'
+        delete_str = 'scancel'
+        for task in tasks:
+            if task.task_state == EntityState.RUNNING.value:
+                fetch_str += f' {array_id}_{i}'
+            if task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+                delete_str += f' {array_id}_{i}'
+        con.run(fetch_str)
+        con.run(delete_str)
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)
         return {"message": "Job cancelation failed"}, 500

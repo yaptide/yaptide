@@ -196,14 +196,6 @@ class TaskModel(db.Model):
                                         nullable=False,
                                         default=EntityState.PENDING.value,
                                         doc="Task state (i.e. 'pending', 'running', 'completed', 'failed')")
-    sim_pid: Column[int] = db.Column(db.Integer,
-                                     nullable=False,
-                                     default=-1,
-                                     doc='Id of simulator process (at the moment used only in shieldhit)')
-    path_to_sim: Column[str] = db.Column(db.String,
-                                         nullable=False,
-                                         default='',
-                                         doc='Path to simulation input and output files in tmp directory')
     estimated_time: Column[int] = db.Column(db.Integer, nullable=True, doc="Estimated time in seconds")
     start_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task start time")
     end_time: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Task end time")
@@ -281,6 +273,12 @@ class CeleryTaskModel(TaskModel):
     __tablename__ = 'CeleryTask'
     id: Column[int] = db.Column(db.Integer, db.ForeignKey('Task.id', ondelete="CASCADE"), primary_key=True)
     celery_id: Column[str] = db.Column(db.String, nullable=False, default="", doc="Celery task ID")
+    sim_pid: Column[int] = db.Column(db.Integer,
+                                     nullable=True,
+                                     doc='Id of simulation process used to communicate with shieldhit process')
+    path_to_sim: Column[str] = db.Column(db.String,
+                                         nullable=True,
+                                         doc='Path to simulation input and output files in tmp directory')
 
     def update_state(self, update_dict: dict):
         """Update method for CeleryTaskModel"""

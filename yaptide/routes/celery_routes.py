@@ -1,7 +1,7 @@
 import logging
 from collections import Counter
 from datetime import datetime
-import os
+from pathlib import Path
 import subprocess
 
 from flask import request
@@ -161,35 +161,41 @@ class JobsDirect(Resource):
                                     })
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
-        celery_ids = [
-            task.celery_id for task in tasks
-            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
-        ]
-
-        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
-        # We don't want it to run accidentally.
+        celery_ids = []
         if to_fetch is True and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
                 EntityState.RUNNING.value):
             logging.debug('Cancelling shieldhit with fetching data')
             command_as_list = ['kill', '--signal', 'SIGINT']
             for task in tasks:
-                command_as_list.append(str(task.sim_pid))
+                if task.task_state == EntityState.RUNNING.value:
+                    command_as_list.append(str(task.sim_pid))
+                elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+                    celery_ids.append(task.celery_id)
             logging.debug(command_as_list)
             subprocess.run(command_as_list, check=True)
+            celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
         elif to_fetch is True and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (
                 EntityState.RUNNING.value):
             logging.debug('Cancelling fluka with fetching data')
-            file_name = '/rfluka.stop'
+            file_name = 'rfluka.stop'
             for task in tasks:
-                entries = os.listdir(task.path_to_sim)
-                target_folder = [
-                    entry for entry in entries
-                    if entry.startswith('fluka_') and os.path.isdir(os.path.join(task.path_to_sim, entry))
-                ][0]
-                target_path = os.path.join(task.path_to_sim, target_folder)
-                with open(target_path + file_name, 'w') as file:
-                    file.write("")
+                if task.task_state == EntityState.RUNNING.value:
+                    target_folder = next(Path(task.path_to_sim).glob("fluka_*/"))
+                    target_path = target_folder / file_name
+                    logging.debug("Path: %s", target_path)
+                    with target_path.open('w') as file:
+                        file.write("")
+                elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+                    celery_ids.append(task.celery_id)
+            celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
         else:
+            logging.debug('Cancelling tasks without fetching data')
+            celery_ids = [
+                task.celery_id for task in tasks
+                if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
+            ]
+            # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
+            # We don't want it to run accidentally.
             celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
             celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
             update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})

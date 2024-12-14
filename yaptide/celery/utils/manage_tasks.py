@@ -5,7 +5,10 @@ from celery.result import AsyncResult
 
 from yaptide.celery.tasks import merge_results, run_single_simulation, set_merging_queued_state
 from yaptide.celery.simulation_worker import celery_app
+from yaptide.persistence.db_methods import update_simulation_state, update_task_state
+from yaptide.persistence.models import CelerySimulationModel, CeleryTaskModel
 from yaptide.utils.enums import EntityState
+from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
 
 def run_job(files_dict: dict,
