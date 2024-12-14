@@ -11,7 +11,8 @@ from uuid import uuid4
 
 from yaptide.celery.simulation_worker import celery_app
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import (get_job_results, run_job)
+from yaptide.celery.utils.manage_tasks import (cancel_tasks_without_fetching, get_job_results,
+                                               handle_fluka_cancellation, handle_shieldhit_cancellation, run_job)
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
                                             fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
                                             fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
@@ -162,49 +163,15 @@ class JobsDirect(Resource):
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
         celery_ids = []
-        if fetch_results is True and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
-                EntityState.RUNNING.value):
-            logging.debug('Cancelling shieldhit with fetching data')
-            command_as_list = ['kill', '--signal', 'SIGINT']
-            for task in tasks:
-                if task.task_state == EntityState.RUNNING.value:
-                    command_as_list.append(str(task.sim_pid))
-                elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.sim_pid is None:
-                    celery_ids.append(task.celery_id)
-            logging.debug(command_as_list)
-            subprocess.run(command_as_list, check=True)
-            celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
-        elif fetch_results is True and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (
-                EntityState.RUNNING.value):
-            logging.debug('Cancelling fluka with fetching data')
-            FILE_NAME = 'rfluka.stop'
-            for task in tasks:
-                if task.task_state == EntityState.RUNNING.value:
-                    try:
-                        if (target_folder := next(Path(task.path_to_sim).glob("fluka_*/"), None)):
-                            (target_folder / FILE_NAME).write_text("")
-                    except (OSError, FileNotFoundError, PermissionError) as e:
-                        logging.warning(f"Error due to file operation: {e}")
-                elif task.task_state in (EntityState.PENDING.value,
-                                         EntityState.UNKNOWN.value) or task.path_to_sim is None:
-                    celery_ids.append(task.celery_id)
-            celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
-        else:
-            logging.debug('Cancelling tasks without fetching data')
-            celery_ids = [
-                task.celery_id for task in tasks
-                if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
-            ]
-            # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
-            # We don't want it to run accidentally.
-            celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
-            celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
-            update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
-            for task in tasks:
-                if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
-                    update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
-            terminate_unfinished_tasks.delay(simulation_id=simulation.id)
+        #handle different simulation types and fetching data (or not)
+        if fetch_results and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state == EntityState.RUNNING.value:
+            handle_shieldhit_cancellation(tasks, celery_ids)
+        elif fetch_results and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state == EntityState.RUNNING.value:
+            handle_fluka_cancellation(tasks, celery_ids)
+        else:
+            cancel_tasks_without_fetching(simulation, tasks)
+
         return yaptide_response(message="Cancelled sucessfully", code=200)
 
 

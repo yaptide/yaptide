@@ -5,7 +5,7 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.batch.batch_methods import cancel_simulation_with_fertching_data, delete_job, get_job_status, submit_job
+from yaptide.batch.batch_methods import cancel_simulation_with_fetching_data, delete_job, get_job_status, submit_job
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_all_clusters, fetch_batch_simulation_by_job_id,
                                             fetch_batch_tasks_by_sim_id, fetch_cluster_by_id, make_commit_to_db,
                                             update_simulation_state, update_task_state)
@@ -166,9 +166,9 @@ class JobsBatch(Resource):
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
         if fetch_results:
-            result, status_code = cancel_simulation_with_fertching_data(simulation=simulation,
-                                                                        user=user,
-                                                                        cluster=cluster)
+            result, status_code = cancel_simulation_with_fetching_data(simulation=simulation,
+                                                                       user=user,
+                                                                       cluster=cluster)
         else:
             result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
         if status_code != 200:

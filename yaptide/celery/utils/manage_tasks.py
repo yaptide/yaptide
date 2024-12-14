@@ -1,11 +1,16 @@
 import logging
+from pathlib import Path
+import subprocess
 
 from celery import chain, chord, group
 from celery.result import AsyncResult
 
 from yaptide.celery.tasks import merge_results, run_single_simulation, set_merging_queued_state
 from yaptide.celery.simulation_worker import celery_app
+from yaptide.persistence.db_methods import update_simulation_state, update_task_state
+from yaptide.persistence.models import CelerySimulationModel, CeleryTaskModel
 from yaptide.utils.enums import EntityState
+from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
 
 def run_job(files_dict: dict,
@@ -87,3 +92,49 @@ def translate_celery_state_naming(job_state: str) -> str:
         return EntityState.COMPLETED.value
     # Others are the same
     return job_state
+
+
+def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int]):
+    command_as_list = ['kill', '--signal', 'SIGINT']
+    for task in tasks:
+        if task.task_state == EntityState.RUNNING.value:
+            command_as_list.append(str(task.sim_pid))
+        elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.sim_pid is None:
+            celery_ids.append(task.celery_id)
+
+    # Send SIGINT to Shieldhit processes
+    subprocess.run(command_as_list, check=True)
+    celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+
+
+def handle_fluka_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int]):
+    FILE_NAME = 'rfluka.stop'
+    for task in tasks:
+        if task.task_state == EntityState.RUNNING.value:
+            try:
+                if (target_folder := next(Path(task.path_to_sim).glob("fluka_*/"), None)):
+                    (target_folder / FILE_NAME).write_text("")
+            except OSError as e:
+                logging.warning("Error due to file operation: %s", str(e))
+        elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.path_to_sim is None:
+            celery_ids.append(task.celery_id)
+    celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+
+
+def cancel_tasks_without_fetching(simulation: CelerySimulationModel, tasks: list[CeleryTaskModel]):
+    celery_ids = [
+        task.celery_id for task in tasks
+        if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
+    ]
+
+    # Revoke the merge task first
+    celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
+    celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+
+    # Update states
+    update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+    for task in tasks:
+        if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
+            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+
+    terminate_unfinished_tasks.delay(simulation_id=simulation.id)
