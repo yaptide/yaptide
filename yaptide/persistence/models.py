@@ -225,10 +225,6 @@ class TaskModel(db.Model):
             self.task_state = update_dict["task_state"]
             if self.task_state == EntityState.COMPLETED.value:
                 self.simulated_primaries = self.requested_primaries
-        if value_changed(self.sim_pid, update_dict.get("sim_pid")):
-            self.sim_pid = update_dict["sim_pid"]
-        if value_changed(self.path_to_sim, update_dict.get("path_to_sim")):
-            self.path_to_sim = update_dict["path_to_sim"]
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]
         end_time_not_set = self.end_time is None

@@ -144,7 +144,7 @@ class JobsDirect(Resource):
         params_dict: dict = schema.load(request.args)
 
         job_id = params_dict['job_id']
-        to_fetch = params_dict.get('to_fetch', True)
+        fetch_results = params_dict.get('fetch_results', True)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -162,30 +162,31 @@ class JobsDirect(Resource):
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
         celery_ids = []
-        if to_fetch is True and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
+        if fetch_results is True and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state in (
                 EntityState.RUNNING.value):
             logging.debug('Cancelling shieldhit with fetching data')
             command_as_list = ['kill', '--signal', 'SIGINT']
             for task in tasks:
                 if task.task_state == EntityState.RUNNING.value:
                     command_as_list.append(str(task.sim_pid))
-                elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+                elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.sim_pid is None:
                     celery_ids.append(task.celery_id)
             logging.debug(command_as_list)
             subprocess.run(command_as_list, check=True)
             celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
-        elif to_fetch is True and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (
+        elif fetch_results is True and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state in (
                 EntityState.RUNNING.value):
             logging.debug('Cancelling fluka with fetching data')
-            file_name = 'rfluka.stop'
+            FILE_NAME = 'rfluka.stop'
             for task in tasks:
                 if task.task_state == EntityState.RUNNING.value:
-                    target_folder = next(Path(task.path_to_sim).glob("fluka_*/"))
-                    target_path = target_folder / file_name
-                    logging.debug("Path: %s", target_path)
-                    with target_path.open('w') as file:
-                        file.write("")
-                elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+                    try:
+                        if (target_folder := next(Path(task.path_to_sim).glob("fluka_*/"), None)):
+                            (target_folder / FILE_NAME).write_text("")
+                    except (OSError, FileNotFoundError, PermissionError) as e:
+                        logging.warning(f"Error due to file operation: {e}")
+                elif task.task_state in (EntityState.PENDING.value,
+                                         EntityState.UNKNOWN.value) or task.path_to_sim is None:
                     celery_ids.append(task.celery_id)
             celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
         else:

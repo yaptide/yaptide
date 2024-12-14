@@ -329,8 +329,8 @@ def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
     return {"message": "Job canceled"}, 200
 
 
-def fetch_results_without_stopping(simulation: BatchSimulationModel, user: KeycloakUserModel,
-                                   cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+def cancel_simulation_with_fertching_data(simulation: BatchSimulationModel, user: KeycloakUserModel,
+                                          cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
     """Function that stops simulation without cancelling collection job"""
     array_id = simulation.array_id
     tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
