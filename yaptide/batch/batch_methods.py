@@ -339,7 +339,8 @@ def cancel_simulation_with_fetching_data(simulation: BatchSimulationModel, user:
         i = 1
         fetch_str = 'scancel --signal=SIGINT'
         delete_str = 'scancel'
-        #Iterating through tasks to find tasks from which data can be fetched and this which should be deleted to stop simulation
+        # Iterating through tasks to find tasks from which data can be fetched
+        # and this which should be deleted to stop simulation
         for task in tasks:
             if task.task_state == EntityState.RUNNING.value:
                 fetch_str += f' {array_id}_{i}'
@@ -347,7 +348,7 @@ def cancel_simulation_with_fetching_data(simulation: BatchSimulationModel, user:
                 delete_str += f' {array_id}_{i}'
         # Execute the fetch command to gracefully stop running tasks and potentially fetch intermediate results.
         con.run(fetch_str)
-        # Execute the delete command to cancel pending or unknown tasks without attempting to fetch data, because there are no data to fetch.
+        # Execute the delete command to cancel pending or unknown tasks without attempting to fetch data.
         con.run(delete_str)
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)

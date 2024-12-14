@@ -95,6 +95,7 @@ def translate_celery_state_naming(job_state: str) -> str:
 
 
 def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int]):
+    """Function cancelling shieldhit processes"""
     command_as_list = ['kill', '--signal', 'SIGINT']
     for task in tasks:
         if task.task_state == EntityState.RUNNING.value:
@@ -108,6 +109,7 @@ def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel], celery_ids: list
 
 
 def handle_fluka_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int]):
+    """Function cancelling fluka processes"""
     FILE_NAME = 'rfluka.stop'
     for task in tasks:
         if task.task_state == EntityState.RUNNING.value:
@@ -122,6 +124,7 @@ def handle_fluka_cancellation(tasks: list[CeleryTaskModel], celery_ids: list[int
 
 
 def cancel_tasks_without_fetching(simulation: CelerySimulationModel, tasks: list[CeleryTaskModel]):
+    """Function to cancel tasks without feching data"""
     celery_ids = [
         task.celery_id for task in tasks
         if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]

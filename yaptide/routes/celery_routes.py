@@ -1,22 +1,24 @@
 import logging
 from collections import Counter
 from datetime import datetime
-from pathlib import Path
-import subprocess
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 from uuid import uuid4
 
-from yaptide.celery.simulation_worker import celery_app
 from yaptide.celery.tasks import convert_input_files
 from yaptide.celery.utils.manage_tasks import (cancel_tasks_without_fetching, get_job_results,
                                                handle_fluka_cancellation, handle_shieldhit_cancellation, run_job)
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
-                                            fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
-                                            fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
-                                            update_task_state)
+from yaptide.persistence.db_methods import (
+    add_object_to_db,
+    fetch_celery_simulation_by_job_id,
+    fetch_celery_tasks_by_sim_id,
+    fetch_estimators_by_sim_id,
+    fetch_pages_by_estimator_id,
+    make_commit_to_db,
+    update_simulation_state,
+)
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
@@ -24,7 +26,6 @@ from yaptide.routes.utils.response_templates import (error_validation_response, 
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType, SimulationType
-from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
 
 class JobsDirect(Resource):
@@ -164,10 +165,12 @@ class JobsDirect(Resource):
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
         celery_ids = []
 
-        #handle different simulation types and fetching data (or not)
-        if fetch_results and simulation.sim_type == SimulationType.SHIELDHIT.value and simulation.job_state == EntityState.RUNNING.value:
+        # handle different simulation types and fetching data (or not)
+        if fetch_results and simulation.sim_type == SimulationType.SHIELDHIT.value \
+                and simulation.job_state == EntityState.RUNNING.value:
             handle_shieldhit_cancellation(tasks, celery_ids)
-        elif fetch_results and simulation.sim_type == SimulationType.FLUKA.value and simulation.job_state == EntityState.RUNNING.value:
+        elif fetch_results and simulation.sim_type == SimulationType.FLUKA.value \
+                and simulation.job_state == EntityState.RUNNING.value:
             handle_fluka_cancellation(tasks, celery_ids)
         else:
             cancel_tasks_without_fetching(simulation, tasks)
