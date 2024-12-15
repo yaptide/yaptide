@@ -275,11 +275,11 @@ def merge_results(results: list[dict]) -> dict:
             # There is nothing to average yet
             continue
 
-        new_particles = int(result.get("estimators", [])[0]["metadata"]["number_of_primaries"])
-        logging.debug("Averaging results from %d primaries", new_particles)
+        new_primaries = int(result.get("estimators", [])[0]["metadata"]["number_of_primaries"])
+        logging.debug("Averaging results from %d primaries", new_primaries)
         averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), total_primaries,
-                                                 new_particles)
-        total_primaries += new_particles
+                                                 new_primaries)
+        total_primaries += new_primaries
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 

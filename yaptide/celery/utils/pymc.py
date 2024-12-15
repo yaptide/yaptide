@@ -128,6 +128,7 @@ def execute_simulation_subprocess(dir_path: Path,
                                    stderr=subprocess.PIPE,
                                    text=True)
         pid = process.pid
+        # There was some problem with not a None value in some tests in simulation_id, thats why or -1 here
         logging.info("sending info to task: %d in simulation: %d with update key: %s to update PID %d", task_id,
                      simulation_id or -1, update_key, pid)
         send_task_update(simulation_id, task_id, update_key, {"sim_pid": pid})

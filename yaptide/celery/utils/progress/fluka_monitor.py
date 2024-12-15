@@ -174,6 +174,8 @@ def read_fluka_out_file_offline(sim_dir: Path) -> tuple[int, int]:
                     break
                 if in_progress:
                     simulated_primaries, remaining_particles = parse_progress_remaining_line(line)
+                    # calculate a requested primaries, fluka don't have any info about it in a .out file
+                    # so it is needed to calculate it
                     if requested_primaries == 0:
                         requested_primaries = simulated_primaries + remaining_particles
                     in_progress = False

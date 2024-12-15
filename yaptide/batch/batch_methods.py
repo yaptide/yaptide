@@ -330,7 +330,7 @@ def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
 
 
 def cancel_simulation_with_fetching_data(simulation: BatchSimulationModel, user: KeycloakUserModel,
-                                         cluster: ClusterModel) -> tuple[dict, int]:  # skipcq: PYL-W0613
+                                         cluster: ClusterModel) -> tuple[dict, int]:
     """Function that stops simulation without cancelling collection job"""
     array_id = simulation.array_id
     tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
@@ -346,6 +346,7 @@ def cancel_simulation_with_fetching_data(simulation: BatchSimulationModel, user:
                 fetch_str += f' {array_id}_{i}'
             if task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
                 delete_str += f' {array_id}_{i}'
+            i += 1
         # Execute the fetch command to gracefully stop running tasks and potentially fetch intermediate results.
         con.run(fetch_str)
         # Execute the delete command to cancel pending or unknown tasks without attempting to fetch data.

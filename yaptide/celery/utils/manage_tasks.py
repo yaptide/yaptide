@@ -1,5 +1,7 @@
 import logging
+import os
 from pathlib import Path
+import signal
 import subprocess
 
 from celery import chain, chord, group
@@ -96,18 +98,14 @@ def translate_celery_state_naming(job_state: str) -> str:
 
 def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel]):
     """Function triggering shieldhit processes to terminate and dump results"""
-    command_as_list = ['kill', '--signal', 'SIGINT']
     celery_ids = []
     for task in tasks:
         if task.task_state == EntityState.RUNNING.value:
             logging.warning(task.sim_pid)
-            command_as_list.append(str(task.sim_pid))
+            os.kill(task.sim_pid, signal.SIGINT)
         elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.sim_pid is None:
             celery_ids.append(task.celery_id)
 
-    # Send SIGINT to shieldhit processes, that will immediately stop the simulation and trigger output files dump
-    subprocess.run(command_as_list, check=True)
-    # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
     # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
     celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
 
@@ -125,6 +123,7 @@ def handle_fluka_cancellation(tasks: list[CeleryTaskModel]):
                 logging.warning("Error due to file operation: %s", str(e))
         elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.path_to_sim is None:
             celery_ids.append(task.celery_id)
+
     # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
     celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
 
