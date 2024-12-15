@@ -108,6 +108,7 @@ def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel]):
     # Send SIGINT to shieldhit processes, that will immediately stop the simulation and trigger output files dump
     subprocess.run(command_as_list, check=True)
     # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
+    # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
     celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
 
 
