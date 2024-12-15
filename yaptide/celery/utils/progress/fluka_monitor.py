@@ -162,8 +162,12 @@ def read_fluka_out_file_offline(sim_dir: Path) -> tuple[int, int]:
     simulated_primaries = 0
     requested_primaries = 0
     in_progress = False
+    out_file_path = sim_dir / "fl_sim001.out"
+    if not out_file_path.exists():
+        logging.error("Out file %s not found", out_file_path)
+        return simulated_primaries, requested_primaries
     try:
-        with open(sim_dir / "fl_sim001.out", 'r') as f:
+        with open(out_file_path, 'r') as f:
             for line in f:
                 logging.debug("Parsing line: %s", line.rstrip())
                 if line.startswith(S_TERMINATED_FROM_OUTSIDE) or line.startswith(S_OK_OUT_COLLECTED):
@@ -177,5 +181,5 @@ def read_fluka_out_file_offline(sim_dir: Path) -> tuple[int, int]:
                     if line.startswith(S_OK_OUT_IN_PROGRESS):
                         in_progress = True
     except FileNotFoundError:
-        logging.error("Out file %s not found", str(sim_dir / "fl_sim001.out"))
+        logging.error("Log file %s not found", out_file_path)
     return simulated_primaries, requested_primaries
