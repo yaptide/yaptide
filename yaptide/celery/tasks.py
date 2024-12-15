@@ -8,7 +8,7 @@ import threading
 from typing import Optional
 
 from yaptide.batch.batch_methods import post_update
-from yaptide.celery.utils.progress.fluka_monitor import read_fluka_file_offline
+from yaptide.celery.utils.progress.fluka_monitor import read_fluka_out_file_offline
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
                                        get_tmp_dir, read_file, read_file_offline, read_fluka_file)
@@ -212,7 +212,7 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
     # reading of the log file for fluka after simulation was finished
     # fluka copies the file back to main directory from temporary directory
     if task_monitor:
-        simulated_primaries, requested_primaries = read_fluka_file_offline(task_monitor.path_to_monitor)
+        simulated_primaries, requested_primaries = read_fluka_out_file_offline(task_monitor.path_to_monitor)
         logging.debug("Simulated primaries: %d, requested primaries: %d", simulated_primaries, requested_primaries)
 
     # both simulation execution and monitoring process are finished now, we can read the estimators

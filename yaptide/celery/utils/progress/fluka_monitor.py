@@ -157,14 +157,13 @@ def read_fluka_out_file(event: threading.Event,
     send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
 
 
-def read_fluka_file_offline(filepath: Path) -> tuple[int, int]:
+def read_fluka_out_file_offline(sim_dir: Path) -> tuple[int, int]:
     """Reads fluka out file and returns number of simulated and requested primaries"""
     simulated_primaries = 0
     requested_primaries = 0
-    filepath = filepath / "fl_sim001.out"
     in_progress = False
     try:
-        with open(filepath, 'r') as f:
+        with open(sim_dir / "fl_sim001.out", 'r') as f:
             for line in f:
                 logging.debug("Parsing line: %s", line.rstrip())
                 if line.startswith(S_TERMINATED_FROM_OUTSIDE) or line.startswith(S_OK_OUT_COLLECTED):
@@ -178,5 +177,5 @@ def read_fluka_file_offline(filepath: Path) -> tuple[int, int]:
                     if line.startswith(S_OK_OUT_IN_PROGRESS):
                         in_progress = True
     except FileNotFoundError:
-        logging.error("Log file %s not found", filepath)
+        logging.error("Out file %s not found", str(sim_dir / "fl_sim001.out"))
     return simulated_primaries, requested_primaries
