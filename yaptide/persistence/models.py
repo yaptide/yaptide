@@ -271,15 +271,22 @@ class CeleryTaskModel(TaskModel):
     celery_id: Column[str] = db.Column(db.String, nullable=False, default="", doc="Celery task ID")
     sim_pid: Column[int] = db.Column(db.Integer,
                                      nullable=True,
-                                     doc='Id of simulation process used to communicate with shieldhit process')
-    path_to_sim: Column[str] = db.Column(db.String,
-                                         nullable=True,
-                                         doc='Path to simulation input and output files in tmp directory')
+                                     doc="""Id of simulation process used to communicate with shieldhit process,
+                                     fluka doesn't use it""")
+    path_to_sim: Column[str] = db.Column(
+        db.String,
+        nullable=True,
+        doc="""Path to simulation input and output files in tmp directory for fluka usage,
+                                         shieldhit doesn't use it""")
 
     def update_state(self, update_dict: dict):
         """Update method for CeleryTaskModel"""
         if "celery_id" in update_dict and self.celery_id != update_dict["celery_id"]:
             self.celery_id = update_dict["celery_id"]
+        if value_changed(self.sim_pid, update_dict.get("sim_pid")):
+            self.sim_pid = update_dict["sim_pid"]
+        if value_changed(self.path_to_sim, update_dict.get("path_to_sim")):
+            self.path_to_sim = update_dict["path_to_sim"]
         return super().update_state(update_dict)
 
     __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}
