@@ -9,7 +9,7 @@ from uuid import uuid4
 
 from yaptide.celery.tasks import convert_input_files
 from yaptide.celery.utils.manage_tasks import (cancel_tasks_without_fetching, get_job_results,
-                                               handle_fluka_cancellation, handle_shieldhit_cancellation, run_job)
+                                               handle_cancellation_with_fetching, run_job)
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_celery_simulation_by_job_id,
@@ -165,12 +165,8 @@ class JobsDirect(Resource):
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
 
         # handle different simulation types and fetching data (or not)
-        if fetch_results and simulation.sim_type == SimulationType.SHIELDHIT.value \
-                and simulation.job_state == EntityState.RUNNING.value:
-            handle_shieldhit_cancellation(tasks)
-        elif fetch_results and simulation.sim_type == SimulationType.FLUKA.value \
-                and simulation.job_state == EntityState.RUNNING.value:
-            handle_fluka_cancellation(tasks)
+        if fetch_results and simulation.job_state == EntityState.RUNNING.value:
+            handle_cancellation_with_fetching(tasks)
         else:
             cancel_tasks_without_fetching(simulation, tasks)
 

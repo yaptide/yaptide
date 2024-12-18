@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import signal
 import subprocess
 import tempfile
 import threading
@@ -13,10 +14,13 @@ from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
 
+from celery.result import AsyncResult
+
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
+from yaptide.celery.simulation_worker import celery_app
 
 
 def get_tmp_dir() -> Path:
@@ -112,28 +116,44 @@ def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
     update_fluka_function(str(input_file.resolve()), random_seed)
 
 
-def execute_simulation_subprocess(dir_path: Path,
-                                  command_as_list: list[str],
-                                  task_id: int,
-                                  update_key: str = '',
-                                  simulation_id: int = Optional[None]) -> tuple[bool, str, str]:
+def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], celery_id: str,
+                                  sim_type: str) -> tuple[bool, str, str]:
     """Function to execute simulation subprocess."""
     process_exit_success: bool = True
     command_stdout: str = ""
     command_stderr: str = ""
+    state: str = ""
     try:
         process = subprocess.Popen(command_as_list,
                                    cwd=str(dir_path),
                                    stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE,
                                    text=True)
-        pid = process.pid
-        # There was some problem with not a None value in some tests in simulation_id, thats why or -1 here
-        logging.info("sending info to task: %d in simulation: %d with update key: %s to update PID %d", task_id,
-                     simulation_id or -1, update_key, pid)
-        send_task_update(simulation_id, task_id, update_key, {"sim_pid": pid})
-        # Capture stdout and stderr
-        command_stdout, command_stderr = process.communicate()
+        try:
+            # wait untill simulation subprocess is not marked in celery as ended
+            while state != 'END':
+                time.sleep(1)
+                # Check if the task has been marked to dump
+                simulation = AsyncResult(celery_id)
+                state = simulation.state
+                if state == 'DUMP':
+                    # Send SIGINT to the shieldhit subprocess to stop simulation and dump data
+                    if sim_type == 'shieldhit':
+                        os.kill(process.pid, signal.SIGINT)  # Only affects the subprocess, not the worker
+                    # create rfluka file to stop fluka simulation and dump data
+                    else:
+                        FILE_NAME = 'rfluka.stop'
+                        try:
+                            if (target_folder := next(Path(dir_path).glob("fluka_*/"), None)):
+                                (target_folder / FILE_NAME).write_text("")
+                        except OSError as e:
+                            logging.warning("Error due to file operation: %s", str(e))
+                    # Wait for subprocess to finish and capture stdout and stderr
+                    command_stdout, command_stderr = process.communicate()
+                    break
+
+        except Exception as e:
+            logging.error(f"An error occurred: {e}")
 
         logging.info("simulation subprocess with return code %d finished", process.returncode)
 
@@ -213,6 +233,7 @@ def read_file(event: threading.Event,
               simulation_id: int,
               task_id: str,
               update_key: str,
+              celery_id: str,
               timeout_wait_for_file: int = 20,
               timeout_wait_for_line: int = 5 * 60,
               next_backend_update_time: int = 2,
@@ -297,7 +318,6 @@ def read_file(event: threading.Event,
         elif re.search(COMPLETE_MATCH, line):
             logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
             break
-
     logging.info("Parsing log file for task %d finished", task_id)
     up_dict = {
         "simulated_primaries": requested_primaries,
@@ -306,6 +326,9 @@ def read_file(event: threading.Event,
     }
     logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
     send_task_update(simulation_id, task_id, update_key, up_dict)
+    result = AsyncResult(celery_id)
+    # mark celery task as ended to end a while loop waiting for results
+    result.backend.store_result(celery_id, None, 'END')
 
 
 def read_fluka_file(event: threading.Event,
@@ -313,6 +336,7 @@ def read_fluka_file(event: threading.Event,
                     simulation_id: int,
                     task_id: int,
                     update_key: str,
+                    celery_id: str,
                     timeout_wait_for_file_s: int = 20,
                     timeout_wait_for_line_s: int = 5 * 60,
                     next_backend_update_time_s: int = 2,
@@ -360,6 +384,9 @@ def read_fluka_file(event: threading.Event,
                         next_backend_update_time=next_backend_update_time_s,
                         details=TaskDetails(simulation_id, task_id, update_key),
                         verbose=logging_level <= logging.INFO)
+    result = AsyncResult(celery_id)
+    # mark celery task as ended to end a while loop waiting for results
+    result.backend.store_result(celery_id, None, 'END')
 
 
 def read_file_offline(filepath: Path) -> tuple[int, int]:
@@ -369,7 +396,7 @@ def read_file_offline(filepath: Path) -> tuple[int, int]:
     try:
         with open(filepath, 'r') as f:
             for line in f:
-                logging.debug("Parsing line: %s", line.rstrip())
+                #logging.debug("Parsing line: %s", line.rstrip())
                 if re.search(RUN_MATCH, line):
                     logging.debug("Found RUN_MATCH in line: %s for file: %s", line.rstrip(), filepath)
                     splitted = line.split()

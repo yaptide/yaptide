@@ -1,8 +1,4 @@
 import logging
-import os
-from pathlib import Path
-import signal
-import subprocess
 
 from celery import chain, chord, group
 from celery.result import AsyncResult
@@ -96,40 +92,30 @@ def translate_celery_state_naming(job_state: str) -> str:
     return job_state
 
 
-def handle_shieldhit_cancellation(tasks: list[CeleryTaskModel]):
-    """Function triggering shieldhit processes to terminate and dump results"""
-    celery_ids = []
+def handle_cancellation_with_fetching(tasks: list[CeleryTaskModel]):
+    """Function cancel tasks with feching data"""
+    celery_ids_to_terminate = []
+    celery_ids_to_dump_data = []
     for task in tasks:
         if task.task_state == EntityState.RUNNING.value:
-            logging.warning(task.sim_pid)
-            os.kill(task.sim_pid, signal.SIGINT)
-        elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.sim_pid is None:
-            celery_ids.append(task.celery_id)
+            celery_ids_to_dump_data.append(task.celery_id)
+        elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+            celery_ids_to_terminate.append(task.celery_id)
+            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
-    # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
-    celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+    # terminate tasks which do not start
+    celery_app.control.revoke(celery_ids_to_terminate, terminate=True, signal="SIGINT")
 
-
-def handle_fluka_cancellation(tasks: list[CeleryTaskModel]):
-    """Function cancelling fluka processes with results dump"""
-    FILE_NAME = 'rfluka.stop'
-    celery_ids = []
-    for task in tasks:
-        if task.task_state == EntityState.RUNNING.value:
-            try:
-                if (target_folder := next(Path(task.path_to_sim).glob("fluka_*/"), None)):
-                    (target_folder / FILE_NAME).write_text("")
-            except OSError as e:
-                logging.warning("Error due to file operation: %s", str(e))
-        elif task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value) or task.path_to_sim is None:
-            celery_ids.append(task.celery_id)
-
-    # tell celery to stop all other tasks related to this simulation, being in pending or unknown status
-    celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
+    # change celery tasks state to brake a while loop and dump data
+    if len(celery_ids_to_dump_data) > 0:
+        for id in celery_ids_to_dump_data:
+            result = AsyncResult(id)
+            result.backend.store_result(id, None, 'DUMP')
 
 
 def cancel_tasks_without_fetching(simulation: CelerySimulationModel, tasks: list[CeleryTaskModel]):
     """Function to cancel tasks without feching data"""
+
     celery_ids = [
         task.celery_id for task in tasks
         if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
