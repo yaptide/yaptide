@@ -185,8 +185,8 @@ def list_tasks(user, auth_provider, sim_id):
     if sim_id:
         filter_args_simulation['simulation_id'] = int(sim_id)
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username, tasks.c.task_state,
-                     tasks.c.sim_pid).select_from(tasks).filter_by(**filter_args_simulation).join(
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username, tasks.c.task_state
+                     ).select_from(tasks).filter_by(**filter_args_simulation).join(
                          simulations, tasks.c.simulation_id == simulations.c.id).join(
                              users, simulations.c.user_id == users.c.id).filter_by(**filter_args_user).order_by(
                                  tasks.c.simulation_id, tasks.c.task_id)
@@ -196,11 +196,10 @@ def list_tasks(user, auth_provider, sim_id):
     for task in all_tasks:
         simulation_id_col = f"Simulation id {task.simulation_id}"
         task_id_col = f"Task id ...{task.task_id}"
-        task_sim_pid = f"PID ...{task.sim_pid}"
         task_state_col = f"task_state {task.task_state}"
         user_col = f" username {task.username}" if not user else ''
 
-        click.echo('; '.join((simulation_id_col, task_id_col, task_sim_pid, task_state_col, user_col)))
+        click.echo('; '.join((simulation_id_col, task_id_col, task_state_col, user_col)))
 
 
 @run.command

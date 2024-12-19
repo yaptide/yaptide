@@ -110,12 +110,11 @@ def handle_cancellation_with_fetching(tasks: list[CeleryTaskModel]):
     if len(celery_ids_to_dump_data) > 0:
         for id in celery_ids_to_dump_data:
             result = AsyncResult(id)
-            result.backend.store_result(id, None, 'DUMP')
+            result.backend.store_result(id, {"dump": True}, state="RUNNING")
 
 
 def cancel_tasks_without_fetching(simulation: CelerySimulationModel, tasks: list[CeleryTaskModel]):
     """Function to cancel tasks without feching data"""
-
     celery_ids = [
         task.celery_id for task in tasks
         if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
