@@ -7,21 +7,25 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 from uuid import uuid4
 
-from yaptide.celery.simulation_worker import celery_app
 from yaptide.celery.tasks import convert_input_files
-from yaptide.celery.utils.manage_tasks import (get_job_results, run_job)
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
-                                            fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
-                                            fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
-                                            update_task_state)
+from yaptide.celery.utils.manage_tasks import (cancel_tasks_without_fetching, get_job_results,
+                                               handle_cancellation_with_fetching, run_job)
+from yaptide.persistence.db_methods import (
+    add_object_to_db,
+    fetch_celery_simulation_by_job_id,
+    fetch_celery_tasks_by_sim_id,
+    fetch_estimators_by_sim_id,
+    fetch_pages_by_estimator_id,
+    make_commit_to_db,
+    update_simulation_state,
+)
 from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
-from yaptide.utils.enums import EntityState, PlatformType
-from yaptide.utils.helper_tasks import terminate_unfinished_tasks
+from yaptide.utils.enums import EntityState, PlatformType, SimulationType
 
 
 class JobsDirect(Resource):
@@ -142,6 +146,7 @@ class JobsDirect(Resource):
         params_dict: dict = schema.load(request.args)
 
         job_id = params_dict['job_id']
+        fetch_results = params_dict.get('fetch_results', True)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -158,21 +163,13 @@ class JobsDirect(Resource):
                                     })
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
-        celery_ids = [
-            task.celery_id for task in tasks
-            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
-        ]
 
-        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
-        # We don't want it to run accidentally.
-        celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
-        celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
-        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
-        for task in tasks:
-            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
-                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+        # handle different simulation types and fetching data (or not)
+        if fetch_results and simulation.job_state == EntityState.RUNNING.value:
+            handle_cancellation_with_fetching(tasks)
+        else:
+            cancel_tasks_without_fetching(simulation, tasks)
 
-        terminate_unfinished_tasks.delay(simulation_id=simulation.id)
         return yaptide_response(message="Cancelled sucessfully", code=200)
 
 

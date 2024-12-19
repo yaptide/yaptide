@@ -15,6 +15,7 @@ from paramiko import RSAKey
 
 from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
+from yaptide.persistence.db_methods import fetch_batch_tasks_by_sim_id
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import write_simulation_input_files
@@ -318,10 +319,38 @@ def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
 
     try:
         con = get_connection(user=user, cluster=cluster)
-
         con.run(f'scancel {array_id}')
         con.run(f'scancel {collect_id}')
         con.run(f'rm -rf {job_dir}')
+    except Exception as e:  # skipcq: PYL-W0703
+        logging.error(e)
+        return {"message": "Job cancelation failed"}, 500
+
+    return {"message": "Job canceled"}, 200
+
+
+def cancel_simulation_with_fetching_data(simulation: BatchSimulationModel, user: KeycloakUserModel,
+                                         cluster: ClusterModel) -> tuple[dict, int]:
+    """Function that stops simulation without cancelling collection job"""
+    array_id = simulation.array_id
+    tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
+    try:
+        con = get_connection(user=user, cluster=cluster)
+        i = 1
+        fetch_str = 'scancel --signal=SIGINT'
+        delete_str = 'scancel'
+        # Iterating through tasks to find tasks from which data can be fetched
+        # and this which should be deleted to stop simulation
+        for task in tasks:
+            if task.task_state == EntityState.RUNNING.value:
+                fetch_str += f' {array_id}_{i}'
+            if task.task_state in (EntityState.PENDING.value, EntityState.UNKNOWN.value):
+                delete_str += f' {array_id}_{i}'
+            i += 1
+        # Execute the fetch command to gracefully stop running tasks and potentially fetch intermediate results.
+        con.run(fetch_str)
+        # Execute the delete command to cancel pending or unknown tasks without attempting to fetch data.
+        con.run(delete_str)
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)
         return {"message": "Job cancelation failed"}, 500
