@@ -146,7 +146,7 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
 
     # start monitoring process if possible
     # is None if monitoring if monitor was not started
-    task_monitor = monitor_shieldhit(event, tmp_work_dir, task_id, update_key, simulation_id, celery_id)
+    task_monitor = monitor_shieldhit(event, tmp_work_dir, task_id, update_key, simulation_id)
     # run the simulation
     logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
     process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
@@ -188,7 +188,7 @@ def run_single_simulation_for_fluka(tmp_work_dir: str,
     event = threading.Event()
     # start monitoring process if possible
     # is None if monitoring if monitor was not started
-    task_monitor = monitor_fluka(event, tmp_work_dir, task_id, update_key, simulation_id, celery_id)
+    task_monitor = monitor_fluka(event, tmp_work_dir, task_id, update_key, simulation_id)
 
     # run the simulation
     logging.info("Running Fluka process in %s", tmp_work_dir)
@@ -302,7 +302,7 @@ class MonitorTask:
 
 
 def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str, simulation_id: str,
-                      celery_id: str) -> Optional[MonitorTask]:
+                      ) -> Optional[MonitorTask]:
     """Function monitoring progress of SHIELD-HIT12A simulation"""
     # we would like to monitor the progress of simulation
     # this is done by reading the log file and sending the updates to the backend
@@ -316,7 +316,6 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, u
                                             simulation_id=simulation_id,
                                             task_id=task_id,
                                             update_key=update_key,
-                                            celery_id=celery_id,
                                             logging_level=current_logging_level))
         task.start()
         logging.info("Started monitoring process for task %d", task_id)
@@ -327,7 +326,7 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, u
 
 
 def monitor_fluka(event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str, simulation_id: int,
-                  celery_id: str) -> Optional[MonitorTask]:
+                  ) -> Optional[MonitorTask]:
     """Function running the monitoring process for Fluka simulation"""
     # we would like to monitor the progress of simulation
     # this is done by reading the log file and sending the updates to the backend
@@ -342,7 +341,6 @@ def monitor_fluka(event: threading.Event, tmp_work_dir: str, task_id: int, updat
                                             simulation_id=simulation_id,
                                             task_id=task_id,
                                             update_key=update_key,
-                                            celery_id=celery_id,
                                             logging_level=current_logging_level))
 
         task.start()

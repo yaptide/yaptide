@@ -121,7 +121,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
     process_exit_success: bool = True
     command_stdout: str = ""
     command_stderr: str = ""
-    state: str = ""
+    simulation = AsyncResult(celery_id)
     try:
         process = subprocess.Popen(command_as_list,
                                    cwd=str(dir_path),
@@ -129,13 +129,11 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
                                    stderr=subprocess.PIPE,
                                    text=True)
         try:
-            # wait untill simulation subprocess is not marked in celery as ended
-            while not state.get("end", False):
-                time.sleep(1)
-                # Check if the task has been marked to dump
-                simulation = AsyncResult(celery_id)
-                state = simulation.backend.get_task_meta(celery_id)
-                if state.get("dump", False):
+            # wait for dump signal while subprocess works
+            while process.poll() is None:
+                # Check if the task has been marked as ended, info can be None
+                # Check if the task has been marked as dump, info can be None
+                if simulation.info.get(key="dump", default=False) if simulation.info else False:
                     # Send SIGINT to the shieldhit subprocess to stop simulation and dump data
                     if sim_type == 'shieldhit':
                         os.kill(process.pid, signal.SIGINT)  # Only affects the subprocess, not the worker
@@ -150,9 +148,10 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
                     # Wait for subprocess to finish and capture stdout and stderr
                     command_stdout, command_stderr = process.communicate()
                     break
+                time.sleep(1)
 
         except Exception as e:
-            logging.error("An error occurred: %s", e.stderr)
+            logging.error("An error occurred: %s", str(e))
 
         logging.info("simulation subprocess with return code %d finished", process.returncode)
 
@@ -232,7 +231,6 @@ def read_file(event: threading.Event,
               simulation_id: int,
               task_id: str,
               update_key: str,
-              celery_id: str,
               timeout_wait_for_file: int = 20,
               timeout_wait_for_line: int = 5 * 60,
               next_backend_update_time: int = 2,
@@ -325,9 +323,6 @@ def read_file(event: threading.Event,
     }
     logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
     send_task_update(simulation_id, task_id, update_key, up_dict)
-    result = AsyncResult(celery_id)
-    # mark celery task as ended to end a while loop waiting for results
-    result.backend.store_result(celery_id, {"end": True}, state="RUNNING")
 
 
 def read_fluka_file(event: threading.Event,
@@ -335,7 +330,6 @@ def read_fluka_file(event: threading.Event,
                     simulation_id: int,
                     task_id: int,
                     update_key: str,
-                    celery_id: str,
                     timeout_wait_for_file_s: int = 20,
                     timeout_wait_for_line_s: int = 5 * 60,
                     next_backend_update_time_s: int = 2,
@@ -383,9 +377,6 @@ def read_fluka_file(event: threading.Event,
                         next_backend_update_time=next_backend_update_time_s,
                         details=TaskDetails(simulation_id, task_id, update_key),
                         verbose=logging_level <= logging.INFO)
-    result = AsyncResult(celery_id)
-    # mark celery task as ended to end a while loop waiting for results
-    result.backend.store_result(celery_id, {"end": True}, state="RUNNING")
 
 
 def read_file_offline(filepath: Path) -> tuple[int, int]:
