@@ -185,8 +185,8 @@ def list_tasks(user, auth_provider, sim_id):
     if sim_id:
         filter_args_simulation['simulation_id'] = int(sim_id)
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username,
-                     tasks.c.task_state).select_from(tasks).filter_by(**filter_args_simulation).join(
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username, tasks.c.task_state
+                     ).select_from(tasks).filter_by(**filter_args_simulation).join(
                          simulations, tasks.c.simulation_id == simulations.c.id).join(
                              users, simulations.c.user_id == users.c.id).filter_by(**filter_args_user).order_by(
                                  tasks.c.simulation_id, tasks.c.task_id)

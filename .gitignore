@@ -294,3 +294,6 @@ yaptide_tester/output/
 server.crt
 server.key
 docs/openapi.yaml
+
+# redis
+dump.rdb
