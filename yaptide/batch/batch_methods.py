@@ -13,7 +13,8 @@ import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
 
-from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_BASH, SUBMIT_SHIELDHIT)
+from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT)
+from yaptide.batch.fluka_string_templates import (ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH, SUBMIT_FLUKA)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
 from yaptide.utils.enums import EntityState
@@ -224,22 +225,40 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
-    submit_script = SUBMIT_SHIELDHIT.format(array_options=array_options,
+    if payload_dict['sim_type'] == 'fluka':
+        submit_script = SUBMIT_FLUKA.format(array_options=array_options,
                                             collect_options=collect_options,
                                             root_dir=job_dir,
                                             n_tasks=str(payload_dict["ntasks"]),
                                             convertmc_version=pymchelper.__version__)
-    array_script = ARRAY_SHIELDHIT_BASH.format(array_header=array_header,
+        array_script = ARRAY_FLUKA_BASH.format(array_header=array_header,
                                                root_dir=job_dir,
                                                sim_id=sim_id,
                                                update_key=update_key,
                                                backend_url=backend_url)
-    collect_script = COLLECT_BASH.format(collect_header=collect_header,
-                                         root_dir=job_dir,
-                                         clear_bdos="true",
-                                         sim_id=sim_id,
-                                         update_key=update_key,
-                                         backend_url=backend_url)
+        collect_script = COLLECT_FLUKA_BASH.format(collect_header=collect_header,
+                                                   root_dir=job_dir,
+                                                   clear_forts="true",
+                                                   sim_id=sim_id,
+                                                   update_key=update_key,
+                                                   backend_url=backend_url)
+    elif payload_dict['sim_type'] == 'shieldhit':
+        submit_script = SUBMIT_SHIELDHIT.format(array_options=array_options,
+                                                collect_options=collect_options,
+                                                root_dir=job_dir,
+                                                n_tasks=str(payload_dict["ntasks"]),
+                                                convertmc_version=pymchelper.__version__)
+        array_script = ARRAY_SHIELDHIT_BASH.format(array_header=array_header,
+                                                   root_dir=job_dir,
+                                                   sim_id=sim_id,
+                                                   update_key=update_key,
+                                                   backend_url=backend_url)
+        collect_script = COLLECT_BASH.format(collect_header=collect_header,
+                                             root_dir=job_dir,
+                                             clear_bdos="true",
+                                             sim_id=sim_id,
+                                             update_key=update_key,
+                                             backend_url=backend_url)
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
     con.run(f'chmod +x {array_file}')
