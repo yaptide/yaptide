@@ -28,7 +28,7 @@ if [ -n "$JOB_ID" ] ; then
 fi
 """  # skipcq: FLK-E501
 
-COLLECT_BASH: str = """#!/bin/bash
+COLLECT_SHIELDHIT_BASH: str = """#!/bin/bash
 {collect_header}
 ROOT_DIR={root_dir}
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
