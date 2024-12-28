@@ -13,11 +13,11 @@ import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
 
-from yaptide.batch.string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT)
+from yaptide.batch.shieldhit_string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT)
 from yaptide.batch.fluka_string_templates import (ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH, SUBMIT_FLUKA)
 from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
 from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
-from yaptide.utils.enums import EntityState
+from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 from yaptide.admin.db_manage import TableTypes, connect_to_db
@@ -227,7 +227,7 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
 
     logging.info(payload_dict)
 
-    if payload_dict['sim_type'] == 'fluka':
+    if payload_dict['sim_type'] == SimulationType.FLUKA.value:
         submit_script = SUBMIT_FLUKA.format(array_options=array_options,
                                             collect_options=collect_options,
                                             root_dir=job_dir,
@@ -244,7 +244,7 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
                                                    sim_id=sim_id,
                                                    update_key=update_key,
                                                    backend_url=backend_url)
-    elif payload_dict['sim_type'] == 'shieldhit':
+    elif payload_dict['sim_type'] == SimulationType.SHIELDHIT.value:
         submit_script = SUBMIT_SHIELDHIT.format(array_options=array_options,
                                                 collect_options=collect_options,
                                                 root_dir=job_dir,
