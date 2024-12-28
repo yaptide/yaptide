@@ -84,7 +84,8 @@ cp $INPUT_DIR/*.inp .
 INPUT_FILE=$(ls *.inp)
 
 module load pymchelper
-python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)"
+python3 -c "from pymchelper.executor.runner import Runner;
+Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)"
 sig_handler()
 {{
     echo "BATCH interrupted"
