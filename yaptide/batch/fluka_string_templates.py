@@ -21,7 +21,7 @@ JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
 
 if [ -n "$JOB_ID" ] ; then
-    # COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
+    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
@@ -80,11 +80,11 @@ cd $WORK_DIR
 # copy .inp file from input folder to working directory
 cp $INPUT_DIR/*.inp .
 
-INPUT_FILE=fl_sim.inp
+# assign .inp file to a variable
+INPUT_FILE=$(ls *.inp)
 
 module load pymchelper
-python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('$INPUT_FILE',${RNG_SEED}.0)"
-
+python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)"
 sig_handler()
 {{
     echo "BATCH interrupted"
