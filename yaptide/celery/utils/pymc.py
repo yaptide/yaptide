@@ -122,52 +122,76 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
     command_stdout: str = ""
     command_stderr: str = ""
     simulation = AsyncResult(celery_id)
+    process = subprocess.Popen(command_as_list,
+                                cwd=str(dir_path),
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE,
+                                text=True)
     try:
-        process = subprocess.Popen(command_as_list,
-                                   cwd=str(dir_path),
-                                   stdout=subprocess.PIPE,
-                                   stderr=subprocess.PIPE,
-                                   text=True)
-        try:
-            # wait for dump signal while subprocess works
-            while process.poll() is None:
-                # Check if the task has been marked as ended, info can be None
-                # Check if the task has been marked as dump, info can be None
-                if simulation.info.get(key="dump", default=False) if simulation.info else False:
-                    # Send SIGINT to the shieldhit subprocess to stop simulation and dump data
-                    if sim_type == 'shieldhit':
-                        os.kill(process.pid, signal.SIGINT)  # Only affects the subprocess, not the worker
-                    # create rfluka file to stop fluka simulation and dump data
-                    else:
-                        FILE_NAME = 'rfluka.stop'
-                        try:
-                            if (target_folder := next(Path(dir_path).glob("fluka_*/"), None)):
-                                (target_folder / FILE_NAME).write_text("")
-                        except OSError as e:
-                            logging.warning("Error due to file operation: %s", str(e))
-                    # Wait for subprocess to finish and capture stdout and stderr
-                    command_stdout, command_stderr = process.communicate()
-                    break
-                time.sleep(1)
+        while process.poll() is None:
+            # Handle the "dump" signal
+            if simulation.info.get(key="dump", default=False) if simulation.info else False:
+                if sim_type == 'shieldhit':
+                    os.kill(process.pid, signal.SIGINT)  # Send SIGINT to terminate the simulation
+                    logging.info("Sent SIGINT to shieldhit process.")
+                else:
+                    FILE_NAME = 'rfluka.stop'
+                    try:
+                        # Create a stop file to terminate FLUKA simulation
+                        target_folder = next(Path(dir_path).glob("fluka_*/"), None)
+                        if target_folder:
+                            (target_folder / FILE_NAME).write_text("")
+                            logging.info("Created rfluka.stop to terminate FLUKA simulation.")
+                    except OSError as e:
+                        logging.warning("File operation error: %s", str(e))
+                
+                # Stop the process and capture its output
+                command_stdout, command_stderr = process.communicate(timeout=10)
+                logging.info("Process stopped by signal. Captured stdout and stderr.")
+                break
 
-        except Exception as e:
-            logging.error("An error occurred: %s", str(e))
+            # Wait for 1 second before checking again
+            time.sleep(1)
 
-        logging.info("simulation subprocess with return code %d finished", process.returncode)
-
-        process_exit_success = True
-
-        # Log stdout and stderr using logging
-        logging.info("Command Output:\n%s", command_stdout)
-        logging.info("Command Error Output:\n%s", command_stderr)
-    except subprocess.CalledProcessError as e:
+    except subprocess.TimeoutExpired:
+        logging.error("Process did not terminate in the expected time. Killing it.")
+        process.kill()
+        command_stdout, command_stderr = process.communicate()
         process_exit_success = False
-        # If the command exits with a non-zero status
-        logging.error("Command Error: %sSTD OUT: %s\nExecuted Command: %s", e.stderr, e.stdout,
-                      " ".join(command_as_list))
-    except Exception as e:  # skipcq: PYL-W0703
+
+    except subprocess.SubprocessError as subproc_err:
+        logging.error("Subprocess error occurred: %s", str(subproc_err))
+        process.kill()
+        command_stdout, command_stderr = process.communicate()
         process_exit_success = False
-        logging.error("Exception while running simulation: %s", e)
+
+    except Exception as e:
+        logging.error("An unexpected error occurred: %s", str(e))
+        if process.poll() is None:
+            logging.warning("Process is still running. Terminating it.")
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                logging.error("Process did not terminate in time. Killing it.")
+                process.kill()
+        command_stdout, command_stderr = process.communicate()
+        process_exit_success = False
+
+    finally:
+        # Ensure any remaining output is captured
+        if process.stdout or process.stderr:
+            command_stdout, command_stderr = process.communicate()
+    logging.info("Subprocess completed or was terminated. Output captured.")
+
+    logging.info("simulation subprocess with return code %d finished", process.returncode)
+
+    # Log stdout and stderr using logging
+    logging.info("Command Output:\n%s", command_stdout)
+    logging.info("Command Error Output:\n%s", command_stderr)
+    
+    if command_stdout == '' and command_stderr == '':
+        process_exit_success = False
 
     return process_exit_success, command_stdout, command_stderr
 
