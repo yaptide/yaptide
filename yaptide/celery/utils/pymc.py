@@ -190,7 +190,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
     logging.info("Command Output:\n%s", command_stdout)
     logging.info("Command Error Output:\n%s", command_stderr)
     
-    if command_stdout == '' and command_stderr == '':
+    if command_stdout == '':
         process_exit_success = False
 
     return process_exit_success, command_stdout, command_stderr
