@@ -150,14 +150,8 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
                 logging.info("Process stopped by signal. Captured stdout and stderr.")
                 break
 
-            # Wait for 1 second before checking again
-            time.sleep(1)
-
-    except subprocess.TimeoutExpired:
-        logging.error("Process did not terminate in the expected time. Killing it.")
-        process.kill()
-        command_stdout, command_stderr = process.communicate()
-        process_exit_success = False
+            # Wait for 0.1 second before checking again
+            time.sleep(0.1)
 
     except subprocess.SubprocessError as subproc_err:
         logging.error("Subprocess error occurred: %s", str(subproc_err))
