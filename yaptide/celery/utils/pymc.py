@@ -123,10 +123,10 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
     command_stderr: str = ""
     simulation = AsyncResult(celery_id)
     process = subprocess.Popen(command_as_list,
-                                cwd=str(dir_path),
-                                stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE,
-                                text=True)
+                               cwd=str(dir_path),
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               text=True)
     try:
         while process.poll() is None:
             # Handle the "dump" signal
@@ -144,7 +144,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
                             logging.info("Created rfluka.stop to terminate FLUKA simulation.")
                     except OSError as e:
                         logging.warning("File operation error: %s", str(e))
-                
+
                 # Stop the process and capture its output
                 command_stdout, command_stderr = process.communicate(timeout=10)
                 logging.info("Process stopped by signal. Captured stdout and stderr.")
@@ -183,7 +183,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
     # Log stdout and stderr using logging
     logging.info("Command Output:\n%s", command_stdout)
     logging.info("Command Error Output:\n%s", command_stderr)
-    
+
     if command_stdout == '':
         process_exit_success = False
 
