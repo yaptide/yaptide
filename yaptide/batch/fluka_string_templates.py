@@ -35,28 +35,19 @@ python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={upda
       --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
 
-INPUT_WILDCARD48=$ROOT_DIR/workspaces/task_*/*_fort.48
-INPUT_WILDCARD49=$ROOT_DIR/workspaces/task_*/*_fort.49
-INPUT_WILDCARD50=$ROOT_DIR/workspaces/task_*/*_fort.50
-INPUT_WILDCARD51=$ROOT_DIR/workspaces/task_*/*_fort.51
+INPUT_WILDCARD48=$ROOT_DIR/workspaces/task_*/*_fort.*
 OUTPUT_DIRECTORY=$ROOT_DIR/output
 
 mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
 
-convertmc json --many "$INPUT_WILDCARD48"
-convertmc json --many "$INPUT_WILDCARD49"
-convertmc json --many "$INPUT_WILDCARD50"
-convertmc json --many "$INPUT_WILDCARD51"
+convertmc json --many "$INPUT_WILDCARD"
 
 CLEAR_FORTS={clear_forts}
 
 if $CLEAR_FORTS; then
-    rm $INPUT_WILDCARD48
-    rm $INPUT_WILDCARD49
-    rm $INPUT_WILDCARD50
-    rm $INPUT_WILDCARD51
+    rm $INPUT_WILDCARD
 fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
