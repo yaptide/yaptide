@@ -161,8 +161,6 @@ def get_fluka_estimators(dir_path: Path) -> dict:
     estimators_list = frompattern(pattern=files_pattern_pattern)
     for estimator in estimators_list:
         logging.debug("Appending estimator for %s", estimator.file_corename)
-        for i, page in enumerate(estimator.pages):
-            page.page_number = i
 
         estimators_dict[estimator.file_corename] = estimator
 
