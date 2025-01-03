@@ -5,7 +5,7 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
+from yaptide.batch.batch_methods import cancel_simulation_with_fetching_data, delete_job, get_job_status, submit_job
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_all_clusters, fetch_batch_simulation_by_job_id,
                                             fetch_batch_tasks_by_sim_id, fetch_cluster_by_id, make_commit_to_db,
                                             update_simulation_state, update_task_state)
@@ -148,6 +148,7 @@ class JobsBatch(Resource):
         params_dict: dict = schema.load(request.args)
 
         job_id: str = params_dict["job_id"]
+        fetch_results = params_dict.get('fetch_results', True)
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -164,17 +165,21 @@ class JobsBatch(Resource):
                                     })
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
-
-        result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
+        if fetch_results:
+            result, status_code = cancel_simulation_with_fetching_data(simulation=simulation,
+                                                                       user=user,
+                                                                       cluster=cluster)
+        else:
+            result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
         if status_code != 200:
             return error_internal_response(content=result)
+        if not fetch_results:
+            update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
 
-        update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
+            tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
 
-        tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
-
-        for task in tasks:
-            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+            for task in tasks:
+                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
 
         return yaptide_response(message="", code=status_code, content=result)
 

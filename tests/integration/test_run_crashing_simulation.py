@@ -66,6 +66,7 @@ def test_run_simulation_with_flask_crashing(celery_app, celery_worker, client: F
         for i, task_status in enumerate(jobs_data["job_tasks_status"]):
             logging.info("Task %d status %s", i, task_status)
 
+        logging.info('Job state %s', jobs_data['job_state'])
         if jobs_data['job_state'] in ['COMPLETED', 'FAILED']:
             logging.debug("Job state is %s, breaking the loop", jobs_data['job_state'])
             assert jobs_data['job_state'] == 'FAILED'

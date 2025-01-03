@@ -1,6 +1,7 @@
 import logging
 import os
 import re
+import signal
 import subprocess
 import tempfile
 import threading
@@ -12,6 +13,8 @@ from typing import List, Optional, Protocol
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
+
+from celery.result import AsyncResult
 
 from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
 from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
@@ -112,37 +115,77 @@ def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
     update_fluka_function(str(input_file.resolve()), random_seed)
 
 
-def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
+def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], celery_id: str,
+                                  sim_type: str) -> tuple[bool, str, str]:
     """Function to execute simulation subprocess."""
     process_exit_success: bool = True
     command_stdout: str = ""
     command_stderr: str = ""
+    simulation = AsyncResult(celery_id)
+    process = subprocess.Popen(command_as_list,
+                               cwd=str(dir_path),
+                               stdout=subprocess.PIPE,
+                               stderr=subprocess.PIPE,
+                               text=True)
     try:
-        completed_process = subprocess.run(command_as_list,
-                                           check=True,
-                                           cwd=str(dir_path),
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           text=True)
-        logging.info("simulation subprocess with return code %d finished", completed_process.returncode)
+        while process.poll() is None:
+            # Handle the "dump" signal
+            if simulation.info.get(key="dump", default=False) if simulation.info else False:
+                if sim_type == 'shieldhit':
+                    os.kill(process.pid, signal.SIGINT)  # Send SIGINT to terminate the simulation
+                    logging.info("Sent SIGINT to shieldhit process.")
+                else:
+                    FILE_NAME = 'rfluka.stop'
+                    try:
+                        # Create a stop file to terminate FLUKA simulation
+                        target_folder = next(Path(dir_path).glob("fluka_*/"), None)
+                        if target_folder:
+                            (target_folder / FILE_NAME).write_text("")
+                            logging.info("Created rfluka.stop to terminate FLUKA simulation.")
+                    except OSError as e:
+                        logging.warning("File operation error: %s", str(e))
 
-        # Capture stdout and stderr
-        command_stdout = completed_process.stdout
-        command_stderr = completed_process.stderr
+                # Stop the process and capture its output
+                command_stdout, command_stderr = process.communicate(timeout=10)
+                logging.info("Process stopped by signal. Captured stdout and stderr.")
+                break
 
-        process_exit_success = True
+            # Wait for 0.1 second before checking again
+            time.sleep(0.1)
 
-        # Log stdout and stderr using logging
-        logging.info("Command Output:\n%s", command_stdout)
-        logging.info("Command Error Output:\n%s", command_stderr)
-    except subprocess.CalledProcessError as e:
+    except subprocess.SubprocessError as subproc_err:
+        logging.error("Subprocess error occurred: %s", str(subproc_err))
+        process.kill()
+        command_stdout, command_stderr = process.communicate()
         process_exit_success = False
-        # If the command exits with a non-zero status
-        logging.error("Command Error: %sSTD OUT: %s\nExecuted Command: %s", e.stderr, e.stdout,
-                      " ".join(command_as_list))
-    except Exception as e:  # skipcq: PYL-W0703
+
+    except Exception as e:
+        logging.error("An unexpected error occurred: %s", str(e))
+        if process.poll() is None:
+            logging.warning("Process is still running. Terminating it.")
+            process.terminate()
+            try:
+                process.wait(timeout=10)
+            except subprocess.TimeoutExpired:
+                logging.error("Process did not terminate in time. Killing it.")
+                process.kill()
+        command_stdout, command_stderr = process.communicate()
         process_exit_success = False
-        logging.error("Exception while running simulation: %s", e)
+
+    finally:
+        # Ensure any remaining output is captured
+        if process.stdout or process.stderr:
+            command_stdout, command_stderr = process.communicate()
+    logging.info("Subprocess completed or was terminated. Output captured.")
+
+    logging.info("simulation subprocess with return code %d finished", process.returncode)
+
+    # Log stdout and stderr using logging
+    logging.info("Command Output:\n%s", command_stdout)
+    logging.info("Command Error Output:\n%s", command_stderr)
+
+    if command_stdout == '':
+        process_exit_success = False
 
     return process_exit_success, command_stdout, command_stderr
 
@@ -169,14 +212,18 @@ def get_fluka_estimators(dir_path: Path) -> dict:
     return estimators_dict
 
 
-def average_values(base_values: List[float], new_values: List[float], count: int) -> List[float]:
+def average_values(base_values: List[float], new_values: List[float], base_particles: int,
+                   new_particles: int) -> List[float]:
     """Average two lists of values"""
-    return [sum(x) / (count + 1) for x in zip(map(lambda x: x * count, base_values), new_values)]
+    total_particles = base_particles + new_particles
+    return [(base_val * base_particles + new_val * new_particles) / total_particles
+            for base_val, new_val in zip(base_values, new_values)]
 
 
-def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
+def average_estimators(base_list: list[dict], list_to_add: list[dict], total_particles: int,
+                       new_particles: int) -> list:
     """Averages estimators from two dicts"""
-    logging.debug("Averaging estimators - already averaged: %d", averaged_count)
+    logging.debug("Averaging estimators - already averaged: %d", total_particles)
     for est_i, estimator_dict in enumerate(list_to_add):
         # check if estimator names are the same and if not, find matching estimator's index in base_list
         if estimator_dict["name"] != base_list[est_i]["name"]:
@@ -189,7 +236,8 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
                                if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
 
             base_list[est_i]["pages"][page_i]["data"]["values"] = average_values(
-                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count)
+                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], total_particles,
+                new_particles)
 
             logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
                           len(page_dict["data"]["values"]))
@@ -285,7 +333,6 @@ def read_file(event: threading.Event,
         elif re.search(COMPLETE_MATCH, line):
             logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
             break
-
     logging.info("Parsing log file for task %d finished", task_id)
     up_dict = {
         "simulated_primaries": requested_primaries,
@@ -322,6 +369,7 @@ def read_fluka_file(event: threading.Event,
             return
         try:
             optional_file = get_first_matching_file()
+            logging.info(optional_file)
             if not optional_file:
                 time.sleep(1)
                 continue
