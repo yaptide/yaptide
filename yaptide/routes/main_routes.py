@@ -2,7 +2,7 @@ from flask_restful import Api, Resource
 
 from yaptide.routes.auth_routes import (AuthLogIn, AuthLogOut, AuthRefresh, AuthRegister, AuthStatus)
 from yaptide.routes.batch_routes import Clusters, JobsBatch
-from yaptide.routes.celery_routes import ConvertResource, JobsDirect
+from yaptide.routes.celery_routes import JobsDirect
 from yaptide.routes.common_sim_routes import (JobsResource, InputsResource, LogfilesResource, ResultsResource)
 from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
@@ -34,8 +34,6 @@ def initialize_routes(api: Api):
     api.add_resource(ResultsResource, "/results")
     api.add_resource(InputsResource, "/inputs")
     api.add_resource(LogfilesResource, "/logfiles")
-
-    api.add_resource(ConvertResource, "/convert")
 
     api.add_resource(UserSimulations, "/user/simulations")
     api.add_resource(UserUpdate, "/user/update")
