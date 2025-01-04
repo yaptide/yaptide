@@ -116,7 +116,7 @@ def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
 
 
 def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], celery_id: str,
-                                  sim_type: str) -> tuple[bool, str, str]:
+                                  sim_type: str, wait_time: int = 0.1) -> tuple[bool, str, str]:
     """Function to execute simulation subprocess."""
     process_exit_success: bool = True
     command_stdout: str = ""
@@ -150,8 +150,8 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str], ce
                 logging.info("Process stopped by signal. Captured stdout and stderr.")
                 break
 
-            # Wait for 0.1 second before checking again
-            time.sleep(0.1)
+            # Wait some defined time before checking again
+            time.sleep(wait_time)
 
     except subprocess.SubprocessError as subproc_err:
         logging.error("Subprocess error occurred: %s", str(subproc_err))

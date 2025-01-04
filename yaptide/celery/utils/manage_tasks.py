@@ -106,11 +106,11 @@ def handle_cancellation_with_fetching(tasks: list[CeleryTaskModel]):
     # terminate tasks which do not start
     celery_app.control.revoke(celery_ids_to_terminate, terminate=True, signal="SIGINT")
 
-    # change celery tasks state to brake a while loop and dump data
-    if len(celery_ids_to_dump_data) > 0:
-        for id in celery_ids_to_dump_data:
-            result = AsyncResult(id)
-            result.backend.store_result(id, {"dump": True}, state="RUNNING")
+    # inform celery tasks end simulation subprocess and dump data from simulation
+    for id in celery_ids_to_dump_data:
+        result = AsyncResult(id)
+        current_status = result.status
+        result.backend.store_result(id, {"dump": True}, status=current_status)
 
 
 def cancel_tasks_without_fetching(simulation: CelerySimulationModel, tasks: list[CeleryTaskModel]):
