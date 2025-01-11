@@ -4,7 +4,6 @@ Most configuration is set via environment variables.
 For local development, use a .env file to set
 environment variables.
 """
-from environs import Env
+from environs import env
 
-env = Env()
 env.read_env()
