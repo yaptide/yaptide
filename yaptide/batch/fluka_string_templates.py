@@ -31,9 +31,6 @@ fi
 COLLECT_FLUKA_BASH: str = """#!/bin/bash
 {collect_header}
 ROOT_DIR={root_dir}
-python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
-      --backend_url={backend_url} --simulation_state=MERGING_RUNNING
-
 
 INPUT_WILDCARD48=$ROOT_DIR/workspaces/task_*/*_fort.*
 OUTPUT_DIRECTORY=$ROOT_DIR/output
@@ -41,6 +38,9 @@ OUTPUT_DIRECTORY=$ROOT_DIR/output
 mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
+
+python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
+      --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
 convertmc json --many "$INPUT_WILDCARD"
 

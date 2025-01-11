@@ -225,42 +225,31 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
-    logging.info(payload_dict)
-
     if payload_dict['sim_type'] == SimulationType.FLUKA.value:
-        submit_script = SUBMIT_FLUKA.format(array_options=array_options,
-                                            collect_options=collect_options,
-                                            root_dir=job_dir,
-                                            n_tasks=str(payload_dict["ntasks"]),
-                                            convertmc_version=pymchelper.__version__)
-        array_script = ARRAY_FLUKA_BASH.format(array_header=array_header,
-                                               root_dir=job_dir,
-                                               sim_id=sim_id,
-                                               update_key=update_key,
-                                               backend_url=backend_url)
-        collect_script = COLLECT_FLUKA_BASH.format(collect_header=collect_header,
-                                                   root_dir=job_dir,
-                                                   clear_forts="true",
-                                                   sim_id=sim_id,
-                                                   update_key=update_key,
-                                                   backend_url=backend_url)
+        submit_template = SUBMIT_FLUKA
+        array_template = ARRAY_FLUKA_BASH
+        collect_template = COLLECT_FLUKA_BASH
     elif payload_dict['sim_type'] == SimulationType.SHIELDHIT.value:
-        submit_script = SUBMIT_SHIELDHIT.format(array_options=array_options,
-                                                collect_options=collect_options,
-                                                root_dir=job_dir,
-                                                n_tasks=str(payload_dict["ntasks"]),
-                                                convertmc_version=pymchelper.__version__)
-        array_script = ARRAY_SHIELDHIT_BASH.format(array_header=array_header,
-                                                   root_dir=job_dir,
-                                                   sim_id=sim_id,
-                                                   update_key=update_key,
-                                                   backend_url=backend_url)
-        collect_script = COLLECT_SHIELDHIT_BASH.format(collect_header=collect_header,
-                                                       root_dir=job_dir,
-                                                       clear_bdos="true",
-                                                       sim_id=sim_id,
-                                                       update_key=update_key,
-                                                       backend_url=backend_url)
+        submit_template = SUBMIT_SHIELDHIT
+        array_template = ARRAY_SHIELDHIT_BASH
+        collect_template = COLLECT_SHIELDHIT_BASH
+
+    submit_script = submit_template.format(array_options=array_options,
+                                           collect_options=collect_options,
+                                           root_dir=job_dir,
+                                           n_tasks=str(payload_dict["ntasks"]),
+                                           convertmc_version=pymchelper.__version__)
+    array_script = array_template.format(array_header=array_header,
+                                         root_dir=job_dir,
+                                         sim_id=sim_id,
+                                         update_key=update_key,
+                                         backend_url=backend_url)
+    collect_script = collect_template.format(collect_header=collect_header,
+                                             root_dir=job_dir,
+                                             clear_forts="true",
+                                             sim_id=sim_id,
+                                             update_key=update_key,
+                                             backend_url=backend_url)
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
     con.run(f'chmod +x {array_file}')
