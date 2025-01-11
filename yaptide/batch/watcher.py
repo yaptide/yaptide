@@ -68,7 +68,7 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
     return True
 
 
-def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backend_url: str):  # skipcq: PYL-W0613
+def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backend_url: str, sim_type: str = "shieldhit"):  # skipcq: PYL-W0613
     """Monitors log file of certain task"""
     logging.debug("Started monitoring, simulation id: %d, task id: %s", sim_id, task_id)
     logfile = None
@@ -174,6 +174,7 @@ if __name__ == "__main__":
     parser.add_argument("--update_key", type=str)
     parser.add_argument("--backend_url", type=str)
     parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--sim_type", type=str, default="shieldhit")
     args = parser.parse_args()
 
     log_level = logging.INFO
@@ -188,8 +189,10 @@ if __name__ == "__main__":
     logging.info("task_id %s", args.task_id)
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
+    logging.info("sim_type %s", args.sim_type)
     read_file(filepath=Path(args.filepath),
               sim_id=args.sim_id,
               task_id=args.task_id,
               update_key=args.update_key,
-              backend_url=args.backend_url)
+              backend_url=args.backend_url,
+              sim_type=args.sim_type)
