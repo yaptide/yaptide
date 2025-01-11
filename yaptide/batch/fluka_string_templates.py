@@ -26,13 +26,13 @@ if [ -n "$JOB_ID" ] ; then
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
 fi
-"""
+"""  # skipcq: FLK-E501
 
 COLLECT_FLUKA_BASH: str = """#!/bin/bash
 {collect_header}
 ROOT_DIR={root_dir}
 
-INPUT_WILDCARD48=$ROOT_DIR/workspaces/task_*/*_fort.*
+INPUT_WILDCARD="$ROOT_DIR/workspaces/task_*/*_fort.*"
 OUTPUT_DIRECTORY=$ROOT_DIR/output
 
 mkdir -p $OUTPUT_DIRECTORY
@@ -42,6 +42,7 @@ cd $OUTPUT_DIRECTORY
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
       --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
+module load pymchelper
 convertmc json --many "$INPUT_WILDCARD"
 
 CLEAR_FORTS={clear_forts}
@@ -52,7 +53,7 @@ fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
-"""
+"""  # skipcq: FLK-E501
 
 ARRAY_FLUKA_BASH: str = """#!/bin/bash
 {array_header}
@@ -75,8 +76,7 @@ cp $INPUT_DIR/*.inp .
 INPUT_FILE=$(ls *.inp)
 
 module load pymchelper
-python3 -c "from pymchelper.executor.runner import Runner;
-Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)"
+python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)"
 sig_handler()
 {{
     echo "BATCH interrupted"
@@ -98,4 +98,4 @@ trap 'sig_handler' SIGUSR1
 srun rfluka -N0 -M1 $WORK_DIR/*.inp &
 
 wait
-"""
+"""  # skipcq: FLK-E501
