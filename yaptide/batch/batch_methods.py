@@ -225,6 +225,8 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
+    logging.info(payload_dict)
+
     if payload_dict['sim_type'] == 'fluka':
         submit_script = SUBMIT_FLUKA.format(array_options=array_options,
                                             collect_options=collect_options,
@@ -253,12 +255,12 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
                                                    sim_id=sim_id,
                                                    update_key=update_key,
                                                    backend_url=backend_url)
-        collect_script = COLLECT_BASH.format(collect_header=collect_header,
-                                             root_dir=job_dir,
-                                             clear_bdos="true",
-                                             sim_id=sim_id,
-                                             update_key=update_key,
-                                             backend_url=backend_url)
+        collect_script = COLLECT_SHIELDHIT_BASH.format(collect_header=collect_header,
+                                                       root_dir=job_dir,
+                                                       clear_bdos="true",
+                                                       sim_id=sim_id,
+                                                       update_key=update_key,
+                                                       backend_url=backend_url)
 
     con.run(f'echo \'{array_script}\' >> {array_file}')
     con.run(f'chmod +x {array_file}')
