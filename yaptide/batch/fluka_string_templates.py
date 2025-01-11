@@ -26,7 +26,7 @@ if [ -n "$JOB_ID" ] ; then
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
 fi
-"""  # skipcq: FLK-E501
+"""
 
 COLLECT_FLUKA_BASH: str = """#!/bin/bash
 {collect_header}
@@ -53,7 +53,7 @@ fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
-"""  # skipcq: FLK-E501
+"""
 
 ARRAY_FLUKA_BASH: str = """#!/bin/bash
 {array_header}
@@ -98,4 +98,4 @@ trap 'sig_handler' SIGUSR1
 srun rfluka -N0 -M1 $WORK_DIR/*.inp &
 
 wait
-"""  # skipcq: FLK-E501
+"""
