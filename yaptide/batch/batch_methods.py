@@ -233,6 +233,11 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
         submit_template = SUBMIT_SHIELDHIT
         array_template = ARRAY_SHIELDHIT_BASH
         collect_template = COLLECT_SHIELDHIT_BASH
+    else:
+        # Ready for future simulators
+        submit_template = ""
+        array_template = ""
+        collect_template = ""
 
     submit_script = submit_template.format(array_options=array_options,
                                            collect_options=collect_options,
