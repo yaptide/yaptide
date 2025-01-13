@@ -25,7 +25,7 @@ redis = "5.2.1"
 requests = "2.32.3"
 sqlalchemy = "2.0.37"
 werkzeug = "3.1.3"
-boto3 = "1.35.96"
+boto3 = "1.35.97"
 cryptography = "43.0.3"
 psycopg = {version = "3.2.3", extras = ["binary"]}
 yaptide-converter = { git = "https://github.com/yaptide/converter.git", rev = "b8a784dce60d374aa2293c093a6d3609b00e7c08"}
