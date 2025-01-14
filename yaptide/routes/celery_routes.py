@@ -8,7 +8,6 @@ from marshmallow import Schema, fields
 from uuid import uuid4
 
 from yaptide.celery.simulation_worker import celery_app
-from yaptide.celery.tasks import convert_input_files
 from yaptide.celery.utils.manage_tasks import (get_job_results, run_job)
 from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
                                             fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
@@ -237,21 +236,3 @@ class ResultsDirect(Resource):
 
         logging.debug("Returning results from Celery")
         return yaptide_response(message=f"Results for job: {job_id}, results from Celery", code=200, content=result)
-
-
-class ConvertResource(Resource):
-    """Class responsible for returning input_model files converted from front JSON"""
-
-    @staticmethod
-    @requires_auth()
-    def post(_: UserModel):
-        """Method handling input_model files convertion"""
-        payload_dict: dict = request.get_json(force=True)
-        if not payload_dict:
-            return yaptide_response(message="No JSON in body", code=400)
-
-        # Rework in later PRs to match pattern from jobs endpoint
-        job = convert_input_files.delay(payload_dict=payload_dict)
-        result: dict = job.wait()
-
-        return yaptide_response(message="Converted Input Files", code=200, content=result)
