@@ -7,7 +7,6 @@ cd $ROOT_DIR
 mkdir -p $ROOT_DIR/workspaces/task_{{0001..{n_tasks}}}
 mkdir -p $ROOT_DIR/input
 
-
 INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
@@ -53,6 +52,9 @@ fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
+
+python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
+      --backend_url={backend_url} --simulation_state=COMPLETED
 """
 
 ARRAY_FLUKA_BASH: str = """#!/bin/bash
