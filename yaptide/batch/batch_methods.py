@@ -251,7 +251,7 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
                                          backend_url=backend_url)
     collect_script = collect_template.format(collect_header=collect_header,
                                              root_dir=job_dir,
-                                             clear_forts="true",
+                                             remove_output_from_workspace="true",
                                              sim_id=sim_id,
                                              update_key=update_key,
                                              backend_url=backend_url)

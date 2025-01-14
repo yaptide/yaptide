@@ -7,7 +7,6 @@ cd $ROOT_DIR
 mkdir -p $ROOT_DIR/workspaces/task_{{0001..{n_tasks}}}
 mkdir -p $ROOT_DIR/input
 
-
 INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
@@ -45,7 +44,7 @@ python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={upda
 module load pymchelper
 convertmc json --many "$INPUT_WILDCARD"
 
-CLEAR_FORTS={clear_forts}
+CLEAR_FORTS={remove_output_from_workspace}
 
 if $CLEAR_FORTS; then
     rm $INPUT_WILDCARD
@@ -53,6 +52,9 @@ fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
+
+python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
+      --backend_url={backend_url} --simulation_state=COMPLETED
 """
 
 ARRAY_FLUKA_BASH: str = """#!/bin/bash
@@ -83,14 +85,14 @@ sig_handler()
     wait # wait for all children, this is important!
 }}
 
-FILE_TO_WATCH=$WORK_DIR/fluka_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-python3 $ROOT_DIR/watcher.py \
-    --filepath=$FILE_TO_WATCH\
-    --sim_id={sim_id}\
-    --task_id=$SLURM_ARRAY_TASK_ID\
-    --update_key={update_key}\
-    --backend_url={backend_url}\
-    --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
+# FILE_TO_WATCH=$WORK_DIR/fluka_`printf %04d $SLURM_ARRAY_TASK_ID`.log
+# python3 $ROOT_DIR/watcher.py \
+#     --filepath=$FILE_TO_WATCH\
+#     --sim_id={sim_id}\
+#     --task_id=$SLURM_ARRAY_TASK_ID\
+#     --update_key={update_key}\
+#     --backend_url={backend_url}\
+#     --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 trap 'sig_handler' SIGUSR1
 

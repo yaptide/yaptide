@@ -43,7 +43,7 @@ cd $OUTPUT_DIRECTORY
 
 convertmc json --many "$INPUT_WILDCARD"
 
-CLEAR_BDOS={clear_bdos}
+CLEAR_BDOS={remove_output_from_workspace}
 
 if $CLEAR_BDOS; then
     rm $INPUT_WILDCARD
