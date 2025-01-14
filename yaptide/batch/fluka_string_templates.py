@@ -45,7 +45,7 @@ python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={upda
 module load pymchelper
 convertmc json --many "$INPUT_WILDCARD"
 
-CLEAR_FORTS={clear_forts}
+CLEAR_FORTS={remove_output_from_workspace}
 
 if $CLEAR_FORTS; then
     rm $INPUT_WILDCARD
@@ -83,14 +83,14 @@ sig_handler()
     wait # wait for all children, this is important!
 }}
 
-FILE_TO_WATCH=$WORK_DIR/fluka_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-python3 $ROOT_DIR/watcher.py \
-    --filepath=$FILE_TO_WATCH\
-    --sim_id={sim_id}\
-    --task_id=$SLURM_ARRAY_TASK_ID\
-    --update_key={update_key}\
-    --backend_url={backend_url}\
-    --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
+# FILE_TO_WATCH=$WORK_DIR/fluka_`printf %04d $SLURM_ARRAY_TASK_ID`.log
+# python3 $ROOT_DIR/watcher.py \
+#     --filepath=$FILE_TO_WATCH\
+#     --sim_id={sim_id}\
+#     --task_id=$SLURM_ARRAY_TASK_ID\
+#     --update_key={update_key}\
+#     --backend_url={backend_url}\
+#     --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 trap 'sig_handler' SIGUSR1
 
