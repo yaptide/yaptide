@@ -28,9 +28,12 @@ if [ -n "$JOB_ID" ] ; then
 fi
 """  # skipcq: FLK-E501
 
-COLLECT_BASH: str = """#!/bin/bash
+COLLECT_SHIELDHIT_BASH: str = """#!/bin/bash
 {collect_header}
 ROOT_DIR={root_dir}
+python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
+      --backend_url={backend_url} --simulation_state=MERGING_RUNNING
+
 INPUT_WILDCARD=$ROOT_DIR/workspaces/task_*/*.bdo
 OUTPUT_DIRECTORY=$ROOT_DIR/output
 
@@ -40,13 +43,13 @@ cd $OUTPUT_DIRECTORY
 
 convertmc json --many "$INPUT_WILDCARD"
 
-CLEAR_BDOS={clear_bdos}
+CLEAR_BDOS={remove_output_from_workspace}
 
 if $CLEAR_BDOS; then
     rm $INPUT_WILDCARD
 fi
 
-python3 $ROOT_DIR/result_sender.py --output_dir=$OUTPUT_DIRECTORY\\
+python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
 """  # skipcq: FLK-E501
 

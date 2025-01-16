@@ -158,9 +158,10 @@ def remove_user(name, auth_provider):
 
 
 @run.command
+@click.option('sim_id', '--sim_id')
 @click.option('user', '--user')
 @click.option('auth_provider', '--auth-provider')
-def list_tasks(user, auth_provider):
+def list_tasks(user, auth_provider, sim_id):
     """List tasks"""
     con, metadata, _ = connect_to_db()
     tasks = metadata.tables[TableTypes.Task.name]
@@ -174,23 +175,31 @@ def list_tasks(user, auth_provider):
             click.echo(f"Aborting, user {user} does not exist")
             raise click.Abort()
 
-    filter_args = {}
+    filter_args_user = {}
+    filter_args_simulation = {}
 
     if user:
-        filter_args['username'] = user
+        filter_args_user['username'] = user
     if auth_provider:
-        filter_args['auth_provider'] = auth_provider
+        filter_args_user['auth_provider'] = auth_provider
+    if sim_id:
+        filter_args_simulation['simulation_id'] = int(sim_id)
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username).select_from(tasks).join(
-        simulations,
-        tasks.c.simulation_id == simulations.c.id).join(users,
-                                                        simulations.c.user_id == users.c.id).filter_by(**filter_args)
+    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username,
+                     tasks.c.task_state).select_from(tasks).filter_by(**filter_args_simulation).join(
+                         simulations, tasks.c.simulation_id == simulations.c.id).join(
+                             users, simulations.c.user_id == users.c.id).filter_by(**filter_args_user).order_by(
+                                 tasks.c.simulation_id, tasks.c.task_id)
     all_tasks = con.execute(stmt).all()
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
     for task in all_tasks:
-        user_column = f" username {task.username}" if not user else ''
-        click.echo(f"Simulation id {task.simulation_id}; Task id ...{task.task_id};{user_column}")
+        simulation_id_col = f"Simulation id {task.simulation_id}"
+        task_id_col = f"Task id ...{task.task_id}"
+        task_state_col = f"task_state {task.task_state}"
+        user_col = f" username {task.username}" if not user else ''
+
+        click.echo('; '.join((simulation_id_col, task_id_col, task_state_col, user_col)))
 
 
 @run.command

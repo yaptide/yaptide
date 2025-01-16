@@ -62,7 +62,7 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
         # and that there is no results, logfiles and input files here
         assert set(jobs_data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(jobs_data["job_tasks_status"]) == small_simulation_payload["ntasks"]
-        logging.debug("Job state: %s", jobs_data["job_state"])
+        logging.info("Job state: %s", jobs_data["job_state"])
         if jobs_data["job_state"] == 'RUNNING':
             # when job is is running, at least one task should be running
             # its interesting that it may happen that a job is RUNNING and still all tasks may be COMPLETED
@@ -78,6 +78,10 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
             start_time = simulations_data["simulations"][0]["start_time"]
             logging.info("start_time: %s", start_time)
             assert start_time is not None
+
+        if jobs_data["job_state"] in ['MERGING_QUEUED', 'MERGING_RUNNING']:
+            # when job is in MERGING_QUEUED state or MERGING_RUNNING, all tasks should be COMPLETED
+            assert all(task["task_state"] == "COMPLETED" for task in jobs_data["job_tasks_status"])
 
         logging.info("Checking if number of simulated primaries is correct")
         if jobs_data["job_state"] == 'COMPLETED':
@@ -98,12 +102,56 @@ def test_run_simulation_with_flask(celery_app, celery_worker, client: Flask, db_
         sleep(0.5)
     assert i < max_number_of_attempts - 1, "Job did not finish in time"
 
-    logging.info("Fetching results from /results endpoint")
+    # Test the results endpoint without estimator_name
+    logging.info("Fetching results from /results endpoint without estimator_name")
     resp = client.get("/results", query_string={"job_id": job_id})
     results_data: dict = json.loads(resp.data.decode())
 
     assert resp.status_code == 200  # skipcq: BAN-B101
     assert {"message", "estimators"} == set(results_data.keys())
+
+    # Test the results endpoint with a specific estimator_name
+    estimator_name = results_data["estimators"][0]["name"]
+    logging.info("Fetching results from /results endpoint with estimator_name '%s'", estimator_name)
+    resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": estimator_name})
+    results_data_for_specific_estimator: dict = json.loads(resp.data.decode())
+
+    assert resp.status_code == 200  # skipcq: BAN-B101
+    assert {"message", "metadata", "name", "pages"} == set(results_data_for_specific_estimator.keys())
+    assert estimator_name == results_data_for_specific_estimator["name"]
+    assert results_data["estimators"][0]["metadata"] == results_data_for_specific_estimator["metadata"]
+    assert results_data["estimators"][0]["pages"] == results_data_for_specific_estimator["pages"]
+
+    # Test the results endpoint with a nonexistent estimator_name
+    resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": "nonexistent_estimator"})
+    assert resp.status_code == 404  # skipcq: BAN-B101
+
+    # Test the results endpoint with a specific page number
+    resp = client.get("/results", query_string={"job_id": job_id, "estimator_name": estimator_name, "page_number": 0})
+    results_data_for_specific_page: dict = json.loads(resp.data.decode())
+    assert results_data["estimators"][0]["pages"][0] == results_data_for_specific_page["page"]
+
+    # Test the results endpoint with a specific page numbers
+    resp = client.get("/results",
+                      query_string={
+                          "job_id": job_id,
+                          "estimator_name": estimator_name,
+                          "page_numbers": "0-1,3"
+                      })
+    results_data_for_specific_pages: dict = json.loads(resp.data.decode())
+    assert results_data["estimators"][0]["pages"][0] == results_data_for_specific_pages["pages"][0]
+    assert results_data["estimators"][0]["pages"][1] == results_data_for_specific_pages["pages"][1]
+    assert results_data["estimators"][0]["pages"][3] == results_data_for_specific_pages["pages"][2]
+
+    # Test /estimators endpoint
+    resp = client.get("/estimators", query_string={"job_id": job_id})
+    estimators_metadata = json.loads(resp.data.decode())["estimators_metadata"]
+    assert [estimator["name"] for estimator in results_data["estimators"]
+            ] == [estimator_metadata["name"] for estimator_metadata in estimators_metadata]
+
+    # Test /estimators endpoint with wrong job_id
+    resp = client.get("/estimators", query_string={"job_id": job_id + "1234"})
+    assert resp.status_code == 404  # skipcq: BAN-B101
 
     resp = client.get("/user/simulations")
     assert resp.status_code == 200  # skipcq: BAN-B101

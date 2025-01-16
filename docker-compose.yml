@@ -4,12 +4,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: yaptide_redis
+    restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
 
   postgresql:
     image: postgres:16-alpine
     container_name: yaptide_postgresql
+    restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-yaptide_db}
       POSTGRES_USER: ${POSTGRES_USER:-yaptide_user}
@@ -28,6 +30,7 @@ services:
       dockerfile: Dockerfile-flask
     image: yaptide_flask
     container_name: yaptide_flask
+    restart: unless-stopped
     environment:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
@@ -42,12 +45,13 @@ services:
       postgresql:
         condition: service_healthy
 
-  yaptide_worker:
+  yaptide_simulation_worker:
     build:
       context: .
-      dockerfile: Dockerfile-worker
-    image: yaptide_worker
-    container_name: yaptide_worker
+      dockerfile: Dockerfile-simulation-worker
+    image: yaptide_simulation_worker
+    container_name: yaptide_simulation_worker
+    restart: unless-stopped
     volumes:
       - simulators:/simulators:rw
     deploy:
@@ -62,7 +66,33 @@ services:
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
     healthcheck:
-      test: ["CMD-SHELL", "celery --app yaptide.celery.worker inspect ping"]
+      test: ["CMD-SHELL", "celery --app yaptide.celery.simulation_worker inspect ping"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      yaptide_flask:
+        condition: service_healthy
+
+  yaptide_helper_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile-helper-worker
+    image: yaptide_helper_worker
+    container_name: yaptide_helper_worker
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+    env_file: .env
+    environment:
+      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
+      - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
+      - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+    healthcheck:
+      test: ["CMD-SHELL", "celery --app yaptide.utils.helper_worker inspect ping"]
     depends_on:
       redis:
         condition: service_healthy
@@ -72,6 +102,7 @@ services:
   nginx:
     image: yaptide_nginx
     container_name: yaptide_nginx
+    restart: unless-stopped
     build:
       context: .
       dockerfile: Dockerfile-nginx
@@ -81,8 +112,11 @@ services:
     depends_on:
       yaptide_flask:
         condition: service_healthy
-      yaptide_worker:
+      yaptide_simulation_worker:
         condition: service_healthy
+      yaptide_helper_worker:
+        condition: service_healthy
+
 
 volumes:
   data:

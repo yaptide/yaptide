@@ -1,4 +1,4 @@
-name: On-demand deploy worker
+name: On-demand deploy simulation worker
 
 # https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows
 on:
@@ -7,14 +7,14 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}-worker
+  IMAGE_NAME: ${{ github.repository }}-simulation-worker
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     # Only run if it is a PR and the comment contains /deploy
-    if: github.event.issue.pull_request && contains(github.event.comment.body, '/deploy-worker')
+    if: github.event.issue.pull_request && contains(github.event.comment.body, '/deploy-simulation-worker')
 
     # when we run this action as depenabot, we need to give it write permissions to the package registry and to the statuses
     permissions:
@@ -25,7 +25,7 @@ jobs:
 
     steps:
       - name: Get branch of PR
-        uses: xt0rted/pull-request-comment-branch@v2
+        uses: xt0rted/pull-request-comment-branch@v3
         id: comment-branch
 
       - name: Set latest commit status as pending
@@ -51,7 +51,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5.5.1
+        uses: docker/metadata-action@v5.6.1
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           # Need to override the tag with pr-{issue_number} to make the retention working properly
@@ -64,7 +64,7 @@ jobs:
         with:
           provenance: false
           context: .
-          file: Dockerfile-worker
+          file: Dockerfile-simulation-worker
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

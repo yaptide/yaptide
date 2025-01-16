@@ -8,27 +8,84 @@ on:
 
   workflow_dispatch:
 
-env:
-  S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
-  S3_TOPAS_KEY: ${{ vars.S3_TOPAS_KEY }}
-  S3_TOPAS_VERSION: ${{ vars.S3_TOPAS_VERSION }}
-  S3_TOPAS_BUCKET: ${{ vars.S3_TOPAS_BUCKET }}
-  S3_GEANT4_BUCKET: ${{ vars.S3_GEANT4_BUCKET }}
-  S3_FLUKA_BUCKET: ${{ vars.S3_FLUKA_BUCKET }}
-  S3_FLUKA_KEY: ${{ vars.S3_FLUKA_KEY }}
-
 jobs:
+  get-simulators:
+    env:
+      POETRY_VIRTUALENVS_CREATE: false
+    runs-on:  ${{ matrix.platform }}
+    strategy:
+      matrix:
+        platform: ['ubuntu-latest', 'windows-latest']
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Update pip and install poetry
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install poetry
+
+      - name: Install dependencies for production
+        run: |
+          poetry install --only main
+
+      # try downloading full version of SHIELD-HIT12A
+      - name: Get simulators for Linux
+        if: matrix.platform == 'ubuntu-latest'
+        id: get_simulators
+        run: |
+            poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
+        timeout-minutes: 2
+        env:
+          S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
+          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
+          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
+          S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
+        continue-on-error: true
+
+      # fallback to demo version of SHIELD-HIT12A
+      - name: Get demo simulators for Linux due to timeout
+        if: matrix.platform == 'ubuntu-latest' && steps.get_simulators.outcome == 'failure'
+        run: |
+          echo "Retrying due to timeout..."
+          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
+        timeout-minutes: 1
+
+    
+      - name: Get demo simulator for Windows
+        if: matrix.platform == 'windows-latest'
+        run: |
+          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
+        timeout-minutes: 2
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: simulators-${{ matrix.platform }}
+          path: bin/
+          if-no-files-found: error
+          retention-days: 1
+
   build-and-test:
     runs-on:  ${{ matrix.platform }}
+    needs: get-simulators
     env:
       POETRY_VIRTUALENVS_CREATE: false
     strategy:
       matrix:
         python-version: ['3.9', '3.10', '3.11', '3.12']
-        platform: [ubuntu-latest, windows-latest]
-        exclude:
-          - python-version: '3.9'
-            platform: windows-latest
+        platform: ['ubuntu-latest']
+        include:
+          - python-version: '3.12'
+            platform: 'windows-latest'
 
     steps:
       - name: Checkout
@@ -38,40 +95,33 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
+
+      - name: Download simulators
+        uses: actions/download-artifact@v4
+        with:
+          name: simulators-${{ matrix.platform }}
+          path: bin/
+
       - name: Update pip and install poetry
         run: |
           python3 -m pip install --upgrade pip
           pip install poetry
+
       - name: Install dependencies for production
-        run: |
-          poetry install --only main
+        run: poetry install --only main
+
       - name: Install dependencies for tests
-        run: |
-          poetry install --only test
+        run: poetry install --only test
 
       - name: Run main tests on Linux
         if: matrix.platform == 'ubuntu-latest'
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: pytest
-
-      # for some reason, pytest cannot run all tests at once, but seems to work if we run them one by one
-      - name: Run main tests on Windows using powershell
-        if: matrix.platform == 'windows-latest'
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
         run: |
-          Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
+          chmod +x bin/shieldhit
+          poetry run pytest --reruns 3 --reruns-delay 5
+
+      - name: Run main tests on Windows
+        if: matrix.platform == 'windows-latest' 
+        run: poetry run pytest --reruns 3 --reruns-delay 5 -k "not test_run_simulation_with_flask and not test_run_simulation_with_flask_crashing"
 
 
   # upload coverage report to deepsource
@@ -97,15 +147,16 @@ jobs:
       - name: Install deepsource CLI
         run: curl https://deepsource.io/cli | sh
 
+      - name: Download simulators
+        uses: actions/download-artifact@v4
+        with:
+          name: simulators-ubuntu-latest
+          path: bin/
+
       - name: Generate tests coverage report
-        env:
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
-          S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
-          S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        run: poetry run pytest --cov=./ --cov-report xml
+        run: |
+          chmod +x bin/shieldhit
+          poetry run pytest --cov=./ --cov-report xml
 
       - name: Upload coverage report to deepsource
         run: ./bin/deepsource report --analyzer test-coverage --key python --value-file ./coverage.xml

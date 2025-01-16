@@ -1,16 +1,13 @@
 import logging
-from typing import Union
+from typing import Optional, Union
 
+from sqlalchemy import and_
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (BatchSimulationModel, BatchTaskModel,
-                                        CelerySimulationModel, CeleryTaskModel,
-                                        ClusterModel, EstimatorModel,
-                                        InputModel, KeycloakUserModel,
-                                        LogfilesModel, PageModel,
-                                        SimulationModel, TaskModel, UserModel,
-                                        YaptideUserModel)
+from yaptide.persistence.models import (BatchSimulationModel, BatchTaskModel, CelerySimulationModel, CeleryTaskModel,
+                                        ClusterModel, EstimatorModel, InputModel, KeycloakUserModel, LogfilesModel,
+                                        PageModel, SimulationModel, TaskModel, UserModel, YaptideUserModel)
 
 
 def add_object_to_db(obj: db.Model, make_commit: bool = True) -> None:
@@ -56,6 +53,15 @@ def fetch_simulation_by_job_id(job_id: str) -> Union[BatchSimulationModel, Celer
     SimulationPoly = with_polymorphic(SimulationModel, [BatchSimulationModel, CelerySimulationModel])
     simulation = db.session.query(SimulationPoly).filter_by(job_id=job_id).first()
     return simulation
+
+
+def fetch_simulation_id_by_job_id(job_id: str) -> Optional[int]:
+    """Fetches simulation_id by job_id for both Celery and Batch simulations.
+    Returns simulation_id if simulation exists,
+    or None if no simulation is found.
+    """
+    simulation_id = db.session.query(SimulationModel.id).filter_by(job_id=job_id).first()
+    return simulation_id[0] if simulation_id else None
 
 
 def fetch_celery_simulation_by_job_id(job_id: str) -> CelerySimulationModel:
@@ -116,10 +122,35 @@ def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
     return estimators
 
 
+def fetch_estimator_names_by_job_id(job_id: int) -> Optional[list[str]]:
+    """Fetches estimators names by job id
+    Returns a list of estimator names if the simulation exists,
+    or None if no simulation is found for the provided job ID.
+    """
+    simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+    if not simulation_id:
+        return None
+    estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).all()
+    estimator_names = [name for (name, ) in estimator_names_tuples]
+    return estimator_names
+
+
 def fetch_estimator_by_sim_id_and_est_name(sim_id: int, est_name: str) -> EstimatorModel:
     """Fetches estimator by simulation id and estimator name"""
     estimator = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id, name=est_name).first()
     return estimator
+
+
+def fetch_estimator_by_sim_id_and_file_name(sim_id: int, file_name: str) -> EstimatorModel:
+    """Fetches estimator by simulation id and estimator name"""
+    estimator = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id, file_name=file_name).first()
+    return estimator
+
+
+def fetch_estimator_id_by_sim_id_and_est_name(sim_id: int, est_name: str) -> Optional[int]:
+    """Fetches estimator_id by simulation id and estimator name"""
+    estimator_id = db.session.query(EstimatorModel.id).filter_by(simulation_id=sim_id, name=est_name).first()
+    return estimator_id[0] if estimator_id else None
 
 
 def fetch_pages_by_estimator_id(est_id: int) -> list[PageModel]:
@@ -132,6 +163,20 @@ def fetch_page_by_est_id_and_page_number(est_id: int, page_number: int) -> PageM
     """Fetches page by estimator id and page number"""
     page = db.session.query(PageModel).filter_by(estimator_id=est_id, page_number=page_number).first()
     return page
+
+
+def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> PageModel:
+    """Fetches page by estimator id and page number"""
+    pages = db.session.query(PageModel).filter(
+        and_(PageModel.estimator_id == est_id, PageModel.page_number.in_(page_numbers))).all()
+    return pages
+
+
+def fetch_pages_metadata_by_est_id(est_id: str) -> EstimatorModel:
+    """Fetches estimator by simulation id and estimator name"""
+    pages_metadata = db.session.query(PageModel.page_number, PageModel.page_name,
+                                      PageModel.page_dimension).filter_by(estimator_id=est_id).all()
+    return pages_metadata
 
 
 def fetch_all_clusters() -> list[ClusterModel]:

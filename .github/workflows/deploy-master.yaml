@@ -1,4 +1,4 @@
-name: Deploy worker and flask docker images to GHCR registry on push to master
+name: Deploy simulation-worker and flask docker images to GHCR registry on push to master
 
 on:
   push:
@@ -7,11 +7,11 @@ on:
 
 env:
   REGISTRY: ghcr.io
-  WORKER_IMAGE_NAME: ${{ github.repository }}-worker
+  SIMULATION_WORKER_IMAGE_NAME: ${{ github.repository }}-simulation-worker
   FLASK_IMAGE_NAME: ${{ github.repository }}-flask
 
 jobs:
-  deploy-worker:
+  deploy-simulation-worker:
     runs-on: ubuntu-latest
 
     permissions:
@@ -33,9 +33,9 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5.5.1
+        uses: docker/metadata-action@v5.6.1
         with:
-          images: ${{ env.REGISTRY }}/${{ env.WORKER_IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ env.SIMULATION_WORKER_IMAGE_NAME }}
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v6
@@ -43,7 +43,7 @@ jobs:
           provenance: false
           context: .
           push: true
-          file: Dockerfile-worker
+          file: Dockerfile-simulation-worker
           tags: ${{ steps.meta.outputs.tags }}, ${{ steps.meta.outputs.tags }}-${{github.run_number}}
           labels: ${{ steps.meta.outputs.labels }}
           build-args: |
@@ -71,7 +71,7 @@ jobs:
 
       - name: Extract metadata (tags, labels) for Docker
         id: meta
-        uses: docker/metadata-action@v5.5.1
+        uses: docker/metadata-action@v5.6.1
         with:
           images: ${{ env.REGISTRY }}/${{ env.FLASK_IMAGE_NAME }}
 
