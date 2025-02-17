@@ -8,12 +8,15 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (
-    add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_by_sim_id_and_file_name,
-    fetch_estimator_id_by_sim_id_and_est_name, fetch_estimators_by_sim_id, fetch_input_by_sim_id,
-    fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number, fetch_pages_by_est_id_and_page_numbers,
-    fetch_pages_by_estimator_id, fetch_simulation_by_job_id, fetch_simulation_by_sim_id, fetch_simulation_id_by_job_id,
-    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
-from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
+    add_object_to_db, fetch_cluster_by_id,
+    fetch_estimator_by_sim_id_and_est_name, fetch_estimators_by_sim_id,
+    fetch_input_by_sim_id, fetch_logfiles_by_sim_id,
+    fetch_page_by_est_id_and_page_number, fetch_pages_by_estimator_id,
+    fetch_simulation_by_job_id, fetch_simulation_by_sim_id,
+    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state,
+    update_task_state)
+from yaptide.persistence.models import (BatchSimulationModel, EstimatorModel,
+                                        LogfilesModel, PageModel, UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
@@ -239,6 +242,13 @@ class ResultsResource(Resource):
         update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         update_simulation_state(simulation=simulation, update_dict=update_dict)
 
+        # If simulation is too short, it can happen that the simulation completes,
+        # but tasks didnt' sent their completion status or simulated_primaries = requested_primaries.
+        # To avoid this, we update simulation tasks by their final status
+        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
+        for task in tasks:
+            update_task_state(task, {"task_state": EntityState.COMPLETED.value})
+        
         logging.debug("Marking simulation tasks as completed")
 
         return yaptide_response(message="Results saved", code=202)
