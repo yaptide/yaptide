@@ -752,14 +752,14 @@ wmi = ["wmi (>=1.5.1)"]
 
 [[package]]
 name = "environs"
-version = "14.1.0"
+version = "14.1.1"
 description = "simplified environment variable parsing"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "environs-14.1.0-py3-none-any.whl", hash = "sha256:a7edda1668ddf1fbfcb7662bdc242dac25648eff2c7fdbaa5d959693afed7a3e"},
-    {file = "environs-14.1.0.tar.gz", hash = "sha256:a5f2afe9d5a21b468e74a3cceacf5d2371fd67dbb9a7e54fe62290c75a09cdfa"},
+    {file = "environs-14.1.1-py3-none-any.whl", hash = "sha256:45bc56f1d53bbc59d8dd69bba97377dd88ec28b8229d81cedbd455b21789445b"},
+    {file = "environs-14.1.1.tar.gz", hash = "sha256:03db7ee2d50ec697b68814cd175a3a05a7c7954804e4e419ca8b570dc5a835cf"},
 ]
 
 [package.dependencies]
@@ -2415,4 +2415,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "5ea2226d49f2fcc7a871d40a9c0cb1daaad4dd697184367bee1d47dbc04d939c"
+content-hash = "342a12dbef06a507d51d4485e24cc6bc4d5512feb39fbd1974008d1d58701648"
