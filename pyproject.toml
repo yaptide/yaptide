@@ -38,7 +38,7 @@ pytest = "8.3.5"
 pre-commit = "4.2.0"
 pytest-dotenv = "0.5.2"
 black = "25.1.0"
-pytest-rerunfailures = "^15.0"
+pytest-rerunfailures = "^15.1"
 
 
 [build-system]
