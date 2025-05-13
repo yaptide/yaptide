@@ -28,7 +28,7 @@ werkzeug = "3.1.3"
 boto3 = "1.38.13"
 cryptography = "43.0.3"
 psycopg = {version = "3.2.7", extras = ["binary"]}
-yaptide-converter = { git = "https://github.com/yaptide/converter.git", rev = "3ff963fcf0aa3ed8b28c656d9eabb75b22aa4093"}
+yaptide-converter = { git = "https://github.com/yaptide/converter.git", rev = "69f615d0fb391984793017b7eaa0336c38fa1f4b"}
 
 [tool.poetry.group.test.dependencies]
 pytest-flask = "1.3.0"
