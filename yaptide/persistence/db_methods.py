@@ -84,9 +84,9 @@ def fetch_simulation_by_sim_id(sim_id: int) -> Union[BatchSimulationModel, Celer
 
 
 def fetch_simulations_by_user_id(user_id: int) -> Union[list[BatchSimulationModel], list[CelerySimulationModel]]:
-    """Fetches simulations by user id"""
+    """Fetches simulations by user id, sorted by id"""
     SimulationPoly = with_polymorphic(SimulationModel, [BatchSimulationModel, CelerySimulationModel])
-    simulations = db.session.query(SimulationPoly).filter_by(user_id=user_id).all()
+    simulations = db.session.query(SimulationPoly).filter_by(user_id=user_id).order_by(SimulationModel.id).all()
     return simulations
 
 
@@ -98,9 +98,9 @@ def fetch_task_by_sim_id_and_task_id(sim_id: int, task_id: str) -> Union[BatchTa
 
 
 def fetch_tasks_by_sim_id(sim_id: int) -> Union[list[BatchTaskModel], list[CeleryTaskModel]]:
-    """Fetches tasks by simulation id"""
+    """Fetches tasks by simulation id, sorted by task_id"""
     TaskPoly = with_polymorphic(TaskModel, [BatchTaskModel, CeleryTaskModel])
-    tasks = db.session.query(TaskPoly).filter_by(simulation_id=sim_id).all()
+    tasks = db.session.query(TaskPoly).filter_by(simulation_id=sim_id).order_by(TaskModel.task_id).all()
     return tasks
 
 
@@ -115,11 +115,10 @@ def fetch_batch_tasks_by_sim_id(sim_id: int) -> list[BatchTaskModel]:
     tasks = db.session.query(BatchTaskModel).filter_by(simulation_id=sim_id).all()
     return tasks
 
-
-def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
-    """Fetches estimators by simulation id"""
-    estimators = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id).all()
-    return estimators
+    def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
+        """Fetches estimators by simulation id, sorted by id"""
+        estimators = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id).order_by(EstimatorModel.id).all()
+        return estimators
 
 
 def fetch_estimator_names_by_job_id(job_id: int) -> Optional[list[str]]:
@@ -130,7 +129,8 @@ def fetch_estimator_names_by_job_id(job_id: int) -> Optional[list[str]]:
     simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
     if not simulation_id:
         return None
-    estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).all()
+    estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).order_by(
+        EstimatorModel.id).all()
     estimator_names = [name for (name, ) in estimator_names_tuples]
     return estimator_names
 
@@ -154,8 +154,8 @@ def fetch_estimator_id_by_sim_id_and_est_name(sim_id: int, est_name: str) -> Opt
 
 
 def fetch_pages_by_estimator_id(est_id: int) -> list[PageModel]:
-    """Fetches pages by estimator id"""
-    pages = db.session.query(PageModel).filter_by(estimator_id=est_id).all()
+    """Fetches pages by estimator id, sorted by page number"""
+    pages = db.session.query(PageModel).filter_by(estimator_id=est_id).order_by(PageModel.page_number).all()
     return pages
 
 
@@ -173,9 +173,10 @@ def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> P
 
 
 def fetch_pages_metadata_by_est_id(est_id: str) -> EstimatorModel:
-    """Fetches estimator by simulation id and estimator name"""
+    """Fetches estimator by simulation id and estimator name, sorted by page number"""
     pages_metadata = db.session.query(PageModel.page_number, PageModel.page_name,
-                                      PageModel.page_dimension).filter_by(estimator_id=est_id).all()
+                                      PageModel.page_dimension).filter_by(estimator_id=est_id).order_by(
+                                          PageModel.page_number).all()
     return pages_metadata
 
 
