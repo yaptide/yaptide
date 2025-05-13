@@ -115,10 +115,11 @@ def fetch_batch_tasks_by_sim_id(sim_id: int) -> list[BatchTaskModel]:
     tasks = db.session.query(BatchTaskModel).filter_by(simulation_id=sim_id).all()
     return tasks
 
-    def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
-        """Fetches estimators by simulation id, sorted by id"""
-        estimators = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id).order_by(EstimatorModel.id).all()
-        return estimators
+
+def fetch_estimators_by_sim_id(sim_id: int) -> list[EstimatorModel]:
+    """Fetches estimators by simulation id, sorted by id"""
+    estimators = db.session.query(EstimatorModel).filter_by(simulation_id=sim_id).order_by(EstimatorModel.id).all()
+    return estimators
 
 
 def fetch_estimator_names_by_job_id(job_id: int) -> Optional[list[str]]:
