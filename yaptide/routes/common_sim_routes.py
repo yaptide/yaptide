@@ -54,6 +54,7 @@ class JobsResource(Resource):
         tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
+        job_tasks_status = sorted(job_tasks_status, key=lambda x: x["task_id"])
 
         if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value,
                                     EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value):

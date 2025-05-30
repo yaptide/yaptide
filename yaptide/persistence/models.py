@@ -249,6 +249,7 @@ class TaskModel(db.Model):
             "requested_primaries": self.requested_primaries,
             "simulated_primaries": self.simulated_primaries,
             "last_update_time": self.last_update_time,
+            "task_id": self.id
         }
         if self.estimated_time:
             result["estimated_time"] = {
