@@ -1,4 +1,5 @@
 import os
+import logstash 
 
 from flask import Flask
 from flask_restful import Api
@@ -17,7 +18,10 @@ def create_app():
     # Print env variables
     for item in os.environ.items():
         app.logger.debug("Environment variable: %s", item)
-
+    logstash_host = "logstash"
+    logstash_port = 5000
+    logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
+    app.logger.addHandler(logstash_handler)
     # Load configuration from environment variables
     # Load any environment variables that start with FLASK_, dropping the prefix from the env key for the config key.
     # Values are passed through a loading function to attempt to convert them to more specific types than strings.

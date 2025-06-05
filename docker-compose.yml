@@ -117,6 +117,37 @@ services:
       yaptide_helper_worker:
         condition: service_healthy
 
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.13.4
+    container_name: yaptide_logstash
+    restart: unless-stopped
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    depends_on:
+      - elasticsearch
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
+    container_name: yaptide_elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    restart: unless-stopped
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.13.4
+    container_name: yaptide_kibana
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    restart: unless-stopped
+
 
 volumes:
   data:
