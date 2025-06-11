@@ -1,27 +1,35 @@
 import logging
 from collections import Counter
 from datetime import datetime
+from uuid import uuid4
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
-from uuid import uuid4
 
 from yaptide.celery.simulation_worker import celery_app
-from yaptide.celery.utils.manage_tasks import (get_job_results, run_job)
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_celery_simulation_by_job_id,
-                                            fetch_celery_tasks_by_sim_id, fetch_estimators_by_sim_id,
-                                            fetch_pages_by_estimator_id, make_commit_to_db, update_simulation_state,
+from yaptide.celery.utils.manage_tasks import get_job_results, run_job
+from yaptide.persistence.db_methods import (add_object_to_db,
+                                            fetch_celery_simulation_by_job_id,
+                                            fetch_celery_tasks_by_sim_id,
+                                            fetch_estimators_by_sim_id,
+                                            fetch_pages_by_estimator_id,
+                                            make_commit_to_db,
+                                            update_simulation_state,
                                             update_task_state)
-from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, EstimatorModel, InputModel, PageModel,
+from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel,
+                                        EstimatorModel, InputModel, PageModel,
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.response_templates import (error_validation_response,
+                                                     yaptide_response)
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
+from yaptide.routes.utils.utils import (check_if_job_is_owned_and_exist,
+                                        determine_input_type, make_input_dict)
 from yaptide.utils.enums import EntityState, PlatformType
 from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
+logger = logging.getLogger("app")
 
 class JobsDirect(Resource):
     """Class responsible for simulations run directly with celery"""
@@ -33,6 +41,8 @@ class JobsDirect(Resource):
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
+        
+        logger.debug(f"[DEBUG STATES] Received celery_routes.post, payload_dict = {payload_dict}")
 
         required_keys = {"sim_type", "ntasks", "input_type"}
 
@@ -61,13 +71,21 @@ class JobsDirect(Resource):
         # create tasks in the database in the default PENDING state
         celery_ids = [str(uuid4()) for _ in range(payload_dict["ntasks"])]
         for i in range(payload_dict["ntasks"]):
-            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i, celery_id=celery_ids[i])
+            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i, celery_id=celery_ids[i],
+                                   requested_primaries=input_dict["number_of_requested_primaries"])
             add_object_to_db(task, make_commit=False)
+            logger.debug(f"[DEBUG STATES] celery_routes.post creating_tasks {i+1}/{payload_dict['ntasks']}")
+            logger.debug(f"[DEBUG STATES] celery_routes.post requested_primaries  {task.requested_primaries}")
+            logger.debug(f"[DEBUG STATES] celery_routes.post simulated_primaries  {task.simulated_primaries}")
+
         make_commit_to_db()
 
         # submit the asynchronous job to celery
         simulation.merge_id = run_job(input_dict["input_files"], update_key, simulation.id, payload_dict["ntasks"],
                                       celery_ids, payload_dict["sim_type"])
+        
+        logger.debug(f"[DEBUG STATES] celery_routes.post run_job merge_id:{simulation.merge_id}")
+
 
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict

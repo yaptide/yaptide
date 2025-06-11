@@ -5,10 +5,10 @@ import re
 from enum import Enum, auto
 from pathlib import Path
 
+from converter.api import get_parser_from_str, run_parser
 from pymchelper.estimator import Estimator
-from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
-from converter.api import (get_parser_from_str, run_parser)
+from pymchelper.writers.json import JsonWriter
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
@@ -135,7 +135,7 @@ def adjust_primaries_for_shieldhit_files(payload_files_dict: dict, ntasks: int =
     # number_of_tasks = payload_files_dict['ntasks']  -> to be implemented in UI
     # here we manipulate the files_dict['beam.dat'] file to adjust number of primaries
     # we manipulate content of the file, no need to write the file to disk
-    return files_dict, int(number_of_all_primaries)
+    return files_dict, int(number_of_all_primaries), int(primaries_per_task)
 
 
 def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = None) -> tuple[dict, int]:
@@ -180,9 +180,9 @@ def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -
             payload_editor_dict=payload_dict, ntasks=ntasks)
         return check_and_convert_payload_to_files_dict(new_payload_dict), number_of_all_primaries
     if json_type == JSON_TYPE.Files:
-        files_dict, number_of_all_primaries = adjust_primaries_in_files_dict(payload_files_dict=payload_dict,
+        files_dict, number_of_all_primaries, number_of_requested_primaries = adjust_primaries_in_files_dict(payload_files_dict=payload_dict,
                                                                              ntasks=ntasks)
-        return files_dict, number_of_all_primaries
+        return files_dict, number_of_all_primaries, number_of_requested_primaries
     return {}, 0
 
 

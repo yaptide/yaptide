@@ -41,6 +41,7 @@ def make_input_dict(payload_dict: dict, input_type: str) -> dict:
     else:
         files_dict, number_of_all_primaries = files_dict_with_adjusted_primaries(payload_dict=payload_dict)
     input_dict["number_of_all_primaries"] = number_of_all_primaries
+    input_dict["number_of_requested_primaries"] = number_of_all_primaries
     input_dict["input_files"] = files_dict
 
     return input_dict
