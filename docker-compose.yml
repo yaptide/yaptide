@@ -31,6 +31,8 @@ services:
     image: yaptide_flask
     container_name: yaptide_flask
     restart: unless-stopped
+    ports:
+      - "6000:6000"
     environment:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
@@ -127,6 +129,11 @@ services:
       - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf
     depends_on:
       - elasticsearch
+    healthcheck:
+      test: ["CMD", "bash", "-c", "</dev/tcp/localhost/5001"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.13.4
@@ -139,6 +146,11 @@ services:
     restart: unless-stopped
     volumes:
     - elasticsearch-data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '"status"' "]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
   kibana:
     image: docker.elastic.co/kibana/kibana:8.13.4
@@ -148,6 +160,11 @@ services:
     depends_on:
       - elasticsearch
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5601/api/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
 
 
 volumes:

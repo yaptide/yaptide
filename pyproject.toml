@@ -29,6 +29,7 @@ boto3 = "1.38.29"
 cryptography = "43.0.3"
 psycopg = {version = "3.2.9", extras = ["binary"]}
 yaptide-converter = { git = "https://github.com/yaptide/converter.git", rev = "69f615d0fb391984793017b7eaa0336c38fa1f4b"}
+python-logstash = "0.4.8"
 
 [tool.poetry.group.test.dependencies]
 pytest-flask = "1.3.0"
