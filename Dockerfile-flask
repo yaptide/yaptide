@@ -12,7 +12,7 @@ WORKDIR /usr/local/app
 COPY poetry.lock poetry.toml pyproject.toml ./
 # Install poetry and project dependencies, we also disabled virtualenv creation
 ENV POETRY_VIRTUALENVS_CREATE=false
-RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main && poetry add python-logstash
+RUN pip install --no-cache-dir poetry==$POETRY_VERSION && poetry install --only main
 
 # copy project
 COPY yaptide ./yaptide/
