@@ -1,6 +1,6 @@
 import os
-import logstash 
-import logging 
+import logstash
+import logging
 
 from flask import Flask
 from flask_restful import Api
@@ -14,7 +14,7 @@ def create_app():
     """Function starting Flask Server"""
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
-    
+
     logstash_host = "logstash"
     logstash_port = 5001
     logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
@@ -22,7 +22,7 @@ def create_app():
     app.logger.setLevel(logging.DEBUG)
     logging.getLogger().setLevel(logging.DEBUG)
     app.logger.addHandler(logstash_handler)
-    logging.getLogger().addHandler(logstash_handler) 
+    logging.getLogger().addHandler(logstash_handler)
     app.logger.info("Creating Flask app %s", flask_name)
 
     # Print env variables
