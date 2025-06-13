@@ -31,8 +31,6 @@ services:
     image: yaptide_flask
     container_name: yaptide_flask
     restart: unless-stopped
-    ports:
-      - "6000:6000"
     environment:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
