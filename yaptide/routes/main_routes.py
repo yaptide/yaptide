@@ -8,6 +8,7 @@ from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
+from yaptide.routes.frontent_log_routes import FrontendLogs
 from yaptide.routes.utils.response_templates import yaptide_response
 
 
@@ -48,3 +49,5 @@ def initialize_routes(api: Api):
 
     api.add_resource(Clusters, "/clusters")
     api.add_resource(EstimatorResource, "/estimators")
+
+    api.add_resource(FrontendLogs, "/logs")
