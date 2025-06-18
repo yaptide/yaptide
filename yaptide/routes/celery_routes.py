@@ -60,8 +60,11 @@ class JobsDirect(Resource):
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
         # create tasks in the database in the default PENDING state
         celery_ids = [str(uuid4()) for _ in range(payload_dict["ntasks"])]
+        requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
         for i in range(payload_dict["ntasks"]):
-            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i, celery_id=celery_ids[i])
+            task = CeleryTaskModel(simulation_id=simulation.id,
+                                   task_id=i, celery_id=celery_ids[i],
+                                   requested_primaries=requested_primaries)
             add_object_to_db(task, make_commit=False)
         make_commit_to_db()
 

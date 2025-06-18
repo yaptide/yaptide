@@ -10,11 +10,13 @@ from pathlib import Path
 from typing import List, Optional, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
-from pymchelper.input_output import frompattern
 from pymchelper.executor.runner import Runner
+from pymchelper.input_output import frompattern
 
-from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
-from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
+from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
+                                   TIMEOUT_MATCH, log_generator)
+from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails,
+                                                         read_fluka_out_file)
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
@@ -267,11 +269,10 @@ def read_file(event: threading.Event,
             requested_primaries = int(splitted[1])
             up_dict = {
                 "simulated_primaries": 0,
-                "requested_primaries": requested_primaries,
                 "start_time": utc_now.isoformat(sep=" "),
                 "task_state": EntityState.RUNNING.value
             }
-            logging.debug("Sending update for task %d, requested primaries %d", task_id, requested_primaries)
+            logging.debug("Sending update for task %d", task_id)
             send_task_update(simulation_id, task_id, update_key, up_dict)
 
         elif re.search(TIMEOUT_MATCH, line):
@@ -286,7 +287,7 @@ def read_file(event: threading.Event,
 
     logging.info("Parsing log file for task %d finished", task_id)
     up_dict = {
-        "simulated_primaries": requested_primaries,
+        "simulated_primaries": simulated_primaries,
         "end_time": utc_now.isoformat(sep=" "),
         "task_state": EntityState.COMPLETED.value
     }

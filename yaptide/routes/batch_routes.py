@@ -75,8 +75,11 @@ class JobsBatch(Resource):
                          sim_id=simulation.id,
                          update_key=update_key)
 
+        requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
         for i in range(payload_dict["ntasks"]):
-            task = BatchTaskModel(simulation_id=simulation.id, task_id=str(i + 1))
+            task = BatchTaskModel(simulation_id=simulation.id,
+                                  task_id=str(i + 1),
+                                  requested_primaries=requested_primaries,)
             add_object_to_db(task, False)
 
         input_model = InputModel(simulation_id=simulation.id)
