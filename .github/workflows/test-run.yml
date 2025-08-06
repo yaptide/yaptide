@@ -97,7 +97,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download simulators
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
@@ -148,7 +148,7 @@ jobs:
         run: curl https://deepsource.io/cli | sh
 
       - name: Download simulators
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: simulators-ubuntu-latest
           path: bin/
