@@ -24,7 +24,7 @@ jobs:
           PR_URL: ${{github.event.pull_request.html_url}}
           GITHUB_TOKEN: ${{secrets.GITHUB_TOKEN}}
       - name: Checkout repo
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Approve certain sets of PRs
         if: ${{contains(steps.metadata.outputs.dependency-names, 'boto3') && steps.metadata.outputs.update-type == 'version-update:semver-patch'}}
         run: |
