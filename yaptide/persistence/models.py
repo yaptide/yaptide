@@ -22,6 +22,7 @@ class UserModel(db.Model):
     username: Column[str] = db.Column(db.String, nullable=False)
     auth_provider: Column[str] = db.Column(db.String, nullable=False)
     simulations = relationship("SimulationModel")
+    frontend_logs = relationship("FrontendLogModel", cascade="delete")
 
     __table_args__ = (UniqueConstraint('username', 'auth_provider', name='_username_provider_uc'), )
 
@@ -394,6 +395,20 @@ class LogfilesModel(db.Model):
     def data(self, value):
         if value is not None:
             self.compressed_data = compress(value)
+
+
+class FrontendLogModel(db.Model):
+    """Frontend log model"""
+
+    __tablename__ = 'FrontendLog'
+
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), nullable=False)
+    timestamp = db.Column(db.String(100))
+    level: Column[str] = db.Column(db.String(10))
+    message: Column[str] = db.Column(db.Text)
+    browser: Column[str] = db.Column(db.String(100))
+    user_ip: Column[str] = db.Column(db.String(45))
 
 
 def create_all():
