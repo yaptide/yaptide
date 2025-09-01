@@ -1,5 +1,4 @@
 import logging
-import typing
 from enum import Enum
 
 from flask import request, current_app as app
@@ -32,15 +31,20 @@ class OrderBy(Enum):
 
 
 def validate_job_state(states):
+    """ check whether the list of job states in query contains actual enum values """
     app.logger.error(f'states {states}')
     valid_states = [es.value for es in EntityState]
     for state in states:
         if state not in valid_states:
             raise ValidationError('Invalid job state')
 
+
 class JobStateField(fields.Field[list[str]]):
-    def _deserialize(self, value, attr, data, **kwargs):
+    @staticmethod
+    def _deserialize(value, attr, data, **kwargs):
+        """ deserializes job_state, which is expected to come as comma-separated list of states """
         return value.split(',')
+
 
 class UserSimulations(Resource):
     """Class responsible for returning user's simulations' basic infos"""
