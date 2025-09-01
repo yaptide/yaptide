@@ -39,7 +39,7 @@ def validate_job_state(states):
             raise ValidationError('Invalid job state')
 
 
-class JobStateField(fields.Field[list[str]]):
+class JobStateField(fields.Field):
     @staticmethod
     def _deserialize(value, attr, data, **kwargs):
         """ deserializes job_state, which is expected to come as comma-separated list of states """
