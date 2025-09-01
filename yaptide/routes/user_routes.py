@@ -31,7 +31,7 @@ class OrderBy(Enum):
 
 
 def validate_job_state(states):
-    """ check whether the list of job states in query contains actual enum values """
+    """check whether the list of job states in query contains actual enum values"""
     app.logger.error(f'states {states}')
     valid_states = [es.value for es in EntityState]
     for state in states:
@@ -40,9 +40,11 @@ def validate_job_state(states):
 
 
 class JobStateField(fields.Field):
+    """custom deserializer for job_state field"""
+
     @staticmethod
     def _deserialize(value, attr, data, **kwargs):
-        """ deserializes job_state, which is expected to come as comma-separated list of states """
+        """deserializes job_state, which is expected to come as comma-separated list of states"""
         return value.split(',')
 
 
