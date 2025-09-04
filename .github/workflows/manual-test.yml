@@ -47,7 +47,7 @@ jobs:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
             python-version: ${{ matrix.python-version }}
       - name: Update pip and install poetry
