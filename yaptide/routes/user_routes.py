@@ -1,7 +1,8 @@
 import logging
 from enum import Enum
+from typing import List
 
-from flask import request, current_app as app
+from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError
 from sqlalchemy import asc, desc
@@ -30,7 +31,7 @@ class OrderBy(Enum):
     END_TIME = "end_time"
 
 
-def validate_job_state(states: [str]):
+def validate_job_state(states: List[str]):
     """check if all states are correct values of EntityState enum"""
     if not set(states).issubset({es.value for es in EntityState}):
         raise ValidationError('Invalid job state')
@@ -42,7 +43,7 @@ class JobStateField(fields.Field):
     @staticmethod
     def _deserialize(value, attr, data, **kwargs):
         """deserializes job_state, which is expected to come as comma-separated list of states"""
-        return value.split(',')
+        return value.split(',') if isinstance(value, str) else []
 
 
 class UserSimulations(Resource):
