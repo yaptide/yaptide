@@ -1,9 +1,10 @@
 import logging
 from enum import Enum
+from typing import List
 
 from flask import request
 from flask_restful import Resource
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, ValidationError
 from sqlalchemy import asc, desc
 
 from yaptide.persistence.models import SimulationModel, UserModel
@@ -30,6 +31,21 @@ class OrderBy(Enum):
     END_TIME = "end_time"
 
 
+def validate_job_state(states: List[str]):
+    """check if all states are correct values of EntityState enum"""
+    if not set(states).issubset({es.value for es in EntityState}):
+        raise ValidationError('Invalid job state')
+
+
+class JobStateField(fields.Field):
+    """custom deserializer for job_state field"""
+
+    @staticmethod
+    def _deserialize(value, attr, data, **kwargs):
+        """deserializes job_state, which is expected to come as comma-separated list of states"""
+        return value.split(',') if isinstance(value, str) else []
+
+
 class UserSimulations(Resource):
     """Class responsible for returning user's simulations' basic infos"""
 
@@ -40,6 +56,7 @@ class UserSimulations(Resource):
         page_idx = fields.Integer(load_default=DEFAULT_PAGE_IDX)
         order_by = fields.String(load_default=OrderBy.START_TIME.value)
         order_type = fields.String(load_default=OrderType.DESCEND.value)
+        job_state = JobStateField(validate=validate_job_state, load_default=[])
 
     class DeleteAPIParametersSchema(Schema):
         """Schema for DELETE method parameters"""
@@ -58,8 +75,10 @@ class UserSimulations(Resource):
         sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
         query = SimulationModel.query.\
             filter(SimulationModel.job_id != None).\
-            filter_by(user_id=user.id).\
-            order_by(sorting(params_dict['order_by']))
+            filter_by(user_id=user.id)
+        if len(params_dict['job_state']) > 0:
+            query = query.filter(SimulationModel.job_state.in_(params_dict['job_state']))
+        query = query.order_by(sorting(params_dict['order_by']))
         pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
         simulations = pagination.items
 
