@@ -30,13 +30,10 @@ class OrderBy(Enum):
     END_TIME = "end_time"
 
 
-def validate_job_state(states):
-    """check whether the list of job states in query contains actual enum values"""
-    app.logger.error(f'states {states}')
-    valid_states = [es.value for es in EntityState]
-    for state in states:
-        if state not in valid_states:
-            raise ValidationError('Invalid job state')
+def validate_job_state(states: [str]):
+    """check if all states are correct values of EntityState enum"""
+    if not set(states).issubset({es.value for es in EntityState}):
+        raise ValidationError('Invalid job state')
 
 
 class JobStateField(fields.Field):
