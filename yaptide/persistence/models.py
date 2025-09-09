@@ -404,10 +404,10 @@ class FrontendLogModel(db.Model):
 
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), nullable=False)
-    timestamp = db.Column(db.String(100))
-    level: Column[str] = db.Column(db.String(10))
+    timestamp: Column[datetime] = db.Column(db.DateTime, server_default=now())
+    level: Column[str] = db.Column(db.String(50))
     message: Column[str] = db.Column(db.Text)
-    browser: Column[str] = db.Column(db.String(100))
+    browser: Column[str] = db.Column(db.Text)
     user_ip: Column[str] = db.Column(db.String(45))
 
 
