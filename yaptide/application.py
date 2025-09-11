@@ -15,8 +15,8 @@ def create_app():
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
 
-    logstash_host = "logstash"
-    logstash_port = 5001
+    logstash_host = os.getenv("LOGSTASH_HOST", "logstash")
+    logstash_port = int(os.getenv("LOGSTASH_PORT", 5001))
     logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
     logstash_handler.setLevel(logging.DEBUG)
     app.logger.setLevel(logging.DEBUG)
