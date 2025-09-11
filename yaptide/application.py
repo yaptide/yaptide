@@ -17,12 +17,18 @@ def create_app():
 
     logstash_host = os.getenv("LOGSTASH_HOST", "logstash")
     logstash_port = int(os.getenv("LOGSTASH_PORT", 5001))
-    logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
-    logstash_handler.setLevel(logging.DEBUG)
-    app.logger.setLevel(logging.DEBUG)
-    logging.getLogger().setLevel(logging.DEBUG)
-    app.logger.addHandler(logstash_handler)
-    logging.getLogger().addHandler(logstash_handler)
+
+    try:
+        logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
+        logstash_handler.setLevel(logging.DEBUG)
+        app.logger.setLevel(logging.DEBUG)
+        logging.getLogger().setLevel(logging.DEBUG)
+        app.logger.addHandler(logstash_handler)
+        logging.getLogger().addHandler(logstash_handler)
+    except Exception as e:
+        app.logger.error("Failed to initialize Logstash handler: %s", str(e))
+        app.logger.warning("Continuing without Logstash logging.")
+
     app.logger.info("Creating Flask app %s", flask_name)
 
     # Print env variables
