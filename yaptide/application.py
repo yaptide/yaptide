@@ -25,6 +25,7 @@ def create_app():
         logging.getLogger().setLevel(logging.DEBUG)
         app.logger.addHandler(logstash_handler)
         logging.getLogger().addHandler(logstash_handler)
+        app.logger.debug("Logstash handler initialized.")
     except Exception as e:
         app.logger.error("Failed to initialize Logstash handler: %s", str(e))
         app.logger.warning("Continuing without Logstash logging.")
