@@ -44,6 +44,8 @@ services:
         condition: service_healthy
       postgresql:
         condition: service_healthy
+      logstash:
+        condition: service_healthy
 
   yaptide_simulation_worker:
     build:
