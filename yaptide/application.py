@@ -24,7 +24,7 @@ def create_app():
     numeric_level = getattr(logging, log_level)
 
     logstash_host = os.getenv("LOGSTASH_HOST", "logstash")
-    logstash_port = int(os.getenv("LOGSTASH_PORT", 5001))
+    logstash_port = int(os.getenv("LOGSTASH_PORT", '5001'))
 
     logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
 
