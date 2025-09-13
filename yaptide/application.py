@@ -1,6 +1,7 @@
 import os
 import logstash
 import logging
+import sys
 
 from flask import Flask
 from flask_restful import Api
@@ -15,20 +16,24 @@ def create_app():
     flask_name = __name__.split('.')[0]
     app = Flask(flask_name)
 
+    # Logstash setup
+    log_level = os.getenv("LOG_LEVEL", "INFO").upper()
+    if not hasattr(logging, log_level):
+        sys.stderr.write(f"Invalid LOG_LEVEL '{log_level}', falling back to INFO.\n")
+        log_level = "INFO"
+    numeric_level = getattr(logging, log_level)
+
     logstash_host = os.getenv("LOGSTASH_HOST", "logstash")
     logstash_port = int(os.getenv("LOGSTASH_PORT", 5001))
 
-    try:
-        logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
-        logstash_handler.setLevel(logging.DEBUG)
-        app.logger.setLevel(logging.DEBUG)
-        logging.getLogger().setLevel(logging.DEBUG)
-        app.logger.addHandler(logstash_handler)
-        logging.getLogger().addHandler(logstash_handler)
-        app.logger.debug("Logstash handler initialized.")
-    except Exception as e:
-        app.logger.error("Failed to initialize Logstash handler: %s", str(e))
-        app.logger.warning("Continuing without Logstash logging.")
+    logstash_handler = logstash.TCPLogstashHandler(logstash_host, logstash_port, version=1)
+
+    logstash_handler.setLevel(numeric_level)
+    app.logger.setLevel(numeric_level)
+    logging.getLogger().setLevel(numeric_level)
+
+    app.logger.addHandler(logstash_handler)
+    logging.getLogger().addHandler(logstash_handler)
 
     app.logger.info("Creating Flask app %s", flask_name)
 
