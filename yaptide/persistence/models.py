@@ -406,9 +406,8 @@ class FrontendLogModel(db.Model):
     user_id: Column[int] = db.Column(db.Integer, db.ForeignKey('User.id', ondelete="CASCADE"), nullable=False)
     timestamp: Column[datetime] = db.Column(db.DateTime, server_default=now())
     level: Column[str] = db.Column(db.String(50))
-    message: Column[str] = db.Column(db.Text)
-    browser: Column[str] = db.Column(db.Text)
-    user_ip: Column[str] = db.Column(db.String(45))
+    message: Column[str] = db.Column(db.String(2048))
+    browser: Column[str] = db.Column(db.String(256))
 
 
 def create_all():

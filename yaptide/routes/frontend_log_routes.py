@@ -31,17 +31,18 @@ class FrontendLogs(Resource):
                 diff = required_keys.difference(entry.keys())
                 return yaptide_response(message=f"Missing keys in logs payload: {diff}", code=400)
 
-            # Make user_ip NULL in the database if it's an empty string
-            user_ip = entry.get('user_ip')
-            if user_ip == '':
-                user_ip = None
+            # Sanitize message and browser to fit database model
+            # and prevent overflows
+            message = entry.get('message').strip()
+            if len(message) > 2048:
+                message = message[:2045] + '...'
+
+            browser = entry.get('browser').strip()
+            if len(browser) > 256:
+                browser = browser[:253] + '...'
 
             timestamp = entry.get('timestamp')
-            log = FrontendLogModel(user_id=user.id,
-                                   level=entry.get('level'),
-                                   message=entry.get('message'),
-                                   browser=entry.get('browser'),
-                                   user_ip=user_ip)
+            log = FrontendLogModel(user_id=user.id, level=entry.get('level'), message=message, browser=browser)
 
             # If timestamp is provided, use it; otherwise, the default server time will be used
             if timestamp:
