@@ -22,3 +22,4 @@ There are two main ways of build and run the app
 ## Credits
 
 This work was partially funded by EuroHPC PL Project, Smart Growth Operational Programme 4.2
+.
