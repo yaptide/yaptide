@@ -821,14 +821,14 @@ tests = ["backports.strenum ; python_version < \"3.11\"", "environs[django]", "p
 
 [[package]]
 name = "eventlet"
-version = "0.40.3"
+version = "0.40.4"
 description = "Highly concurrent networking library"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "eventlet-0.40.3-py3-none-any.whl", hash = "sha256:e681cae6ee956cfb066a966b5c0541e734cc14879bda6058024104790595ac9d"},
-    {file = "eventlet-0.40.3.tar.gz", hash = "sha256:290852db0065d78cec17a821b78c8a51cafb820a792796a354592ae4d5fceeb0"},
+    {file = "eventlet-0.40.4-py3-none-any.whl", hash = "sha256:6326c6d0bf55810bece151f7a5750207c610f389ba110ffd1541ed6e5215485b"},
+    {file = "eventlet-0.40.4.tar.gz", hash = "sha256:69bef712b1be18b4930df6f0c495d2a882bf7b63aa111e7b6eeff461cfcaf26f"},
 ]
 
 [package.dependencies]
@@ -2495,4 +2495,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "79d0f40baf9253cdc34dca52fa795c9f3165d6615cca5b77faadfe9e60e1edf8"
+content-hash = "9372706328e54d8f1d03e349a63261d2443b59e7a641b0b54ac4fb9a0510d6c3"
