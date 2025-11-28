@@ -1756,31 +1756,29 @@ tests = ["coverage[toml] (==5.0.4)", "pytest (>=6.0.0,<7.0.0)"]
 
 [[package]]
 name = "pymchelper"
-version = "2.7.6"
+version = "2.8.4"
 description = "Python toolkit for SHIELD-HIT12A and FLUKA"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "pymchelper-2.7.6-py2.py3-none-any.whl", hash = "sha256:f4545576071c55ce54bbafd59257f13380e3d5c65e59c70a1adfe7a03537b3c9"},
-    {file = "pymchelper-2.7.6.tar.gz", hash = "sha256:61b7d97b00d6c8d65a34bbf6610cd55fa6fffcee4ff2a76f295baa19cefa7b2b"},
+    {file = "pymchelper-2.8.4-py2.py3-none-any.whl", hash = "sha256:7fb62671f4e5ce0392045093a25d8d1d5bc1e1ad753eb28395d8a527a51e4732"},
+    {file = "pymchelper-2.8.4.tar.gz", hash = "sha256:90bfd829d8b10c6db1bd17bf18c6ff84ea3e76ec10413e1748fe7099d42ac9c4"},
 ]
 
 [package.dependencies]
-numpy = [
-    {version = ">=1.20,<1.27.0", markers = "python_version == \"3.9\""},
-    {version = ">=1.21", markers = "python_version == \"3.10\""},
-    {version = ">=1.23.3", markers = "python_version == \"3.11\""},
-    {version = ">=1.26", markers = "python_version == \"3.12\""},
-]
+numpy = "*"
 
 [package.extras]
-dicom = ["pydicom", "scipy"]
+dev = ["build", "pymchelper[full,test]", "twine"]
+dicom = ["pydicom"]
+docs = ["pydata-sphinx-theme (==0.16.0)", "pymchelper[full]", "sphinx (>=7.0)", "sphinx-copybutton"]
 excel = ["xlwt"]
-full = ["bashplotlib", "h5py", "hipsterplot", "matplotlib", "pydicom", "pytrip98 (<3.9.0) ; platform_system == \"Darwin\" and python_version >= \"3.5\" and python_version < \"3.10\"", "pytrip98 (>=3.6.1) ; python_version == \"3.10\"", "pytrip98 (>=3.6.1,<3.9.0) ; platform_system == \"Darwin\" and python_version == \"3.10\"", "pytrip98 (>=3.8.0) ; python_version == \"3.11\"", "pytrip98 (>=3.8.0,<3.9.0) ; platform_system == \"Darwin\" and python_version >= \"3.11\"", "pytrip98 (>=3.9.1) ; python_version >= \"3.12\"", "pytrip98 ; python_version >= \"3.5\" and python_version < \"3.10\"", "scipy", "xlwt"]
+full = ["bashplotlib", "h5py", "hipsterplot", "matplotlib", "pydicom", "pytrip98", "xlwt"]
 hdf = ["h5py"]
 image = ["matplotlib"]
-pytrip = ["pytrip98 (<3.9.0) ; platform_system == \"Darwin\" and python_version >= \"3.5\" and python_version < \"3.10\"", "pytrip98 (>=3.6.1) ; python_version == \"3.10\"", "pytrip98 (>=3.6.1,<3.9.0) ; platform_system == \"Darwin\" and python_version == \"3.10\"", "pytrip98 (>=3.8.0) ; python_version == \"3.11\"", "pytrip98 (>=3.8.0,<3.9.0) ; platform_system == \"Darwin\" and python_version >= \"3.11\"", "pytrip98 (>=3.9.1) ; python_version >= \"3.12\"", "pytrip98 ; python_version >= \"3.5\" and python_version < \"3.10\"", "scipy"]
+pytrip = ["pytrip98"]
+test = ["flake8 (==7.3.0)", "mcpl (==1.6.2)", "pre-commit (==3.7.1) ; python_version < \"3.10\"", "pre-commit (==4.5.0) ; python_version >= \"3.10\"", "pytest (==8.4.2)", "pytest-rerunfailures", "requests (==2.32.5)", "scipy", "sphinx (>=7.0)", "yapf (==0.43.0)"]
 
 [[package]]
 name = "pynacl"
@@ -2219,7 +2217,7 @@ description = "A lil' TOML parser"
 optional = false
 python-versions = ">=3.8"
 groups = ["test"]
-markers = "python_version < \"3.11\""
+markers = "python_full_version <= \"3.11.0a6\""
 files = [
     {file = "tomli-2.2.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:678e4fa69e4575eb77d103de3df8a895e1591b48e740211bd1067378c69e8249"},
     {file = "tomli-2.2.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:023aa114dd824ade0100497eb2318602af309e5a55595f76b626d6d9f3b7b0a6"},
@@ -2495,4 +2493,4 @@ type = ["pytest-mypy"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.9,<3.13"
-content-hash = "9372706328e54d8f1d03e349a63261d2443b59e7a641b0b54ac4fb9a0510d6c3"
+content-hash = "59c5520f67c3879cec48dd22b3f31b9a5e06711a5d00145bb5d9fd3252c525d0"
