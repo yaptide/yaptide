@@ -18,7 +18,7 @@ jobs:
         platform: ['ubuntu-latest', 'windows-latest']
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -67,7 +67,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
@@ -89,7 +89,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -97,7 +97,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download simulators
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
@@ -131,7 +131,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Setup Python
         uses: actions/setup-python@v6
@@ -148,7 +148,7 @@ jobs:
         run: curl https://deepsource.io/cli | sh
 
       - name: Download simulators
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v6
         with:
           name: simulators-ubuntu-latest
           path: bin/
