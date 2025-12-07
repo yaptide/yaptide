@@ -10,6 +10,7 @@ from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
 from urllib import request
+import yaptide.performance_tracker as tracker
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -25,6 +26,7 @@ def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout
     Main purpose is monitoring of the log files
     """
     sleep_counter = 0
+    line_wait_id = None
     while True:
         if event and event.is_set():
             break
@@ -32,12 +34,21 @@ def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout
             return "File not found"
         line = thefile.readline()
         if not line:
+
+            if line_wait_id is None:
+                line_wait_id = tracker.start("log_generator line wait")
+
             time.sleep(1)
             sleep_counter += 1
             if sleep_counter >= timeout:
                 return "Timeout occured"
             continue
         sleep_counter = 0
+
+        if line_wait_id is not None:
+            tracker.end(line_wait_id)
+            line_wait_id = None
+
         yield line
 
 

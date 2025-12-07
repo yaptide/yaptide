@@ -20,6 +20,8 @@ from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails,
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
+import yaptide.performance_tracker as tracker
+
 
 def get_tmp_dir() -> Path:
     """Function to get temporary directory from environment variables."""
@@ -120,6 +122,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
     command_stdout: str = ""
     command_stderr: str = ""
     try:
+        id = tracker.start("subprocess.run (simulation)")
         completed_process = subprocess.run(command_as_list,
                                            check=True,
                                            cwd=str(dir_path),
@@ -127,7 +130,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
                                            stderr=subprocess.PIPE,
                                            text=True)
         logging.info("simulation subprocess with return code %d finished", completed_process.returncode)
-
+        tracker.end(id)
         # Capture stdout and stderr
         command_stdout = completed_process.stdout
         command_stderr = completed_process.stderr
@@ -210,6 +213,9 @@ def read_file(event: threading.Event,
     logfile = None
     update_time = 0
     logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
+
+    id = tracker.start("wait for logfile creation")
+
     # if the logfile is not created in the first X seconds, it is probably an error
     for i in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
         if event.is_set():
@@ -220,6 +226,8 @@ def read_file(event: threading.Event,
             break
         except FileNotFoundError:
             time.sleep(1)
+
+    tracker.end(id)
 
     # if logfile was not created in the first minute, task is marked as failed
     if logfile is None:
