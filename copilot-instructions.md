@@ -173,7 +173,14 @@ poetry run flask db upgrade
 
 ### Flask Restful
 - The application uses Flask-RESTful for API endpoints
-- Routes are initialized in `yaptide/routes/main_routes.py`
+- Routes are organized across multiple files in `yaptide/routes/` directory:
+  - `main_routes.py` - Main route initialization
+  - `auth_routes.py` - Authentication routes
+  - `batch_routes.py` - Batch processing routes
+  - `celery_routes.py` - Celery task routes
+  - `user_routes.py` - User management routes
+  - `task_routes.py` - Task-related routes
+  - And other specialized route modules
 - Follow RESTful conventions for URL structure and HTTP methods
 
 ### Error Handling
@@ -186,7 +193,10 @@ poetry run flask db upgrade
 
 ### ORM and Migrations
 - Use SQLAlchemy ORM for database operations
-- Database models are in `yaptide/persistence/models.py`
+- Database models and persistence layer are in `yaptide/persistence/` directory:
+  - `models.py` - SQLAlchemy model definitions
+  - `database.py` - Database initialization and setup
+  - `db_methods.py` - Database helper methods
 - Use Flask-Migrate (Alembic) for schema migrations
 - Migration files are in `migrations/` directory (excluded from pre-commit)
 
