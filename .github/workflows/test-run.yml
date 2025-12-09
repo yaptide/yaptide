@@ -23,7 +23,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Update pip and install poetry
         run: |
@@ -84,7 +84,7 @@ jobs:
         python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
         platform: ['ubuntu-latest']
         include:
-          - python-version: '3.12'
+          - python-version: '3.13'
             platform: 'windows-latest'
 
     steps:
@@ -136,7 +136,7 @@ jobs:
       - name: Setup Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
       - name: Install dependencies for production and test
         run: |
