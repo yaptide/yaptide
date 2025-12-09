@@ -3,7 +3,7 @@
 ## Project Overview
 
 Yaptide (Yet Another Particle Transport IDE) is a Flask-based backend application for particle transport simulations. The application uses:
-- **Python 3.9-3.12** as the primary language
+- **Python 3.9-3.12** as the primary language (version constraint: `>=3.9,<3.13` from pyproject.toml)
 - **Flask** for the web framework
 - **SQLAlchemy** with PostgreSQL for database
 - **Celery** with Redis for task queue
