@@ -115,7 +115,9 @@ def run_single_simulation(self,
         "simulated_primaries": simulation_result.requested_primaries,
         "requested_primaries": simulation_result.requested_primaries
     }
+    logging.warning(f"TASK {task_id}: simulation completed")
     send_task_update(simulation_id, task_id, update_key, update_dict)
+
 
     # finally return from the celery task, returning the estimators and stdout/stderr as result
     # the estimators will be merged by subsequent celery task
@@ -236,6 +238,7 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
             "job_state": EntityState.MERGING_QUEUED.value,
             "update_key": update_key
         }
+        logging.warning(f"MERGING QUEUED")
         post_update(dict_to_send)
     return results
 
@@ -265,7 +268,7 @@ def get_nested_memory_size(data, visited=None):
 @celery_app.task
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
-
+    logging.warning(f"MERGE started")
     logging.warning(f"merge_results arg size: {get_nested_memory_size(results) / (1024 * 1024):.2f} MB")
 
     merge_results_id = tracker.start("merge_results")
