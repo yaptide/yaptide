@@ -82,3 +82,7 @@ def generate_report() -> str:
     return "\n".join(report_lines)
 
 
+def reset() -> None:
+    _measurements.clear()
+    _start_times.clear()
+    _names.clear()

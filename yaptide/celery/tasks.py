@@ -1,6 +1,7 @@
 import contextlib
 from dataclasses import dataclass
 import logging
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -238,10 +239,34 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
         post_update(dict_to_send)
     return results
 
+def get_nested_memory_size(data, visited=None):
+    if visited is None:
+        visited = set()
+
+    data_id = id(data)
+    
+    if data_id in visited or not hasattr(data, '__iter__') or isinstance(data, (str, bytes, int, float, bool)):
+        return 0 if data_id in visited else sys.getsizeof(data)
+        
+    visited.add(data_id)
+    total_size = sys.getsizeof(data)
+    if isinstance(data, dict):
+        for key, value in data.items():
+            total_size += get_nested_memory_size(key, visited)
+            total_size += get_nested_memory_size(value, visited)
+    
+    elif isinstance(data, (list, tuple, set)):
+        for item in data:
+            total_size += get_nested_memory_size(item, visited)
+
+    return total_size
+
 
 @celery_app.task
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
+
+    logging.warning(f"merge_results arg size: {get_nested_memory_size(results) / (1024 * 1024):.2f} MB")
 
     merge_results_id = tracker.start("merge_results")
 
@@ -300,7 +325,8 @@ def merge_results(results: list[dict]) -> dict:
 
     tracker.end(merge_results_id)
     report = tracker.generate_report()
-    logging.debug(report)
+    logging.warning(report)
+    tracker.reset()
 
     return final_result
 
