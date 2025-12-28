@@ -1,6 +1,7 @@
 import contextlib
 from dataclasses import dataclass
 import logging
+import sys
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +18,7 @@ from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, estimators_to_list, simulation_logfiles,
                                      write_simulation_input_files)
 
+import yaptide.performance_tracker as tracker
 
 @celery_app.task
 def convert_input_files(payload_dict: dict) -> dict:
@@ -99,7 +101,10 @@ def run_single_simulation(self,
 
         # otherwise we have simulation output
         logging.debug("Converting simulation results to JSON")
+        id = tracker.start("estimators_to_list")
         estimators = estimators_to_list(estimators_dict=simulation_result.estimators_dict, dir_path=Path(tmp_work_dir))
+        tracker.end(id)
+    
 
     # We do not have any information if monitoring process sent the last update
     # so we send it here to make sure that we have the end_time and COMPLETED state
@@ -110,7 +115,9 @@ def run_single_simulation(self,
         "simulated_primaries": simulation_result.requested_primaries,
         "requested_primaries": simulation_result.requested_primaries
     }
+    logging.warning(f"TASK {task_id}: simulation completed")
     send_task_update(simulation_id, task_id, update_key, update_dict)
+
 
     # finally return from the celery task, returning the estimators and stdout/stderr as result
     # the estimators will be merged by subsequent celery task
@@ -154,14 +161,19 @@ def run_single_simulation_for_shieldhit(tmp_work_dir: str,
     if task_monitor:
         logging.debug("Terminating monitoring process for task %d", task_id)
         event.set()
+        id = tracker.start("task_monitor.task.join()")
         task_monitor.task.join()
+        tracker.end(id)
         logging.debug("Monitoring process for task %d terminated", task_id)
     # if watcher didn't finish yet, we need to read the log file and send the last update to the backend
     if task_monitor:
         simulated_primaries, requested_primaries = read_file_offline(task_monitor.path_to_monitor)
 
+    id = tracker.start("get_shieldhit_estimators")
+
     # both simulation execution and monitoring process are finished now, we can read the estimators
     estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
+    tracker.end(id)
 
     return SimulationTaskResult(process_exit_success=process_exit_success,
                                 command_stdout=command_stdout,
@@ -226,13 +238,41 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
             "job_state": EntityState.MERGING_QUEUED.value,
             "update_key": update_key
         }
+        logging.warning(f"MERGING QUEUED")
         post_update(dict_to_send)
     return results
+
+def get_nested_memory_size(data, visited=None):
+    if visited is None:
+        visited = set()
+
+    data_id = id(data)
+    
+    if data_id in visited or not hasattr(data, '__iter__') or isinstance(data, (str, bytes, int, float, bool)):
+        return 0 if data_id in visited else sys.getsizeof(data)
+        
+    visited.add(data_id)
+    total_size = sys.getsizeof(data)
+    if isinstance(data, dict):
+        for key, value in data.items():
+            total_size += get_nested_memory_size(key, visited)
+            total_size += get_nested_memory_size(value, visited)
+    
+    elif isinstance(data, (list, tuple, set)):
+        for item in data:
+            total_size += get_nested_memory_size(item, visited)
+
+    return total_size
 
 
 @celery_app.task
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
+    logging.warning(f"MERGE started")
+    logging.warning(f"merge_results arg size: {get_nested_memory_size(results) / (1024 * 1024):.2f} MB")
+
+    merge_results_id = tracker.start("merge_results")
+
     logging.debug("Merging results from %d tasks", len(results))
     logfiles = {}
 
@@ -260,21 +300,36 @@ def merge_results(results: list[dict]) -> dict:
             # There is nothing to average yet
             continue
 
+        id = tracker.start("average_estimators")
         averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
+        tracker.end(id)
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
+
+    id = tracker.start("send_logfiles")
 
     if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
             simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
         final_result["logfiles"] = logfiles
 
+    tracker.end(id)
+
     if averaged_estimators:
         # send results to the backend and mark whole simulation as completed
+        id = tracker.start("send_simulation_results")
         sending_results_ok = send_simulation_results(simulation_id=simulation_id,
                                                      update_key=update_key,
                                                      estimators=averaged_estimators)
+        
+        tracker.end(id)
+
         if not sending_results_ok:
             final_result["estimators"] = averaged_estimators
+
+    tracker.end(merge_results_id)
+    report = tracker.generate_report()
+    logging.warning(report)
+    tracker.reset()
 
     return final_result
 
