@@ -6,9 +6,11 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 import threading
+import time
 from typing import Optional
 
 from yaptide.batch.batch_methods import post_update
+from yaptide.celery.utils import backend_metrics
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
                                        get_tmp_dir, read_file, read_file_offline, read_fluka_file)
@@ -265,8 +267,8 @@ def get_nested_memory_size(data, visited=None):
     return total_size
 
 
-@celery_app.task
-def merge_results(results: list[dict]) -> dict:
+@celery_app.task(bind=True)
+def merge_results(self, results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     logging.warning(f"MERGE started")
     logging.warning(f"merge_results arg size: {get_nested_memory_size(results) / (1024 * 1024):.2f} MB")
@@ -277,7 +279,15 @@ def merge_results(results: list[dict]) -> dict:
     logfiles = {}
 
     averaged_estimators = None
+    request_headers = {}
+    if hasattr(self, "request"):
+        request_headers = getattr(self.request, "headers", {}) or {}
+    header_simulation_id = request_headers.get("yaptide_simulation_id")
+    enqueue_timestamp = request_headers.get("yaptide_enqueue_ts")
+
     simulation_id = results[0].pop("simulation_id", None)
+    if simulation_id is None:
+        simulation_id = header_simulation_id
     update_key = results[0].pop("update_key", None)
     if simulation_id and update_key:
         dict_to_send = {
@@ -303,6 +313,17 @@ def merge_results(results: list[dict]) -> dict:
         id = tracker.start("average_estimators")
         averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
         tracker.end(id)
+
+    if simulation_id is not None:
+        if isinstance(enqueue_timestamp, (int, float)):
+            delay = max(time.time() - enqueue_timestamp, 0.0)
+            backend_metrics.record_metric_for_simulation(celery_app.backend, simulation_id,
+                                                         "Broker Queue Delay (merging_queued)", delay)
+        backend_metrics.ensure_merge_fetch(celery_app.backend, simulation_id)
+        drained_metrics = backend_metrics.drain_metrics(celery_app.backend, simulation_id)
+        for metric_name, samples in drained_metrics.items():
+            for sample in samples:
+                tracker.record(metric_name, sample)
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 

@@ -31,6 +31,12 @@ _start_times: dict[float, float] = {}
 _names: dict[float, str] = {}
 
 
+def record(name: str, duration: float) -> None:
+    if name not in _measurements:
+        _measurements[name] = _Measurement(name)
+    _measurements[name].add(duration)
+
+
 def start(name: str) -> float:
     if name not in _measurements:
         _measurements[name] = _Measurement(name)
