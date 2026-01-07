@@ -295,7 +295,9 @@ def merge_results(self, results: list[dict]) -> dict:
             "job_state": EntityState.MERGING_RUNNING.value,
             "update_key": update_key
         }
+        post_update_id = tracker.start("post_update")
         post_update(dict_to_send)
+        tracker.end(post_update_id)
     for i, result in enumerate(results):
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
