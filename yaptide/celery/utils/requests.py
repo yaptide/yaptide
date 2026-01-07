@@ -2,10 +2,12 @@ import logging
 import os
 
 import requests
+import yaptide.performance_tracker as tracker
 
 
 def send_task_update(simulation_id: int, task_id: int, update_key: str, update_dict: dict) -> bool:
     """Sends task status to backend which will update the database"""
+    id = tracker.start("send_task_update")
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
     if not flask_url:
         logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
@@ -21,6 +23,7 @@ def send_task_update(simulation_id: int, task_id: int, update_key: str, update_d
     }
     logging.debug("Sending update %s to the backend %s", dict_to_send, flask_url)
     res: requests.Response = requests.Session().post(url=f"{flask_url}/tasks", json=dict_to_send)
+    tracker.end(id)
     if res.status_code != 202:
         logging.warning("Update_dict: %s", update_dict)
         logging.warning("Task update for %s - Failed: %s", task_id, res.json().get("message"))
