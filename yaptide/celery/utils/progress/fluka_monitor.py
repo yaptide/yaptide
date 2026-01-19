@@ -87,7 +87,7 @@ def check_progress(line: str, next_backend_update_time: int, details: TaskDetail
                 "start_time": utc_without_offset(progress_details.utc_now),
                 "task_state": EntityState.RUNNING.value
             }
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict, async_send=True)
         else:
             if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp <
                     next_backend_update_time  # do not send update too often
@@ -97,7 +97,7 @@ def check_progress(line: str, next_backend_update_time: int, details: TaskDetail
             up_dict = {
                 "simulated_primaries": progress,
             }
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict, async_send=True)
         return True
     return False
 
@@ -141,7 +141,7 @@ def read_fluka_out_file(event: threading.Event,
         if re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %s timed out", details.task_id)
             up_dict = {"task_state": EntityState.FAILED.value, "end_time": time_now_utc().isoformat(sep=" ")}
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict, async_send=True)
             return
 
     logging.info("Parsing log file for task %s finished", details.task_id)
@@ -152,4 +152,4 @@ def read_fluka_out_file(event: threading.Event,
     }
     logging.info("Sending final update for task %d, simulated primaries %d", details.task_id,
                  progress_details.requested_primaries)
-    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict, async_send=True)

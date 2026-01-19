@@ -25,7 +25,7 @@ def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout
     It no new line appears in `timeout` seconds, generator stops.
     Main purpose is monitoring of the log files
     """
-    sleep_counter = 0
+    sleep_counter = 0.0
     line_wait_id = None
     while True:
         if event and event.is_set():
@@ -38,12 +38,17 @@ def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout
             if line_wait_id is None:
                 line_wait_id = tracker.start("log_generator line wait")
 
-            time.sleep(1)
-            sleep_counter += 1
+            wait_interval = 0.1
+            if event:
+                if event.wait(wait_interval):
+                    break
+            else:
+                time.sleep(wait_interval)
+            sleep_counter += wait_interval
             if sleep_counter >= timeout:
                 return "Timeout occured"
             continue
-        sleep_counter = 0
+        sleep_counter = 0.0
 
         if line_wait_id is not None:
             tracker.end(line_wait_id)
@@ -149,11 +154,13 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
                 "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
             }
+            end_id = tracker.start("send_task_update on task end")
             send_task_update(sim_id=sim_id,
                              task_id=task_id,
                              update_key=update_key,
                              update_dict=up_dict,
                              backend_url=backend_url)
+            tracker.end(end_id)
             logging.debug("Update for task: %d - COMPLETED", task_id)
             return
 

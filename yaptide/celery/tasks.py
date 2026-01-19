@@ -117,7 +117,7 @@ def run_single_simulation(self,
         "simulated_primaries": simulation_result.requested_primaries,
         "requested_primaries": simulation_result.requested_primaries
     }
-    logging.warning(f"TASK {task_id}: simulation completed")
+    logging.warning(f"TASK {task_id}: simulation completed, timestamp: {end_time}")
     send_task_update(simulation_id, task_id, update_key, update_dict)
 
 
