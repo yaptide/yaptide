@@ -11,6 +11,7 @@ import boto3
 import click
 import cryptography
 import requests
+from botocore.config import Config
 from botocore.exceptions import (ClientError, EndpointConnectionError, NoCredentialsError)
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
@@ -341,12 +342,16 @@ def upload_file_to_s3(bucket: str,
                       encryption_password: str = '',
                       encryption_salt: str = '') -> bool:
     """Upload file to S3 bucket"""
-    # Create S3 client
+    # Create S3 client with disabled flexible checksums to avoid XAmzContentSHA256Mismatch errors
+    # This is needed for S3-compatible endpoints that don't support aws-chunked encoding
     s3_client = boto3.client(
         "s3",
         aws_access_key_id=access_key,
         aws_secret_access_key=secret_key,
         endpoint_url=endpoint,
+        config=Config(
+            request_checksum_calculation='when_required',
+        ),
     )
     if not check_if_s3_connection_is_working(s3_client):
         click.echo("S3 connection failed", err=True)
@@ -365,10 +370,15 @@ def upload_file_to_s3(bucket: str,
     try:
         # Upload encrypted file to S3 bucket
         click.echo(f"Uploading file {file_path}")
-        s3_client.put_object(Body=file_contents, Bucket=bucket, Key=file_path.name)
+        s3_client.put_object(
+            Body=file_contents,
+            Bucket=bucket,
+            Key=file_path.name
+        )
         return True
     except ClientError as e:
-        click.echo("Upload failed with error: ", e.response["Error"]["Message"])
+        error_message = e.response.get("Error", {}).get("Message", str(e))
+        click.echo(f"Upload failed with error: {error_message}")
         return False
 
 
