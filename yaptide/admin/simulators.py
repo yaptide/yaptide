@@ -85,7 +85,7 @@ def encryption_options(required: bool = False):
         @click.option('--salt',
                       type=click.STRING,
                       envvar='S3_ENCRYPTION_SALT',
-                      default=password,
+                      default=salt,
                       required=required,
                       help='encryption salt')
         @wraps(func)
