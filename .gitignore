@@ -293,4 +293,4 @@ yaptide_tester/output/
 # deploy keys
 server.crt
 server.key
-docs/openapi.yaml
+download/
