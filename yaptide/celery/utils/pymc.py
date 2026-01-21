@@ -20,6 +20,8 @@ from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails,
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
+import yaptide.performance_tracker as tracker
+
 
 def get_tmp_dir() -> Path:
     """Function to get temporary directory from environment variables."""
@@ -120,6 +122,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
     command_stdout: str = ""
     command_stderr: str = ""
     try:
+        id = tracker.start("subprocess.run (simulation)")
         completed_process = subprocess.run(command_as_list,
                                            check=True,
                                            cwd=str(dir_path),
@@ -127,7 +130,7 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
                                            stderr=subprocess.PIPE,
                                            text=True)
         logging.info("simulation subprocess with return code %d finished", completed_process.returncode)
-
+        tracker.end(id)
         # Capture stdout and stderr
         command_stdout = completed_process.stdout
         command_stderr = completed_process.stderr
@@ -210,6 +213,9 @@ def read_file(event: threading.Event,
     logfile = None
     update_time = 0
     logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
+
+    id = tracker.start("wait for logfile creation")
+
     # if the logfile is not created in the first X seconds, it is probably an error
     for i in range(timeout_wait_for_file):  # maximum attempts, each attempt is one second
         if event.is_set():
@@ -219,13 +225,16 @@ def read_file(event: threading.Event,
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
-            time.sleep(1)
+            if event.wait(1):
+                return
+
+    tracker.end(id)
 
     # if logfile was not created in the first minute, task is marked as failed
     if logfile is None:
         logging.error("Log file for task %d not found", task_id)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        send_task_update(simulation_id, task_id, update_key, up_dict, async_send=True)
         return
     logging.debug("Log file for task %d found", task_id)
 
@@ -235,6 +244,7 @@ def read_file(event: threading.Event,
     requested_primaries = 0
     logging.info("Parsing log file for task %d started", task_id)
     simulated_primaries = 0
+    completed = False
     for line in loglines:
         if event.is_set():
             return
@@ -259,7 +269,7 @@ def read_file(event: threading.Event,
                 logging.error("Cannot parse estimated time in line: %s", line.rstrip())
             up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
             logging.debug("Sending update for task %d, simulated primaries %d", task_id, simulated_primaries)
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            send_task_update(simulation_id, task_id, update_key, up_dict, async_send=True)
 
         elif re.search(REQUESTED_MATCH, line):
             logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
@@ -273,17 +283,21 @@ def read_file(event: threading.Event,
                 "task_state": EntityState.RUNNING.value
             }
             logging.debug("Sending update for task %d", task_id)
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            send_task_update(simulation_id, task_id, update_key, up_dict, async_send=True)
 
         elif re.search(TIMEOUT_MATCH, line):
             logging.error("Simulation watcher %d timed out", task_id)
             up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            send_task_update(simulation_id, task_id, update_key, up_dict, async_send=True)
             return
 
         elif re.search(COMPLETE_MATCH, line):
             logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
+            completed = True
             break
+
+    if event.is_set() or not completed:
+        return
 
     logging.info("Parsing log file for task %d finished", task_id)
     up_dict = {
@@ -292,7 +306,7 @@ def read_file(event: threading.Event,
         "task_state": EntityState.COMPLETED.value
     }
     logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
-    send_task_update(simulation_id, task_id, update_key, up_dict)
+    send_task_update(simulation_id, task_id, update_key, up_dict, async_send=True)
 
 
 def read_fluka_file(event: threading.Event,
@@ -322,18 +336,20 @@ def read_fluka_file(event: threading.Event,
         try:
             optional_file = get_first_matching_file()
             if not optional_file:
-                time.sleep(1)
+                if event.wait(1):
+                    return
                 continue
             logfile = open(optional_file)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
-            time.sleep(1)
+            if event.wait(1):
+                return
 
     # if logfile was not created in the first minute, task is marked as failed
     if logfile is None:
         logging.error("Log file for task %d not found", task_id)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        send_task_update(simulation_id, task_id, update_key, up_dict, async_send=True)
         return
     logging.debug("Log file for task %d found", task_id)
 
