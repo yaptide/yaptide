@@ -114,7 +114,7 @@ def read_fluka_out_file(event: threading.Event,
                         verbose: bool = False) -> None:
     """
     Function reading the fluka output file and reporting progress to the backend.
-    
+
     Args:
         update_interval_seconds: Minimum interval between progress updates in seconds.
     """

@@ -19,11 +19,10 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(
-        thefile: TextIOWrapper, 
-        event: threading.Event = None, 
-        max_idle_seconds: float = 3600, 
-        polling_interval_seconds: float = 1) -> Iterator[str]:
+def log_generator(thefile: TextIOWrapper,
+                  event: threading.Event = None,
+                  max_idle_seconds: float = 3600,
+                  polling_interval_seconds: float = 1) -> Iterator[str]:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
@@ -81,25 +80,24 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
     return True
 
 
-def read_shieldhit_file(
-        filepath: Path, 
-        sim_id: int, 
-        task_id: int, 
-        update_key: str, 
-        backend_url: str,
-        max_wait_for_file_seconds: float = 30,
-        max_idle_seconds: float = 3600,
-        update_interval_seconds: float = 2,
-        polling_interval_seconds: float = 1):  # skipcq: PYL-W0613
+def read_shieldhit_file(filepath: Path,
+                        sim_id: int,
+                        task_id: int,
+                        update_key: str,
+                        backend_url: str,
+                        max_wait_for_file_seconds: float = 30,
+                        max_idle_seconds: float = 3600,
+                        update_interval_seconds: float = 2,
+                        polling_interval_seconds: float = 1):  # skipcq: PYL-W0613
     """
     Monitors log file of a shieldhit task and sends updates to the backend.
-    
+
     Args:
-        max_wait_for_file_seconds: Maximum time to wait for the log file to be created 
+        max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
         update_interval_seconds: Minimum interval between successive updates to the backend.
-        polling_interval_seconds: Interval between successive file polls while no new 
+        polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
     """
     logging.debug("Started monitoring, simulation id: %d, task id: %s", sim_id, task_id)
@@ -128,11 +126,10 @@ def read_shieldhit_file(
         logging.debug("Update for task: %d - FAILED", task_id)
         return
 
-    loglines = log_generator(
-        logfile, 
-        threading.Event(), 
-        max_idle_seconds=max_idle_seconds, 
-        polling_interval_seconds=polling_interval_seconds)
+    loglines = log_generator(logfile,
+                             threading.Event(),
+                             max_idle_seconds=max_idle_seconds,
+                             polling_interval_seconds=polling_interval_seconds)
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
@@ -225,7 +222,7 @@ if __name__ == "__main__":
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
     read_shieldhit_file(filepath=Path(args.filepath),
-              sim_id=args.sim_id,
-              task_id=args.task_id,
-              update_key=args.update_key,
-              backend_url=args.backend_url)
+                        sim_id=args.sim_id,
+                        task_id=args.task_id,
+                        update_key=args.update_key,
+                        backend_url=args.backend_url)

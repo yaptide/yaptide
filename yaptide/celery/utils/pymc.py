@@ -13,10 +13,8 @@ from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
 from pymchelper.input_output import frompattern
 
-from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH,
-                                   TIMEOUT_MATCH, log_generator)
-from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails,
-                                                         read_fluka_out_file)
+from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
+from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails, read_fluka_out_file)
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
@@ -197,24 +195,24 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
 
 
 def read_shieldhit_file(event: threading.Event,
-              filepath: Path,
-              simulation_id: int,
-              task_id: str,
-              update_key: str,
-              max_wait_for_file_seconds: float = 20,
-              max_idle_seconds: float = 5 * 60,
-              update_interval_seconds: float = 2,
-              polling_interval_seconds: float = 1,
-              logging_level: int = logging.WARNING):
+                        filepath: Path,
+                        simulation_id: int,
+                        task_id: str,
+                        update_key: str,
+                        max_wait_for_file_seconds: float = 20,
+                        max_idle_seconds: float = 5 * 60,
+                        update_interval_seconds: float = 2,
+                        polling_interval_seconds: float = 1,
+                        logging_level: int = logging.WARNING):
     """
     Monitors log file of a shieldhit task, when new line with message matching regex appears, sends update to backend
-    
+
     Args:
-        max_wait_for_file_seconds: Maximum time to wait for the log file to be created 
+        max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
         update_interval_seconds: Minimum interval between successive updates to the backend.
-        polling_interval_seconds: Interval between successive file polls while no new 
+        polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
     """
     logging.getLogger(__name__).setLevel(logging_level)
@@ -224,7 +222,7 @@ def read_shieldhit_file(event: threading.Event,
 
     open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
     # if the logfile is not created in the first max_wait_for_file_seconds, it is probably an error
-    for i in range(open_file_attempts): 
+    for i in range(open_file_attempts):
         if event.is_set():
             return
         try:
@@ -245,11 +243,10 @@ def read_shieldhit_file(event: threading.Event,
 
     # create generator which waits for new lines in log file
     # if no new line appears in max_idle_seconds, generator stops
-    loglines = log_generator(
-        logfile, 
-        event, 
-        max_idle_seconds=max_idle_seconds, 
-        polling_interval_seconds=polling_interval_seconds)
+    loglines = log_generator(logfile,
+                             event,
+                             max_idle_seconds=max_idle_seconds,
+                             polling_interval_seconds=polling_interval_seconds)
     requested_primaries = 0
     logging.info("Parsing log file for task %d started", task_id)
     simulated_primaries = 0
@@ -265,7 +262,8 @@ def read_shieldhit_file(event: threading.Event,
                 simulated_primaries = int(splitted[3])
             except (IndexError, ValueError):
                 logging.error("Cannot parse number of simulated primaries in line: %s", line.rstrip())
-            if (utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds  # do not send update too often
+            if (utc_now.timestamp() - last_update_timestamp_seconds <
+                    update_interval_seconds  # do not send update too often
                     and requested_primaries >= simulated_primaries):
                 logging.debug("Skipping update for task %d", task_id)
                 continue
@@ -325,13 +323,13 @@ def read_fluka_file(event: threading.Event,
                     logging_level: int = logging.WARNING):
     """
     Monitors log file of a fluka task, when new line with message matching regex appears, sends update to backend
-    
+
     Args:
-        max_wait_for_file_seconds: Maximum time to wait for the log file to be created 
+        max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
         update_interval_seconds: Minimum interval between successive updates to the backend.
-        polling_interval_seconds: Interval between successive file polls while no new 
+        polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
     """
     logging.getLogger(__name__).setLevel(logging_level)
@@ -371,11 +369,10 @@ def read_fluka_file(event: threading.Event,
 
     # create generator which waits for new lines in log file
     # if no new line appears in max_idle_seconds, generator stops
-    loglines = log_generator(
-        logfile, 
-        event, 
-        max_idle_seconds=max_idle_seconds,
-        polling_interval_seconds=polling_interval_seconds)
+    loglines = log_generator(logfile,
+                             event,
+                             max_idle_seconds=max_idle_seconds,
+                             polling_interval_seconds=polling_interval_seconds)
     logging.info("Parsing log file for task %d started", task_id)
     read_fluka_out_file(event,
                         loglines,
