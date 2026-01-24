@@ -66,14 +66,19 @@ class ProgressDetails:
 
     utc_now: datetime
     requested_primaries: int = 0
-    last_update_timestamp: int = 0
+    last_update_timestamp_seconds: float = 0
 
 
-def check_progress(line: str, next_backend_update_time: int, details: TaskDetails,
+def check_progress(line: str, update_interval_seconds: float, details: TaskDetails,
                    progress_details: ProgressDetails) -> bool:
-    """Function checking if the line contains progress information and sending update if needed.
+    """
+    Function checking if the line contains progress information and sending update if needed.
 
-    Function returns True if the line contained progress information, False otherwise.
+    Args:
+        update_interval_seconds: Minimum interval between progress updates in seconds.
+
+    Returns:
+        True if the line contained progress information, False otherwise.
     """
     res = parse_progress_remaining_line(line)
     if res:
@@ -89,11 +94,11 @@ def check_progress(line: str, next_backend_update_time: int, details: TaskDetail
             }
             send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
         else:
-            if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp <
-                    next_backend_update_time  # do not send update too often
+            if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp_seconds <
+                    update_interval_seconds  # do not send update too often
                     and progress_details.requested_primaries > progress):
                 return True
-            progress_details.last_update_timestamp = progress_details.utc_now.timestamp()
+            progress_details.last_update_timestamp_seconds = progress_details.utc_now.timestamp()
             up_dict = {
                 "simulated_primaries": progress,
             }
@@ -104,10 +109,15 @@ def check_progress(line: str, next_backend_update_time: int, details: TaskDetail
 
 def read_fluka_out_file(event: threading.Event,
                         line_iterator: Iterator[str],
-                        next_backend_update_time: int,
+                        update_interval_seconds: float,
                         details: TaskDetails,
                         verbose: bool = False) -> None:
-    """Function reading the fluka output file and reporting progress to the backend."""
+    """
+    Function reading the fluka output file and reporting progress to the backend.
+    
+    Args:
+        update_interval_seconds: Minimum interval between progress updates in seconds.
+    """
     in_progress = False
     progress_details = ProgressDetails(utc_now=time_now_utc())
     for line in line_iterator:
@@ -116,7 +126,7 @@ def read_fluka_out_file(event: threading.Event,
         progress_details.utc_now = time_now_utc()
         if in_progress:
             if check_progress(line=line,
-                              next_backend_update_time=next_backend_update_time,
+                              update_interval_seconds=update_interval_seconds,
                               details=details,
                               progress_details=progress_details):
                 continue

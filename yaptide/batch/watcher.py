@@ -1,4 +1,5 @@
 import argparse
+from collections.abc import Iterator
 import json
 import logging
 import re
@@ -10,6 +11,7 @@ from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
 from urllib import request
+import math
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -17,14 +19,21 @@ REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
 TIMEOUT_MATCH = r"\bTimeout occured"
 
 
-def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout: int = 3600) -> str:
+def log_generator(
+        thefile: TextIOWrapper, 
+        event: threading.Event = None, 
+        max_idle_seconds: float = 3600, 
+        polling_interval_seconds: float = 1) -> Iterator[str]:
     """
     Generator equivalent to `tail -f` Linux command.
     Yields new lines appended to the end of the file.
-    It no new line appears in `timeout` seconds, generator stops.
-    Main purpose is monitoring of the log files
+    Main purpose is monitoring of the log files.
+
+    Args:
+        max_idle_seconds: Maximum time to wait for new data before stopping the generator.
+        polling_interval_seconds: Interval between successive file polls while no new data is available.
     """
-    sleep_counter = 0
+    idle_seconds = 0
     while True:
         if event and event.is_set():
             break
@@ -32,12 +41,16 @@ def log_generator(thefile: TextIOWrapper, event: threading.Event = None, timeout
             return "File not found"
         line = thefile.readline()
         if not line:
-            time.sleep(1)
-            sleep_counter += 1
-            if sleep_counter >= timeout:
+            if event:
+                if event.wait(polling_interval_seconds):
+                    break
+            else:
+                time.sleep(polling_interval_seconds)
+            idle_seconds += polling_interval_seconds
+            if idle_seconds >= max_idle_seconds:
                 return "Timeout occured"
             continue
-        sleep_counter = 0
+        idle_seconds = 0
         yield line
 
 
@@ -68,17 +81,38 @@ def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: di
     return True
 
 
-def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backend_url: str):  # skipcq: PYL-W0613
-    """Monitors log file of certain task"""
+def read_shieldhit_file(
+        filepath: Path, 
+        sim_id: int, 
+        task_id: int, 
+        update_key: str, 
+        backend_url: str,
+        max_wait_for_file_seconds: float = 30,
+        max_idle_seconds: float = 3600,
+        update_interval_seconds: float = 2,
+        polling_interval_seconds: float = 1):  # skipcq: PYL-W0613
+    """
+    Monitors log file of a shieldhit task and sends updates to the backend.
+    
+    Args:
+        max_wait_for_file_seconds: Maximum time to wait for the log file to be created 
+            before marking the task as FAILED.
+        max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
+        update_interval_seconds: Minimum interval between successive updates to the backend.
+        polling_interval_seconds: Interval between successive file polls while no new 
+            data is available or while waiting for the file to be created.
+    """
     logging.debug("Started monitoring, simulation id: %d, task id: %s", sim_id, task_id)
     logfile = None
-    update_time = 0
-    for _ in range(30):  # 30 stands for maximum attempts
+    last_update_timestamp_seconds = 0
+
+    open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
+    for _ in range(open_file_attempts):
         try:
             logfile = open(filepath)  # skipcq: PTC-W6004
             break
         except FileNotFoundError:
-            time.sleep(1)
+            time.sleep(polling_interval_seconds)
 
     if logfile is None:
         logging.debug("Log file for task %s not found", task_id)
@@ -94,15 +128,19 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
         logging.debug("Update for task: %d - FAILED", task_id)
         return
 
-    loglines = log_generator(logfile, threading.Event())
+    loglines = log_generator(
+        logfile, 
+        threading.Event(), 
+        max_idle_seconds=max_idle_seconds, 
+        polling_interval_seconds=polling_interval_seconds)
     for line in loglines:
         utc_now = datetime.utcnow()
         if re.search(RUN_MATCH, line):
             logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            if utc_now.timestamp() - update_time < 2:  # hardcoded 2 seconds to avoid spamming
+            if utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds:
                 logging.debug("Skipping update, too often")
                 continue
-            update_time = utc_now.timestamp()
+            last_update_timestamp_seconds = utc_now.timestamp()
             splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "simulated_primaries": int(splitted[3]),
@@ -133,7 +171,6 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
 
         elif re.search(COMPLETE_MATCH, line):
             logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            splitted = line.split()
             up_dict = {  # skipcq: PYL-W0612
                 "end_time": utc_now.isoformat(sep=" "),
                 "task_state": "COMPLETED"
@@ -161,7 +198,6 @@ def read_file(filepath: Path, sim_id: int, task_id: int, update_key: str, backen
             return
         else:
             logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
-    return
 
 
 if __name__ == "__main__":
@@ -188,7 +224,7 @@ if __name__ == "__main__":
     logging.info("task_id %s", args.task_id)
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
-    read_file(filepath=Path(args.filepath),
+    read_shieldhit_file(filepath=Path(args.filepath),
               sim_id=args.sim_id,
               task_id=args.task_id,
               update_key=args.update_key,
