@@ -203,10 +203,11 @@ def read_shieldhit_file(event: threading.Event,
                         max_idle_seconds: float = 5 * 60,
                         update_interval_seconds: float = 2,
                         polling_interval_seconds: float = 1,
-                        logging_level: int = logging.WARNING):
+                        logging_level: int = logging.WARNING): # skipcq:  PY-R1000
     """
     Monitors log file of a shieldhit task, when new line with message matching regex appears, sends update to backend
-
+    The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
+    
     Args:
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
@@ -323,7 +324,8 @@ def read_fluka_file(event: threading.Event,
                     logging_level: int = logging.WARNING):
     """
     Monitors log file of a fluka task, when new line with message matching regex appears, sends update to backend
-
+    The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
+    
     Args:
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
