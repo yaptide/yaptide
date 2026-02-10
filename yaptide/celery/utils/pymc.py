@@ -194,6 +194,7 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
     return base_list
 
 
+# skipcq:  PY-R1000
 def read_shieldhit_file(event: threading.Event,
                         filepath: Path,
                         simulation_id: int,
@@ -203,11 +204,11 @@ def read_shieldhit_file(event: threading.Event,
                         max_idle_seconds: float = 5 * 60,
                         update_interval_seconds: float = 2,
                         polling_interval_seconds: float = 1,
-                        logging_level: int = logging.WARNING): # skipcq:  PY-R1000
+                        logging_level: int = logging.WARNING):
     """
     Monitors log file of a shieldhit task, when new line with message matching regex appears, sends update to backend
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
-    
+
     Args:
         event: Threading event to signal when to stop monitoring.
         filepath: Path to the log file to monitor.
@@ -331,7 +332,7 @@ def read_fluka_file(event: threading.Event,
     """
     Monitors log file of a fluka task, when new line with message matching regex appears, sends update to backend
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
-    
+
     Args:
         event: Threading event to signal when to stop monitoring.
         dirpath: Path to the directory containing the log file to monitor.

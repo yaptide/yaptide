@@ -79,7 +79,7 @@ def check_progress(line: str, update_interval_seconds: float, details: TaskDetai
         update_interval_seconds: Minimum interval between progress updates in seconds.
         details: TaskDetails object containing details about the task.
         progress_details: ProgressDetails object containing details about the progress.
-        
+
     Returns:
         True if the line contained progress information, False otherwise.
     """

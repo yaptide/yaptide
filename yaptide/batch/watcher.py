@@ -92,8 +92,8 @@ def read_shieldhit_file(filepath: Path,
                         update_interval_seconds: float = 2,
                         polling_interval_seconds: float = 1):  # skipcq: PYL-W0613
     """
-    Monitors log file of a shieldhit task and sends updates to the backend. 
-    The purpose of the updates is the progress bar update and state updates 
+    Monitors log file of a shieldhit task and sends updates to the backend.
+    The purpose of the updates is the progress bar update and state updates
     (like simulation failed or completed).
 
     Args:
