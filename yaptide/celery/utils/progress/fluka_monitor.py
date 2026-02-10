@@ -75,8 +75,11 @@ def check_progress(line: str, update_interval_seconds: float, details: TaskDetai
     Function checking if the line contains progress information and sending update if needed.
 
     Args:
+        line: Line to be checked for progress information.
         update_interval_seconds: Minimum interval between progress updates in seconds.
-
+        details: TaskDetails object containing details about the task.
+        progress_details: ProgressDetails object containing details about the progress.
+        
     Returns:
         True if the line contained progress information, False otherwise.
     """
@@ -116,6 +119,9 @@ def read_fluka_out_file(event: threading.Event,
     Function reading the fluka output file and reporting progress to the backend.
 
     Args:
+        event: Threading event to signal when to stop monitoring.
+        line_iterator: Iterator over lines of the log file to be monitored.
+        details: TaskDetails object containing details about the task.
         update_interval_seconds: Minimum interval between progress updates in seconds.
     """
     in_progress = False

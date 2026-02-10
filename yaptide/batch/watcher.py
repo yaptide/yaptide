@@ -29,6 +29,8 @@ def log_generator(thefile: TextIOWrapper,
     Main purpose is monitoring of the log files.
 
     Args:
+        thefile: File object to read from.
+        event: Threading event to signal when to stop the generator.
         max_idle_seconds: Maximum time to wait for new data before stopping the generator.
         polling_interval_seconds: Interval between successive file polls while no new data is available.
     """
@@ -95,6 +97,11 @@ def read_shieldhit_file(filepath: Path,
     (like simulation failed or completed).
 
     Args:
+        filepath: Path to the log file to monitor.
+        sim_id: Simulation ID.
+        task_id: Task ID.
+        update_key: Simulation auth token for backend updates.
+        backend_url: URL of the backend server to send updates to.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.

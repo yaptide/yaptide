@@ -209,12 +209,18 @@ def read_shieldhit_file(event: threading.Event,
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
     
     Args:
+        event: Threading event to signal when to stop monitoring.
+        filepath: Path to the log file to monitor.
+        simulation_id: Simulation ID.
+        task_id: Task ID.
+        update_key: Simulation auth token for backend updates.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
         update_interval_seconds: Minimum interval between successive updates to the backend.
         polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
+        logging_level: Logging level to use for monitoring logs.
     """
     logging.getLogger(__name__).setLevel(logging_level)
     logfile = None
@@ -327,12 +333,18 @@ def read_fluka_file(event: threading.Event,
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
     
     Args:
+        event: Threading event to signal when to stop monitoring.
+        dirpath: Path to the directory containing the log file to monitor.
+        simulation_id: Simulation ID.
+        task_id: Task ID.
+        update_key: Simulation auth token for backend updates.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
         update_interval_seconds: Minimum interval between successive updates to the backend.
         polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
+        logging_level: Logging level to use for monitoring logs.
     """
     logging.getLogger(__name__).setLevel(logging_level)
     logfile = None
