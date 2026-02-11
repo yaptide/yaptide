@@ -13,7 +13,7 @@ from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
 from pymchelper.input_output import frompattern
 
-from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, TIMEOUT_MATCH, log_generator)
+from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator)
 from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails, read_fluka_out_file)
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
@@ -258,65 +258,65 @@ def read_shieldhit_file(event: threading.Event,
     requested_primaries = 0
     logging.info("Parsing log file for task %d started", task_id)
     simulated_primaries = 0
-    for line in loglines:
-        if event.is_set():
-            return
-        utc_now = datetime.utcnow()
-        logging.debug("Parsing line: %s", line.rstrip())
-        if re.search(RUN_MATCH, line):
-            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath, task_id)
-            splitted = line.split()
-            try:
-                simulated_primaries = int(splitted[3])
-            except (IndexError, ValueError):
-                logging.error("Cannot parse number of simulated primaries in line: %s", line.rstrip())
-            if (utc_now.timestamp() - last_update_timestamp_seconds <
-                    update_interval_seconds  # do not send update too often
-                    and requested_primaries >= simulated_primaries):
-                logging.debug("Skipping update for task %d", task_id)
-                continue
-            last_update_timestamp_seconds = utc_now.timestamp()
-            estimated_seconds = 0
-            try:
-                estimated_seconds = int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
-            except (IndexError, ValueError):
-                logging.error("Cannot parse estimated time in line: %s", line.rstrip())
-            up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
-            logging.debug("Sending update for task %d, simulated primaries %d", task_id, simulated_primaries)
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+    try:
+        for line in loglines:
+            if event.is_set():
+                return
+            utc_now = datetime.utcnow()
+            logging.debug("Parsing line: %s", line.rstrip())
+            if re.search(RUN_MATCH, line):
+                logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath, task_id)
+                splitted = line.split()
+                try:
+                    simulated_primaries = int(splitted[3])
+                except (IndexError, ValueError):
+                    logging.error("Cannot parse number of simulated primaries in line: %s", line.rstrip())
+                if (utc_now.timestamp() - last_update_timestamp_seconds <
+                        update_interval_seconds  # do not send update too often
+                        and requested_primaries >= simulated_primaries):
+                    logging.debug("Skipping update for task %d", task_id)
+                    continue
+                last_update_timestamp_seconds = utc_now.timestamp()
+                estimated_seconds = 0
+                try:
+                    estimated_seconds = int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
+                except (IndexError, ValueError):
+                    logging.error("Cannot parse estimated time in line: %s", line.rstrip())
+                up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
+                logging.debug("Sending update for task %d, simulated primaries %d", task_id, simulated_primaries)
+                send_task_update(simulation_id, task_id, update_key, up_dict)
 
-        elif re.search(REQUESTED_MATCH, line):
-            logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
-            # found a line with requested primaries, update database
-            # task is in RUNNING state
-            splitted = line.split(": ")
-            requested_primaries = int(splitted[1])
-            up_dict = {
-                "simulated_primaries": 0,
-                "start_time": utc_now.isoformat(sep=" "),
-                "task_state": EntityState.RUNNING.value
-            }
-            logging.debug("Sending update for task %d", task_id)
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            elif re.search(REQUESTED_MATCH, line):
+                logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
+                # found a line with requested primaries, update database
+                # task is in RUNNING state
+                splitted = line.split(": ")
+                requested_primaries = int(splitted[1])
+                up_dict = {
+                    "simulated_primaries": 0,
+                    "start_time": utc_now.isoformat(sep=" "),
+                    "task_state": EntityState.RUNNING.value
+                }
+                logging.debug("Sending update for task %d", task_id)
+                send_task_update(simulation_id, task_id, update_key, up_dict)
+            elif re.search(COMPLETE_MATCH, line):
+                logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
+                logging.info("Parsing log file for task %d finished", task_id)
+                up_dict = {
+                    "simulated_primaries": simulated_primaries,
+                    "end_time": utc_now.isoformat(sep=" "),
+                    "task_state": EntityState.COMPLETED.value
+                }
+                logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
+                send_task_update(simulation_id, task_id, update_key, up_dict)
+                return
+    except TimeoutError as err:
+        logging.error("Simulation watcher %d timed out: %s", task_id, err)
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        send_task_update(simulation_id, task_id, update_key, up_dict)
+        return
 
-        elif re.search(TIMEOUT_MATCH, line):
-            logging.error("Simulation watcher %d timed out", task_id)
-            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
-            return
-
-        elif re.search(COMPLETE_MATCH, line):
-            logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
-            break
-
-    logging.info("Parsing log file for task %d finished", task_id)
-    up_dict = {
-        "simulated_primaries": simulated_primaries,
-        "end_time": utc_now.isoformat(sep=" "),
-        "task_state": EntityState.COMPLETED.value
-    }
-    logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
-    send_task_update(simulation_id, task_id, update_key, up_dict)
+    raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen.")
 
 
 def read_fluka_file(event: threading.Event,

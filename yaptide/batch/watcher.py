@@ -16,7 +16,6 @@ import math
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
-TIMEOUT_MATCH = r"\bTimeout occured"
 
 
 def log_generator(thefile: TextIOWrapper,
@@ -31,15 +30,15 @@ def log_generator(thefile: TextIOWrapper,
     Args:
         thefile: File object to read from.
         event: Threading event to signal when to stop the generator.
-        max_idle_seconds: Maximum time to wait for new data before stopping the generator.
+        max_idle_seconds: Maximum time to wait for new data before stopping the generator. If it gets exceeded, TimeoutError is raised.
         polling_interval_seconds: Interval between successive file polls while no new data is available.
     """
+    if thefile is None:
+        raise ValueError("File object cannot be None.")
     idle_seconds = 0
     while True:
         if event and event.is_set():
             break
-        if thefile is None:
-            return "File not found"
         line = thefile.readline()
         if not line:
             if event:
@@ -49,7 +48,7 @@ def log_generator(thefile: TextIOWrapper,
                 time.sleep(polling_interval_seconds)
             idle_seconds += polling_interval_seconds
             if idle_seconds >= max_idle_seconds:
-                return "Timeout occured"
+                raise TimeoutError("No new log data received before timeout.")
             continue
         idle_seconds = 0
         yield line
@@ -139,71 +138,72 @@ def read_shieldhit_file(filepath: Path,
                              threading.Event(),
                              max_idle_seconds=max_idle_seconds,
                              polling_interval_seconds=polling_interval_seconds)
-    for line in loglines:
-        utc_now = datetime.utcnow()
-        if re.search(RUN_MATCH, line):
-            logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            if utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds:
-                logging.debug("Skipping update, too often")
-                continue
-            last_update_timestamp_seconds = utc_now.timestamp()
-            splitted = line.split()
-            up_dict = {  # skipcq: PYL-W0612
-                "simulated_primaries": int(splitted[3]),
-                "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
-            }
-            send_task_update(sim_id=sim_id,
-                             task_id=task_id,
-                             update_key=update_key,
-                             update_dict=up_dict,
-                             backend_url=backend_url)
-            logging.debug("Update for task: %d - simulated primaries: %s", task_id, splitted[3])
+    try:
+        for line in loglines:
+            utc_now = datetime.utcnow()
+            if re.search(RUN_MATCH, line):
+                logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+                if utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds:
+                    logging.debug("Skipping update, too often")
+                    continue
+                last_update_timestamp_seconds = utc_now.timestamp()
+                splitted = line.split()
+                up_dict = {  # skipcq: PYL-W0612
+                    "simulated_primaries": int(splitted[3]),
+                    "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600
+                }
+                send_task_update(sim_id=sim_id,
+                                 task_id=task_id,
+                                 update_key=update_key,
+                                 update_dict=up_dict,
+                                 backend_url=backend_url)
+                logging.debug("Update for task: %d - simulated primaries: %s", task_id, splitted[3])
 
-        elif re.search(REQUESTED_MATCH, line):
-            logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            splitted = line.split(": ")
-            up_dict = {  # skipcq: PYL-W0612
-                "simulated_primaries": 0,
-                "requested_primaries": int(splitted[1]),
-                "start_time": utc_now.isoformat(sep=" "),
-                "task_state": "RUNNING"
-            }
-            send_task_update(sim_id=sim_id,
-                             task_id=task_id,
-                             update_key=update_key,
-                             update_dict=up_dict,
-                             backend_url=backend_url)
-            logging.debug("Update for task: %d - RUNNING", task_id)
+            elif re.search(REQUESTED_MATCH, line):
+                logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+                splitted = line.split(": ")
+                up_dict = {  # skipcq: PYL-W0612
+                    "simulated_primaries": 0,
+                    "requested_primaries": int(splitted[1]),
+                    "start_time": utc_now.isoformat(sep=" "),
+                    "task_state": "RUNNING"
+                }
+                send_task_update(sim_id=sim_id,
+                                 task_id=task_id,
+                                 update_key=update_key,
+                                 update_dict=up_dict,
+                                 backend_url=backend_url)
+                logging.debug("Update for task: %d - RUNNING", task_id)
 
-        elif re.search(COMPLETE_MATCH, line):
-            logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            up_dict = {  # skipcq: PYL-W0612
-                "end_time": utc_now.isoformat(sep=" "),
-                "task_state": "COMPLETED"
-            }
-            send_task_update(sim_id=sim_id,
-                             task_id=task_id,
-                             update_key=update_key,
-                             update_dict=up_dict,
-                             backend_url=backend_url)
-            logging.debug("Update for task: %d - COMPLETED", task_id)
-            return
-
-        elif re.search(TIMEOUT_MATCH, line):
-            logging.debug("Found TIMEOUT_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-            up_dict = {  # skipcq: PYL-W0612
-                "task_state": "FAILED",
-                "end_time": datetime.utcnow().isoformat(sep=" ")
-            }
-            send_task_update(sim_id=sim_id,
-                             task_id=task_id,
-                             update_key=update_key,
-                             update_dict=up_dict,
-                             backend_url=backend_url)
-            print("Update for task: %d - TIMEOUT", task_id)
-            return
-        else:
-            logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
+            elif re.search(COMPLETE_MATCH, line):
+                logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
+                up_dict = {  # skipcq: PYL-W0612
+                    "end_time": utc_now.isoformat(sep=" "),
+                    "task_state": "COMPLETED"
+                }
+                send_task_update(sim_id=sim_id,
+                                 task_id=task_id,
+                                 update_key=update_key,
+                                 update_dict=up_dict,
+                                 backend_url=backend_url)
+                logging.debug("Update for task: %d - COMPLETED", task_id)
+                return
+            else:
+                logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
+    except TimeoutError as err:
+        logging.warning("Log monitoring timed out for file %s and task %s: %s", filepath, task_id, err)
+        up_dict = {  # skipcq: PYL-W0612
+            "task_state": "FAILED",
+            "end_time": datetime.utcnow().isoformat(sep=" ")
+        }
+        send_task_update(sim_id=sim_id,
+                         task_id=task_id,
+                         update_key=update_key,
+                         update_dict=up_dict,
+                         backend_url=backend_url)
+        logging.debug("Update for task: %d - TIMEOUT", task_id)
+    
+    raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen.")
 
 
 if __name__ == "__main__":

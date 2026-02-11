@@ -122,50 +122,50 @@ def read_fluka_out_file(event: threading.Event,
         event: Threading event to signal when to stop monitoring.
         line_iterator: Iterator over lines of the log file to be monitored.
         details: TaskDetails object containing details about the task.
-        update_interval_seconds: Minimum interval between progress updates in seconds.
     """
     in_progress = False
     progress_details = ProgressDetails(utc_now=time_now_utc())
-    for line in line_iterator:
-        if event.is_set():
-            return
-        progress_details.utc_now = time_now_utc()
-        if in_progress:
-            if check_progress(line=line,
-                              update_interval_seconds=update_interval_seconds,
-                              details=details,
-                              progress_details=progress_details):
-                continue
-            if line.startswith(S_OK_OUT_COLLECTED):
-                in_progress = False
-                if verbose:
-                    logger.debug("Found end of simulation calculation line")
-                continue
-        else:
-            if line.startswith(S_OK_OUT_IN_PROGRESS):
-                in_progress = True
-                if verbose:
-                    logger.debug("Found progress line")
-                continue
-            if line.startswith(S_OK_OUT_START):
-                logger.debug("Found start of the simulation")
-                continue
-            if S_OK_OUT_FIN_PRE_CHECK in line and re.match(S_OK_OUT_FIN_PATTERN, line):
-                logger.debug("Found end of the simulation")
-                break
-        # handle generator timeout
-        if re.search(TIMEOUT_MATCH, line):
-            logging.error("Simulation watcher %s timed out", details.task_id)
-            up_dict = {"task_state": EntityState.FAILED.value, "end_time": time_now_utc().isoformat(sep=" ")}
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
-            return
+    try:
+        for line in line_iterator:
+            if event.is_set():
+                return
+            progress_details.utc_now = time_now_utc()
+            if in_progress:
+                if check_progress(line=line,
+                                update_interval_seconds=update_interval_seconds,
+                                details=details,
+                                progress_details=progress_details):
+                    continue
+                if line.startswith(S_OK_OUT_COLLECTED):
+                    in_progress = False
+                    if verbose:
+                        logger.debug("Found end of simulation calculation line")
+                    continue
+            else:
+                if line.startswith(S_OK_OUT_IN_PROGRESS):
+                    in_progress = True
+                    if verbose:
+                        logger.debug("Found progress line")
+                    continue
+                if line.startswith(S_OK_OUT_START):
+                    logger.debug("Found start of the simulation")
+                    continue
+                if S_OK_OUT_FIN_PRE_CHECK in line and re.match(S_OK_OUT_FIN_PATTERN, line):
+                    logger.debug("Found end of the simulation")
+                    logger.info("Parsing log file for task %s finished", details.task_id)
+                    up_dict = {
+                        "simulated_primaries": progress_details.requested_primaries,
+                        "end_time": utc_without_offset(progress_details.utc_now),
+                        "task_state": EntityState.COMPLETED.value
+                    }
+                    logger.info("Sending final update for task %d, simulated primaries %d", details.task_id,
+                                progress_details.requested_primaries)
+                    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+                    return 
+    except TimeoutError as err:
+        logger.error("Simulation watcher %s timed out: %s", details.task_id, err)
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": time_now_utc().isoformat(sep=" ")}
+        send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+        return
 
-    logging.info("Parsing log file for task %s finished", details.task_id)
-    up_dict = {
-        "simulated_primaries": progress_details.requested_primaries,
-        "end_time": utc_without_offset(progress_details.utc_now),
-        "task_state": EntityState.COMPLETED.value
-    }
-    logging.info("Sending final update for task %d, simulated primaries %d", details.task_id,
-                 progress_details.requested_primaries)
-    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+    raise RuntimeError(f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. This should never happen.")
