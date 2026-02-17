@@ -90,7 +90,7 @@ def fetch_simulations_by_user_id(user_id: int) -> Union[list[BatchSimulationMode
     return simulations
 
 
-def fetch_task_by_sim_id_and_task_id(sim_id: int, task_id: str) -> Union[BatchTaskModel, CeleryTaskModel]:
+def fetch_task_by_sim_id_and_task_id(sim_id: int, task_id: int) -> Union[BatchTaskModel, CeleryTaskModel]:
     """Fetches task by simulation id and task id"""
     TaskPoly = with_polymorphic(TaskModel, [BatchTaskModel, CeleryTaskModel])
     task = db.session.query(TaskPoly).filter_by(simulation_id=sim_id, task_id=task_id).first()

@@ -76,7 +76,7 @@ def get_shieldhit_estimators(dir_path: Path) -> dict:
     return estimators_dict
 
 
-def command_to_run_fluka(dir_path: Path, task_id: str) -> list[str]:
+def command_to_run_fluka(dir_path: Path, task_id: int) -> list[str]:
     """Function to create command to run FLUKA."""
     input_file = next(dir_path.glob("*.inp"), None)
     if input_file is None:
@@ -198,7 +198,7 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
 def read_shieldhit_file(event: threading.Event,
                         filepath: Path,
                         simulation_id: int,
-                        task_id: str,
+                        task_id: int,
                         update_key: str,
                         max_wait_for_file_seconds: float = 20,
                         max_idle_seconds: float = 5 * 60,

@@ -54,7 +54,7 @@ def log_generator(thefile: TextIOWrapper,
         yield line
 
 
-def send_task_update(sim_id: int, task_id: str, update_key: str, update_dict: dict, backend_url: str) -> bool:
+def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
     """Sends task update to flask to update database"""
     if not backend_url:
         logging.error("Backend url not specified")

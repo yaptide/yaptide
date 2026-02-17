@@ -3,8 +3,7 @@ from datetime import datetime, timezone
 import logging
 import re
 import threading
-from typing import Iterator, Optional, Tuple
-from yaptide.batch.watcher import TIMEOUT_MATCH
+from typing import Iterator, Optional
 
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
@@ -45,7 +44,7 @@ class TaskDetails:
     """Class holding details about the task."""
 
     simulation_id: int
-    task_id: str
+    task_id: int
     update_key: str
 
 
