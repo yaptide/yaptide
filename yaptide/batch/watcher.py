@@ -202,8 +202,10 @@ def read_shieldhit_file(filepath: Path,
                          update_dict=up_dict,
                          backend_url=backend_url)
         logging.debug("Update for task: %d - TIMEOUT", task_id)
-    
-    raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen.")
+
+    raise RuntimeError(
+        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen."
+    )
 
 
 if __name__ == "__main__":

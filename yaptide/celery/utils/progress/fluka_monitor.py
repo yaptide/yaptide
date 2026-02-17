@@ -131,9 +131,9 @@ def read_fluka_out_file(event: threading.Event,
             progress_details.utc_now = time_now_utc()
             if in_progress:
                 if check_progress(line=line,
-                                update_interval_seconds=update_interval_seconds,
-                                details=details,
-                                progress_details=progress_details):
+                                  update_interval_seconds=update_interval_seconds,
+                                  details=details,
+                                  progress_details=progress_details):
                     continue
                 if line.startswith(S_OK_OUT_COLLECTED):
                     in_progress = False
@@ -160,11 +160,13 @@ def read_fluka_out_file(event: threading.Event,
                     logger.info("Sending final update for task %d, simulated primaries %d", details.task_id,
                                 progress_details.requested_primaries)
                     send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
-                    return 
+                    return
     except TimeoutError as err:
         logger.error("Simulation watcher %s timed out: %s", details.task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": time_now_utc().isoformat(sep=" ")}
         send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
         return
 
-    raise RuntimeError(f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. This should never happen.")
+    raise RuntimeError(
+        f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. This should never happen."
+    )

@@ -265,7 +265,8 @@ def read_shieldhit_file(event: threading.Event,
             utc_now = datetime.utcnow()
             logging.debug("Parsing line: %s", line.rstrip())
             if re.search(RUN_MATCH, line):
-                logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath, task_id)
+                logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath,
+                              task_id)
                 splitted = line.split()
                 try:
                     simulated_primaries = int(splitted[3])
@@ -316,7 +317,9 @@ def read_shieldhit_file(event: threading.Event,
         send_task_update(simulation_id, task_id, update_key, up_dict)
         return
 
-    raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen.")
+    raise RuntimeError(
+        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen."
+    )
 
 
 def read_fluka_file(event: threading.Event,
