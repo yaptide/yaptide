@@ -168,5 +168,6 @@ def read_fluka_out_file(event: threading.Event,
         return
 
     raise RuntimeError(
-        f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. This should never happen."
+        f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. "
+        "This should never happen."
     )

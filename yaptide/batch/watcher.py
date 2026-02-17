@@ -30,7 +30,7 @@ def log_generator(thefile: TextIOWrapper,
     Args:
         thefile: File object to read from.
         event: Threading event to signal when to stop the generator.
-        max_idle_seconds: Maximum time to wait for new data before stopping the generator. If it gets exceeded, TimeoutError is raised.
+        max_idle_seconds: Maximum time to wait for new data before raising TimeoutError.
         polling_interval_seconds: Interval between successive file polls while no new data is available.
     """
     if thefile is None:
@@ -204,7 +204,8 @@ def read_shieldhit_file(filepath: Path,
         logging.debug("Update for task: %d - TIMEOUT", task_id)
 
     raise RuntimeError(
-        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen."
+        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
+        f"This should never happen."
     )
 
 

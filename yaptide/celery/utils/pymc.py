@@ -318,7 +318,8 @@ def read_shieldhit_file(event: threading.Event,
         return
 
     raise RuntimeError(
-        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. This should never happen."
+        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
+        f"This should never happen."
     )
 
 
