@@ -246,10 +246,7 @@ def read_shieldhit_file(event: threading.Event,
         # if logfile was not created in the first max_wait_for_file_seconds, task is marked as failed
         if logfile is None:
             logging.error("Log file for task %d not found", task_id)
-            up_dict = {
-                "task_state": EntityState.FAILED.value,
-                "end_time": datetime.utcnow().isoformat(sep=" ")
-            }
+            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
         logging.debug("Log file for task %d found", task_id)
@@ -317,8 +314,9 @@ def read_shieldhit_file(event: threading.Event,
                 send_task_update(simulation_id, task_id, update_key, up_dict)
                 return
 
-        raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
-                           f"This should never happen.")
+        if not event.is_set():
+            raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
+                               f"This should never happen.")
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
@@ -389,10 +387,7 @@ def read_fluka_file(event: threading.Event,
         # if logfile was not created in the first max_wait_for_file_seconds, task is marked as failed
         if logfile is None:
             logging.error("Log file for task %d not found", task_id)
-            up_dict = {
-                "task_state": EntityState.FAILED.value,
-                "end_time": datetime.utcnow().isoformat(sep=" ")
-            }
+            up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
         logging.debug("Log file for task %d found", task_id)

@@ -162,6 +162,7 @@ def read_fluka_out_file(event: threading.Event,
                             progress_details.requested_primaries)
                 send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
                 return
-
-    raise RuntimeError(f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. "
-                       "This should never happen.")
+    if not event.is_set():
+        raise RuntimeError(
+            f"Log stream ended without completion markers in SHIELDHIT monitor for task {details.task_id}. "
+            f"This should never happen.")
