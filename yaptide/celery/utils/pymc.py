@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import threading
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Optional, Protocol
 
@@ -208,6 +208,7 @@ def read_shieldhit_file(event: threading.Event,
     """
     Monitors log file of a shieldhit task, when new line with message matching regex appears, sends update to backend
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
+    All possible exceptions are caught and logged, and in case of any exception the task is marked as FAILED.
 
     Args:
         event: Threading event to signal when to stop monitoring.
@@ -223,46 +224,50 @@ def read_shieldhit_file(event: threading.Event,
             data is available or while waiting for the file to be created.
         logging_level: Logging level to use for monitoring logs.
     """
-    logging.getLogger(__name__).setLevel(logging_level)
-    logfile = None
-    last_update_timestamp_seconds = 0
-    logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
-
-    open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
-    # if the logfile is not created in the first max_wait_for_file_seconds, it is probably an error
-    for i in range(open_file_attempts):
-        if event.is_set():
-            return
-        try:
-            logging.debug("Trying to open file %s, attempt %d/%d", filepath, i, open_file_attempts)
-            logfile = open(filepath)  # skipcq: PTC-W6004
-            break
-        except FileNotFoundError:
-            if event.wait(polling_interval_seconds):
-                return
-
-    # if logfile was not created in the first max_wait_for_file_seconds, task is marked as failed
-    if logfile is None:
-        logging.error("Log file for task %d not found", task_id)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
-        return
-    logging.debug("Log file for task %d found", task_id)
-
-    # create generator which waits for new lines in log file
-    # if no new line appears in max_idle_seconds, generator stops
-    loglines = log_generator(logfile,
-                             event,
-                             max_idle_seconds=max_idle_seconds,
-                             polling_interval_seconds=polling_interval_seconds)
-    requested_primaries = 0
-    logging.info("Parsing log file for task %d started", task_id)
-    simulated_primaries = 0
     try:
+        logging.getLogger(__name__).setLevel(logging_level)
+        logfile = None
+        last_update_timestamp_seconds = 0
+        logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
+
+        open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
+        # if the logfile is not created in the first max_wait_for_file_seconds, it is probably an error
+        for i in range(open_file_attempts):
+            if event.is_set():
+                return
+            try:
+                logging.debug("Trying to open file %s, attempt %d/%d", filepath, i, open_file_attempts)
+                logfile = open(filepath)  # skipcq: PTC-W6004
+                break
+            except FileNotFoundError:
+                if event.wait(polling_interval_seconds):
+                    return
+
+        # if logfile was not created in the first max_wait_for_file_seconds, task is marked as failed
+        if logfile is None:
+            logging.error("Log file for task %d not found", task_id)
+            up_dict = {
+                "task_state": EntityState.FAILED.value,
+                "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+            return
+        logging.debug("Log file for task %d found", task_id)
+
+        # create generator which waits for new lines in log file
+        # if no new line appears in max_idle_seconds, generator stops
+        loglines = log_generator(logfile,
+                                 event,
+                                 max_idle_seconds=max_idle_seconds,
+                                 polling_interval_seconds=polling_interval_seconds)
+        requested_primaries = 0
+        logging.info("Parsing log file for task %d started", task_id)
+        simulated_primaries = 0
+
         for line in loglines:
             if event.is_set():
                 return
-            utc_now = datetime.utcnow()
+            utc_now = datetime.now(timezone.utc)
             logging.debug("Parsing line: %s", line.rstrip())
             if re.search(RUN_MATCH, line):
                 logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath,
@@ -311,16 +316,17 @@ def read_shieldhit_file(event: threading.Event,
                 logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
                 send_task_update(simulation_id, task_id, update_key, up_dict)
                 return
+
+        raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
+                           f"This should never happen.")
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
-        return
-
-    raise RuntimeError(
-        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
-        f"This should never happen."
-    )
+    except Exception as err:  # skipcq: PYL-W0703
+        logging.error("Error while monitoring log file for task %d: %s", task_id, err)
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
+        send_task_update(simulation_id, task_id, update_key, up_dict)
 
 
 def read_fluka_file(event: threading.Event,
@@ -336,6 +342,7 @@ def read_fluka_file(event: threading.Event,
     """
     Monitors log file of a fluka task, when new line with message matching regex appears, sends update to backend
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
+    All possible exceptions are caught and logged, and in case of any exception the task is marked as FAILED.
 
     Args:
         event: Threading event to signal when to stop monitoring.
@@ -351,53 +358,65 @@ def read_fluka_file(event: threading.Event,
             data is available or while waiting for the file to be created.
         logging_level: Logging level to use for monitoring logs.
     """
-    logging.getLogger(__name__).setLevel(logging_level)
-    logfile = None
-    logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
+    try:
+        logging.getLogger(__name__).setLevel(logging_level)
+        logfile = None
+        logging.info("Started monitoring, simulation id: %d, task id: %d", simulation_id, task_id)
 
-    # if the logfile is not created in the first max_wait_for_file_seconds, it is probably an error
-    # continuation of awful glob path hack
-    def get_first_matching_file() -> Optional[Path]:
-        """Returns first matching file."""
-        path = next(dirpath.glob("fluka_*/*001.out"), None)
-        return path.resolve() if path else None
+        # if the logfile is not created in the first max_wait_for_file_seconds, it is probably an error
+        # continuation of awful glob path hack
+        def get_first_matching_file() -> Optional[Path]:
+            """Returns first matching file."""
+            path = next(dirpath.glob("fluka_*/*001.out"), None)
+            return path.resolve() if path else None
 
-    open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
-    for _ in range(open_file_attempts):
-        if event.is_set():
-            return
-        try:
-            optional_file = get_first_matching_file()
-            if not optional_file:
+        open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
+        for _ in range(open_file_attempts):
+            if event.is_set():
+                return
+            try:
+                optional_file = get_first_matching_file()
+                if not optional_file:
+                    if event.wait(polling_interval_seconds):
+                        return
+                    continue
+                logfile = open(optional_file)  # skipcq: PTC-W6004
+                break
+            except FileNotFoundError:
                 if event.wait(polling_interval_seconds):
                     return
-                continue
-            logfile = open(optional_file)  # skipcq: PTC-W6004
-            break
-        except FileNotFoundError:
-            if event.wait(polling_interval_seconds):
-                return
 
-    # if logfile was not created in the first max_wait_for_file_seconds, task is marked as failed
-    if logfile is None:
-        logging.error("Log file for task %d not found", task_id)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        # if logfile was not created in the first max_wait_for_file_seconds, task is marked as failed
+        if logfile is None:
+            logging.error("Log file for task %d not found", task_id)
+            up_dict = {
+                "task_state": EntityState.FAILED.value,
+                "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+            }
+            send_task_update(simulation_id, task_id, update_key, up_dict)
+            return
+        logging.debug("Log file for task %d found", task_id)
+
+        # create generator which waits for new lines in log file
+        # if no new line appears in max_idle_seconds, generator stops
+        loglines = log_generator(logfile,
+                                 event,
+                                 max_idle_seconds=max_idle_seconds,
+                                 polling_interval_seconds=polling_interval_seconds)
+        logging.info("Parsing log file for task %d started", task_id)
+        read_fluka_out_file(event,
+                            loglines,
+                            update_interval_seconds=update_interval_seconds,
+                            details=TaskDetails(simulation_id, task_id, update_key),
+                            verbose=logging_level <= logging.INFO)
+    except TimeoutError as err:
+        logging.error("Simulation watcher %d timed out: %s", task_id, err)
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
-        return
-    logging.debug("Log file for task %d found", task_id)
-
-    # create generator which waits for new lines in log file
-    # if no new line appears in max_idle_seconds, generator stops
-    loglines = log_generator(logfile,
-                             event,
-                             max_idle_seconds=max_idle_seconds,
-                             polling_interval_seconds=polling_interval_seconds)
-    logging.info("Parsing log file for task %d started", task_id)
-    read_fluka_out_file(event,
-                        loglines,
-                        update_interval_seconds=update_interval_seconds,
-                        details=TaskDetails(simulation_id, task_id, update_key),
-                        verbose=logging_level <= logging.INFO)
+    except Exception as err:  # skipcq: PYL-W0703
+        logging.error("Error while monitoring log file for task %d: %s", task_id, err)
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
+        send_task_update(simulation_id, task_id, update_key, up_dict)
 
 
 def read_file_offline(filepath: Path) -> tuple[int, int]:

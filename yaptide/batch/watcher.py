@@ -7,7 +7,7 @@ import signal
 import ssl
 import threading
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from io import TextIOWrapper
 from pathlib import Path
 from urllib import request
@@ -93,7 +93,8 @@ def read_shieldhit_file(filepath: Path,
     """
     Monitors log file of a shieldhit task and sends updates to the backend.
     The purpose of the updates is the progress bar update and state updates
-    (like simulation failed or completed).
+    (like simulation failed or completed). All possible exceptions are caught and logged,
+    and in case of any exception the task is marked as FAILED.
 
     Args:
         filepath: Path to the log file to monitor.
@@ -108,39 +109,40 @@ def read_shieldhit_file(filepath: Path,
         polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
     """
-    logging.debug("Started monitoring, simulation id: %d, task id: %s", sim_id, task_id)
-    logfile = None
-    last_update_timestamp_seconds = 0
-
-    open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
-    for _ in range(open_file_attempts):
-        try:
-            logfile = open(filepath)  # skipcq: PTC-W6004
-            break
-        except FileNotFoundError:
-            time.sleep(polling_interval_seconds)
-
-    if logfile is None:
-        logging.debug("Log file for task %s not found", task_id)
-        up_dict = {  # skipcq: PYL-W0612
-            "task_state": "FAILED",
-            "end_time": datetime.utcnow().isoformat(sep=" ")
-        }
-        send_task_update(sim_id=sim_id,
-                         task_id=task_id,
-                         update_key=update_key,
-                         update_dict=up_dict,
-                         backend_url=backend_url)
-        logging.debug("Update for task: %d - FAILED", task_id)
-        return
-
-    loglines = log_generator(logfile,
-                             threading.Event(),
-                             max_idle_seconds=max_idle_seconds,
-                             polling_interval_seconds=polling_interval_seconds)
     try:
+        logging.debug("Started monitoring, simulation id: %d, task id: %s", sim_id, task_id)
+        logfile = None
+        last_update_timestamp_seconds = 0
+
+        open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
+        for _ in range(open_file_attempts):
+            try:
+                logfile = open(filepath)  # skipcq: PTC-W6004
+                break
+            except FileNotFoundError:
+                time.sleep(polling_interval_seconds)
+
+        if logfile is None:
+            logging.debug("Log file for task %s not found", task_id)
+            up_dict = {  # skipcq: PYL-W0612
+                "task_state": "FAILED",
+                "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+            }
+            send_task_update(sim_id=sim_id,
+                             task_id=task_id,
+                             update_key=update_key,
+                             update_dict=up_dict,
+                             backend_url=backend_url)
+            logging.debug("Update for task: %d - FAILED", task_id)
+            return
+
+        loglines = log_generator(logfile,
+                                 threading.Event(),
+                                 max_idle_seconds=max_idle_seconds,
+                                 polling_interval_seconds=polling_interval_seconds)
+
         for line in loglines:
-            utc_now = datetime.utcnow()
+            utc_now = datetime.now(timezone.utc)
             if re.search(RUN_MATCH, line):
                 logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
                 if utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds:
@@ -190,11 +192,14 @@ def read_shieldhit_file(filepath: Path,
                 return
             else:
                 logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
+
+        raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
+                           f"This should never happen.")
     except TimeoutError as err:
         logging.warning("Log monitoring timed out for file %s and task %s: %s", filepath, task_id, err)
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED",
-            "end_time": datetime.utcnow().isoformat(sep=" ")
+            "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
         }
         send_task_update(sim_id=sim_id,
                          task_id=task_id,
@@ -202,11 +207,18 @@ def read_shieldhit_file(filepath: Path,
                          update_dict=up_dict,
                          backend_url=backend_url)
         logging.debug("Update for task: %d - TIMEOUT", task_id)
-
-    raise RuntimeError(
-        f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
-        f"This should never happen."
-    )
+    except Exception as err:
+        logging.error("Error while monitoring log file %s for task %s: %s", filepath, task_id, err)
+        up_dict = {  # skipcq: PYL-W0612
+            "task_state": "FAILED",
+            "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+        }
+        send_task_update(sim_id=sim_id,
+                         task_id=task_id,
+                         update_key=update_key,
+                         update_dict=up_dict,
+                         backend_url=backend_url)
+        logging.debug("Update for task: %d - ERROR", task_id)
 
 
 if __name__ == "__main__":
