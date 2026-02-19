@@ -248,7 +248,7 @@ def read_shieldhit_file(event: threading.Event,
             logging.error("Log file for task %d not found", task_id)
             up_dict = {
                 "task_state": EntityState.FAILED.value,
-                "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+                "end_time": datetime.utcnow().isoformat(sep=" ")
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
@@ -267,7 +267,7 @@ def read_shieldhit_file(event: threading.Event,
         for line in loglines:
             if event.is_set():
                 return
-            utc_now = datetime.now(timezone.utc)
+            utc_now = datetime.utcnow()
             logging.debug("Parsing line: %s", line.rstrip())
             if re.search(RUN_MATCH, line):
                 logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath,
@@ -321,11 +321,11 @@ def read_shieldhit_file(event: threading.Event,
                            f"This should never happen.")
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
     except Exception as err:  # skipcq: PYL-W0703
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
 
 
@@ -391,7 +391,7 @@ def read_fluka_file(event: threading.Event,
             logging.error("Log file for task %d not found", task_id)
             up_dict = {
                 "task_state": EntityState.FAILED.value,
-                "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+                "end_time": datetime.utcnow().isoformat(sep=" ")
             }
             send_task_update(simulation_id, task_id, update_key, up_dict)
             return
@@ -411,11 +411,11 @@ def read_fluka_file(event: threading.Event,
                             verbose=logging_level <= logging.INFO)
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
     except Exception as err:  # skipcq: PYL-W0703
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
-        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.now(timezone.utc).isoformat(sep=" ")}
+        up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
 
 

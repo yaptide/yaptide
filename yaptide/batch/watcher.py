@@ -126,7 +126,7 @@ def read_shieldhit_file(filepath: Path,
             logging.debug("Log file for task %s not found", task_id)
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED",
-                "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+                "end_time": datetime.utcnow().isoformat(sep=" ")
             }
             send_task_update(sim_id=sim_id,
                              task_id=task_id,
@@ -142,7 +142,7 @@ def read_shieldhit_file(filepath: Path,
                                  polling_interval_seconds=polling_interval_seconds)
 
         for line in loglines:
-            utc_now = datetime.now(timezone.utc)
+            utc_now = datetime.utcnow()
             if re.search(RUN_MATCH, line):
                 logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
                 if utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds:
@@ -199,7 +199,7 @@ def read_shieldhit_file(filepath: Path,
         logging.warning("Log monitoring timed out for file %s and task %s: %s", filepath, task_id, err)
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED",
-            "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+            "end_time": datetime.utcnow().isoformat(sep=" ")
         }
         send_task_update(sim_id=sim_id,
                          task_id=task_id,
@@ -211,7 +211,7 @@ def read_shieldhit_file(filepath: Path,
         logging.error("Error while monitoring log file %s for task %s: %s", filepath, task_id, err)
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED",
-            "end_time": datetime.now(timezone.utc).isoformat(sep=" ")
+            "end_time": datetime.utcnow().isoformat(sep=" ")
         }
         send_task_update(sim_id=sim_id,
                          task_id=task_id,
