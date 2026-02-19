@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import threading
 import math
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import List, Optional, Protocol
 

@@ -7,7 +7,7 @@ import signal
 import ssl
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
 from urllib import request
