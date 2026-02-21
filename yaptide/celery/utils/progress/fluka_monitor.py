@@ -164,5 +164,5 @@ def read_fluka_out_file(event: threading.Event,
                 return
     if not event.is_set():
         raise RuntimeError(
-            f"Log stream ended without completion markers in SHIELDHIT monitor for task {details.task_id}. "
+            f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. "
             f"This should never happen.")
