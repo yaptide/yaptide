@@ -3,8 +3,7 @@ from datetime import datetime, timezone
 import logging
 import re
 import threading
-from typing import Iterator, Optional, Tuple
-from yaptide.batch.watcher import TIMEOUT_MATCH
+from typing import Iterator, Optional
 
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
@@ -45,7 +44,7 @@ class TaskDetails:
     """Class holding details about the task."""
 
     simulation_id: int
-    task_id: str
+    task_id: int
     update_key: str
 
 
@@ -66,14 +65,22 @@ class ProgressDetails:
 
     utc_now: datetime
     requested_primaries: int = 0
-    last_update_timestamp: int = 0
+    last_update_timestamp_seconds: float = 0
 
 
-def check_progress(line: str, next_backend_update_time: int, details: TaskDetails,
+def check_progress(line: str, update_interval_seconds: float, details: TaskDetails,
                    progress_details: ProgressDetails) -> bool:
-    """Function checking if the line contains progress information and sending update if needed.
+    """
+    Function checking if the line contains progress information and sending update if needed.
 
-    Function returns True if the line contained progress information, False otherwise.
+    Args:
+        line: Line to be checked for progress information.
+        update_interval_seconds: Minimum interval between progress updates in seconds.
+        details: TaskDetails object containing details about the task.
+        progress_details: ProgressDetails object containing details about the progress.
+
+    Returns:
+        True if the line contained progress information, False otherwise.
     """
     res = parse_progress_remaining_line(line)
     if res:
@@ -89,11 +96,11 @@ def check_progress(line: str, next_backend_update_time: int, details: TaskDetail
             }
             send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
         else:
-            if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp <
-                    next_backend_update_time  # do not send update too often
+            if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp_seconds <
+                    update_interval_seconds  # do not send update too often
                     and progress_details.requested_primaries > progress):
                 return True
-            progress_details.last_update_timestamp = progress_details.utc_now.timestamp()
+            progress_details.last_update_timestamp_seconds = progress_details.utc_now.timestamp()
             up_dict = {
                 "simulated_primaries": progress,
             }
@@ -104,10 +111,19 @@ def check_progress(line: str, next_backend_update_time: int, details: TaskDetail
 
 def read_fluka_out_file(event: threading.Event,
                         line_iterator: Iterator[str],
-                        next_backend_update_time: int,
+                        update_interval_seconds: float,
                         details: TaskDetails,
                         verbose: bool = False) -> None:
-    """Function reading the fluka output file and reporting progress to the backend."""
+    """
+    Function reading the fluka output file and reporting progress to the backend.
+
+    Args:
+        event: Threading event to signal when to stop monitoring.
+        line_iterator: Iterator over lines of the log file to be monitored.
+        update_interval_seconds: Minimum interval between successive updates to the backend.
+        details: TaskDetails object containing details about the task.
+        verbose: If True, debug logs will be printed. Default is False.
+    """
     in_progress = False
     progress_details = ProgressDetails(utc_now=time_now_utc())
     for line in line_iterator:
@@ -116,7 +132,7 @@ def read_fluka_out_file(event: threading.Event,
         progress_details.utc_now = time_now_utc()
         if in_progress:
             if check_progress(line=line,
-                              next_backend_update_time=next_backend_update_time,
+                              update_interval_seconds=update_interval_seconds,
                               details=details,
                               progress_details=progress_details):
                 continue
@@ -136,20 +152,17 @@ def read_fluka_out_file(event: threading.Event,
                 continue
             if S_OK_OUT_FIN_PRE_CHECK in line and re.match(S_OK_OUT_FIN_PATTERN, line):
                 logger.debug("Found end of the simulation")
-                break
-        # handle generator timeout
-        if re.search(TIMEOUT_MATCH, line):
-            logging.error("Simulation watcher %s timed out", details.task_id)
-            up_dict = {"task_state": EntityState.FAILED.value, "end_time": time_now_utc().isoformat(sep=" ")}
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
-            return
-
-    logging.info("Parsing log file for task %s finished", details.task_id)
-    up_dict = {
-        "simulated_primaries": progress_details.requested_primaries,
-        "end_time": utc_without_offset(progress_details.utc_now),
-        "task_state": EntityState.COMPLETED.value
-    }
-    logging.info("Sending final update for task %d, simulated primaries %d", details.task_id,
-                 progress_details.requested_primaries)
-    send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+                logger.info("Parsing log file for task %s finished", details.task_id)
+                up_dict = {
+                    "simulated_primaries": progress_details.requested_primaries,
+                    "end_time": utc_without_offset(progress_details.utc_now),
+                    "task_state": EntityState.COMPLETED.value
+                }
+                logger.info("Sending final update for task %d, simulated primaries %d", details.task_id,
+                            progress_details.requested_primaries)
+                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+                return
+    if not event.is_set():
+        raise RuntimeError(
+            f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. "
+            f"This should never happen.")

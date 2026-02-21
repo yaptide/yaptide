@@ -10,7 +10,7 @@ from typing import Optional
 from yaptide.batch.batch_methods import post_update
 from yaptide.celery.utils.pymc import (average_estimators, command_to_run_fluka, command_to_run_shieldhit,
                                        execute_simulation_subprocess, get_fluka_estimators, get_shieldhit_estimators,
-                                       get_tmp_dir, read_file, read_file_offline, read_fluka_file)
+                                       get_tmp_dir, read_shieldhit_file, read_file_offline, read_fluka_file)
 from yaptide.celery.utils.requests import (send_simulation_logfiles, send_simulation_results, send_task_update)
 from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
@@ -296,7 +296,7 @@ def monitor_shieldhit(event: threading.Event, tmp_work_dir: str, task_id: int, u
     path_to_monitor = Path(tmp_work_dir) / f"shieldhit_{task_id:04d}.log"
     if update_key and simulation_id is not None:
         current_logging_level = logging.getLogger().getEffectiveLevel()
-        task = threading.Thread(target=read_file,
+        task = threading.Thread(target=read_shieldhit_file,
                                 kwargs=dict(event=event,
                                             filepath=path_to_monitor,
                                             simulation_id=simulation_id,
