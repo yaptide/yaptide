@@ -219,6 +219,9 @@ def read_shieldhit_file(filepath: Path,
                          update_dict=up_dict,
                          backend_url=backend_url)
         logging.debug("Update for task: %d - ERROR", task_id)
+    finally:
+        if logfile is not None:
+            logfile.close()
 
 
 if __name__ == "__main__":

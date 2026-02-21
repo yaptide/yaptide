@@ -325,6 +325,9 @@ def read_shieldhit_file(event: threading.Event,
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
+    finally:
+        if logfile is not None:
+            logfile.close()
 
 
 def read_fluka_file(event: threading.Event,
@@ -412,6 +415,9 @@ def read_fluka_file(event: threading.Event,
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
         send_task_update(simulation_id, task_id, update_key, up_dict)
+    finally:
+        if logfile is not None:
+            logfile.close()
 
 
 def read_file_offline(filepath: Path) -> tuple[int, int]:
