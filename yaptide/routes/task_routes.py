@@ -17,7 +17,7 @@ class TasksResource(Resource):
         Structure required by this method to work properly:
         {
             "simulation_id": <int>,
-            "task_id": <string>,
+            "task_id": <int>,
             "update_key": <string>,
             "update_dict": <dict>
         }
