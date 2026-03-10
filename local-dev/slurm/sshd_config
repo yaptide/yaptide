@@ -1,0 +1,21 @@
+# Certificate-based SSH authentication configuration.
+# Drop-in file for /etc/ssh/sshd_config.d/
+
+# Trust certificates signed by the CA whose public key is mounted at /etc/ssh/ca.pub.
+# Mount: local-dev/ssh-ca/ca.pub → /etc/ssh/ca.pub:ro
+TrustedUserCAKeys /etc/ssh/ca.pub
+
+PubkeyAuthentication yes
+
+# No traditional authorized_keys needed when using certificate auth.
+AuthorizedKeysFile none
+
+# Disable password auth to enforce certificate-only login.
+PasswordAuthentication no
+ChallengeResponseAuthentication no
+
+# Export SCRATCH into SSH sessions.
+# batch_methods.py runs: con.run("echo $SCRATCH")
+# Fabric opens a non-login non-interactive shell, so /etc/profile is NOT sourced.
+# SetEnv is the reliable way to inject env vars regardless of shell type.
+SetEnv SCRATCH=/scratch

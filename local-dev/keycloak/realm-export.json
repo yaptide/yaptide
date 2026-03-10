@@ -1,0 +1,85 @@
+{
+    "id": "yaptide-local",
+    "realm": "yaptide-local",
+    "displayName": "Yaptide Local Dev",
+    "enabled": true,
+    "sslRequired": "none",
+    "registrationAllowed": false,
+    "loginWithEmailAllowed": false,
+    "duplicateEmailsAllowed": false,
+    "resetPasswordAllowed": false,
+    "editUsernameAllowed": false,
+    "bruteForceProtected": false,
+    "accessTokenLifespan": 86400,
+    "clients": [
+        {
+            "clientId": "yaptide-client",
+            "name": "Yaptide Client",
+            "enabled": true,
+            "publicClient": true,
+            "standardFlowEnabled": true,
+            "implicitFlowEnabled": false,
+            "directAccessGrantsEnabled": true,
+            "serviceAccountsEnabled": false,
+            "protocol": "openid-connect",
+            "rootUrl": "http://localhost:3000",
+            "baseUrl": "http://localhost:3000",
+            "redirectUris": [
+                "http://localhost:3000/*",
+                "http://localhost:5000/*",
+                "http://localhost/*"
+            ],
+            "webOrigins": [
+                "+"
+            ],
+            "attributes": {
+                "pkce.code.challenge.method": "S256",
+                "post.logout.redirect.uris": "+"
+            },
+            "protocolMappers": [
+                {
+                    "name": "plgrid-access-services",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-hardcoded-claim-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "claim.value": "[\"PLG_YAPTIDE_ACCESS\"]",
+                        "userinfo.token.claim": "true",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true",
+                        "claim.name": "plgridAccessServices",
+                        "jsonType.label": "JSON"
+                    }
+                },
+                {
+                    "name": "audience-mapper",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "consentRequired": false,
+                    "config": {
+                        "included.client.audience": "yaptide-client",
+                        "id.token.claim": "true",
+                        "access.token.claim": "true"
+                    }
+                }
+            ]
+        }
+    ],
+    "users": [
+        {
+            "username": "testuser",
+            "enabled": true,
+            "emailVerified": true,
+            "email": "testuser@local.dev",
+            "firstName": "Test",
+            "lastName": "User",
+            "credentials": [
+                {
+                    "type": "password",
+                    "value": "Testpass1!",
+                    "temporary": false
+                }
+            ]
+        }
+    ]
+}

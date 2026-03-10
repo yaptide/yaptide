@@ -6,16 +6,31 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_all_clusters, fetch_batch_simulation_by_job_id,
-                                            fetch_batch_tasks_by_sim_id, fetch_cluster_by_id, make_commit_to_db,
-                                            update_simulation_state, update_task_state)
+from yaptide.persistence.db_methods import (
+    add_object_to_db,
+    fetch_all_clusters,
+    fetch_batch_simulation_by_job_id,
+    fetch_batch_tasks_by_sim_id,
+    fetch_cluster_by_id,
+    make_commit_to_db,
+    update_simulation_state,
+    update_task_state,
+)
 from yaptide.persistence.models import (  # skipcq: FLK-E101
-    BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel, KeycloakUserModel)
+    BatchSimulationModel, BatchTaskModel, ClusterModel, InputModel, KeycloakUserModel,
+)
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response, error_internal_response,
-                                                     yaptide_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.response_templates import (
+    error_validation_response,
+    error_internal_response,
+    yaptide_response,
+)
+from yaptide.routes.utils.utils import (
+    check_if_job_is_owned_and_exist,
+    determine_input_type,
+    make_input_dict,
+)
 from yaptide.utils.enums import EntityState, PlatformType
 
 
@@ -49,46 +64,55 @@ class JobsBatch(Resource):
             return error_validation_response({"message": "No clusters are available"})
 
         filtered_clusters: list[ClusterModel] = []
-        if "batch_options" in payload_dict and "cluster_name" in payload_dict["batch_options"]:
+        if ("batch_options" in payload_dict and "cluster_name" in payload_dict["batch_options"]):
             cluster_name = payload_dict["batch_options"]["cluster_name"]
             filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
         cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
 
         # create a new simulation in the database, not waiting for the job to finish
-        job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid.uuid4()) + PlatformType.BATCH.value
+        job_id = (datetime.now().strftime("%Y%m%d-%H%M%S-") + str(uuid.uuid4()) + PlatformType.BATCH.value)
         # skipcq: PYL-E1123
-        simulation = BatchSimulationModel(user_id=user.id,
-                                          cluster_id=cluster.id,
-                                          job_id=job_id,
-                                          sim_type=payload_dict["sim_type"],
-                                          input_type=input_type,
-                                          title=payload_dict.get("title", ''))
+        simulation = BatchSimulationModel(
+            user_id=user.id,
+            cluster_id=cluster.id,
+            job_id=job_id,
+            sim_type=payload_dict["sim_type"],
+            input_type=input_type,
+            title=payload_dict.get("title", ""),
+        )
         add_object_to_db(simulation)
         update_key = encode_simulation_auth_token(simulation.id)
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
-
-        submit_job.delay(payload_dict=payload_dict,
-                         files_dict=input_dict["input_files"],
-                         userId=user.id,
-                         clusterId=cluster.id,
-                         sim_id=simulation.id,
-                         update_key=update_key)
-
-        requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
+        requested_primaries = (input_dict["number_of_all_primaries"] // payload_dict["ntasks"])
         for i in range(payload_dict["ntasks"]):
-            task = BatchTaskModel(simulation_id=simulation.id,
-                                  task_id=str(i + 1),
-                                  requested_primaries=requested_primaries,)
-            add_object_to_db(task, False)
+            task = BatchTaskModel(
+                simulation_id=simulation.id,
+                task_id=str(i + 1),
+                requested_primaries=requested_primaries,
+            )
+            add_object_to_db(task, make_commit=False)
 
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict
-        add_object_to_db(input_model)
+        add_object_to_db(input_model, make_commit=False)
         if simulation.update_state({"job_state": EntityState.PENDING.value}):
             make_commit_to_db()
 
-        return yaptide_response(message="Job waiting for submission", code=202, content={'job_id': simulation.job_id})
+        submit_job.delay(
+            payload_dict=payload_dict,
+            files_dict=input_dict["input_files"],
+            userId=user.id,
+            clusterId=cluster.id,
+            sim_id=simulation.id,
+            update_key=update_key,
+        )
+
+        return yaptide_response(
+            message="Job waiting for submission",
+            code=202,
+            content={"job_id": simulation.job_id},
+        )
 
     class APIParametersSchema(Schema):
         """Class specifies API parameters"""
@@ -119,13 +143,18 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
-            return yaptide_response(message=f"Job state: {simulation.job_state}",
-                                    code=200,
-                                    content={
-                                        "job_state": simulation.job_state,
-                                        "job_tasks_status": job_tasks_status,
-                                    })
+        if simulation.job_state in (
+                EntityState.COMPLETED.value,
+                EntityState.FAILED.value,
+        ):
+            return yaptide_response(
+                message=f"Job state: {simulation.job_state}",
+                code=200,
+                content={
+                    "job_state": simulation.job_state,
+                    "job_tasks_status": job_tasks_status,
+                },
+            )
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
@@ -158,13 +187,19 @@ class JobsBatch(Resource):
 
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value,
-                                    EntityState.UNKNOWN.value):
-            return yaptide_response(message=f"Cannot cancel job which is in {simulation.job_state} state",
-                                    code=200,
-                                    content={
-                                        "job_state": simulation.job_state,
-                                    })
+        if simulation.job_state in (
+                EntityState.COMPLETED.value,
+                EntityState.FAILED.value,
+                EntityState.CANCELED.value,
+                EntityState.UNKNOWN.value,
+        ):
+            return yaptide_response(
+                message=f"Cannot cancel job which is in {simulation.job_state} state",
+                code=200,
+                content={
+                    "job_state": simulation.job_state,
+                },
+            )
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
@@ -194,5 +229,5 @@ class Clusters(Resource):
 
         clusters = fetch_all_clusters()
 
-        result = {'clusters': [{'cluster_name': cluster.cluster_name} for cluster in clusters]}
-        return yaptide_response(message='Available clusters', code=200, content=result)
+        result = {"clusters": [{"cluster_name": cluster.cluster_name} for cluster in clusters]}
+        return yaptide_response(message="Available clusters", code=200, content=result)
