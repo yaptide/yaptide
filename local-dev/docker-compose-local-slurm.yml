@@ -32,6 +32,13 @@ services:
   # Compose merges environment maps: these values override the base defaults.
   # ─────────────────────────────────────────────────────────────────
 
+  redis:
+    # Expose Redis to the host so that a locally-running Flask process
+    # (external-flask mode) can reach it as localhost:6379.
+    # This binding is harmless in the default all-Docker mode as well.
+    ports:
+      - "6379:6379"
+
   yaptide_flask:
     environment:
       CERT_AUTH_URL: "http://cert-issuer:8000/key"
@@ -45,6 +52,72 @@ services:
       # batch_methods.prepare_script_files(). The scripts run on the SLURM
       # container, which reaches nginx via the shared Docker network.
       BACKEND_EXTERNAL_URL: "http://nginx:5000"
+    extra_hosts:
+      # On Linux, Docker does not always provide host.docker.internal automatically.
+      # host-gateway makes the host Flask process reachable from helper_worker and
+      # keeps the same hostname working on macOS and Linux.
+      - "host.docker.internal:host-gateway"
+
+  # Dedicated helper worker for the "Flask on the host" workflow.
+  # Unlike the default helper worker from docker-compose.yml, this variant does
+  # not depend on the dockerized yaptide_flask service.
+  yaptide_helper_worker_external_flask:
+    build:
+      context: ..
+      dockerfile: Dockerfile-helper-worker
+    image: yaptide_helper_worker
+    container_name: yaptide_helper_worker_external_flask
+    restart: unless-stopped
+    profiles: [ "external-flask" ]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+    environment:
+      CELERY_BROKER_URL: "redis://yaptide_redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://yaptide_redis:6379/0"
+      LOG_LEVEL_ROOT: "${LOG_LEVEL_ROOT:-WARNING}"
+      BACKEND_INTERNAL_URL: "${BACKEND_INTERNAL_URL:-http://host.docker.internal:5001}"
+      BACKEND_EXTERNAL_URL: "${BACKEND_EXTERNAL_URL:-http://host.docker.internal:5001}"
+      FLASK_SQLALCHEMY_DATABASE_URI: "postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "celery --app yaptide.utils.helper_worker inspect ping" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Dedicated simulation worker for the "Flask on the host" workflow.
+  # Unlike the default simulation worker from docker-compose.yml, this variant
+  # does not depend on the dockerized yaptide_flask service.
+  # It handles direct-run simulations dispatched to the `simulations` Celery queue.
+  yaptide_simulation_worker_external_flask:
+    build:
+      context: ..
+      dockerfile: Dockerfile-simulation-worker
+    image: yaptide_simulation_worker
+    container_name: yaptide_simulation_worker_external_flask
+    restart: unless-stopped
+    profiles: [ "external-flask" ]
+    volumes:
+      - simulators:/simulators:rw
+    deploy:
+      resources:
+        limits:
+          cpus: "${MAX_CORES:-1.0}"
+    environment:
+      CELERY_BROKER_URL: "redis://yaptide_redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://yaptide_redis:6379/0"
+      LOG_LEVEL_ROOT: "${LOG_LEVEL_ROOT:-WARNING}"
+      BACKEND_INTERNAL_URL: "${BACKEND_INTERNAL_URL:-http://host.docker.internal:5001}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "celery --app yaptide.celery.simulation_worker inspect ping" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   # ─────────────────────────────────────────────────────────────────
   # New services
@@ -102,5 +175,8 @@ services:
       # Mount the CA public key so sshd can verify user certificates.
       # cert-issuer signs with the matching private key (ca_key).
       - ./ssh-ca/ca.pub:/etc/ssh/ca.pub:ro
+    extra_hosts:
+      # Needed when collect jobs POST results back to a Flask process running on the host.
+      - "host.docker.internal:host-gateway"
     ports:
       - "2222:22"
