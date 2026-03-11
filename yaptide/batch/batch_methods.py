@@ -49,7 +49,7 @@ def get_user(db_con, metadata, userId):
     try:
         user: KeycloakUserModel = db_con.execute(stmt).first()
     except Exception:
-        logging.error("Error getting user object wiht id: %s from database", str(userId))
+        logging.error("Error getting user object with id: %s from database", str(userId))
         return None
     return user
 
