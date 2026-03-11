@@ -174,7 +174,7 @@ services:
     volumes:
       # Mount the CA public key so sshd can verify user certificates.
       # cert-issuer signs with the matching private key (ca_key).
-      - ./ssh-ca/ca.pub:/etc/ssh/ca.pub:ro
+      - ./ssh-ca/ca_key.pub:/etc/ssh/ca_key.pub:ro
     extra_hosts:
       # Needed when collect jobs POST results back to a Flask process running on the host.
       - "host.docker.internal:host-gateway"
