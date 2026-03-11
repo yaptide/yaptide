@@ -37,8 +37,9 @@ RUN set -eux; \
     rm -rf /tmp/shieldhit_demo.tar.gz /tmp/shield_hit12a*
 
 # Ensure slurm system user/group exist (packages usually create them)
-RUN groupadd -r slurm --gid=997 2>/dev/null || true && \
-    useradd -r -g slurm -u=997 --no-create-home --shell=/sbin/nologin slurm 2>/dev/null || true
+RUN set +e; \
+    groupadd -r slurm --gid=997 2>/dev/null; \
+    useradd -r -g slurm -u=997 --no-create-home --shell=/sbin/nologin slurm 2>/dev/null
 
 # Create the Linux user that Keycloak's testuser maps to.
 # The cert principal (from cert-issuer) and this username must match.
@@ -73,7 +74,7 @@ RUN dd if=/dev/urandom bs=1 count=1024 > /etc/munge/munge.key 2>/dev/null && \
 # Make /bin/sh point to bash so that "sh script.sh" honours bash syntax
 # (batch_methods.py calls: con.run(f'sh {submit_file}') which ignores the
 # #!/bin/bash shebang and would otherwise use dash, breaking brace expansion)
-RUN ln -sf /bin/bash /bin/sh
+SHELL ["/bin/bash", "-c"]
 
 # SSH setup
 RUN mkdir -p /run/sshd /etc/ssh/sshd_config.d && \

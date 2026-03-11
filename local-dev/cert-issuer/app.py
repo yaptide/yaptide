@@ -57,13 +57,17 @@ def get_ssh_cert(authorization: str = Header(default="")) -> JSONResponse:
     with tempfile.TemporaryDirectory() as tmpdir:
         key_path = Path(tmpdir) / f"{uuid.uuid4()}_key"
 
+        ssh_keygen = "/usr/bin/ssh-keygen"
+        if not Path(ssh_keygen).is_file():
+            raise FileNotFoundError(f"ssh-keygen not found at expected path: {ssh_keygen}")
+
         # Generate RSA 2048 key in traditional PEM format.
         # Must be RSA — paramiko's RSAKey.from_private_key() requires RSA.
         # -m PEM produces the classic -----BEGIN RSA PRIVATE KEY----- header
         # which both old and new paramiko versions handle reliably.
         subprocess.run(
             [
-                "ssh-keygen",
+                ssh_keygen,
                 "-t",
                 "rsa",
                 "-b",
@@ -85,7 +89,7 @@ def get_ssh_cert(authorization: str = Header(default="")) -> JSONResponse:
         # -n <principal> must match the Linux username on the SLURM node.
         subprocess.run(
             [
-                "ssh-keygen",
+                ssh_keygen,
                 "-s",
                 CA_KEY_PATH,
                 "-I",

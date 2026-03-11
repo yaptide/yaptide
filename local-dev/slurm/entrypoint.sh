@@ -12,7 +12,7 @@ echo "[entrypoint] Starting sshd..."
 
 echo "[entrypoint] Starting slurmd..."
 /usr/sbin/slurmd -D -N slurm &
-SLURMD_PID=$!
+
 
 # Give slurmd a moment to initialise before slurmctld tries to contact it.
 sleep 2
