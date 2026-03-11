@@ -1,2 +1,3 @@
-# CA public key is intentionally not committed.
+# This file is a placeholder.
 # Run ./generate_ssh_ca.sh to generate ca_key and ca_key.pub locally for your environment.
+# ca_key.pub is the CA public key used by the SLURM container's TrustedUserCAKeys.

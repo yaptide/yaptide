@@ -1,9 +1,9 @@
 # Certificate-based SSH authentication configuration.
 # Drop-in file for /etc/ssh/sshd_config.d/
 
-# Trust certificates signed by the CA whose public key is mounted at /etc/ssh/ca.pub.
-# Mount: local-dev/ssh-ca/ca.pub → /etc/ssh/ca.pub:ro
-TrustedUserCAKeys /etc/ssh/ca.pub
+# Trust certificates signed by the CA whose public key is mounted at /etc/ssh/ca_key.pub.
+# Mount: local-dev/ssh-ca/ca_key.pub → /etc/ssh/ca_key.pub:ro
+TrustedUserCAKeys /etc/ssh/ca_key.pub
 
 PubkeyAuthentication yes
 

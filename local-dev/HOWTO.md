@@ -42,7 +42,7 @@ bash local-dev/generate_ssh_ca.sh
 ```
 
 This creates `local-dev/ssh-ca/ca_key` (private, never commit) and
-`local-dev/ssh-ca/ca.pub` (public, safe to commit).
+`local-dev/ssh-ca/ca_key.pub` (public, safe to commit).
 
 > **Skip** this step on subsequent runs — the script exits early if the key already exists.
 
