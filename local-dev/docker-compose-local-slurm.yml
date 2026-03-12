@@ -45,6 +45,9 @@ services:
       KEYCLOAK_BASE_URL: "http://keycloak:8080"
       KEYCLOAK_REALM: "yaptide-local"
       BACKEND_EXTERNAL_URL: "http://nginx:5000"
+    healthcheck:
+      start_period: 30s
+      start_interval: 5s
 
   yaptide_helper_worker:
     environment:
