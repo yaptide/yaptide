@@ -13,10 +13,26 @@ import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
 
-from yaptide.batch.shieldhit_string_templates import (ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT)
-from yaptide.batch.fluka_string_templates import (ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH, SUBMIT_FLUKA)
-from yaptide.batch.utils.utils import (convert_dict_to_sbatch_options, extract_sbatch_header)
-from yaptide.persistence.models import (BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel)
+from yaptide.batch.shieldhit_string_templates import (
+    ARRAY_SHIELDHIT_BASH,
+    COLLECT_SHIELDHIT_BASH,
+    SUBMIT_SHIELDHIT,
+)
+from yaptide.batch.fluka_string_templates import (
+    ARRAY_FLUKA_BASH,
+    COLLECT_FLUKA_BASH,
+    SUBMIT_FLUKA,
+)
+from yaptide.batch.utils.utils import (
+    convert_dict_to_sbatch_options,
+    extract_sbatch_header,
+)
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    ClusterModel,
+    KeycloakUserModel,
+    UserModel,
+)
 from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import write_simulation_input_files
 
@@ -28,13 +44,12 @@ def get_user(db_con, metadata, userId):
     """Queries database for user"""
     users = metadata.tables[TableTypes.User.name]
     keycloackUsers = metadata.tables[TableTypes.KeycloakUser.name]
-    stmt = db.select(users,
-                     keycloackUsers).select_from(users).join(keycloackUsers,
-                                                             KeycloakUserModel.id == UserModel.id).filter_by(id=userId)
+    stmt = (db.select(users, keycloackUsers).select_from(users).join(
+        keycloackUsers, KeycloakUserModel.id == UserModel.id).filter_by(id=userId))
     try:
         user: KeycloakUserModel = db_con.execute(stmt).first()
     except Exception:
-        logging.error('Error getting user object wiht id: %s from database', str(userId))
+        logging.error("Error getting user object with id: %s from database", str(userId))
         return None
     return user
 
@@ -46,7 +61,7 @@ def get_cluster(db_con, metadata, clusterId):
     try:
         cluster: ClusterModel = db_con.execute(stmt).first()
     except Exception:
-        logging.error('Error getting cluster object with id: %s from database', str(clusterId))
+        logging.error("Error getting cluster object with id: %s from database", str(clusterId))
         return None
     return cluster
 
@@ -56,12 +71,14 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
 
-    con = Connection(host=f"{user.username}@{cluster.cluster_name}",
-                     connect_kwargs={
-                         "pkey": pkey,
-                         "allow_agent": False,
-                         "look_for_keys": False
-                     })
+    con = Connection(
+        host=f"{user.username}@{cluster.cluster_name}",
+        connect_kwargs={
+            "pkey": pkey,
+            "allow_agent": False,
+            "look_for_keys": False
+        },
+    )
     return con
 
 
@@ -73,11 +90,18 @@ def post_update(dict_to_send):
 
 @celery_app.task()
 def submit_job(  # skipcq: PY-R1000
-        payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
+    payload_dict: dict,
+    files_dict: dict,
+    userId: int,
+    clusterId: int,
+    sim_id: int,
+    update_key: str,
+):
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
-        db_con, metadata, _ = connect_to_db(
+        db_con, metadata, _ = (
+            connect_to_db()
         )  # Connection to database and quering objects looks like that because celery task works outside flask context
     except Exception as e:
         logging.error('Async worker couldn\'t connect to db. Error message:"%s"', str(e))
@@ -92,7 +116,7 @@ def submit_job(  # skipcq: PY-R1000
             "update_key": update_key,
             "log": {
                 "error": f"User {user.username} has no certificate or private key"
-            }
+            },
         }
         post_update(dict_to_send)
         return
@@ -107,7 +131,7 @@ def submit_job(  # skipcq: PY-R1000
             "update_key": update_key,
             "log": {
                 "error": str(e)
-            }
+            },
         }
         post_update(dict_to_send)
         return
@@ -121,7 +145,11 @@ def submit_job(  # skipcq: PY-R1000
     try:
         con.run(f"mkdir -p {job_dir}")
     except Exception as e:
-        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
+        dict_to_send = {
+            "sim_id": sim_id,
+            "job_state": EntityState.FAILED.value,
+            "update_key": update_key,
+        }
         post_update(dict_to_send)
         return
     with tempfile.TemporaryDirectory() as tmp_dir_path:
@@ -138,18 +166,24 @@ def submit_job(  # skipcq: PY-R1000
         logging.debug("Transfering simulation input %s to %s", zip_path, job_dir)
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
-    SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
+    SIMULATION_DATA_SENDER_SCRIPT = (Path(__file__).parent.resolve() / "simulation_data_sender.py")
 
     logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
-    logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+    logging.debug(
+        "Transfering result sender script %s to %s",
+        SIMULATION_DATA_SENDER_SCRIPT,
+        job_dir,
+    )
     con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
 
-    submit_file, sh_files = prepare_script_files(payload_dict=payload_dict,
-                                                 job_dir=job_dir,
-                                                 sim_id=sim_id,
-                                                 update_key=update_key,
-                                                 con=con)
+    submit_file, sh_files = prepare_script_files(
+        payload_dict=payload_dict,
+        job_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key,
+        con=con,
+    )
 
     array_id = collect_id = None
     if not submit_file.startswith(job_dir):
@@ -160,11 +194,11 @@ def submit_job(  # skipcq: PY-R1000
             "update_key": update_key,
             "log": {
                 "error": "Job submission failed due to invalid submit file path"
-            }
+            },
         }
         post_update(dict_to_send)
         return
-    fabric_result: Result = con.run(f'sh {submit_file}', hide=True)
+    fabric_result: Result = con.run(f"sh {submit_file}", hide=True)
     submit_stdout = fabric_result.stdout
     submit_stderr = fabric_result.stderr
     for line in submit_stdout.split("\n"):
@@ -191,8 +225,8 @@ def submit_job(  # skipcq: PY-R1000
                 "message": "Job submission failed",
                 "submit_stdout": submit_stdout,
                 "sh_files": sh_files,
-                "submit_stderr": submit_stderr
-            }
+                "submit_stderr": submit_stderr,
+            },
         }
         post_update(dict_to_send)
         return
@@ -204,7 +238,7 @@ def submit_job(  # skipcq: PY-R1000
         "array_id": array_id,
         "collect_id": collect_id,
         "submit_stdout": submit_stdout,
-        "sh_files": sh_files
+        "sh_files": sh_files,
     }
     post_update(dict_to_send)
     return
@@ -213,9 +247,9 @@ def submit_job(  # skipcq: PY-R1000
 def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_key: str,
                          con: Connection) -> tuple[str, dict]:
     """Prepares script files to run them on cluster"""
-    submit_file = f'{job_dir}/yaptide_submitter.sh'
-    array_file = f'{job_dir}/array_script.sh'
-    collect_file = f'{job_dir}/collect_script.sh'
+    submit_file = f"{job_dir}/yaptide_submitter.sh"
+    array_file = f"{job_dir}/array_script.sh"
+    collect_file = f"{job_dir}/collect_script.sh"
 
     array_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="array_options")
     array_header = extract_sbatch_header(payload_dict=payload_dict, target_key="array_header")
@@ -225,11 +259,11 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
-    if payload_dict['sim_type'] == SimulationType.FLUKA.value:
+    if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         submit_template = SUBMIT_FLUKA
         array_template = ARRAY_FLUKA_BASH
         collect_template = COLLECT_FLUKA_BASH
-    elif payload_dict['sim_type'] == SimulationType.SHIELDHIT.value:
+    elif payload_dict["sim_type"] == SimulationType.SHIELDHIT.value:
         submit_template = SUBMIT_SHIELDHIT
         array_template = ARRAY_SHIELDHIT_BASH
         collect_template = COLLECT_SHIELDHIT_BASH
@@ -239,31 +273,41 @@ def prepare_script_files(payload_dict: dict, job_dir: str, sim_id: int, update_k
         array_template = ""
         collect_template = ""
 
-    submit_script = submit_template.format(array_options=array_options,
-                                           collect_options=collect_options,
-                                           root_dir=job_dir,
-                                           n_tasks=str(payload_dict["ntasks"]),
-                                           convertmc_version=pymchelper.__version__)
-    array_script = array_template.format(array_header=array_header,
-                                         root_dir=job_dir,
-                                         sim_id=sim_id,
-                                         update_key=update_key,
-                                         backend_url=backend_url)
-    collect_script = collect_template.format(collect_header=collect_header,
-                                             root_dir=job_dir,
-                                             remove_output_from_workspace="true",
-                                             sim_id=sim_id,
-                                             update_key=update_key,
-                                             backend_url=backend_url)
+    submit_script = submit_template.format(
+        array_options=array_options,
+        collect_options=collect_options,
+        root_dir=job_dir,
+        n_tasks=str(payload_dict["ntasks"]),
+        convertmc_version=pymchelper.__version__,
+    )
+    array_script = array_template.format(
+        array_header=array_header,
+        root_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url,
+    )
+    collect_script = collect_template.format(
+        collect_header=collect_header,
+        root_dir=job_dir,
+        remove_output_from_workspace="true",
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url,
+    )
 
-    con.run(f'echo \'{array_script}\' >> {array_file}')
-    con.run(f'chmod +x {array_file}')
-    con.run(f'echo \'{submit_script}\' >> {submit_file}')
-    con.run(f'chmod +x {submit_file}')
-    con.run(f'echo \'{collect_script}\' >> {collect_file}')
-    con.run(f'chmod +x {collect_file}')
+    con.run(f"echo '{array_script}' >> {array_file}")
+    con.run(f"chmod +x {array_file}")
+    con.run(f"echo '{submit_script}' >> {submit_file}")
+    con.run(f"chmod +x {submit_file}")
+    con.run(f"echo '{collect_script}' >> {collect_file}")
+    con.run(f"chmod +x {collect_file}")
 
-    return submit_file, {"submit": submit_script, "array": array_script, "collect": collect_script}
+    return submit_file, {
+        "submit": submit_script,
+        "array": array_script,
+        "collect": collect_script,
+    }
 
 
 def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
@@ -273,20 +317,23 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run(f'sacct -j {array_id} --format State', hide=True)
+    fabric_result: Result = con.run(f"sacct -j {array_id} --format State", hide=True)
     job_state = fabric_result.stdout.split()[-1].split()[0]
 
-    fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
+    fabric_result: Result = con.run(f"sacct -j {collect_id} --format State", hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
 
     if job_state == "FAILED" or collect_state == "FAILED":
-        return {"job_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-    if collect_state == "COMPLETED":
-        return {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-    if collect_state == "RUNNING":
+        return {
+            "job_state": EntityState.FAILED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" "),
+        }
+    # Results are persisted asynchronously via POST /results. Keep the batch in a
+    # merging state until that callback marks the simulation as COMPLETED.
+    if collect_state in {"RUNNING", "COMPLETED", "COMPLETING"}:
         logging.debug("Collect job is in RUNNING state")
         return {"job_state": EntityState.MERGING_RUNNING.value}
-    if job_state == "COMPLETED" and collect_state == "PENDING":
+    if job_state == "COMPLETED" and collect_state in {"PENDING", "UNKNOWN"}:
         logging.debug("Collect job is in PENDING state")
         return {"job_state": EntityState.MERGING_QUEUED.value}
     if job_state == "RUNNING":
@@ -304,20 +351,20 @@ def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, c
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run(f'sacct -j {collect_id} --format State', hide=True)
+    fabric_result: Result = con.run(f"sacct -j {collect_id} --format State", hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
 
     if collect_state == "COMPLETED":
-        fabric_result: Result = con.run(f'ls -f {job_dir}/output | grep .json', hide=True)
+        fabric_result: Result = con.run(f"ls -f {job_dir}/output | grep .json", hide=True)
         result_estimators = []
         with tempfile.TemporaryDirectory() as tmp_dir_path:
             for filename in fabric_result.stdout.split():
                 file_path = Path(tmp_dir_path, filename)
                 with open(file_path, "wb") as writer:
-                    con.get(f'{job_dir}/output/{filename}', writer)
+                    con.get(f"{job_dir}/output/{filename}", writer)
                 with open(file_path, "r") as json_file:
                     est_dict = json.load(json_file)
-                    est_dict["name"] = filename.split('.')[0]
+                    est_dict["name"] = filename.split(".")[0]
                     result_estimators.append(est_dict)
 
         return {"estimators": result_estimators}
@@ -334,9 +381,9 @@ def delete_job(simulation: BatchSimulationModel, user: KeycloakUserModel,
     try:
         con = get_connection(user=user, cluster=cluster)
 
-        con.run(f'scancel {array_id}')
-        con.run(f'scancel {collect_id}')
-        con.run(f'rm -rf {job_dir}')
+        con.run(f"scancel {array_id}")
+        con.run(f"scancel {collect_id}")
+        con.run(f"rm -rf {job_dir}")
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)
         return {"message": "Job cancelation failed"}, 500

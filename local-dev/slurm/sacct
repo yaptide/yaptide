@@ -1,0 +1,49 @@
+#!/bin/bash
+# Mock sacct for local dev (AccountingStorageType=none).
+# Parses "-j <job_id>" and outputs state in sacct format so
+# batch_methods.get_job_status() works without a real accounting daemon.
+#
+# sacct output parsed by backend:
+#   fabric_result.stdout.split()[-1].split()[0]
+# so we just need:
+#   "     State\n----------\n   <STATE>\n"
+
+JOB_ID=""
+
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -j) JOB_ID="$2"; shift 2 ;;
+        *) shift ;;
+    esac
+done
+
+# Header sacct always prints
+printf "     State\n----------\n"
+
+if [[ -z "$JOB_ID" ]]; then
+    printf "   UNKNOWN\n"
+    exit 0
+fi
+
+# First try squeue (job still in queue or running)
+STATE=$(squeue -j "$JOB_ID" -h -o "%T" 2>/dev/null | tail -1)
+
+if [[ -n "$STATE" ]]; then
+    printf "   %s\n" "$STATE"
+    exit 0
+fi
+
+# Job left the queue — try scontrol (stays in memory a few minutes after completion)
+CTRL=$(scontrol show job "$JOB_ID" 2>/dev/null)
+if [[ -n "$CTRL" ]]; then
+    STATE=$(echo "$CTRL" | grep -o 'JobState=[A-Z_]*' | cut -d= -f2 | head -1)
+    if [[ -n "$STATE" ]]; then
+        printf "   %s\n" "$STATE"
+        exit 0
+    fi
+fi
+
+# Job is gone from memory. In local-dev we do not have persistent accounting,
+# so treating this as COMPLETED causes the backend to expose results too early.
+printf "   UNKNOWN\n"
+exit 0

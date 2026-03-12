@@ -1,0 +1,6 @@
+#!/bin/bash
+# No-op replacement for Lmod/Environment Modules.
+# The SUBMIT_SHIELDHIT template calls: module load shieldhit
+# Without Lmod installed, this script silently succeeds so the job doesn't fail.
+echo "module (no-op): $*" >&2
+exit 0

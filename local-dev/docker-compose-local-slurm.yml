@@ -1,0 +1,185 @@
+# Local SLURM development environment
+# Extends the base yaptide stack with three new services:
+#   - keycloak    : local Keycloak SSO (replaces sso.plgrid.pl)
+#   - cert-issuer : dummy SSH certificate issuer (replaces ccm-dev.kdm.cyfronet.pl/key)
+#   - slurm       : single-node SLURM cluster (replaces Ares)
+#
+# Prerequisites:
+#   1. Generate SSH CA keypair (once):
+#        bash local-dev/generate_ssh_ca.sh
+#   2. Start the stack:
+#        docker compose -f local-dev/docker-compose-local-slurm.yml up --build
+#   3. Register the local SLURM cluster in the DB (once, after stack is up):
+#        bash local-dev/setup_local_cluster.sh
+#
+# UI env vars to set when starting the React dev server:
+#   REACT_APP_BACKEND_URL=http://localhost:5000
+#   REACT_APP_KEYCLOAK_BASE_URL=http://localhost:8080
+#   REACT_APP_KEYCLOAK_REALM=yaptide-local
+#   REACT_APP_KEYCLOAK_CLIENT_ID=yaptide-client
+#   REACT_APP_ALT_AUTH=plg
+#
+# Requires Docker Compose >= 2.20 (for the `include:` directive).
+
+include:
+  - path: ../docker-compose.yml
+
+services:
+
+  # ─────────────────────────────────────────────────────────────────
+  # Overrides for existing services
+  # These inject the local-dev URLs on top of the base configuration.
+  # Compose merges environment maps: these values override the base defaults.
+  # ─────────────────────────────────────────────────────────────────
+
+  redis:
+    # Expose Redis to the host so that a locally-running Flask process
+    # (external-flask mode) can reach it as localhost:6379.
+    # This binding is harmless in the default all-Docker mode as well.
+    ports:
+      - "6379:6379"
+
+  yaptide_flask:
+    environment:
+      CERT_AUTH_URL: "http://cert-issuer:8000/key"
+      KEYCLOAK_BASE_URL: "http://keycloak:8080"
+      KEYCLOAK_REALM: "yaptide-local"
+      BACKEND_EXTERNAL_URL: "http://nginx:5000"
+    healthcheck:
+      start_period: 30s
+      start_interval: 5s
+
+  yaptide_helper_worker:
+    environment:
+      # BACKEND_EXTERNAL_URL is embedded into SLURM bash scripts by
+      # batch_methods.prepare_script_files(). The scripts run on the SLURM
+      # container, which reaches nginx via the shared Docker network.
+      BACKEND_EXTERNAL_URL: "http://nginx:5000"
+    extra_hosts:
+      # On Linux, Docker does not always provide host.docker.internal automatically.
+      # host-gateway makes the host Flask process reachable from helper_worker and
+      # keeps the same hostname working on macOS and Linux.
+      - "host.docker.internal:host-gateway"
+
+  # Dedicated helper worker for the "Flask on the host" workflow.
+  # Unlike the default helper worker from docker-compose.yml, this variant does
+  # not depend on the dockerized yaptide_flask service.
+  yaptide_helper_worker_external_flask:
+    build:
+      context: ..
+      dockerfile: Dockerfile-helper-worker
+    image: yaptide_helper_worker
+    container_name: yaptide_helper_worker_external_flask
+    restart: unless-stopped
+    profiles: [ "external-flask" ]
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+    environment:
+      CELERY_BROKER_URL: "redis://yaptide_redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://yaptide_redis:6379/0"
+      LOG_LEVEL_ROOT: "${LOG_LEVEL_ROOT:-WARNING}"
+      BACKEND_INTERNAL_URL: "${BACKEND_INTERNAL_URL:-http://host.docker.internal:5001}"
+      BACKEND_EXTERNAL_URL: "${BACKEND_EXTERNAL_URL:-http://host.docker.internal:5001}"
+      FLASK_SQLALCHEMY_DATABASE_URI: "postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "celery --app yaptide.utils.helper_worker inspect ping" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Dedicated simulation worker for the "Flask on the host" workflow.
+  # Unlike the default simulation worker from docker-compose.yml, this variant
+  # does not depend on the dockerized yaptide_flask service.
+  # It handles direct-run simulations dispatched to the `simulations` Celery queue.
+  yaptide_simulation_worker_external_flask:
+    build:
+      context: ..
+      dockerfile: Dockerfile-simulation-worker
+    image: yaptide_simulation_worker
+    container_name: yaptide_simulation_worker_external_flask
+    restart: unless-stopped
+    profiles: [ "external-flask" ]
+    volumes:
+      - simulators:/simulators:rw
+    deploy:
+      resources:
+        limits:
+          cpus: "${MAX_CORES:-1.0}"
+    environment:
+      CELERY_BROKER_URL: "redis://yaptide_redis:6379/0"
+      CELERY_RESULT_BACKEND: "redis://yaptide_redis:6379/0"
+      LOG_LEVEL_ROOT: "${LOG_LEVEL_ROOT:-WARNING}"
+      BACKEND_INTERNAL_URL: "${BACKEND_INTERNAL_URL:-http://host.docker.internal:5001}"
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "celery --app yaptide.celery.simulation_worker inspect ping" ]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # ─────────────────────────────────────────────────────────────────
+  # New services
+  # ─────────────────────────────────────────────────────────────────
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.5.5
+    container_name: yaptide_keycloak
+    restart: unless-stopped
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+    volumes:
+      - ./keycloak/realm-export.json:/opt/keycloak/data/import/realm.json:ro
+    # --http-relative-path=/auth is required because:
+    #   keycloak_routes.py builds: {KEYCLOAK_BASE_URL}/auth/realms/{REALM}/...
+    #   KeycloakAuthService.tsx: url = `${REACT_APP_KEYCLOAK_BASE_URL}/auth/`
+    command: start-dev --import-realm --http-relative-path=/auth
+    ports:
+      - "8080:8080"
+    healthcheck:
+      # HTTP/1.1 + Host header required — Keycloak 24 NPEs on HTTP/1.0 (no Host)
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && printf 'GET /auth/realms/yaptide-local HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q 'realm' <&3" ]
+      interval: 15s
+      timeout: 10s
+      retries: 15
+      start_period: 60s
+
+  cert-issuer:
+    build:
+      context: ./cert-issuer
+    container_name: yaptide_cert_issuer
+    restart: unless-stopped
+    volumes:
+      # Mount the CA private key read-only — used to sign user certificates.
+      # Generate it first with: bash local-dev/generate_ssh_ca.sh
+      - ./ssh-ca/ca_key:/ca_key:ro
+    ports:
+      - "8001:8000"
+    healthcheck:
+      test: [ "CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/docs')\" || exit 1" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  slurm:
+    build:
+      context: ./slurm
+    container_name: yaptide_slurm
+    # hostname must match SlurmctldHost and NodeName in slurm/slurm.conf
+    hostname: slurm
+    restart: unless-stopped
+    volumes:
+      # Mount the CA public key so sshd can verify user certificates.
+      # cert-issuer signs with the matching private key (ca_key).
+      - ./ssh-ca/ca_key.pub:/etc/ssh/ca_key.pub:ro
+    extra_hosts:
+      # Needed when collect jobs POST results back to a Flask process running on the host.
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "2222:22"
