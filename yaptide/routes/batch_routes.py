@@ -39,6 +39,9 @@ class JobsBatch(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
+        # ensure there are at most as many tasks as primaries
+        payload_dict["ntasks"] = min(payload_dict["ntasks"], payload_dict["input_json"]["beam"]["numberOfParticles"])
+
         input_type = determine_input_type(payload_dict)
 
         if input_type is None:
