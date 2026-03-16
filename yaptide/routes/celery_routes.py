@@ -40,8 +40,9 @@ class JobsDirect(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        # ensure there are at most as many tasks as primaries
-        payload_dict["ntasks"] = min(payload_dict["ntasks"], payload_dict["input_json"]["beam"]["numberOfParticles"])
+        # ensure there are at most as many tasks as primaries if using editor
+        if (input_type == "editor" && payload_dict["input_json"] is not None):
+            payload_dict["ntasks"] = min(payload_dict["ntasks"], payload_dict["input_json"]["beam"]["numberOfParticles"])
 
         input_type = determine_input_type(payload_dict)
 
