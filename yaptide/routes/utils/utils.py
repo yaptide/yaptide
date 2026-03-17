@@ -44,3 +44,48 @@ def make_input_dict(payload_dict: dict, input_type: str) -> dict:
     input_dict["input_files"] = files_dict
 
     return input_dict
+
+
+def get_clumped_ntasks_value(payload_dict: dict, input_type: str) -> int:
+    """
+    Function that validates ntasks value in a simulation and returns the number of tasks that  the simulation should use.
+    It's used to prevents simulations with ntasks outside of range [1; primaries_count].
+    The ntasks value needs to be larger than 0, because you need at least a single task to run a simulation.
+    The ntasks value also needs to be smaller than the number of primaries, because a task
+    needs at least one primary to run. If the number of tasks is larger than the number of primaries
+    then some tasks would have 0 primaries in them, which will make the simulation crash.
+
+    Args:
+        payload_dict: A dictionary containing the payload received from a request.
+        input_type: Input type determining if the request used editor or files.
+
+    Returns:
+        Integer value representing the ntasks value to use in the simulation.
+    """
+    # ensure there is at least 1 task
+    if payload_dict["ntasks"] < 1:
+        return 1
+
+    # get the number of primaries, depending on the input_type
+    if input_type == InputType.EDITOR.value:
+        number_of_all_primaries = payload_dict["input_json"]["beam"]["numberOfParticles"]
+    # ugly way of determining the file type, but that's how it's done in sim_utils
+    elif 'beam.dat' in payload_dict["input_files"]:
+        all_beam_lines: list[str] = payload_dict["input_files"]['beam.dat'].split('\n')
+        all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
+        number_of_all_primaries = int(all_beam_lines_with_nstat[0].split()[1])
+    elif next((file for file in payload_dict["input_files"] if file.endswith(".inp")), None):
+        input_file = next((file for file in payload_dict["input_files"] if file.endswith(".inp")), None)
+        # read number of primaries from fluka file
+        all_input_lines: list[str] = payload_dict[input_file].split('\n')
+        # get value from START card
+        start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
+        number_of_all_primaries = int(float(start_card.split()[1]))
+
+    # if the number of tasks is larger than the number of primaries, clump the number of tasks to its value
+    if payload_dict["ntasks"] > number_of_all_primaries:
+        return number_of_all_primaries
+
+    # if ntasks is within range, return the original value
+    return payload_dict["ntasks"]
+

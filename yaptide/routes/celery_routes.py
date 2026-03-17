@@ -17,7 +17,7 @@ from yaptide.persistence.models import (CelerySimulationModel, CeleryTaskModel, 
                                         UserModel)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict, get_clumped_ntasks_value
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
 from yaptide.utils.helper_tasks import terminate_unfinished_tasks
@@ -40,11 +40,10 @@ class JobsDirect(Resource):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
-        # ensure there are at most as many tasks as primaries if using editor
-        if (payload_dict["input_type"] == "editor" and payload_dict["input_json"] is not None):
-            payload_dict["ntasks"] = min(payload_dict["ntasks"], payload_dict["input_json"]["beam"]["numberOfParticles"])
-
         input_type = determine_input_type(payload_dict)
+
+        # ensure the ntasks value is in allowed range
+        payload_dict["ntasks"] = get_clumped_ntasks_value(payload_dict=payload_dict, input_type=input_type)
 
         if input_type is None:
             return error_validation_response()
