@@ -42,11 +42,11 @@ class JobsDirect(Resource):
 
         input_type = determine_input_type(payload_dict)
 
-        # ensure the ntasks value is in allowed range
-        payload_dict["ntasks"] = get_clumped_ntasks_value(payload_dict=payload_dict, input_type=input_type)
-
         if input_type is None:
             return error_validation_response()
+
+        # ensure the ntasks value is in allowed range
+        payload_dict["ntasks"] = get_clumped_ntasks_value(payload_dict=payload_dict, input_type=input_type)
 
         # create a new simulation in the database, not waiting for the job to finish
         job_id = datetime.now().strftime('%Y%m%d-%H%M%S-') + str(uuid4()) + PlatformType.DIRECT.value

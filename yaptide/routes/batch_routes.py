@@ -41,11 +41,11 @@ class JobsBatch(Resource):
 
         input_type = determine_input_type(payload_dict)
 
-        # ensure the ntasks value is in allowed range
-        payload_dict["ntasks"] = get_clumped_ntasks_value(payload_dict=payload_dict, input_type=input_type)
-
         if input_type is None:
             return error_validation_response()
+
+        # ensure the ntasks value is in allowed range
+        payload_dict["ntasks"] = get_clumped_ntasks_value(payload_dict=payload_dict, input_type=input_type)
 
         clusters = fetch_all_clusters()
         if len(clusters) < 1:

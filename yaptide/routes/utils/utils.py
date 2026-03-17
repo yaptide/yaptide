@@ -48,7 +48,7 @@ def make_input_dict(payload_dict: dict, input_type: str) -> dict:
 
 def get_clumped_ntasks_value(payload_dict: dict, input_type: str) -> int:
     """
-    Function that validates ntasks value in a simulation and returns the number of tasks that  the simulation should use.
+    Function that validates ntasks value in a simulation and returns the number of tasks that the simulation should use.
     It's used to prevents simulations with ntasks outside of range [1; primaries_count].
     The ntasks value needs to be larger than 0, because you need at least a single task to run a simulation.
     The ntasks value also needs to be smaller than the number of primaries, because a task
@@ -77,10 +77,13 @@ def get_clumped_ntasks_value(payload_dict: dict, input_type: str) -> int:
     elif next((file for file in payload_dict["input_files"] if file.endswith(".inp")), None):
         input_file = next((file for file in payload_dict["input_files"] if file.endswith(".inp")), None)
         # read number of primaries from fluka file
-        all_input_lines: list[str] = payload_dict[input_file].split('\n')
+        all_input_lines: list[str] = payload_dict["input_files"][input_file].split('\n')
         # get value from START card
         start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
         number_of_all_primaries = int(float(start_card.split()[1]))
+    # if we cannot determine the file type, fallback to original ntasks
+    else:
+        return payload_dict["ntasks"]
 
     # if the number of tasks is larger than the number of primaries, clump the number of tasks to its value
     if payload_dict["ntasks"] > number_of_all_primaries:
