@@ -3,7 +3,7 @@ from typing import Optional
 from yaptide.persistence.db_methods import fetch_simulation_by_job_id
 from yaptide.persistence.models import UserModel
 from yaptide.utils.enums import InputType, SimulationType
-from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_primaries_file_type_and_name
+from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
 
 
 def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool, str, int]:
@@ -67,26 +67,12 @@ def get_clamped_ntasks_value(payload_dict: dict, input_type: str, ntasks: int) -
     if ntasks < 1:
         return 1
 
-    # get the number of primaries, depending on the input_type
-    if input_type == InputType.EDITOR.value:
-        number_of_all_primaries = payload_dict["input_json"]["beam"]["numberOfParticles"]
-    else:
-        file_type, file_name = get_primaries_file_type_and_name(payload_dict)
+    # get the number of primaries
+    number_of_all_primaries = get_total_number_of_primaries(payload_dict)
 
-        # if we cannot determine the file type, fallback to original ntasks
-        if not file_type:
-            return ntasks
-
-        if file_type == SimulationType.SHIELDHIT:
-            all_beam_lines: list[str] = payload_dict["input_files"][file_name].split('\n')
-            all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
-            number_of_all_primaries = int(all_beam_lines_with_nstat[0].split()[1])
-        elif file_type == SimulationType.FLUKA:
-            # read number of primaries from fluka file
-            all_input_lines: list[str] = payload_dict["input_files"][file_name].split('\n')
-            # get value from START card
-            start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
-            number_of_all_primaries = int(float(start_card.split()[1]))
+    # if we couldn't get the total number of primaries, fall back to the original ntasks value
+    if not number_of_all_primaries:
+        return ntasks
 
     # if the number of tasks is larger than the number of primaries, clamp the number of tasks to its value
     if ntasks > number_of_all_primaries:

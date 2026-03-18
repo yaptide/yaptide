@@ -54,7 +54,7 @@ def get_primaries_file_type_and_name(payload_dict: dict) -> tuple[Optional[Simul
         payload_dict: A dictionary containing the payload received from a request.
 
     Returns:
-        Tuple of FILE_TYPE enumerator and string containing the name of the file
+        Tuple of SimulationType enumerator and string containing the name of the file
         or the tuple of Nones if the file type couldn't be determined
     """
     # ensure that the payload contains the input files dictionary
@@ -72,6 +72,75 @@ def get_primaries_file_type_and_name(payload_dict: dict) -> tuple[Optional[Simul
 
     # if we couldn't determine the file type, return a tuple of Nones
     return None, None
+
+
+def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
+    """
+    Gets the total number of primary particles from the payload dictionary from a request
+    depending on the input type and the simulation type.
+
+    Args:
+        payload_dict: A dictionary containing the payload received from a request.
+
+    Returns:
+        Integer representing the total number of primaries or None if it cannot be acquired from given payload.
+    """
+    input_type = get_json_type(payload_dict)
+
+    # get number of primaries when EDITOR was used
+    if input_type == InputType.EDITOR:
+        # check with try-catch for the number of paricles variable and return it
+        # if it's not there, return None
+        try:
+            return payload_dict["input_json"]["beam"]["numberOfParticles"]
+        except KeyError:
+            return None
+
+    # get number of primaries when FILES were used
+    if input_type == InputType.FILES:
+        file_type, file_name = get_primaries_file_type_and_name(payload_dict)
+
+        # if we couldn't get the file, return None
+        if not file_type:
+            return None
+
+        # get file lines
+        # no need for key check since if the file_type is not None then we know it exists
+        file_lines: list[str] = payload_dict["input_files"][file_name].split('\n')
+
+        # return number of particles depending on the simulation type
+        # this could be more generalized by just defining startswith string,
+        # but a change to how one simulation type defines its files could break the generalization
+        # therefore I don't believe such specific operations should be generalized
+        if file_type == SimulationType.SHIELDHIT:
+            first_nstat_line = next((line for line in file_lines if line.lstrip().startswith('NSTAT')), None)
+            if first_nstat_line:
+                # try-catch for index out of range and int convession esrors
+                try:
+                    return int(first_nstat_line.split()[1])
+                except (IndexError, ValueError):
+                    return None
+            # if there's no NSTAT line, return None
+            else:
+                return None
+
+        if file_type == SimulationType.FLUKA:
+            first_start_line = next((line for line in file_lines if line.lstrip().startswith('START')), None)
+            if first_start_line:
+                # try-catch for index out of range and int conversion errors
+                try:
+                    return int(first_start_line.split()[1])
+                except (IndexError, ValueError):
+                    return None
+            # if there's no START line, return None
+            else:
+                return None
+
+        # if the file_type is unknown, return None
+        return None
+
+    # if the input type couldn't be determined, return None
+    return None
 
 
 def convert_editor_dict_to_files_dict(editor_dict: dict, parser_type: str) -> dict:
