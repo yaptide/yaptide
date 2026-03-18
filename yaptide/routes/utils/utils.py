@@ -46,7 +46,7 @@ def make_input_dict(payload_dict: dict, input_type: str) -> dict:
     return input_dict
 
 
-def get_clumped_ntasks_value(payload_dict: dict, input_type: str) -> int:
+def get_clamped_ntasks_value(payload_dict: dict, input_type: str, ntasks: int) -> int:
     """
     Function that validates ntasks value in a simulation and returns the number of tasks that the simulation should use.
     It's used to prevents simulations with ntasks outside of range [1; primaries_count].
@@ -58,12 +58,13 @@ def get_clumped_ntasks_value(payload_dict: dict, input_type: str) -> int:
     Args:
         payload_dict: A dictionary containing the payload received from a request.
         input_type: Input type determining if the request used editor or files.
+        ntasks: Task count from the request to be clamped
 
     Returns:
         Integer value representing the ntasks value to use in the simulation.
     """
     # ensure there is at least 1 task
-    if payload_dict["ntasks"] < 1:
+    if ntasks < 1:
         return 1
 
     # get the number of primaries, depending on the input_type
@@ -83,12 +84,12 @@ def get_clumped_ntasks_value(payload_dict: dict, input_type: str) -> int:
         number_of_all_primaries = int(float(start_card.split()[1]))
     # if we cannot determine the file type, fallback to original ntasks
     else:
-        return payload_dict["ntasks"]
+        return ntasks
 
-    # if the number of tasks is larger than the number of primaries, clump the number of tasks to its value
-    if payload_dict["ntasks"] > number_of_all_primaries:
+    # if the number of tasks is larger than the number of primaries, clamp the number of tasks to its value
+    if ntasks > number_of_all_primaries:
         return number_of_all_primaries
 
     # if ntasks is within range, return the original value
-    return payload_dict["ntasks"]
+    return ntasks
 
