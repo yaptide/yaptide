@@ -70,7 +70,7 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
     number_of_all_primaries = get_total_number_of_primaries(payload_dict)
 
     # if we couldn't get the total number of primaries, fall back to the original ntasks value
-    if number_of_all_primaries is not None:
+    if number_of_all_primaries is None:
         return ntasks
 
     # if number of all primaries is less than 1, fall back to 1 task
