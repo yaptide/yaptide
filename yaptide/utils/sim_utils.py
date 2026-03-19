@@ -2,7 +2,6 @@ import copy
 import json
 import logging
 import re
-from enum import Enum, auto
 from pathlib import Path
 from typing import Optional
 
