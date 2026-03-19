@@ -50,7 +50,8 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
     """
     Function that validates ntasks value in a simulation and returns the number of tasks that the simulation should use.
     It's used to prevent simulations with ntasks outside of range [1; primaries_count].
-    The ntasks value needs to be larger than 0, because you need at least a single task to run a simulation.
+    The ntasks value needs to be larger than 0, because you need at least a single task to run a simulation
+    with certain simulators (like SHIELD-HIT12A).
     The ntasks value also needs to be less than or equal to the number of primaries, because a task
     needs at least one primary to run. If the number of tasks is larger than the number of primaries
     then some tasks would have 0 primaries in them, which will make the simulation crash.
@@ -66,7 +67,7 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
     if ntasks < 1:
         return 1
 
-    # get the number of primaries
+    # get the total number of primaries for the whole simulation/job
     number_of_all_primaries = get_total_number_of_primaries(payload_dict)
 
     # if we couldn't get the total number of primaries, fall back to the original ntasks value

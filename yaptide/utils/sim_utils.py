@@ -44,7 +44,8 @@ def get_json_type(payload_dict: dict) -> InputType:
     return InputType.EDITOR
 
 
-def get_primaries_file_type_and_name(payload_dict: dict) -> tuple[Optional[SimulationType], Optional[str]]:
+def get_simulator_type_and_particle_source_input_file(
+        payload_dict: dict) -> tuple[Optional[SimulationType], Optional[str]]:
     """
     Function used for getting the file type and name that contains the primaries
     from the payload dictionary received from a request.
@@ -97,7 +98,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
 
     # get number of primaries when FILES were used
     if input_type == InputType.FILES:
-        file_type, file_name = get_primaries_file_type_and_name(payload_dict)
+        file_type, file_name = get_simulator_type_and_particle_source_input_file(payload_dict)
 
         # if we couldn't get the file, return None
         if not file_type:
@@ -197,29 +198,24 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     else:
         logging.warning("ntasks value was specified as %d and will be overwritten", ntasks)
 
-    file_type, file_name = get_primaries_file_type_and_name(payload_files_dict)
+    file_type, file_name = get_simulator_type_and_particle_source_input_file(payload_files_dict)
     if file_type == SimulationType.SHIELDHIT:
         return adjust_primaries_for_shieldhit_files(payload_files_dict=payload_files_dict,
                                                     ntasks=ntasks,
-                                                    primaries_file=file_name)
+                                                    beam_dat_file=file_name)
     if file_type == SimulationType.FLUKA:
         return adjust_primaries_for_fluka_files(payload_files_dict=payload_files_dict,
                                                 ntasks=ntasks,
-                                                primaries_file=file_name)
+                                                fluka_input_file=file_name)
     return {}, 0
 
 
 def adjust_primaries_for_shieldhit_files(payload_files_dict: dict,
                                          ntasks: int = None,
-                                         primaries_file: str = None) -> tuple[dict, int]:
+                                         beam_dat_file: str = "beam.dat") -> tuple[dict, int]:
     """Adjusts number of primaries in beam.dat file for SHIELD-HIT12A"""
     files_dict = copy.deepcopy(payload_files_dict['input_files'])
-
-    # if the primaries file name is not passed, use beam.dat
-    if not primaries_file:
-        primaries_file = "beam.dat"
-
-    all_beam_lines: list[str] = files_dict[primaries_file].split('\n')
+    all_beam_lines: list[str] = files_dict[beam_dat_file].split('\n')
     all_beam_lines_with_nstat = [line for line in all_beam_lines if line.lstrip().startswith('NSTAT')]
     beam_lines_count = len(all_beam_lines_with_nstat)
     if beam_lines_count != 1:
@@ -234,7 +230,7 @@ def adjust_primaries_for_shieldhit_files(payload_files_dict: dict,
             # it is important to specify 3rd argument as 1
             # because otherwise values further in line might be changed to
             all_beam_lines[i] = all_beam_lines[i].replace(number_of_all_primaries, primaries_per_task, 1)
-    files_dict[primaries_file] = '\n'.join(all_beam_lines)
+    files_dict[beam_dat_file] = '\n'.join(all_beam_lines)
     # number_of_tasks = payload_files_dict['ntasks']  -> to be implemented in UI
     # here we manipulate the files_dict['beam.dat'] file to adjust number of primaries
     # we manipulate content of the file, no need to write the file to disk
@@ -243,18 +239,18 @@ def adjust_primaries_for_shieldhit_files(payload_files_dict: dict,
 
 def adjust_primaries_for_fluka_files(payload_files_dict: dict,
                                      ntasks: int = None,
-                                     primaries_file: str = None) -> tuple[dict, int]:
+                                     fluka_input_file: str = None) -> tuple[dict, int]:
     """Adjusts number of primaries in *.inp file for FLUKA"""
     files_dict = copy.deepcopy(payload_files_dict['input_files'])
 
     # if the primaries file name is not passed, get it from payload
-    if not primaries_file:
-        primaries_file = next((file for file in files_dict if file.endswith(".inp")), None)
-        if not primaries_file:
+    if not fluka_input_file:
+        fluka_input_file = next((file for file in files_dict if file.endswith(".inp")), None)
+        if not fluka_input_file:
             return {}, 0
 
     # read number of primaries from fluka file
-    all_input_lines: list[str] = files_dict[primaries_file].split('\n')
+    all_input_lines: list[str] = files_dict[fluka_input_file].split('\n')
     # get value from START card
     start_card = next((line for line in all_input_lines if line.lstrip().startswith('START')), None)
     number_of_all_primaries = start_card.split()[1]
@@ -270,7 +266,7 @@ def adjust_primaries_for_fluka_files(payload_files_dict: dict,
             start_card = str(card)
             all_input_lines[i] = start_card
             break
-    files_dict[primaries_file] = '\n'.join(all_input_lines)
+    files_dict[fluka_input_file] = '\n'.join(all_input_lines)
     return files_dict, parsed_number_of_all_primaries
 
 
