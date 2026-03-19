@@ -1,4 +1,5 @@
 from typing import Optional
+import logging
 
 from yaptide.persistence.db_methods import fetch_simulation_by_job_id
 from yaptide.persistence.models import UserModel
