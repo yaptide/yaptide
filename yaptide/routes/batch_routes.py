@@ -15,7 +15,8 @@ from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (error_validation_response, error_internal_response,
                                                      yaptide_response)
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, determine_input_type, make_input_dict, get_clamped_ntasks_value
+from yaptide.routes.utils.utils import (check_if_job_is_owned_and_exist, determine_input_type,
+                                        make_input_dict, get_clamped_ntasks_value)
 from yaptide.utils.enums import EntityState, PlatformType
 
 

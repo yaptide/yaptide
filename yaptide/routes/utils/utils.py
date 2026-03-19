@@ -86,4 +86,3 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
 
     # if ntasks is within range, return the original value
     return ntasks
-

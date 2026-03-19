@@ -208,7 +208,9 @@ def adjust_primaries_in_files_dict(payload_files_dict: dict, ntasks: int = None)
     return {}, 0
 
 
-def adjust_primaries_for_shieldhit_files(payload_files_dict: dict, ntasks: int = None, primaries_file: str = None) -> tuple[dict, int]:
+def adjust_primaries_for_shieldhit_files(payload_files_dict: dict,
+                                         ntasks: int = None,
+                                         primaries_file: str = None) -> tuple[dict, int]:
     """Adjusts number of primaries in beam.dat file for SHIELD-HIT12A"""
     files_dict = copy.deepcopy(payload_files_dict['input_files'])
 
@@ -238,7 +240,9 @@ def adjust_primaries_for_shieldhit_files(payload_files_dict: dict, ntasks: int =
     return files_dict, int(number_of_all_primaries)
 
 
-def adjust_primaries_for_fluka_files(payload_files_dict: dict, ntasks: int = None, primaries_file: str = None) -> tuple[dict, int]:
+def adjust_primaries_for_fluka_files(payload_files_dict: dict,
+                                     ntasks: int = None,
+                                     primaries_file: str = None) -> tuple[dict, int]:
     """Adjusts number of primaries in *.inp file for FLUKA"""
     files_dict = copy.deepcopy(payload_files_dict['input_files'])
 
