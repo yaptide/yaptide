@@ -89,7 +89,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
 
     # get number of primaries when EDITOR was used
     if input_type == InputType.EDITOR:
-        # check with try-catch for the number of paricles variable and return it
+        # check with try-catch for the number of particles variable and return it
         # if it's not there, return None
         try:
             return payload_dict["input_json"]["beam"]["numberOfParticles"]
@@ -115,7 +115,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
         if file_type == SimulationType.SHIELDHIT:
             first_nstat_line = next((line for line in file_lines if line.lstrip().startswith('NSTAT')), None)
             if first_nstat_line:
-                # try-catch for index out of range and int convession esrors
+                # try-catch for index out of range and int conversion esrors
                 try:
                     return int(first_nstat_line.split()[1])
                 except (IndexError, ValueError):
