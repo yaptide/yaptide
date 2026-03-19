@@ -57,7 +57,6 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
 
     Args:
         payload_dict: A dictionary containing the payload received from a request.
-        input_type: Input type determining if the request used editor or files.
         ntasks: Task count from the request to be clamped
 
     Returns:
