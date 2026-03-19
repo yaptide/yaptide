@@ -2,9 +2,10 @@
 import json
 from pathlib import Path
 import pytest
+from yaptide.utils.enums import InputType
 from yaptide.utils.sim_utils import (check_and_convert_payload_to_files_dict, convert_editor_dict_to_files_dict,
                                      adjust_primaries_in_editor_dict, adjust_primaries_in_files_dict,
-                                     write_simulation_input_files, get_json_type, JSON_TYPE)
+                                     write_simulation_input_files, get_json_type)
 from converter.api import (get_parser_from_str, run_parser)
 
 
@@ -78,8 +79,8 @@ def test_json_type_detection_editor(payload_editor_dict_data: dict):
        - containing user uploaded files (files)
     """
     json_type = get_json_type(payload_editor_dict_data)
-    assert json_type == JSON_TYPE.Editor
-    assert json_type != JSON_TYPE.Files
+    assert json_type == InputType.EDITOR
+    assert json_type != InputType.FILES
 
 
 def test_json_type_detection_files(payload_files_dict_data: dict):
@@ -89,8 +90,8 @@ def test_json_type_detection_files(payload_files_dict_data: dict):
        - containing user uploaded files (files)
     """
     json_type = get_json_type(payload_files_dict_data)
-    assert json_type != JSON_TYPE.Editor
-    assert json_type == JSON_TYPE.Files
+    assert json_type != InputType.EDITOR
+    assert json_type == InputType.FILES
 
 
 def test_if_parsing_works_for_payload(payload_editor_dict_data: dict):
