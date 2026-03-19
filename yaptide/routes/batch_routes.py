@@ -46,7 +46,6 @@ class JobsBatch(Resource):
 
         # ensure the ntasks value is in allowed range
         payload_dict["ntasks"] = get_clamped_ntasks_value(payload_dict=payload_dict,
-                                                          input_type=input_type,
                                                           ntasks=payload_dict["ntasks"])
 
         clusters = fetch_all_clusters()

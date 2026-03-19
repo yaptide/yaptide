@@ -2,7 +2,7 @@ from typing import Optional
 
 from yaptide.persistence.db_methods import fetch_simulation_by_job_id
 from yaptide.persistence.models import UserModel
-from yaptide.utils.enums import InputType, SimulationType
+from yaptide.utils.enums import InputType
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
 
 
@@ -46,7 +46,7 @@ def make_input_dict(payload_dict: dict, input_type: str) -> dict:
     return input_dict
 
 
-def get_clamped_ntasks_value(payload_dict: dict, input_type: str, ntasks: int) -> int:
+def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
     """
     Function that validates ntasks value in a simulation and returns the number of tasks that the simulation should use.
     It's used to prevents simulations with ntasks outside of range [1; primaries_count].
