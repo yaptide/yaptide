@@ -60,6 +60,7 @@ def get_simulator_type_and_particle_source_input_file(
     # ensure that the payload contains the input files dictionary
     input_files = payload_dict.get("input_files")
     if not input_files:
+        logging.warning("Received payload doesn't have the input_files dictionary.")
         return None, None
 
     # determining input file type - that information should most certainly be passed in the payload,
@@ -71,6 +72,7 @@ def get_simulator_type_and_particle_source_input_file(
         return SimulationType.FLUKA, inp_file
 
     # if we couldn't determine the file type, return a tuple of Nones
+    logging.warning("Couldn't determine the file type from the received payload.")
     return None, None
 
 
@@ -94,6 +96,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
         try:
             return payload_dict["input_json"]["beam"]["numberOfParticles"]
         except KeyError:
+            logging.warning("The payload received from the editor doesn't have the number of particles value.")
             return None
 
     # get number of primaries when FILES were used
@@ -102,6 +105,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
 
         # if we couldn't get the file, return None
         if not file_type:
+            logging.warning("Couldn't get the particle source input file from received payload.")
             return None
 
         # get file lines
@@ -139,9 +143,11 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
                 return None
 
         # if the file_type is unknown, return None
+        logging.warning("The simulator type determined from payload is unknown.")
         return None
 
     # if the input type couldn't be determined, return None
+    logging.warning("Couldn't determine the input type when trying to get the total number of primaries.")
     return None
 
 
