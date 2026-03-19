@@ -129,7 +129,9 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
             if first_start_line:
                 # try-catch for index out of range and int conversion errors
                 try:
-                    return int(first_start_line.split()[1])
+                    # START values are often written as floats (e.g. 50000.0)
+                    # therfore we use a float first, to avoid excepting due to ValueError
+                    return int(float(first_start_line.split()[1]))
                 except (IndexError, ValueError):
                     return None
             # if there's no START line, return None
