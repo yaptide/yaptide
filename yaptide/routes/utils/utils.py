@@ -74,6 +74,12 @@ def get_clamped_ntasks_value(payload_dict: dict, input_type: str, ntasks: int) -
     if not number_of_all_primaries:
         return ntasks
 
+    # if number of all primaries is less than 1, fall back to 1 task
+    # if this happens the simulation will most likely fail anyway, but it's better to check it,
+    # because it could just be incorrect read from the function above or something similar
+    if number_of_all_primaries < 1:
+        return 1
+
     # if the number of tasks is larger than the number of primaries, clamp the number of tasks to its value
     if ntasks > number_of_all_primaries:
         return number_of_all_primaries
