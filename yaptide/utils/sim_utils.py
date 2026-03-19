@@ -114,7 +114,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
         if file_type == SimulationType.SHIELDHIT:
             first_nstat_line = next((line for line in file_lines if line.lstrip().startswith('NSTAT')), None)
             if first_nstat_line:
-                # try-catch for index out of range and int conversion esrors
+                # try-catch for index out of range and int conversion errors
                 try:
                     return int(first_nstat_line.split()[1])
                 except (IndexError, ValueError):
@@ -129,7 +129,7 @@ def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
                 # try-catch for index out of range and int conversion errors
                 try:
                     # START values are often written as floats (e.g. 50000.0)
-                    # therfore we use a float first, to avoid excepting due to ValueError
+                    # therefore we use a float first, to avoid excepting due to ValueError
                     return int(float(first_start_line.split()[1]))
                 except (IndexError, ValueError):
                     return None

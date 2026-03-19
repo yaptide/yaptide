@@ -49,9 +49,9 @@ def make_input_dict(payload_dict: dict, input_type: str) -> dict:
 def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
     """
     Function that validates ntasks value in a simulation and returns the number of tasks that the simulation should use.
-    It's used to prevents simulations with ntasks outside of range [1; primaries_count].
+    It's used to prevent simulations with ntasks outside of range [1; primaries_count].
     The ntasks value needs to be larger than 0, because you need at least a single task to run a simulation.
-    The ntasks value also needs to be smaller than the number of primaries, because a task
+    The ntasks value also needs to be less than or equal to the number of primaries, because a task
     needs at least one primary to run. If the number of tasks is larger than the number of primaries
     then some tasks would have 0 primaries in them, which will make the simulation crash.
 
