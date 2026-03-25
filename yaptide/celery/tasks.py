@@ -116,9 +116,9 @@ def run_single_simulation(self,
     # finally return from the celery task, returning the estimators and stdout/stderr as result
     # the estimators will be merged by subsequent celery task
     return {
-        "estimators": estimators, 
-        "simulation_id": simulation_id, 
-        "update_key": update_key, 
+        "estimators": estimators,
+        "simulation_id": simulation_id,
+        "update_key": update_key,
         "task_state": EntityState.COMPLETED.value
     }
 
@@ -236,6 +236,7 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
     return results
 
 
+# skipcq:  PY-R1000
 @celery_app.task
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
@@ -259,7 +260,8 @@ def merge_results(results: list[dict]) -> dict:
             logfiles.update(result["logfiles"])
             continue
 
-    # send logfiles to the backend before averaging the estimators, as they may contain useful information about the simulation failure
+    # send logfiles to the backend before averaging the estimators, as they may contain useful 
+    # information about the simulation failure
     if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
             simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
         final_result["logfiles"] = logfiles
@@ -267,11 +269,7 @@ def merge_results(results: list[dict]) -> dict:
     # if no task completed set the job state as failed
     if not any(result["task_state"] == EntityState.COMPLETED.value for result in results):
         if simulation_id and update_key:
-            dict_to_send = {
-                "sim_id": simulation_id,
-                "job_state": EntityState.FAILED.value,
-                "update_key": update_key
-            }
+            dict_to_send = {"sim_id": simulation_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
             post_update(dict_to_send)
         logging.info("No tasks have completed for simulation %s, setting job state as FAILED", simulation_id)
         return final_result
