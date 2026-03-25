@@ -236,8 +236,8 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
     return results
 
 
-# skipcq:  PY-R1000
 @celery_app.task
+# skipcq:  PY-R1000
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
@@ -260,7 +260,7 @@ def merge_results(results: list[dict]) -> dict:
             logfiles.update(result["logfiles"])
             continue
 
-    # send logfiles to the backend before averaging the estimators, as they may contain useful 
+    # send logfiles to the backend before averaging the estimators, as they may contain useful
     # information about the simulation failure
     if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
             simulation_id=simulation_id, update_key=update_key, logfiles=logfiles):
