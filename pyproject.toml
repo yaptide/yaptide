@@ -46,11 +46,8 @@ requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 # Tooling configuration
-[tool.yapf]
-based_on_style = "pep8"
-column_limit = 120
+[tool.ruff]
+line-length = 120
 
-[tool.yapfignore]
-ignore_patterns = [
-  ".venv/**"
-]
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["F401", "F811"]
