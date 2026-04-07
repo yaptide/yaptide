@@ -13,6 +13,7 @@ from yaptide.utils.sim_utils import adjust_primaries_for_fluka_files
     ],
 )
 def test_adjust_primaries_for_fluka_files(start_line: str, tasks: int, expected: str):
+    """Test that primary particles are correctly adjusted for FLUKA input files."""
     payload_files_dict = {"input_files": {"fluka.inp": f"{start_line}\n"}}
     expected = f"{expected}\n"
 
