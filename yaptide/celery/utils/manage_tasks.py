@@ -8,31 +8,32 @@ from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 
 
-def run_job(files_dict: dict,
-            update_key: str,
-            simulation_id: int,
-            ntasks: int,
-            celery_ids: list,
-            sim_type: str = 'shieldhit') -> str:
+def run_job(
+    files_dict: dict, update_key: str, simulation_id: int, ntasks: int, celery_ids: list, sim_type: str = "shieldhit"
+) -> str:
     """Runs asynchronous simulation job"""
     logging.debug("Starting run_simulation task for %d tasks", ntasks)
     logging.debug("Simulation id: %d", simulation_id)
     logging.debug("Update key: %s", update_key)
-    map_group = group([
-        run_single_simulation.s(
-            files_dict=files_dict,  # simulation input, keys: filenames, values: file contents
-            task_id=i,
-            update_key=update_key,
-            simulation_id=simulation_id,
-            sim_type=sim_type).set(task_id=celery_ids[i]) for i in range(ntasks)
-    ])
+    map_group = group(
+        [
+            run_single_simulation.s(
+                files_dict=files_dict,  # simulation input, keys: filenames, values: file contents
+                task_id=i,
+                update_key=update_key,
+                simulation_id=simulation_id,
+                sim_type=sim_type,
+            ).set(task_id=celery_ids[i])
+            for i in range(ntasks)
+        ]
+    )
 
     # By setup of simulation_worker all tasks from yaptide.celery.tasks are directed to simulations queue
     # For tests to work: putting signature as second task in chord requires specifying queue
     workflow = chord(
         map_group,
-        chain(set_merging_queued_state.s().set(queue="simulations"),
-              merge_results.s().set(queue="simulations")))
+        chain(set_merging_queued_state.s().set(queue="simulations"), merge_results.s().set(queue="simulations")),
+    )
     job: AsyncResult = workflow.delay()
 
     return job.id
@@ -59,7 +60,7 @@ def get_job_status(merge_id: str, celery_ids: list[str]) -> dict:
     """
     result = {
         "merge": get_task_status(merge_id, "job_state"),
-        "tasks": [get_task_status(job_id, "task_state") for job_id in celery_ids]
+        "tasks": [get_task_status(job_id, "task_state") for job_id in celery_ids],
     }
 
     return result

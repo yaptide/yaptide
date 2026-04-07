@@ -12,9 +12,11 @@ def terminate_unfinished_tasks(simulation_id: int):
         previous_number_of_tasks = number_of_tasks
         sleep(1)
         number_of_tasks = get_tasks_from_celery(simulation_id)
-    celery_app.control.revoke([celery_pair['celery_id'] for celery_pair in get_tasks_from_celery(simulation_id)],
-                              terminate=True,
-                              signal="SIGINT")
+    celery_app.control.revoke(
+        [celery_pair["celery_id"] for celery_pair in get_tasks_from_celery(simulation_id)],
+        terminate=True,
+        signal="SIGINT",
+    )
 
 
 def get_tasks_from_celery(simulation_id: int):
@@ -25,14 +27,14 @@ def get_tasks_from_celery(simulation_id: int):
     while retry_treshold > 0:
         # Sometimes celery_app.control is None
         try:
-            for simulation in celery_app.control.inspect().active(
-            )['celery@yaptide-simulation-worker'] + celery_app.control.inspect().reserved(
-            )['celery@yaptide-simulation-worker']:
-                if simulation['kwargs']['simulation_id'] == simulation_id:
-                    simulation_task_ids.append({
-                        "celery_id": simulation['id'],
-                        "task_id": simulation['kwargs']['task_id']
-                    })
+            for simulation in (
+                celery_app.control.inspect().active()["celery@yaptide-simulation-worker"]
+                + celery_app.control.inspect().reserved()["celery@yaptide-simulation-worker"]
+            ):
+                if simulation["kwargs"]["simulation_id"] == simulation_id:
+                    simulation_task_ids.append(
+                        {"celery_id": simulation["id"], "task_id": simulation["kwargs"]["task_id"]}
+                    )
             break
         except Exception:
             retry_treshold -= 1

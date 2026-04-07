@@ -8,28 +8,49 @@ from flask import Flask
 from yaptide.routes.user_routes import DEFAULT_PAGE_SIZE
 
 # skipcq: PY-W2000
-from celery.contrib.pytest import celery_app, celery_worker, celery_config, celery_enable_logging, celery_parameters, use_celery_app_trap, celery_includes, celery_worker_pool
+from celery.contrib.pytest import (
+    celery_app,
+    celery_worker,
+    celery_config,
+    celery_enable_logging,
+    celery_parameters,
+    use_celery_app_trap,
+    celery_includes,
+    celery_worker_pool,
+)
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_username: str, db_good_password: str,
-                          small_simulation_payload: dict, add_simulators_to_path_variable, shieldhit_binary_installed):
+def test_list_simulations(
+    celery_app,
+    celery_worker,
+    client: Flask,
+    db_good_username: str,
+    db_good_password: str,
+    small_simulation_payload: dict,
+    add_simulators_to_path_variable,
+    shieldhit_binary_installed,
+):
     """Test we can run simulations"""
-    client.put("/auth/register",
-               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-               content_type='application/json')
-    resp = client.post("/auth/login",
-                       data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-                       content_type='application/json')
+    client.put(
+        "/auth/register",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
+    resp = client.post(
+        "/auth/login",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
 
     assert resp.status_code == 202  # skipcq: BAN-B101
-    assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
+    assert resp.headers["Set-Cookie"]  # skipcq: BAN-B101
 
     logging.info("Sending multiple job submition requests on /jobs/direct endpoint to test pagination")
     # by default we have 6 simulations per page, therefore we need to send 7 to test pagination
     number_of_simulations = 7
     for _ in range(number_of_simulations):
-        resp = client.post("/jobs/direct", data=json.dumps(small_simulation_payload), content_type='application/json')
+        resp = client.post("/jobs/direct", data=json.dumps(small_simulation_payload), content_type="application/json")
 
         assert resp.status_code == 202  # skipcq: BAN-B101
         data = json.loads(resp.data.decode())
@@ -45,7 +66,7 @@ def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_user
     for item in data["simulations"]:
         logging.info(item["start_time"])
     # check if we get expected keys in the response
-    assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
+    assert {"message", "simulations_count", "simulations", "page_count"} == set(data.keys())
     # check if we get expected total number of simulations in the response
     assert data["simulations_count"] == number_of_simulations
     # check if we get expected number of pages in the response
@@ -66,19 +87,16 @@ def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_user
 
     # check first page with 3 items out of 7
     page_size = 3
-    resp = client.get("/user/simulations",
-                      query_string={
-                          "page_size": page_size,
-                          "page_idx": 1,
-                          "order_by": "start_time",
-                          "order_type": "descend"
-                      })
+    resp = client.get(
+        "/user/simulations",
+        query_string={"page_size": page_size, "page_idx": 1, "order_by": "start_time", "order_type": "descend"},
+    )
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     logging.info("descending order, page 1")
     for item in data["simulations"]:
         logging.info(item["start_time"])
-    assert {'message', 'simulations_count', 'simulations', 'page_count'} == set(data.keys())
+    assert {"message", "simulations_count", "simulations", "page_count"} == set(data.keys())
     assert data["simulations_count"] == number_of_simulations
     assert data["page_count"] == 3
     assert len(data["simulations"]) == page_size
@@ -86,13 +104,10 @@ def test_list_simulations(celery_app, celery_worker, client: Flask, db_good_user
     assert data["simulations"][1]["start_time"] == start_time_of_second_newest_simulation
 
     # check second page with 1 item out of 7, not different ordering
-    resp = client.get("/user/simulations",
-                      query_string={
-                          "page_size": page_size,
-                          "page_idx": 3,
-                          "order_by": "start_time",
-                          "order_type": "ascend"
-                      })
+    resp = client.get(
+        "/user/simulations",
+        query_string={"page_size": page_size, "page_idx": 3, "order_by": "start_time", "order_type": "ascend"},
+    )
     assert resp.status_code == 200  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
     logging.info("ascending order, page 3")

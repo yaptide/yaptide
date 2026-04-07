@@ -5,9 +5,22 @@ from sqlalchemy import and_
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
-from yaptide.persistence.models import (BatchSimulationModel, BatchTaskModel, CelerySimulationModel, CeleryTaskModel,
-                                        ClusterModel, EstimatorModel, InputModel, KeycloakUserModel, LogfilesModel,
-                                        PageModel, SimulationModel, TaskModel, UserModel, YaptideUserModel)
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    BatchTaskModel,
+    CelerySimulationModel,
+    CeleryTaskModel,
+    ClusterModel,
+    EstimatorModel,
+    InputModel,
+    KeycloakUserModel,
+    LogfilesModel,
+    PageModel,
+    SimulationModel,
+    TaskModel,
+    UserModel,
+    YaptideUserModel,
+)
 
 
 def add_object_to_db(obj: db.Model, make_commit: bool = True) -> None:
@@ -130,9 +143,10 @@ def fetch_estimator_names_by_job_id(job_id: int) -> Optional[list[str]]:
     simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
     if not simulation_id:
         return None
-    estimator_names_tuples = db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).order_by(
-        EstimatorModel.id).all()
-    estimator_names = [name for (name, ) in estimator_names_tuples]
+    estimator_names_tuples = (
+        db.session.query(EstimatorModel.name).filter_by(simulation_id=simulation_id).order_by(EstimatorModel.id).all()
+    )
+    estimator_names = [name for (name,) in estimator_names_tuples]
     return estimator_names
 
 
@@ -168,16 +182,22 @@ def fetch_page_by_est_id_and_page_number(est_id: int, page_number: int) -> PageM
 
 def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> PageModel:
     """Fetches page by estimator id and page number"""
-    pages = db.session.query(PageModel).filter(
-        and_(PageModel.estimator_id == est_id, PageModel.page_number.in_(page_numbers))).all()
+    pages = (
+        db.session.query(PageModel)
+        .filter(and_(PageModel.estimator_id == est_id, PageModel.page_number.in_(page_numbers)))
+        .all()
+    )
     return pages
 
 
 def fetch_pages_metadata_by_est_id(est_id: str) -> EstimatorModel:
     """Fetches estimator by simulation id and estimator name, sorted by page number"""
-    pages_metadata = db.session.query(PageModel.page_number, PageModel.page_name,
-                                      PageModel.page_dimension).filter_by(estimator_id=est_id).order_by(
-                                          PageModel.page_number).all()
+    pages_metadata = (
+        db.session.query(PageModel.page_number, PageModel.page_name, PageModel.page_dimension)
+        .filter_by(estimator_id=est_id)
+        .order_by(PageModel.page_number)
+        .all()
+    )
     return pages_metadata
 
 

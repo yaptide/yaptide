@@ -12,9 +12,9 @@ _Keycloak_Token_Expiration_Time = 30  # minutes
 _Simulation_Token_Expiration_time = 10080  # minutes
 
 
-def encode_auth_token(user_id: int,
-                      is_refresh: bool = False,
-                      is_keycloak: bool = False) -> tuple[Union[str, Exception], datetime]:  # skipcq: FLK-E101
+def encode_auth_token(
+    user_id: int, is_refresh: bool = False, is_keycloak: bool = False
+) -> tuple[Union[str, Exception], datetime]:  # skipcq: FLK-E101
     """Function encoding the token"""
     if is_refresh:
         secret = SECRET_KEY_TOKEN_REFRESH
@@ -29,11 +29,11 @@ def encode_auth_token(user_id: int,
         # For a description of the payload fields, take look
         # at JSON Web Token RFC https://datatracker.ietf.org/doc/html/rfc7519
         payload = {
-            'exp': exp,  # Token Expiration Time
-            'iat': datetime.utcnow(),  # Issued At Time
-            'sub': str(user_id)  # Subject
+            "exp": exp,  # Token Expiration Time
+            "iat": datetime.utcnow(),  # Issued At Time
+            "sub": str(user_id),  # Subject
         }
-        return jwt.encode(payload, secret, algorithm='HS256'), exp
+        return jwt.encode(payload, secret, algorithm="HS256"), exp
     except Exception as e:  # skipcq: PYL-W0703
         return e, exp
 
@@ -44,11 +44,11 @@ def encode_simulation_auth_token(simulation_id: int):
     exp = datetime.utcnow() + timedelta(minutes=_Simulation_Token_Expiration_time)
     try:
         payload = {
-            'exp': exp,  # Token Expiration Time
-            'iat': datetime.utcnow(),  # Issued At Time
-            'simulation_id': str(simulation_id)  # Subject
+            "exp": exp,  # Token Expiration Time
+            "iat": datetime.utcnow(),  # Issued At Time
+            "simulation_id": str(simulation_id),  # Subject
         }
-        return jwt.encode(payload, secret, algorithm='HS256')
+        return jwt.encode(payload, secret, algorithm="HS256")
     except Exception as e:  # skipcq: PYL-W0703
         return e, exp
 
@@ -61,9 +61,9 @@ def decode_auth_token(token: str, is_refresh: bool = False, payload_key_to_retur
         secret = SECRET_KEY_TOKEN
 
     try:
-        payload = jwt.decode(token, secret, algorithms=['HS256'])
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
         return int(payload[payload_key_to_return])
     except jwt.ExpiredSignatureError:
-        return 'Signature expired.'
+        return "Signature expired."
     except jwt.InvalidTokenError:
-        return 'Invalid token.'
+        return "Invalid token."
