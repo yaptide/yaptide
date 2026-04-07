@@ -16,7 +16,7 @@ services:
       driver: gelf
       options:
         gelf-address: "udp://127.0.0.1:12201"
-        
+
   elasticsearch:
     container_name: yaptide_elasticsearch
     restart: unless-stopped
@@ -30,8 +30,8 @@ services:
     container_name: yaptide_logstash
     restart: unless-stopped
     image: docker.elastic.co/logstash/logstash:8.12.0
-    command: >
-      bash -c "echo 'input { gelf { port => 12201 } } output { elasticsearch { hosts => [\"http://elasticsearch:9200\"] index => \"yaptide-%{+YYYY.MM.dd}\" } }' > /usr/share/logstash/pipeline/logstash.conf && /usr/share/logstash/bin/logstash"
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
     ports:
       - "127.0.0.1:12201:12201/udp"
 
