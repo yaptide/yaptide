@@ -285,8 +285,8 @@ def merge_results(results: list[dict]) -> dict:
         }
         post_update(dict_to_send)
     for i, result in enumerate(
-        r for r in results 
-        if r.get("task_state") == EntityState.COMPLETED.value 
+        r for r in results
+        if r.get("task_state") == EntityState.COMPLETED.value
         and "estimators" in r
     ):
         if averaged_estimators is None:
