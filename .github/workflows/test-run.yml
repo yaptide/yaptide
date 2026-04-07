@@ -59,7 +59,7 @@ jobs:
           poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
         timeout-minutes: 1
 
-    
+
       - name: Get demo simulator for Windows
         if: matrix.platform == 'windows-latest'
         run: |
@@ -120,7 +120,7 @@ jobs:
           poetry run pytest --reruns 3 --reruns-delay 5
 
       - name: Run main tests on Windows
-        if: matrix.platform == 'windows-latest' 
+        if: matrix.platform == 'windows-latest'
         run: poetry run pytest --reruns 3 --reruns-delay 5 -k "not test_run_simulation_with_flask and not test_run_simulation_with_flask_crashing"
 
 

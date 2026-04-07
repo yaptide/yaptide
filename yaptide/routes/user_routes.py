@@ -9,8 +9,8 @@ from sqlalchemy import asc, desc
 
 from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import (error_validation_response, yaptide_response)
-from yaptide.persistence.db_methods import (delete_object_from_db, fetch_simulation_by_job_id)
+from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
+from yaptide.persistence.db_methods import delete_object_from_db, fetch_simulation_by_job_id
 from yaptide.utils.enums import EntityState
 
 DEFAULT_PAGE_SIZE = 6  # default number of simulations per page
@@ -34,7 +34,7 @@ class OrderBy(Enum):
 def validate_job_state(states: List[str]):
     """check if all states are correct values of EntityState enum"""
     if not set(states).issubset({es.value for es in EntityState}):
-        raise ValidationError('Invalid job state')
+        raise ValidationError("Invalid job state")
 
 
 class JobStateField(fields.Field):
@@ -43,7 +43,7 @@ class JobStateField(fields.Field):
     @staticmethod
     def _deserialize(value, attr, data, **kwargs):
         """deserializes job_state, which is expected to come as comma-separated list of states"""
-        return value.split(',') if isinstance(value, str) else []
+        return value.split(",") if isinstance(value, str) else []
 
 
 class UserSimulations(Resource):
@@ -69,42 +69,39 @@ class UserSimulations(Resource):
         """Method returning simulations from the database"""
         schema = UserSimulations.GetAPIParametersSchema()
         params_dict: dict = schema.load(request.args)
-        logging.info('User %s requested simulations with parameters: %s', user.username, params_dict)
+        logging.info("User %s requested simulations with parameters: %s", user.username, params_dict)
 
         # Query the database for the paginated results
-        sorting = desc if params_dict['order_type'] == OrderType.DESCEND.value else asc
-        query = SimulationModel.query.\
-            filter(SimulationModel.job_id != None).\
-            filter_by(user_id=user.id)
-        if len(params_dict['job_state']) > 0:
-            query = query.filter(SimulationModel.job_state.in_(params_dict['job_state']))
-        query = query.order_by(sorting(params_dict['order_by']))
-        pagination = query.paginate(page=params_dict['page_idx'], per_page=params_dict['page_size'], error_out=False)
+        sorting = desc if params_dict["order_type"] == OrderType.DESCEND.value else asc
+        query = SimulationModel.query.filter(SimulationModel.job_id != None).filter_by(user_id=user.id)  # noqa: E711
+        if len(params_dict["job_state"]) > 0:
+            query = query.filter(SimulationModel.job_state.in_(params_dict["job_state"]))
+        query = query.order_by(sorting(params_dict["order_by"]))
+        pagination = query.paginate(page=params_dict["page_idx"], per_page=params_dict["page_size"], error_out=False)
         simulations = pagination.items
 
         result = {
-            'simulations': [
+            "simulations": [
                 {
-                    'title': simulation.title,
-                    'job_id': simulation.job_id,
-                    'start_time': simulation.start_time,
+                    "title": simulation.title,
+                    "job_id": simulation.job_id,
+                    "start_time": simulation.start_time,
                     # submission time, when user send the request to the backend - jobs may start much later than that
-                    'end_time': simulation.end_time,
+                    "end_time": simulation.end_time,
                     # end time, when the all jobs are finished and results are merged
-                    'metadata': {
-                        'platform': simulation.platform,
-                        'server': 'Yaptide',
-                        'input_type': simulation.input_type,
-                        'sim_type': simulation.sim_type
-                    }
-                } for simulation in simulations
+                    "metadata": {
+                        "platform": simulation.platform,
+                        "server": "Yaptide",
+                        "input_type": simulation.input_type,
+                        "sim_type": simulation.sim_type,
+                    },
+                }
+                for simulation in simulations
             ],
-            'page_count':
-            pagination.pages,
-            'simulations_count':
-            pagination.total,
+            "page_count": pagination.pages,
+            "simulations_count": pagination.total,
         }
-        return yaptide_response(message='User Simulations', code=200, content=result)
+        return yaptide_response(message="User Simulations", code=200, content=result)
 
     @staticmethod
     @requires_auth()
@@ -116,24 +113,27 @@ class UserSimulations(Resource):
             return error_validation_response(content=errors)
         params_dict: dict = schema.load(request.args)
 
-        job_id = params_dict['job_id']
+        job_id = params_dict["job_id"]
         simulation = fetch_simulation_by_job_id(job_id)
 
         if simulation is None:
-            return yaptide_response(message=f'Simulation with job_id={job_id} do not exist', code=404)
+            return yaptide_response(message=f"Simulation with job_id={job_id} do not exist", code=404)
 
         if simulation.user_id != user.id:
-            return yaptide_response(message='Unauthorized: You do not have permission to delete this simulation',
-                                    code=401)
+            return yaptide_response(
+                message="Unauthorized: You do not have permission to delete this simulation", code=401
+            )
 
         # Simulation has to be completed/cancelled before deleting it.
         if simulation.job_state in (EntityState.UNKNOWN.value, EntityState.PENDING.value, EntityState.RUNNING.value):
-            return yaptide_response(message=f'''Simulation with job_id={job_id} is currently running.
-                  Please cancel simulation or wait for it to finish''',
-                                    code=403)
+            return yaptide_response(
+                message=f"""Simulation with job_id={job_id} is currently running.
+                  Please cancel simulation or wait for it to finish""",
+                code=403,
+            )
 
         delete_object_from_db(simulation)
-        return yaptide_response(message=f'Simulation with job_id={job_id} successfully deleted from database', code=200)
+        return yaptide_response(message=f"Simulation with job_id={job_id} successfully deleted from database", code=200)
 
 
 class UserUpdate(Resource):
@@ -146,4 +146,4 @@ class UserUpdate(Resource):
         json_data: dict = request.get_json(force=True)
         if not json_data:
             return error_validation_response()
-        return yaptide_response(message=f'User {user.username} updated', code=202)
+        return yaptide_response(message=f"User {user.username} updated", code=202)

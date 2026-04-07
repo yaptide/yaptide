@@ -13,8 +13,8 @@ from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
 from pymchelper.input_output import frompattern
 
-from yaptide.batch.watcher import (COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator)
-from yaptide.celery.utils.progress.fluka_monitor import (TaskDetails, read_fluka_out_file)
+from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator
+from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
@@ -49,7 +49,8 @@ def command_to_run_shieldhit(dir_path: Path, task_id: int) -> list[str]:
         input_path=dir_path,  # skipcq: PYL-W0612 # usefull
         simulator_type=SimulatorType.shieldhit,
         simulator_exec_path=None,  # useless, we guess from PATH
-        cmdline_opts="")  # useless, we could use -q in the future
+        cmdline_opts="",
+    )  # useless, we could use -q in the future
     # last part of task_id gives an integer seed for random number generator
     settings.set_rng_seed(task_id)
     command_as_list = str(settings).split()
@@ -118,12 +119,9 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
     command_stdout: str = ""
     command_stderr: str = ""
     try:
-        completed_process = subprocess.run(command_as_list,
-                                           check=True,
-                                           cwd=str(dir_path),
-                                           stdout=subprocess.PIPE,
-                                           stderr=subprocess.PIPE,
-                                           text=True)
+        completed_process = subprocess.run(
+            command_as_list, check=True, cwd=str(dir_path), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+        )
         logging.info("simulation subprocess with return code %d finished", completed_process.returncode)
 
         # Capture stdout and stderr
@@ -138,8 +136,9 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
     except subprocess.CalledProcessError as e:
         process_exit_success = False
         # If the command exits with a non-zero status
-        logging.error("Command Error: %sSTD OUT: %s\nExecuted Command: %s", e.stderr, e.stdout,
-                      " ".join(command_as_list))
+        logging.error(
+            "Command Error: %sSTD OUT: %s\nExecuted Command: %s", e.stderr, e.stdout, " ".join(command_as_list)
+        )
     except Exception as e:  # skipcq: PYL-W0703
         process_exit_success = False
         logging.error("Exception while running simulation: %s", e)
@@ -183,28 +182,40 @@ def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_
         for page_i, page_dict in enumerate(estimator_dict["pages"]):
             # check if page numbers are the same and if not, find matching page's index in base_list
             if page_dict["metadata"]["page_number"] != base_list[est_i]["pages"][page_i]["metadata"]["page_number"]:
-                page_i = next((i for i, item in enumerate(base_list[est_i]["pages"])
-                               if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]), None)
+                page_i = next(
+                    (
+                        i
+                        for i, item in enumerate(base_list[est_i]["pages"])
+                        if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]
+                    ),
+                    None,
+                )
 
             base_list[est_i]["pages"][page_i]["data"]["values"] = average_values(
-                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count)
+                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count
+            )
 
-            logging.debug("Averaged page %s with %d elements", page_dict["metadata"]["page_number"],
-                          len(page_dict["data"]["values"]))
+            logging.debug(
+                "Averaged page %s with %d elements",
+                page_dict["metadata"]["page_number"],
+                len(page_dict["data"]["values"]),
+            )
     return base_list
 
 
 # skipcq:  PY-R1000
-def read_shieldhit_file(event: threading.Event,
-                        filepath: Path,
-                        simulation_id: int,
-                        task_id: int,
-                        update_key: str,
-                        max_wait_for_file_seconds: float = 20,
-                        max_idle_seconds: float = 5 * 60,
-                        update_interval_seconds: float = 2,
-                        polling_interval_seconds: float = 1,
-                        logging_level: int = logging.WARNING):
+def read_shieldhit_file(
+    event: threading.Event,
+    filepath: Path,
+    simulation_id: int,
+    task_id: int,
+    update_key: str,
+    max_wait_for_file_seconds: float = 20,
+    max_idle_seconds: float = 5 * 60,
+    update_interval_seconds: float = 2,
+    polling_interval_seconds: float = 1,
+    logging_level: int = logging.WARNING,
+):
     """
     Monitors log file of a shieldhit task, when new line with message matching regex appears, sends update to backend
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
@@ -253,10 +264,9 @@ def read_shieldhit_file(event: threading.Event,
 
         # create generator which waits for new lines in log file
         # if no new line appears in max_idle_seconds, generator stops
-        loglines = log_generator(logfile,
-                                 event,
-                                 max_idle_seconds=max_idle_seconds,
-                                 polling_interval_seconds=polling_interval_seconds)
+        loglines = log_generator(
+            logfile, event, max_idle_seconds=max_idle_seconds, polling_interval_seconds=polling_interval_seconds
+        )
         requested_primaries = 0
         logging.info("Parsing log file for task %d started", task_id)
         simulated_primaries = 0
@@ -267,16 +277,19 @@ def read_shieldhit_file(event: threading.Event,
             utc_now = datetime.utcnow()
             logging.debug("Parsing line: %s", line.rstrip())
             if re.search(RUN_MATCH, line):
-                logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath,
-                              task_id)
+                logging.debug(
+                    "Found RUN_MATCH in line: %s for file: %s and task: %d ", line.rstrip(), filepath, task_id
+                )
                 splitted = line.split()
                 try:
                     simulated_primaries = int(splitted[3])
                 except (IndexError, ValueError):
                     logging.error("Cannot parse number of simulated primaries in line: %s", line.rstrip())
-                if (utc_now.timestamp() - last_update_timestamp_seconds <
-                        update_interval_seconds  # do not send update too often
-                        and requested_primaries >= simulated_primaries):
+                if (
+                    utc_now.timestamp() - last_update_timestamp_seconds
+                    < update_interval_seconds  # do not send update too often
+                    and requested_primaries >= simulated_primaries
+                ):
                     logging.debug("Skipping update for task %d", task_id)
                     continue
                 last_update_timestamp_seconds = utc_now.timestamp()
@@ -298,7 +311,7 @@ def read_shieldhit_file(event: threading.Event,
                 up_dict = {
                     "simulated_primaries": 0,
                     "start_time": utc_now.isoformat(sep=" "),
-                    "task_state": EntityState.RUNNING.value
+                    "task_state": EntityState.RUNNING.value,
                 }
                 logging.debug("Sending update for task %d", task_id)
                 send_task_update(simulation_id, task_id, update_key, up_dict)
@@ -308,15 +321,17 @@ def read_shieldhit_file(event: threading.Event,
                 up_dict = {
                     "simulated_primaries": simulated_primaries,
                     "end_time": utc_now.isoformat(sep=" "),
-                    "task_state": EntityState.COMPLETED.value
+                    "task_state": EntityState.COMPLETED.value,
                 }
                 logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
                 send_task_update(simulation_id, task_id, update_key, up_dict)
                 return
 
         if not event.is_set():
-            raise RuntimeError(f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
-                               f"This should never happen.")
+            raise RuntimeError(
+                f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
+                f"This should never happen."
+            )
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
@@ -330,16 +345,18 @@ def read_shieldhit_file(event: threading.Event,
             logfile.close()
 
 
-def read_fluka_file(event: threading.Event,
-                    dirpath: Path,
-                    simulation_id: int,
-                    task_id: int,
-                    update_key: str,
-                    max_wait_for_file_seconds: float = 20,
-                    max_idle_seconds: float = 5 * 60,
-                    update_interval_seconds: float = 2,
-                    polling_interval_seconds: float = 1,
-                    logging_level: int = logging.WARNING):
+def read_fluka_file(
+    event: threading.Event,
+    dirpath: Path,
+    simulation_id: int,
+    task_id: int,
+    update_key: str,
+    max_wait_for_file_seconds: float = 20,
+    max_idle_seconds: float = 5 * 60,
+    update_interval_seconds: float = 2,
+    polling_interval_seconds: float = 1,
+    logging_level: int = logging.WARNING,
+):
     """
     Monitors log file of a fluka task, when new line with message matching regex appears, sends update to backend
     The purpose of the updates is the progress bar update and state updates (like simulation failed or completed).
@@ -397,16 +414,17 @@ def read_fluka_file(event: threading.Event,
 
         # create generator which waits for new lines in log file
         # if no new line appears in max_idle_seconds, generator stops
-        loglines = log_generator(logfile,
-                                 event,
-                                 max_idle_seconds=max_idle_seconds,
-                                 polling_interval_seconds=polling_interval_seconds)
+        loglines = log_generator(
+            logfile, event, max_idle_seconds=max_idle_seconds, polling_interval_seconds=polling_interval_seconds
+        )
         logging.info("Parsing log file for task %d started", task_id)
-        read_fluka_out_file(event,
-                            loglines,
-                            update_interval_seconds=update_interval_seconds,
-                            details=TaskDetails(simulation_id, task_id, update_key),
-                            verbose=logging_level <= logging.INFO)
+        read_fluka_out_file(
+            event,
+            loglines,
+            update_interval_seconds=update_interval_seconds,
+            details=TaskDetails(simulation_id, task_id, update_key),
+            verbose=logging_level <= logging.INFO,
+        )
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
@@ -425,7 +443,7 @@ def read_file_offline(filepath: Path) -> tuple[int, int]:
     simulated_primaries = 0
     requested_primaries = 0
     try:
-        with open(filepath, 'r') as f:
+        with open(filepath, "r") as f:
             for line in f:
                 logging.debug("Parsing line: %s", line.rstrip())
                 if re.search(RUN_MATCH, line):

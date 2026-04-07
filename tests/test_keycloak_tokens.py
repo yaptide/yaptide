@@ -10,7 +10,7 @@ def keycloak_environment(monkeypatch):
     monkeypatch.setenv("KEYCLOAK_REALM", "yaptide")
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def token() -> str:
     """
     Keycloak dummy token, constructed using https://jwt.io site

@@ -36,7 +36,7 @@ Filter
 Output
     Filename z_profile.bdo
     Geo CylZ_Mesh
-    Quantity DoseGy 
+    Quantity DoseGy
     Quantity Fluence Protons
     Quantity Fluence Primaries
     Quantity Fluence Secondary_protons
@@ -44,7 +44,7 @@ Output
 Output
     Filename yz_profile.bdo
     Geo YZ_Mesh
-    Quantity DoseGy 
+    Quantity DoseGy
     Quantity Fluence Protons
     Quantity Fluence Secondary_protons
 
@@ -57,7 +57,7 @@ Output
     Quantity dLET Protons
     Quantity tLET Protons
     Quantity Fluence Protons
-    Diff1 0 160 640 
+    Diff1 0 160 640
     Diff1Type E
 
 Output
@@ -69,5 +69,5 @@ Output
     Quantity dLET Protons
     Quantity tLET Protons
     Quantity Fluence Protons
-    Diff1 0 160 640 
+    Diff1 0 160 640
     Diff1Type E

@@ -10,7 +10,7 @@ from yaptide.routes.main_routes import initialize_routes
 
 def create_app():
     """Function starting Flask Server"""
-    flask_name = __name__.split('.')[0]
+    flask_name = __name__.split(".")[0]
     app = Flask(flask_name)
     app.logger.info("Creating Flask app %s", flask_name)
 
@@ -25,17 +25,14 @@ def create_app():
     for item in app.config.items():
         app.logger.debug("Flask config variable: %s", item)
 
-    if app.config.get('USE_CORS'):
+    if app.config.get("USE_CORS"):
         app.logger.info("enabling cors")
         from flask_cors import CORS
+
         cors_config = {
             "origins": ["http://127.0.0.1:3000", "http://localhost:3000"],
             "supports_credentials": True,
-            "resources": {
-                r"/*": {
-                    "origins": ["http://127.0.0.1:3000", "http://localhost:3000"]
-                }
-            },
+            "resources": {r"/*": {"origins": ["http://127.0.0.1:3000", "http://localhost:3000"]}},
             "allow_headers": ["Content-Type", "Authorization"],
             "expose_headers": ["Access-Control-Allow-Origin"],
             "send_wildcard": False,
