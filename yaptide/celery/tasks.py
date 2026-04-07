@@ -253,9 +253,9 @@ def merge_results(results: list[dict]) -> dict:
     logfiles = {}
     for i, result in enumerate(results):
         if simulation_id is None:
-            simulation_id = result.pop("simulation_id", None)
+            simulation_id = result.get("simulation_id", None)
         if update_key is None:
-            update_key = result.pop("update_key", None)
+            update_key = result.get("update_key", None)
         if "logfiles" in result:
             logfiles.update(result["logfiles"])
             continue
