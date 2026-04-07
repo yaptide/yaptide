@@ -267,7 +267,7 @@ def merge_results(results: list[dict]) -> dict:
         final_result["logfiles"] = logfiles
 
     # if no task completed set the job state as failed
-    if not any(result["task_state"] == EntityState.COMPLETED.value for result in results):
+    if not any(result.get("task_state") == EntityState.COMPLETED.value for result in results):
         if simulation_id and update_key:
             dict_to_send = {"sim_id": simulation_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
             post_update(dict_to_send)
@@ -284,13 +284,17 @@ def merge_results(results: list[dict]) -> dict:
             "update_key": update_key
         }
         post_update(dict_to_send)
-    for i, result in enumerate(results):
+    for i, result in enumerate(
+        r for r in results 
+        if r.get("task_state") == EntityState.COMPLETED.value 
+        and "estimators" in r
+    ):
         if averaged_estimators is None:
-            averaged_estimators: list[dict] = result.get("estimators", [])
+            averaged_estimators: list[dict] = result["estimators"]
             # There is nothing to average yet
             continue
 
-        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
+        averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
 
     if averaged_estimators:
         # send results to the backend and mark whole simulation as completed
