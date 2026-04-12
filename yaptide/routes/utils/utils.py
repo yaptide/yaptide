@@ -12,10 +12,10 @@ def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool,
     simulation = fetch_simulation_by_job_id(job_id=job_id)
 
     if not simulation:
-        return False, 'Job with provided ID does not exist', 404
+        return False, "Job with provided ID does not exist", 404
     if simulation.user_id == user.id:
         return True, "", 200
-    return False, 'Job with provided ID does not belong to the user', 403
+    return False, "Job with provided ID does not belong to the user", 403
 
 
 def determine_input_type(payload_dict: dict) -> Optional[str]:
@@ -74,8 +74,10 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
 
     # if we couldn't get the total number of primaries, fall back to the original ntasks value
     if number_of_all_primaries is None:
-        logging.warning("Could not determine the total number of primaries from the payload.\
-                         Therefore we cannot validate the ntasks value. Using the received value without validation.")
+        logging.warning(
+            "Could not determine the total number of primaries from the payload.\
+                         Therefore we cannot validate the ntasks value. Using the received value without validation."
+        )
         return ntasks
 
     # if number of all primaries is less than 1, fall back to 1 task
@@ -86,11 +88,14 @@ def get_clamped_ntasks_value(payload_dict: dict, ntasks: int) -> int:
 
     # if the number of tasks is larger than the number of primaries, clamp the number of tasks to its value
     if ntasks > number_of_all_primaries:
-        logging.warning("The received ntasks value is %d and the determined number of all primaries is %d.\
+        logging.warning(
+            "The received ntasks value is %d and the determined number of all primaries is %d.\
                          To avoid simulation crashing by having tasks with 0 primaries, the number of tasks\
                          should be less than or equal to the number of all primaries.\
                          Clamping ntasks value to the number of all primaries.",
-                        ntasks, number_of_all_primaries)
+            ntasks,
+            number_of_all_primaries,
+        )
         return number_of_all_primaries
 
     # if ntasks is within range, return the original value

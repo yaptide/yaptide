@@ -4,12 +4,14 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, ValidationError, fields
 
-from yaptide.persistence.db_methods import (add_object_to_db,
-                                            fetch_yaptide_user_by_username)
+from yaptide.persistence.db_methods import add_object_to_db, fetch_yaptide_user_by_username
 from yaptide.persistence.models import YaptideUserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import (  # skipcq: FLK-E101
-    error_internal_response, error_validation_response, yaptide_response)
+    error_internal_response,
+    error_validation_response,
+    yaptide_response,
+)
 from yaptide.routes.utils.tokens import encode_auth_token
 
 
@@ -30,22 +32,22 @@ class AuthRegister(Resource):
         except ValidationError:
             return error_validation_response()
 
-        user = fetch_yaptide_user_by_username(username=json_data.get('username'))
+        user = fetch_yaptide_user_by_username(username=json_data.get("username"))
 
         if not user:
             try:
-                user = YaptideUserModel(username=json_data.get('username'))
-                user.set_password(json_data.get('password'))
+                user = YaptideUserModel(username=json_data.get("username"))
+                user.set_password(json_data.get("password"))
 
                 add_object_to_db(user)
 
-                return yaptide_response(message='User created', code=201)
+                return yaptide_response(message="User created", code=201)
 
             except Exception as e:  # skipcq: PYL-W0703
                 logging.error("%s", e)
                 return error_internal_response()
         else:
-            return yaptide_response(message='User existing', code=403)
+            return yaptide_response(message="User existing", code=403)
 
 
 class AuthLogIn(Resource):
@@ -65,26 +67,26 @@ class AuthLogIn(Resource):
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         try:
-            user: YaptideUserModel = fetch_yaptide_user_by_username(username=payload_dict['username'])
+            user: YaptideUserModel = fetch_yaptide_user_by_username(username=payload_dict["username"])
             if not user:
-                return yaptide_response(message='Invalid login or password', code=401)
+                return yaptide_response(message="Invalid login or password", code=401)
 
-            if not user.check_password(password=payload_dict['password']):
-                return yaptide_response(message='Invalid login or password', code=401)
+            if not user.check_password(password=payload_dict["password"]):
+                return yaptide_response(message="Invalid login or password", code=401)
 
             access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
             refresh_token, refresh_exp = encode_auth_token(user_id=user.id, is_refresh=True)
 
             resp = yaptide_response(
-                message='Successfully logged in',
+                message="Successfully logged in",
                 code=202,
                 content={
-                    'access_exp': int(access_exp.timestamp()*1000),
-                    'refresh_exp': int(refresh_exp.timestamp()*1000),
-                }
+                    "access_exp": int(access_exp.timestamp() * 1000),
+                    "refresh_exp": int(refresh_exp.timestamp() * 1000),
+                },
             )
-            resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
-            resp.set_cookie('refresh_token', refresh_token, httponly=True, samesite='Lax', expires=refresh_exp)
+            resp.set_cookie("access_token", access_token, httponly=True, samesite="Lax", expires=access_exp)
+            resp.set_cookie("refresh_token", refresh_token, httponly=True, samesite="Lax", expires=refresh_exp)
             return resp
         except Exception as e:  # skipcq: PYL-W0703
             logging.error("%s", e)
@@ -100,11 +102,9 @@ class AuthRefresh(Resource):
         """Method refreshing token"""
         access_token, access_exp = encode_auth_token(user_id=user.id, is_refresh=False)
         resp = yaptide_response(
-            message='User refreshed',
-            code=200,
-            content={'access_exp': int(access_exp.timestamp()*1000)}
+            message="User refreshed", code=200, content={"access_exp": int(access_exp.timestamp() * 1000)}
         )
-        resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
+        resp.set_cookie("access_token", access_token, httponly=True, samesite="Lax", expires=access_exp)
         return resp
 
 
@@ -115,11 +115,7 @@ class AuthStatus(Resource):
     @requires_auth()
     def get(user: YaptideUserModel):
         """Method returning user's status"""
-        return yaptide_response(
-            message='User status',
-            code=200,
-            content={'username': user.username}
-        )
+        return yaptide_response(message="User status", code=200, content={"username": user.username})
 
 
 class AuthLogOut(Resource):
@@ -128,7 +124,7 @@ class AuthLogOut(Resource):
     @staticmethod
     def delete():
         """Method logging the user out"""
-        resp = yaptide_response(message='User logged out', code=200)
-        resp.delete_cookie('access_token')
-        resp.delete_cookie('refresh_token')
+        resp = yaptide_response(message="User logged out", code=200)
+        resp.delete_cookie("access_token")
+        resp.delete_cookie("refresh_token")
         return resp

@@ -56,7 +56,7 @@ def time_now_utc() -> datetime:
 
 def utc_without_offset(utc: datetime) -> str:
     """Function returning current time in UTC timezone."""
-    return utc.strftime('%Y-%m-%d %H:%M:%S.%f')
+    return utc.strftime("%Y-%m-%d %H:%M:%S.%f")
 
 
 @dataclass
@@ -68,8 +68,9 @@ class ProgressDetails:
     last_update_timestamp_seconds: float = 0
 
 
-def check_progress(line: str, update_interval_seconds: float, details: TaskDetails,
-                   progress_details: ProgressDetails) -> bool:
+def check_progress(
+    line: str, update_interval_seconds: float, details: TaskDetails, progress_details: ProgressDetails
+) -> bool:
     """
     Function checking if the line contains progress information and sending update if needed.
 
@@ -92,13 +93,15 @@ def check_progress(line: str, update_interval_seconds: float, details: TaskDetai
                 "simulated_primaries": progress,
                 "requested_primaries": progress_details.requested_primaries,
                 "start_time": utc_without_offset(progress_details.utc_now),
-                "task_state": EntityState.RUNNING.value
+                "task_state": EntityState.RUNNING.value,
             }
             send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
         else:
-            if (progress_details.utc_now.timestamp() - progress_details.last_update_timestamp_seconds <
-                    update_interval_seconds  # do not send update too often
-                    and progress_details.requested_primaries > progress):
+            if (
+                progress_details.utc_now.timestamp() - progress_details.last_update_timestamp_seconds
+                < update_interval_seconds  # do not send update too often
+                and progress_details.requested_primaries > progress
+            ):
                 return True
             progress_details.last_update_timestamp_seconds = progress_details.utc_now.timestamp()
             up_dict = {
@@ -109,11 +112,13 @@ def check_progress(line: str, update_interval_seconds: float, details: TaskDetai
     return False
 
 
-def read_fluka_out_file(event: threading.Event,
-                        line_iterator: Iterator[str],
-                        update_interval_seconds: float,
-                        details: TaskDetails,
-                        verbose: bool = False) -> None:
+def read_fluka_out_file(
+    event: threading.Event,
+    line_iterator: Iterator[str],
+    update_interval_seconds: float,
+    details: TaskDetails,
+    verbose: bool = False,
+) -> None:
     """
     Function reading the fluka output file and reporting progress to the backend.
 
@@ -131,10 +136,12 @@ def read_fluka_out_file(event: threading.Event,
             return
         progress_details.utc_now = time_now_utc()
         if in_progress:
-            if check_progress(line=line,
-                              update_interval_seconds=update_interval_seconds,
-                              details=details,
-                              progress_details=progress_details):
+            if check_progress(
+                line=line,
+                update_interval_seconds=update_interval_seconds,
+                details=details,
+                progress_details=progress_details,
+            ):
                 continue
             if line.startswith(S_OK_OUT_COLLECTED):
                 in_progress = False
@@ -156,13 +163,17 @@ def read_fluka_out_file(event: threading.Event,
                 up_dict = {
                     "simulated_primaries": progress_details.requested_primaries,
                     "end_time": utc_without_offset(progress_details.utc_now),
-                    "task_state": EntityState.COMPLETED.value
+                    "task_state": EntityState.COMPLETED.value,
                 }
-                logger.info("Sending final update for task %d, simulated primaries %d", details.task_id,
-                            progress_details.requested_primaries)
+                logger.info(
+                    "Sending final update for task %d, simulated primaries %d",
+                    details.task_id,
+                    progress_details.requested_primaries,
+                )
                 send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
                 return
     if not event.is_set():
         raise RuntimeError(
             f"Log stream ended without completion markers in FLUKA monitor for task {details.task_id}. "
-            f"This should never happen.")
+            f"This should never happen."
+        )

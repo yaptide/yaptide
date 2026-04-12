@@ -5,6 +5,7 @@ It is supposed to be used outside of the docker container, therefore by purpose 
 no dependency on the yaptide package. All the tables used by ORM are defined here again.
 We do not use ORM model classes here, because we do not want to import the yaptide package.
 """
+
 from enum import Enum, auto
 import os
 
@@ -30,11 +31,11 @@ class TableTypes(Enum):
 
 def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
     """Connects to the db"""
-    db_uri = os.environ.get('FLASK_SQLALCHEMY_DATABASE_URI')
+    db_uri = os.environ.get("FLASK_SQLALCHEMY_DATABASE_URI")
     if verbose > 1:
-        click.echo(f'Connecting to URI: {db_uri}')
+        click.echo(f"Connecting to URI: {db_uri}")
     if not db_uri:
-        click.echo(f'Database URI: {db_uri} not set - aborting', err=True)
+        click.echo(f"Database URI: {db_uri} not set - aborting", err=True)
         raise click.Abort()
     echo: bool = verbose > 1
     engine = db.create_engine(db_uri, echo=echo)
@@ -43,7 +44,7 @@ def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engi
         metadata = db.MetaData()
         metadata.reflect(bind=engine)
     except db.exc.OperationalError:
-        click.echo(f'Connection to db {db_uri} failed', err=True)
+        click.echo(f"Connection to db {db_uri} failed", err=True)
         raise click.Abort()
     return con, metadata, engine
 
@@ -53,7 +54,7 @@ def user_exists(name: str, auth_provider: str, users: db.Table, con) -> bool:
     stmt = db.select(users).filter_by(username=name, auth_provider=auth_provider)
     users_found = con.execute(stmt).all()
     if len(users_found) > 0:
-        click.echo(f'User: {name} exists')
+        click.echo(f"User: {name} exists")
         return True
     return False
 
@@ -64,7 +65,7 @@ def run():
 
 
 @run.command
-@click.option('-v', '--verbose', count=True)
+@click.option("-v", "--verbose", count=True)
 def list_users(verbose):
     """List users"""
     con, metadata, _ = connect_to_db(verbose=verbose)
@@ -78,24 +79,24 @@ def list_users(verbose):
 
 
 @run.command
-@click.argument('name')
-@click.option('password', '--password', default='')
-@click.option('-v', '--verbose', count=True)
+@click.argument("name")
+@click.option("password", "--password", default="")
+@click.option("-v", "--verbose", count=True)
 def add_user(name, password, verbose):
     """Add yaptide user to database"""
     con, metadata, _ = connect_to_db(verbose=verbose)
-    click.echo(f'Adding user: {name}')
+    click.echo(f"Adding user: {name}")
     if verbose > 2:
-        click.echo(f'Password: {password}')
+        click.echo(f"Password: {password}")
 
     users = metadata.tables[TableTypes.User.name]
 
     if user_exists(name=name, auth_provider="YaptideUser", users=users, con=con):
-        click.echo(f'YaptideUser: {name} already exists, aborting add')
+        click.echo(f"YaptideUser: {name} already exists, aborting add")
         raise click.Abort()
 
-    click.echo(f'YaptideUser: {name} does not exist, adding')
-    click.echo(f'Adding user: {name}')
+    click.echo(f"YaptideUser: {name} does not exist, adding")
+    click.echo(f"Adding user: {name}")
     query = db.insert(users).values(username=name, auth_provider="YaptideUser")
     result = con.execute(query)
     user_id = result.inserted_primary_key[0]
@@ -108,42 +109,44 @@ def add_user(name, password, verbose):
 
 
 @run.command
-@click.argument('name')
-@click.option('password', '--password', default='')
-@click.option('-v', '--verbose', count=True)
+@click.argument("name")
+@click.option("password", "--password", default="")
+@click.option("-v", "--verbose", count=True)
 def update_user(name, password, verbose):
     """Update user in database"""
     con, metadata, _ = connect_to_db(verbose=verbose)
-    click.echo(f'Updating user: {name}')
+    click.echo(f"Updating user: {name}")
     users = metadata.tables[TableTypes.User.name]
 
     if not user_exists(name, "YaptideUser", users, con):
-        click.echo(f'YaptideUser: {name} does not exist, aborting update')
+        click.echo(f"YaptideUser: {name} does not exist, aborting update")
         raise click.Abort()
 
     # update password
     if password:
         pwd_hash: str = generate_password_hash(password)
         yaptide_users = metadata.tables[TableTypes.YaptideUser.name]
-        stmt = db.update(yaptide_users).\
-            where(yaptide_users.c.id == users.c.id).\
-            where(users.c.username == name).\
-            where(users.c.auth_provider == "YaptideUser").\
-            values(password_hash=pwd_hash)
+        stmt = (
+            db.update(yaptide_users)
+            .where(yaptide_users.c.id == users.c.id)
+            .where(users.c.username == name)
+            .where(users.c.auth_provider == "YaptideUser")
+            .values(password_hash=pwd_hash)
+        )
         con.execute(stmt)
         con.commit()
         if verbose > 2:
-            click.echo(f'Updating password: {password}')
-    click.echo(f'Successfully updated user: {name}')
+            click.echo(f"Updating password: {password}")
+    click.echo(f"Successfully updated user: {name}")
 
 
 @run.command
-@click.argument('name')
-@click.argument('auth_provider')
+@click.argument("name")
+@click.argument("auth_provider")
 def remove_user(name, auth_provider):
     """Delete user"""
     con, metadata, _ = connect_to_db()
-    click.echo(f'Deleting user: {name}')
+    click.echo(f"Deleting user: {name}")
     users = metadata.tables[TableTypes.User.name]
 
     # abort if user does not exist
@@ -154,13 +157,13 @@ def remove_user(name, auth_provider):
     query = db.delete(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     con.execute(query)
     con.commit()
-    click.echo(f'Successfully deleted user: {name}')
+    click.echo(f"Successfully deleted user: {name}")
 
 
 @run.command
-@click.option('sim_id', '--sim_id')
-@click.option('user', '--user')
-@click.option('auth_provider', '--auth-provider')
+@click.option("sim_id", "--sim_id")
+@click.option("user", "--user")
+@click.option("auth_provider", "--auth-provider")
 def list_tasks(user, auth_provider, sim_id):
     """List tasks"""
     con, metadata, _ = connect_to_db()
@@ -179,17 +182,21 @@ def list_tasks(user, auth_provider, sim_id):
     filter_args_simulation = {}
 
     if user:
-        filter_args_user['username'] = user
+        filter_args_user["username"] = user
     if auth_provider:
-        filter_args_user['auth_provider'] = auth_provider
+        filter_args_user["auth_provider"] = auth_provider
     if sim_id:
-        filter_args_simulation['simulation_id'] = int(sim_id)
+        filter_args_simulation["simulation_id"] = int(sim_id)
 
-    stmt = db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username,
-                     tasks.c.task_state).select_from(tasks).filter_by(**filter_args_simulation).join(
-                         simulations, tasks.c.simulation_id == simulations.c.id).join(
-                             users, simulations.c.user_id == users.c.id).filter_by(**filter_args_user).order_by(
-                                 tasks.c.simulation_id, tasks.c.task_id)
+    stmt = (
+        db.select(tasks.c.simulation_id, tasks.c.task_id, users.c.username, tasks.c.task_state)
+        .select_from(tasks)
+        .filter_by(**filter_args_simulation)
+        .join(simulations, tasks.c.simulation_id == simulations.c.id)
+        .join(users, simulations.c.user_id == users.c.id)
+        .filter_by(**filter_args_user)
+        .order_by(tasks.c.simulation_id, tasks.c.task_id)
+    )
     all_tasks = con.execute(stmt).all()
 
     click.echo(f"{len(all_tasks)} tasks in DB:")
@@ -197,19 +204,19 @@ def list_tasks(user, auth_provider, sim_id):
         simulation_id_col = f"Simulation id {task.simulation_id}"
         task_id_col = f"Task id ...{task.task_id}"
         task_state_col = f"task_state {task.task_state}"
-        user_col = f" username {task.username}" if not user else ''
+        user_col = f" username {task.username}" if not user else ""
 
-        click.echo('; '.join((simulation_id_col, task_id_col, task_state_col, user_col)))
+        click.echo("; ".join((simulation_id_col, task_id_col, task_state_col, user_col)))
 
 
 @run.command
-@click.argument('simulation_id')
-@click.argument('task_id')
-@click.option('-v', '--verbose', count=True)
+@click.argument("simulation_id")
+@click.argument("task_id")
+@click.option("-v", "--verbose", count=True)
 def remove_task(simulation_id, task_id, verbose):
     """Delete task"""
     con, metadata, _ = connect_to_db(verbose=verbose)
-    click.echo(f'Deleting task: {task_id} from simulation: {simulation_id}')
+    click.echo(f"Deleting task: {task_id} from simulation: {simulation_id}")
     tasks = metadata.tables[TableTypes.Task.name]
     simulation_id = int(simulation_id)
     task_id = int(task_id)
@@ -223,13 +230,13 @@ def remove_task(simulation_id, task_id, verbose):
     query = db.delete(tasks).where(tasks.c.task_id == task_id)
     con.execute(query)
     con.commit()
-    click.echo(f'Successfully deleted task: {task_id}')
+    click.echo(f"Successfully deleted task: {task_id}")
 
 
 @run.command
-@click.option('-v', '--verbose', count=True)
-@click.option('user', '--user')
-@click.option('auth_provider', '--auth-provider')
+@click.option("-v", "--verbose", count=True)
+@click.option("user", "--user")
+@click.option("auth_provider", "--auth-provider")
 def list_simulations(verbose, user, auth_provider):
     """List simulations"""
     con, metadata, _ = connect_to_db(verbose=verbose)
@@ -246,31 +253,37 @@ def list_simulations(verbose, user, auth_provider):
     filter_args = {}
 
     if user:
-        filter_args['username'] = user
+        filter_args["username"] = user
     if auth_provider:
-        filter_args['auth_provider'] = auth_provider
+        filter_args["auth_provider"] = auth_provider
 
-    stmt = db.select(simulations.c.id, simulations.c.job_id, simulations.c.start_time,
-                     simulations.c.end_time, users.c.username).select_from(simulations).join(
-                         users, simulations.c.user_id == users.c.id).filter_by(**filter_args)
+    stmt = (
+        db.select(
+            simulations.c.id, simulations.c.job_id, simulations.c.start_time, simulations.c.end_time, users.c.username
+        )
+        .select_from(simulations)
+        .join(users, simulations.c.user_id == users.c.id)
+        .filter_by(**filter_args)
+    )
     sims = con.execute(stmt).all()
 
     click.echo(f"{len(sims)} simulations in DB:")
-    user_column = ''
+    user_column = ""
     for sim in sims:
-        user_column = f" username {sim.username}" if not user else ''
+        user_column = f" username {sim.username}" if not user else ""
         click.echo(
-            f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};{user_column}")
+            f"id {sim.id}; job id {sim.job_id}; start_time {sim.start_time}; end_time {sim.end_time};{user_column}"
+        )
 
 
 @run.command
-@click.argument('simulation_id')
-@click.option('-v', '--verbose', count=True)
+@click.argument("simulation_id")
+@click.option("-v", "--verbose", count=True)
 def remove_simulation(simulation_id, verbose):
     """Delete simulation"""
     simulation_id = int(simulation_id)
     con, metadata, _ = connect_to_db(verbose=verbose)
-    click.echo(f'Deleting simulation: {simulation_id}')
+    click.echo(f"Deleting simulation: {simulation_id}")
     simulations = metadata.tables[TableTypes.Simulation.name]
 
     stmt = db.select(simulations).filter_by(id=simulation_id)
@@ -283,12 +296,12 @@ def remove_simulation(simulation_id, verbose):
 
     con.execute(query)
     con.commit()
-    click.echo(f'Successfully deleted simulation: {simulation_id}')
+    click.echo(f"Successfully deleted simulation: {simulation_id}")
 
 
 @run.command
-@click.argument('cluster_name')
-@click.option('-v', '--verbose', count=True)
+@click.argument("cluster_name")
+@click.option("-v", "--verbose", count=True)
 def add_cluster(cluster_name, verbose):
     """Adds cluster with provided name to database if it does not exist"""
     con, metadata, _ = connect_to_db(verbose=verbose)
