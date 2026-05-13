@@ -70,3 +70,33 @@ def send_simulation_logfiles(simulation_id: int, update_key: str, logfiles: dict
         logging.warning("Saving logfiles failed: %s", res.json()["message"])
         return False
     return True
+
+
+def send_partial_results(simulation_id: int, update_key: str, estimators: list, tasks_completed: int) -> bool:
+    """
+    Sends partial (intermediate) simulation results to Flask backend.
+
+    Called after each task completes to push the latest merged partial results.
+    The backend will upsert estimators and pages in the database.
+
+    Returns True if successful, False otherwise.
+    """
+    flask_url = os.environ.get("BACKEND_INTERNAL_URL")
+    if not flask_url:
+        logging.warning("Flask URL not found via BACKEND_INTERNAL_URL")
+        return False
+    if not update_key:
+        logging.warning("Update key not found, skipping partial results update")
+        return False
+    dict_to_send = {
+        "simulation_id": simulation_id,
+        "update_key": update_key,
+        "estimators": estimators,
+        "tasks_completed": tasks_completed,
+    }
+    logging.info("Sending partial results (%d tasks merged) to flask via %s", tasks_completed, flask_url)
+    res: requests.Response = requests.Session().post(url=f"{flask_url}/results/partial", json=dict_to_send)
+    if res.status_code != 202:
+        logging.warning("Saving partial results failed: %s", res.json().get("message"))
+        return False
+    return True

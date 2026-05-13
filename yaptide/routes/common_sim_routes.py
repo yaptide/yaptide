@@ -68,6 +68,11 @@ class JobsResource(Resource):
         job_tasks_status = [task.get_status_dict() for task in tasks]
         job_tasks_status = sorted(job_tasks_status, key=lambda x: x["task_id"])
 
+        from yaptide.celery.utils.redis_storage import get_partial_result_count
+
+        partial_count = get_partial_result_count(simulation.id)
+        partial_results_available = partial_count > 0
+
         if simulation.job_state in (
             EntityState.COMPLETED.value,
             EntityState.FAILED.value,
@@ -80,6 +85,7 @@ class JobsResource(Resource):
                 content={
                     "job_state": simulation.job_state,
                     "job_tasks_status": job_tasks_status,
+                    "partial_results_available": partial_results_available,
                 },
             )
 
@@ -97,6 +103,7 @@ class JobsResource(Resource):
         update_simulation_state(simulation=simulation, update_dict=job_info)
 
         job_info["job_tasks_status"] = job_tasks_status
+        job_info["partial_results_available"] = partial_results_available
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
@@ -201,6 +208,116 @@ def parse_page_numbers(param: str) -> List[int]:
         else:
             pages.add(int(part))
     return sorted(pages)
+
+
+class PartialResultsResource(Resource):
+    """Class responsible for managing partial (intermediate) simulation results"""
+
+    @staticmethod
+    @requires_auth()
+    def get(user: UserModel):
+        """
+        Method for retrieving merged partial results as an Arrow stream.
+        """
+        job_id = request.args.get("job_id")
+        if not job_id:
+            return yaptide_response(message="Missing job_id parameter", code=400)
+
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+
+        simulation = fetch_simulation_by_job_id(job_id=job_id)
+        if not simulation:
+            return yaptide_response(message="Simulation does not exist", code=404)
+
+        from flask import Response
+        from yaptide.celery.utils.arrow_serialization import arrow_ipc_to_estimators, estimators_to_arrow_ipc
+        from yaptide.celery.utils.pymc import average_estimators
+        from yaptide.celery.utils.redis_storage import get_all_partial_results
+
+        partial_results = get_all_partial_results(simulation.id)
+        if not partial_results:
+            return yaptide_response(message="No partial results available", code=404)
+
+        logging.info("Merging %d partial results for simulation %d (GET)", len(partial_results), simulation.id)
+
+        # Deserialize the first task's result as the base
+        _, first_ipc = partial_results[0]
+        merged_estimators = arrow_ipc_to_estimators(first_ipc)
+
+        # Incrementally average in remaining tasks
+        for i, (_, ipc_bytes) in enumerate(partial_results[1:], start=1):
+            task_estimators = arrow_ipc_to_estimators(ipc_bytes)
+            merged_estimators = average_estimators(merged_estimators, task_estimators, i)
+
+        # Serialize back to Arrow IPC
+        final_ipc_bytes = estimators_to_arrow_ipc(merged_estimators)
+
+        return Response(
+            final_ipc_bytes,
+            mimetype="application/vnd.apache.arrow.stream",
+            headers={"Content-Disposition": f"attachment; filename=partial_{job_id}.arrow"},
+        )
+
+    @staticmethod
+    def post():
+        """
+        Method for saving partial results pushed from celery workers.
+        Called after each task completes with the latest merged estimator data.
+        Uses upsert logic: creates estimators/pages if they don't exist, updates if they do.
+        Does NOT mark the simulation as completed.
+        Structure required by this method to work properly:
+        {
+            "simulation_id": <int>,
+            "update_key": <string>,
+            "estimators": <list>,
+            "tasks_completed": <int>
+        }
+        """
+        payload_dict: dict = request.get_json(force=True)
+        required_keys = {"simulation_id", "update_key", "estimators", "tasks_completed"}
+        if not required_keys.issubset(set(payload_dict.keys())):
+            diff = required_keys.difference(set(payload_dict.keys()))
+            return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
+
+        sim_id = payload_dict["simulation_id"]
+        simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
+
+        if not simulation:
+            return yaptide_response(message="Simulation does not exist", code=400)
+
+        decoded_token = decode_auth_token(payload_dict["update_key"], payload_key_to_return="simulation_id")
+        if decoded_token != sim_id:
+            return yaptide_response(message="Invalid update key", code=400)
+
+        tasks_completed = payload_dict["tasks_completed"]
+        logging.info(
+            "Saving partial results for simulation %d (%d tasks merged)",
+            sim_id,
+            tasks_completed,
+        )
+
+        # Upsert estimators
+        for estimator_dict in payload_dict["estimators"]:
+            prepare_create_or_update_estimator_in_db(
+                sim_id=simulation.id, name=estimator_dict["name"], estimator_dict=estimator_dict
+            )
+
+        # commit estimators
+        make_commit_to_db()
+
+        # Upsert pages
+        for estimator_dict in payload_dict["estimators"]:
+            prepare_create_or_update_pages_in_db(sim_id=simulation.id, estimator_dict=estimator_dict)
+
+        # commit pages
+        make_commit_to_db()
+
+        return yaptide_response(
+            message=f"Partial results saved ({tasks_completed} tasks merged)",
+            code=202,
+        )
 
 
 class ResultsResource(Resource):

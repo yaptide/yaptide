@@ -8,6 +8,7 @@ import threading
 from typing import Optional
 
 from yaptide.batch.batch_methods import post_update
+from yaptide.celery.utils.arrow_serialization import arrow_ipc_to_estimators, estimators_to_arrow_ipc
 from yaptide.celery.utils.pymc import (
     average_estimators,
     command_to_run_fluka,
@@ -20,7 +21,17 @@ from yaptide.celery.utils.pymc import (
     read_file_offline,
     read_fluka_file,
 )
-from yaptide.celery.utils.requests import send_simulation_logfiles, send_simulation_results, send_task_update
+from yaptide.celery.utils.redis_storage import (
+    cleanup_partial_results,
+    get_all_partial_results,
+    store_partial_result,
+)
+from yaptide.celery.utils.requests import (
+    send_simulation_logfiles,
+    send_simulation_results,
+    send_partial_results,
+    send_task_update,
+)
 from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import (
@@ -129,9 +140,45 @@ def run_single_simulation(
     }
     send_task_update(simulation_id, task_id, update_key, update_dict)
 
+    # Store partial result in Redis and push merged partial results to backend
+    if simulation_id and estimators:
+        try:
+            ipc_bytes = estimators_to_arrow_ipc(estimators)
+            store_partial_result(simulation_id, task_id, ipc_bytes)
+            merge_and_send_partial_results(simulation_id, update_key)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Failed to store/send partial results for task %d", task_id)
+
     # finally return from the celery task, returning the estimators and stdout/stderr as result
     # the estimators will be merged by subsequent celery task
     return {"estimators": estimators, "simulation_id": simulation_id, "update_key": update_key}
+
+
+def merge_and_send_partial_results(simulation_id: int, update_key: str) -> None:
+    """Merge all available partial results from Redis and push to backend."""
+    partial_results = get_all_partial_results(simulation_id)
+    if not partial_results:
+        logging.warning("No partial results found in Redis for simulation %d", simulation_id)
+        return
+
+    tasks_completed = len(partial_results)
+    logging.info("Merging %d partial results for simulation %d", tasks_completed, simulation_id)
+
+    # Deserialize the first task's result as the base
+    _, first_ipc = partial_results[0]
+    merged_estimators = arrow_ipc_to_estimators(first_ipc)
+
+    # Incrementally average in remaining tasks
+    for i, (_, ipc_bytes) in enumerate(partial_results[1:], start=1):
+        task_estimators = arrow_ipc_to_estimators(ipc_bytes)
+        merged_estimators = average_estimators(merged_estimators, task_estimators, i)
+
+    send_partial_results(
+        simulation_id=simulation_id,
+        update_key=update_key,
+        estimators=merged_estimators,
+        tasks_completed=tasks_completed,
+    )
 
 
 @dataclass
@@ -297,6 +344,13 @@ def merge_results(results: list[dict]) -> dict:
         )
         if not sending_results_ok:
             final_result["estimators"] = averaged_estimators
+
+    # Clean up partial results from Redis now that final merge is done
+    if simulation_id:
+        try:
+            cleanup_partial_results(simulation_id)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Failed to cleanup partial results for simulation %d", simulation_id)
 
     return final_result
 
