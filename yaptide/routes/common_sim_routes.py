@@ -232,7 +232,11 @@ class PartialResultsResource(Resource):
             return yaptide_response(message="Simulation does not exist", code=404)
 
         from flask import Response
-        from yaptide.celery.utils.arrow_serialization import arrow_ipc_to_estimators, estimators_to_arrow_ipc
+        from yaptide.celery.utils.arrow_serialization import (
+            arrow_ipc_to_estimators,
+            estimators_to_arrow_ipc,
+            estimator_to_arrow_ipc_stream,
+        )
         from yaptide.celery.utils.pymc import average_estimators
         from yaptide.celery.utils.redis_storage import get_all_partial_results
 
@@ -251,8 +255,14 @@ class PartialResultsResource(Resource):
             task_estimators = arrow_ipc_to_estimators(ipc_bytes)
             merged_estimators = average_estimators(merged_estimators, task_estimators, i)
 
+        yz_profile_estimator = (
+            [est for est in merged_estimators if est["name"] == "yz_profile"][0]
+            if any(est["name"] == "yz_profile" for est in merged_estimators)
+            else None
+        )
+
         # Serialize back to Arrow IPC
-        final_ipc_bytes = estimators_to_arrow_ipc(merged_estimators)
+        final_ipc_bytes = estimator_to_arrow_ipc_stream(yz_profile_estimator)
 
         return Response(
             final_ipc_bytes,

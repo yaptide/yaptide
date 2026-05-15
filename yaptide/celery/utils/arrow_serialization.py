@@ -84,6 +84,35 @@ def estimators_to_arrow_ipc(estimators: list[dict]) -> bytes:
     return output.getvalue()
 
 
+def estimator_to_arrow_ipc_stream(estimator: dict) -> bytes:
+    output = io.BytesIO()
+
+    estimator_name = estimator.get("name", "")
+    estimator_metadata = estimator.get("metadata", {})
+    batches = []
+    for page in estimator.get("pages", []):
+        batch = _page_to_record_batch(estimator_name, estimator_metadata, page)
+        batches.append(batch)
+
+    if not batches:
+        return b""
+
+    # Use the schema of the first batch as the base stream schema
+    # (Works seamlessly if all pages share identical metadata key-structures)
+    stream_schema = batches[0].schema
+
+    # Open a single unified stream writer
+    with pa.ipc.new_stream(output, stream_schema) as writer:
+        for batch in batches:
+            # If schemas are completely identical, write directly
+            # If metadata values differ, we cast them to match the stream layout
+            if batch.schema != stream_schema:
+                batch = pa.RecordBatch.from_arrays(batch.columns, schema=stream_schema)
+            writer.write_batch(batch)
+
+    return output.getvalue()
+
+
 def arrow_ipc_to_estimators(data: bytes) -> list[dict]:
     """
     Deserialize Arrow IPC bytes back to a list of estimator dicts.
