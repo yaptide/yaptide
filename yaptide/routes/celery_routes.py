@@ -160,6 +160,7 @@ class JobsDirect(Resource):
         update_simulation_state(simulation=simulation, update_dict=job_info)
 
         job_info["job_tasks_status"] = job_tasks_status
+        job_info["partial_results_available"] = True  # TODO
 
         return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
 
