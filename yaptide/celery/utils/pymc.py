@@ -210,6 +210,8 @@ def read_shieldhit_file(
     simulation_id: int,
     task_id: int,
     update_key: str,
+    tmp_work_dir: Optional[Path] = None,
+    on_intermediate_estimators=None,
     max_wait_for_file_seconds: float = 20,
     max_idle_seconds: float = 5 * 60,
     update_interval_seconds: float = 2,
@@ -227,6 +229,14 @@ def read_shieldhit_file(
         simulation_id: Simulation ID.
         task_id: Task ID.
         update_key: Simulation auth token for backend updates.
+        tmp_work_dir: Optional path to the simulation working directory. When provided
+            together with ``on_intermediate_estimators``, the monitor will attempt to read
+            the current ``.bdo`` files after each progress update and forward the parsed
+            estimators to the callback.
+        on_intermediate_estimators: Optional callable ``(estimators: list, simulated_primaries: int) -> None``
+            invoked after each update-triggering RUN_MATCH line when fresh ``.bdo`` data
+            is successfully read. All exceptions raised by the callback are caught and
+            logged so that monitoring is never disrupted.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
@@ -301,6 +311,15 @@ def read_shieldhit_file(
                 up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
                 logging.debug("Sending update for task %d, simulated primaries %d", task_id, simulated_primaries)
                 send_task_update(simulation_id, task_id, update_key, up_dict)
+
+                # Attempt to read intermediate .bdo files and push partial results
+                if tmp_work_dir is not None and on_intermediate_estimators is not None and simulated_primaries > 0:
+                    try:
+                        estimators_dict = get_shieldhit_estimators(tmp_work_dir)
+                        if estimators_dict:
+                            on_intermediate_estimators(estimators_dict, simulated_primaries)
+                    except Exception:  # skipcq: PYL-W0703
+                        logging.exception("Failed to read intermediate .bdo files for task %d", task_id)
 
             elif re.search(REQUESTED_MATCH, line):
                 logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)

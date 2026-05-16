@@ -204,9 +204,34 @@ def run_single_simulation_for_shieldhit(
     simulated_primaries, requested_primaries = 0, 0
     event = threading.Event()
 
+    def on_intermediate_estimators(estimators_dict: dict, n_simulated_primaries: int) -> None:
+        """Called by the monitor thread each time fresh .bdo data is available mid-run."""
+        try:
+            estimators = estimators_to_list(estimators_dict=estimators_dict, dir_path=Path(tmp_work_dir))
+            if not estimators:
+                return
+            ipc_bytes = estimators_to_arrow_ipc(estimators)
+            store_partial_result(simulation_id, task_id, ipc_bytes)
+            merge_and_send_partial_results(simulation_id, update_key)
+            logging.info(
+                "Sent intermediate partial results for sim %d task %d (%d primaries)",
+                simulation_id,
+                task_id,
+                n_simulated_primaries,
+            )
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Failed to store/push intermediate partial result for task %d", task_id)
+
     # start monitoring process if possible
     # is None if monitoring if monitor was not started
-    task_monitor = monitor_shieldhit(event, tmp_work_dir, task_id, update_key, simulation_id)
+    task_monitor = monitor_shieldhit(
+        event,
+        tmp_work_dir,
+        task_id,
+        update_key,
+        simulation_id,
+        on_intermediate_estimators=on_intermediate_estimators if simulation_id is not None else None,
+    )
     # run the simulation
     logging.info("Running SHIELD-HIT12A process in %s", tmp_work_dir)
     process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
@@ -364,7 +389,12 @@ class MonitorTask:
 
 
 def monitor_shieldhit(
-    event: threading.Event, tmp_work_dir: str, task_id: int, update_key: str, simulation_id: str
+    event: threading.Event,
+    tmp_work_dir: str,
+    task_id: int,
+    update_key: str,
+    simulation_id: str,
+    on_intermediate_estimators=None,
 ) -> Optional[MonitorTask]:
     """Function monitoring progress of SHIELD-HIT12A simulation"""
     # we would like to monitor the progress of simulation
@@ -381,6 +411,8 @@ def monitor_shieldhit(
                 simulation_id=simulation_id,
                 task_id=task_id,
                 update_key=update_key,
+                tmp_work_dir=Path(tmp_work_dir),
+                on_intermediate_estimators=on_intermediate_estimators,
                 logging_level=current_logging_level,
             ),
         )
