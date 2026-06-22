@@ -9,7 +9,7 @@
 	"features": {
 		"ghcr.io/warrenbuckley/codespace-features/sqlite:1": {},
 		"ghcr.io/itsmechlark/features/redis-server:1": {},
-		"ghcr.io/devcontainers/features/docker-in-docker:2": {},
+		"ghcr.io/devcontainers/features/docker-in-docker:3": {},
 		"ghcr.io/devcontainers-contrib/features/poetry:2": {}
 	},
 
