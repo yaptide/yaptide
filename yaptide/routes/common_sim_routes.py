@@ -8,12 +8,24 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (
-    add_object_to_db, fetch_estimator_by_sim_id_and_est_name, fetch_estimator_by_sim_id_and_file_name,
-    fetch_estimator_id_by_sim_id_and_est_name, fetch_estimators_by_sim_id, fetch_input_by_sim_id,
-    fetch_logfiles_by_sim_id, fetch_page_by_est_id_and_page_number, fetch_pages_by_est_id_and_page_numbers,
-    fetch_pages_by_estimator_id, fetch_simulation_by_job_id, fetch_simulation_by_sim_id, fetch_simulation_id_by_job_id,
-    fetch_tasks_by_sim_id, make_commit_to_db, update_simulation_state)
-from yaptide.persistence.models import (EstimatorModel, LogfilesModel, PageModel, UserModel)
+    add_object_to_db,
+    fetch_estimator_by_sim_id_and_est_name,
+    fetch_estimator_by_sim_id_and_file_name,
+    fetch_estimator_id_by_sim_id_and_est_name,
+    fetch_estimators_by_sim_id,
+    fetch_input_by_sim_id,
+    fetch_logfiles_by_sim_id,
+    fetch_page_by_est_id_and_page_number,
+    fetch_pages_by_est_id_and_page_numbers,
+    fetch_pages_by_estimator_id,
+    fetch_simulation_by_job_id,
+    fetch_simulation_by_sim_id,
+    fetch_simulation_id_by_job_id,
+    fetch_tasks_by_sim_id,
+    make_commit_to_db,
+    update_simulation_state,
+)
+from yaptide.persistence.models import EstimatorModel, LogfilesModel, PageModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
@@ -40,30 +52,36 @@ class JobsResource(Resource):
         param_dict: dict = schema.load(request.args)
 
         # get job_id from request parameters and check if user owns this job
-        job_id = param_dict['job_id']
+        job_id = param_dict["job_id"]
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
         simulation = fetch_simulation_by_job_id(job_id=job_id)
         if simulation.job_state == EntityState.UNKNOWN.value:
-            return yaptide_response(message="Job state is unknown",
-                                    code=200,
-                                    content={"job_state": simulation.job_state})
+            return yaptide_response(
+                message="Job state is unknown", code=200, content={"job_state": simulation.job_state}
+            )
 
         tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
         job_tasks_status = sorted(job_tasks_status, key=lambda x: x["task_id"])
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value,
-                                    EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value):
-            return yaptide_response(message=f"Job state: {simulation.job_state}",
-                                    code=200,
-                                    content={
-                                        "job_state": simulation.job_state,
-                                        "job_tasks_status": job_tasks_status,
-                                    })
+        if simulation.job_state in (
+            EntityState.COMPLETED.value,
+            EntityState.FAILED.value,
+            EntityState.MERGING_QUEUED.value,
+            EntityState.MERGING_RUNNING.value,
+        ):
+            return yaptide_response(
+                message=f"Job state: {simulation.job_state}",
+                code=200,
+                content={
+                    "job_state": simulation.job_state,
+                    "job_tasks_status": job_tasks_status,
+                },
+            )
 
         job_info = {"job_state": simulation.job_state}
         status_counter = Counter([task["task_state"] for task in job_tasks_status])
@@ -116,9 +134,9 @@ def get_single_estimator(sim_id: int, estimator_name: str):
 
     pages = fetch_pages_by_estimator_id(est_id=estimator.id)
     estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
-    return yaptide_response(message=f"Estimator '{estimator_name}' for simulation: {sim_id}",
-                            code=200,
-                            content=estimator_dict)
+    return yaptide_response(
+        message=f"Estimator '{estimator_name}' for simulation: {sim_id}", code=200, content=estimator_dict
+    )
 
 
 def get_all_estimators(sim_id: int):
@@ -133,12 +151,12 @@ def get_all_estimators(sim_id: int):
         estimator_dict = {
             "metadata": estimator.data,
             "name": estimator.name,
-            "pages": [page.data for page in estimator.pages]
+            "pages": [page.data for page in estimator.pages],
         }
         result_estimators.append(estimator_dict)
-    return yaptide_response(message=f"Results for simulation: {sim_id}",
-                            code=200,
-                            content={"estimators": result_estimators})
+    return yaptide_response(
+        message=f"Results for simulation: {sim_id}", code=200, content={"estimators": result_estimators}
+    )
 
 
 def prepare_create_or_update_estimator_in_db(sim_id: int, name: str, estimator_dict: dict):
@@ -155,14 +173,17 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
     """Prepares page objects for insertion or update without committing to the database"""
     estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
     for page_dict in estimator_dict["pages"]:
-        page = fetch_page_by_est_id_and_page_number(est_id=estimator.id,
-                                                    page_number=int(page_dict["metadata"]["page_number"]))
+        page = fetch_page_by_est_id_and_page_number(
+            est_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])
+        )
         page_existed = bool(page)
         if not page_existed:
-            page = PageModel(page_number=int(page_dict["metadata"]["page_number"]),
-                             estimator_id=estimator.id,
-                             page_dimension=int(page_dict['dimensions']),
-                             page_name=str(page_dict["metadata"]["name"]))
+            page = PageModel(
+                page_number=int(page_dict["metadata"]["page_number"]),
+                estimator_id=estimator.id,
+                page_dimension=int(page_dict["dimensions"]),
+                page_name=str(page_dict["metadata"]["name"]),
+            )
         # we always update the data
         page.data = page_dict
         if not page_existed:
@@ -173,9 +194,9 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
 def parse_page_numbers(param: str) -> List[int]:
     """Parses string of page ranges (e.g., '1-3,5') and returns a sorted list of page numbers"""
     pages = set()
-    for part in param.split(','):
-        if '-' in part:
-            start, end = map(int, part.split('-'))
+    for part in param.split(","):
+        if "-" in part:
+            start, end = map(int, part.split("-"))
             pages.update(range(start, end + 1))
         else:
             pages.add(int(part))
@@ -223,9 +244,9 @@ class ResultsResource(Resource):
                 prepare_create_or_update_estimator_in_db(sim_id=simulation.id, name=name, estimator_dict=estimator_dict)
         elif simulation.input_type == InputType.FILES.value:
             for estimator_dict in payload_dict["estimators"]:
-                prepare_create_or_update_estimator_in_db(sim_id=simulation.id,
-                                                         name=estimator_dict["name"],
-                                                         estimator_dict=estimator_dict)
+                prepare_create_or_update_estimator_in_db(
+                    sim_id=simulation.id, name=estimator_dict["name"], estimator_dict=estimator_dict
+                )
 
         # commit estimators
         make_commit_to_db()
@@ -267,10 +288,10 @@ class ResultsResource(Resource):
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
 
-        job_id = param_dict['job_id']
-        estimator_name = param_dict['estimator_name']
-        page_number = param_dict.get('page_number')
-        page_numbers = param_dict.get('page_numbers')
+        job_id = param_dict["job_id"]
+        estimator_name = param_dict["estimator_name"]
+        page_number = param_dict.get("page_number")
+        page_numbers = param_dict.get("page_numbers")
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -318,7 +339,7 @@ class InputsResource(Resource):
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
-        job_id = param_dict['job_id']
+        job_id = param_dict["job_id"]
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -383,7 +404,7 @@ class LogfilesResource(Resource):
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
 
-        job_id = param_dict['job_id']
+        job_id = param_dict["job_id"]
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)

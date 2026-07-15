@@ -59,7 +59,7 @@ jobs:
           poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
         timeout-minutes: 1
 
-    
+
       - name: Get demo simulator for Windows
         if: matrix.platform == 'windows-latest'
         run: |
@@ -67,7 +67,7 @@ jobs:
         timeout-minutes: 2
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
@@ -81,7 +81,7 @@ jobs:
       POETRY_VIRTUALENVS_CREATE: false
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12']
+        python-version: ['3.10', '3.11', '3.12']
         platform: ['ubuntu-latest']
         include:
           - python-version: '3.12'
@@ -97,7 +97,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Download simulators
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
@@ -120,7 +120,7 @@ jobs:
           poetry run pytest --reruns 3 --reruns-delay 5
 
       - name: Run main tests on Windows
-        if: matrix.platform == 'windows-latest' 
+        if: matrix.platform == 'windows-latest'
         run: poetry run pytest --reruns 3 --reruns-delay 5 -k "not test_run_simulation_with_flask and not test_run_simulation_with_flask_crashing"
 
 
@@ -148,7 +148,7 @@ jobs:
         run: curl https://deepsource.io/cli | sh
 
       - name: Download simulators
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: simulators-ubuntu-latest
           path: bin/

@@ -10,6 +10,7 @@ import json
 
 @pytest.fixture(scope="function")
 def setup_data(db_session: scoped_session, db_good_username: str, db_good_password: str, client):
+    """Set up test data including a user and simulations in various states."""
     # Create user
     user = YaptideUserModel(username=db_good_username)
     user.set_password(db_good_password)
@@ -20,27 +21,33 @@ def setup_data(db_session: scoped_session, db_good_username: str, db_good_passwo
     assert user.check_password(db_good_password)
 
     # Login user
-    resp = client.post("/auth/login",
-                       data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-                       content_type='application/json')
+    resp = client.post(
+        "/auth/login",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
     data = json.loads(resp.data.decode())
-    assert {'refresh_exp', 'access_exp', 'message'} == set(data.keys())
+    assert {"refresh_exp", "access_exp", "message"} == set(data.keys())
     assert resp.status_code == 202
-    assert resp.headers['Set-Cookie']
+    assert resp.headers["Set-Cookie"]
 
     # Create simulation
-    simulation_completed = CelerySimulationModel(job_id='test_job_completed',
-                                                 user_id=user.id,
-                                                 input_type=InputType.EDITOR.value,
-                                                 sim_type=SimulationType.SHIELDHIT.value,
-                                                 title='testtitle',
-                                                 job_state=EntityState.COMPLETED.value)
-    simulation_pending = CelerySimulationModel(job_id='test_job_pending',
-                                               user_id=user.id,
-                                               input_type=InputType.EDITOR.value,
-                                               sim_type=SimulationType.SHIELDHIT.value,
-                                               title='testtitle',
-                                               job_state=EntityState.PENDING.value)
+    simulation_completed = CelerySimulationModel(
+        job_id="test_job_completed",
+        user_id=user.id,
+        input_type=InputType.EDITOR.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        title="testtitle",
+        job_state=EntityState.COMPLETED.value,
+    )
+    simulation_pending = CelerySimulationModel(
+        job_id="test_job_pending",
+        user_id=user.id,
+        input_type=InputType.EDITOR.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        title="testtitle",
+        job_state=EntityState.PENDING.value,
+    )
     db_session.add(simulation_completed)
     db_session.add(simulation_pending)
     db_session.commit()
@@ -49,6 +56,7 @@ def setup_data(db_session: scoped_session, db_good_username: str, db_good_passwo
 
 
 def test_delete_simulation_successfull(setup_data, db_session: scoped_session, client):
+    """Test that a completed simulation can be deleted successfully."""
     # Delete simulation
     response = client.delete("/user/simulations", query_string={"job_id": "test_job_completed"})
     assert response.status_code == 200
@@ -62,12 +70,14 @@ def test_delete_simulation_successfull(setup_data, db_session: scoped_session, c
 
 
 def test_delete_simulation_invalid_job_id(setup_data, client):
+    """Test that deleting a simulation with an invalid job_id returns 404."""
     # Delete simulation with an invalid job_id
     response = client.delete("/user/simulations", query_string={"job_id": "invalid_job"})
     assert response.status_code == 404
 
 
 def test_delete_simulation_invalid_state(setup_data, client):
+    """Test that deleting a simulation in PENDING state returns 403."""
     # Delete simulation with an invalid state (PENDING)
     response = client.delete("/user/simulations", query_string={"job_id": "test_job_pending"})
     assert response.status_code == 403

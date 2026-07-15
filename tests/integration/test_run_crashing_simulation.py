@@ -6,23 +6,44 @@ from time import sleep
 from flask import Flask
 
 # skipcq: PY-W2000
-from celery.contrib.pytest import celery_app, celery_worker, celery_enable_logging, celery_config, celery_parameters, use_celery_app_trap, celery_includes, celery_worker_pool
+from celery.contrib.pytest import (
+    celery_app,
+    celery_worker,
+    celery_enable_logging,
+    celery_config,
+    celery_parameters,
+    use_celery_app_trap,
+    celery_includes,
+    celery_worker_pool,
+)
 
 
 @pytest.mark.usefixtures("live_server", "live_server_win")
-def test_run_simulation_with_flask_crashing(celery_app, celery_worker, client: Flask, db_good_username: str,
-                                            db_good_password: str, payload_files_dict_data: dict, modify_tmpdir,
-                                            add_simulators_to_path_variable, shieldhit_binary_installed):
+def test_run_simulation_with_flask_crashing(
+    celery_app,
+    celery_worker,
+    client: Flask,
+    db_good_username: str,
+    db_good_password: str,
+    payload_files_dict_data: dict,
+    modify_tmpdir,
+    add_simulators_to_path_variable,
+    shieldhit_binary_installed,
+):
     """Test we can run simulations"""
-    client.put("/auth/register",
-               data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-               content_type='application/json')
-    resp = client.post("/auth/login",
-                       data=json.dumps(dict(username=db_good_username, password=db_good_password)),
-                       content_type='application/json')
+    client.put(
+        "/auth/register",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
+    resp = client.post(
+        "/auth/login",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
 
     assert resp.status_code == 202  # skipcq: BAN-B101
-    assert resp.headers['Set-Cookie']  # skipcq: BAN-B101
+    assert resp.headers["Set-Cookie"]  # skipcq: BAN-B101
 
     # lets make a local copy of the payload dict, so we don't modify the original one
     payload_dict_with_broken_input = copy.deepcopy(payload_files_dict_data)
@@ -30,7 +51,7 @@ def test_run_simulation_with_flask_crashing(celery_app, celery_worker, client: F
     payload_dict_with_broken_input["input_files"]["mat.dat"] = ""
 
     logging.info("Sending job submition request on /jobs/direct endpoint")
-    resp = client.post("/jobs/direct", data=json.dumps(payload_dict_with_broken_input), content_type='application/json')
+    resp = client.post("/jobs/direct", data=json.dumps(payload_dict_with_broken_input), content_type="application/json")
 
     assert resp.status_code == 202  # skipcq: BAN-B101
     data = json.loads(resp.data.decode())
@@ -62,13 +83,13 @@ def test_run_simulation_with_flask_crashing(celery_app, celery_worker, client: F
         # and that there is no results, logfiles and input files here
         assert set(jobs_data.keys()) == {"message", "job_state", "job_tasks_status"}
         assert len(jobs_data["job_tasks_status"]) == payload_dict_with_broken_input["ntasks"]
-        logging.debug("Job state: %s", jobs_data['job_state'])
+        logging.debug("Job state: %s", jobs_data["job_state"])
         for i, task_status in enumerate(jobs_data["job_tasks_status"]):
             logging.info("Task %d status %s", i, task_status)
 
-        if jobs_data['job_state'] in ['COMPLETED', 'FAILED']:
-            logging.debug("Job state is %s, breaking the loop", jobs_data['job_state'])
-            assert jobs_data['job_state'] == 'FAILED'
+        if jobs_data["job_state"] in ["COMPLETED", "FAILED"]:
+            logging.debug("Job state is %s, breaking the loop", jobs_data["job_state"])
+            assert jobs_data["job_state"] == "FAILED"
             break
         sleep(1)
 

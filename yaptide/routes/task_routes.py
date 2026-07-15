@@ -1,8 +1,11 @@
 from flask import request
 from flask_restful import Resource
 
-from yaptide.persistence.db_methods import (fetch_simulation_by_sim_id, fetch_task_by_sim_id_and_task_id,
-                                            update_task_state)
+from yaptide.persistence.db_methods import (
+    fetch_simulation_by_sim_id,
+    fetch_task_by_sim_id_and_task_id,
+    update_task_state,
+)
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.tokens import decode_auth_token
 

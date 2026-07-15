@@ -2,9 +2,12 @@ from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 
-from yaptide.persistence.db_methods import (fetch_estimators_by_sim_id, fetch_pages_metadata_by_est_id,
-                                            fetch_simulation_id_by_job_id)
-from yaptide.persistence.models import (UserModel)
+from yaptide.persistence.db_methods import (
+    fetch_estimators_by_sim_id,
+    fetch_pages_metadata_by_est_id,
+    fetch_simulation_id_by_job_id,
+)
+from yaptide.persistence.models import UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
@@ -28,7 +31,7 @@ class EstimatorResource(Resource):
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
         param_dict: dict = schema.load(request.args)
 
-        job_id = param_dict['job_id']
+        job_id = param_dict["job_id"]
 
         is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
         if not is_owned:
@@ -44,13 +47,10 @@ class EstimatorResource(Resource):
         for estimator in estimators:
             pages_metadata = fetch_pages_metadata_by_est_id(est_id=estimator.id)
             estimator_dict = {
-                "name":
-                estimator.name,
-                "pages_metadata": [{
-                    "page_number": page[0],
-                    "page_name": page[1],
-                    "page_dimension": page[2]
-                } for page in pages_metadata]
+                "name": estimator.name,
+                "pages_metadata": [
+                    {"page_number": page[0], "page_name": page[1], "page_dimension": page[2]} for page in pages_metadata
+                ],
             }
             results.append(estimator_dict)
 
