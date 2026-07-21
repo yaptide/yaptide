@@ -34,10 +34,9 @@ jobs:
         run: |
           poetry install --only main
 
-      # try downloading full version of SHIELD-HIT12A
+      # download full version of SHIELD-HIT12A from S3 (no demo/website fallback - see #1658)
       - name: Get simulators for Linux
         if: matrix.platform == 'ubuntu-latest'
-        id: get_simulators
         run: |
             poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
         timeout-minutes: 2
@@ -49,35 +48,20 @@ jobs:
           S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
-        continue-on-error: true
 
-      # fallback to demo version of SHIELD-HIT12A (from shieldhit.org, or from an S3 mirror if the
-      # website is unreachable, e.g. blocked by its browser-check firewall - see #1658)
-      - name: Get demo simulators for Linux due to timeout
-        if: matrix.platform == 'ubuntu-latest' && steps.get_simulators.outcome == 'failure'
-        run: |
-          echo "Retrying due to timeout..."
-          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
-        timeout-minutes: 1
-        env:
-          S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
-          S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
-          S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_SHIELDHIT_DEMO_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_DEMO_BUCKET }}
-          S3_SHIELDHIT_DEMO_KEY: ${{ vars.S3_LINUX_SHIELDHIT_DEMO_KEY }}
-
-
-      - name: Get demo simulator for Windows
+      - name: Get simulators for Windows
         if: matrix.platform == 'windows-latest'
         run: |
-          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
+          poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
         timeout-minutes: 2
         env:
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_SHIELDHIT_DEMO_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_DEMO_BUCKET }}
-          S3_SHIELDHIT_DEMO_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_DEMO_KEY }}
+          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
+          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
+          S3_SHIELDHIT_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_BUCKET }}
+          S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
