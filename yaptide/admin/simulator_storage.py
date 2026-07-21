@@ -1,21 +1,69 @@
 import platform
 import shutil
+import socket
 import tarfile
 import tempfile
+import time
 import zipfile
 from base64 import urlsafe_b64encode
 from enum import IntEnum, auto
 from pathlib import Path
+from urllib.parse import urlparse
 
 import boto3
 import click
 import cryptography
 import requests
 from botocore.config import Config
-from botocore.exceptions import ClientError, EndpointConnectionError, NoCredentialsError
+from botocore.exceptions import BotoCoreError, ClientError, NoCredentialsError
 from cryptography.fernet import Fernet
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+# Without explicit timeouts, a network problem (e.g. packets silently dropped by a firewall) can
+# leave boto3's default retry logic hanging well past a CI step's own timeout, which then kills the
+# process before any exception is ever raised or printed. These bound every S3 call so failures
+# surface quickly with a clear message instead of as total silence.
+S3_CONNECT_TIMEOUT_SECONDS = 10
+S3_READ_TIMEOUT_SECONDS = 30
+
+
+def _log_dns_resolution(endpoint: str) -> None:
+    """Resolve the S3 endpoint hostname and log how long it took.
+
+    Helps distinguish "DNS is slow/broken" from "TCP/TLS connect is slow/blocked" when debugging
+    network issues, since both can otherwise look identical (a plain hang).
+    """
+    hostname = urlparse(endpoint).hostname
+    if not hostname:
+        click.echo(f"Could not parse a hostname out of S3 endpoint {endpoint!r}", err=True)
+        return
+    start = time.monotonic()
+    try:
+        resolved_ips = sorted({info[4][0] for info in socket.getaddrinfo(hostname, None)})
+        click.echo(f"DNS resolution for {hostname} took {time.monotonic() - start:.2f}s -> {resolved_ips}")
+    except OSError as e:
+        click.echo(f"DNS resolution for {hostname} failed after {time.monotonic() - start:.2f}s: {e}", err=True)
+
+
+def _build_s3_client(endpoint: str, access_key: str, secret_key: str) -> boto3.client:
+    """Build a boto3 S3 client with short, explicit connect/read timeouts and limited retries"""
+    _log_dns_resolution(endpoint)
+    click.echo(
+        f"Connecting to S3 endpoint {endpoint} (connect_timeout={S3_CONNECT_TIMEOUT_SECONDS}s, "
+        f"read_timeout={S3_READ_TIMEOUT_SECONDS}s, max_attempts=2)"
+    )
+    return boto3.client(
+        "s3",
+        aws_access_key_id=access_key,
+        aws_secret_access_key=secret_key,
+        endpoint_url=endpoint,
+        config=Config(
+            connect_timeout=S3_CONNECT_TIMEOUT_SECONDS,
+            read_timeout=S3_READ_TIMEOUT_SECONDS,
+            retries={"max_attempts": 2, "mode": "standard"},
+        ),
+    )
 
 
 class SimulatorType(IntEnum):
@@ -124,17 +172,37 @@ def download_shieldhit_demo_version(destination_dir: Path) -> bool:
 
 def check_if_s3_connection_is_working(s3_client: boto3.client) -> bool:
     """Check if connection to S3 is possible"""
+    click.echo("Checking S3 connection (list_buckets)...")
+    start = time.monotonic()
     try:
-        s3_client.list_buckets()
+        response = s3_client.list_buckets()
     except NoCredentialsError as e:
-        click.echo(f"No credentials found. Check your access key and secret key. {e}", err=True)
+        click.echo(
+            f"No credentials found after {time.monotonic() - start:.2f}s. "
+            f"Check your access key and secret key. {e}",
+            err=True,
+        )
         return False
-    except EndpointConnectionError as e:
-        click.echo(f"Could not connect to the specified endpoint. {e}", err=True)
+    except BotoCoreError as e:
+        # covers connection-level failures: EndpointConnectionError, ConnectTimeoutError,
+        # ReadTimeoutError, etc. - i.e. anything that looks like a network/reachability problem
+        click.echo(
+            f"Network/connection error talking to S3 after {time.monotonic() - start:.2f}s "
+            f"({type(e).__name__}): {e}",
+            err=True,
+        )
         return False
     except ClientError as e:
-        click.echo(f"An error occurred while connecting to S3: {e.response['Error']['Message']}", err=True)
+        click.echo(
+            f"An error occurred while connecting to S3 after {time.monotonic() - start:.2f}s: "
+            f"{e.response['Error']['Message']}",
+            err=True,
+        )
         return False
+    click.echo(
+        f"S3 connection OK, found {len(response.get('Buckets', []))} bucket(s) in "
+        f"{time.monotonic() - start:.2f}s"
+    )
     return True
 
 
@@ -150,9 +218,7 @@ def download_shieldhit_from_s3(
     decrypt: bool = True,
 ) -> bool:
     """Download SHIELD-HIT12A from S3 bucket"""
-    s3_client = boto3.client(
-        "s3", aws_access_key_id=access_key, aws_secret_access_key=secret_key, endpoint_url=endpoint
-    )
+    s3_client = _build_s3_client(endpoint=endpoint, access_key=access_key, secret_key=secret_key)
 
     if not validate_connection_data(bucket=bucket, key=key, s3_client=s3_client):
         return False
@@ -460,18 +526,32 @@ def validate_connection_data(bucket: str, key: str, s3_client) -> bool:
         return False
 
     # Check if bucket exists
+    click.echo(f"Checking if bucket {bucket} exists (head_bucket)...")
+    start = time.monotonic()
     try:
         s3_client.head_bucket(Bucket=bucket)
-    except ClientError as e:
-        click.echo(f"Problem accessing bucket named {bucket}: {e}", err=True)
+    except (BotoCoreError, ClientError) as e:
+        click.echo(
+            f"Problem accessing bucket named {bucket} after {time.monotonic() - start:.2f}s "
+            f"({type(e).__name__}): {e}",
+            err=True,
+        )
         return False
+    click.echo(f"Bucket {bucket} exists ({time.monotonic() - start:.2f}s)")
 
     # Check if key exists
+    click.echo(f"Checking if key {key} exists in bucket {bucket} (head_object)...")
+    start = time.monotonic()
     try:
         s3_client.head_object(Bucket=bucket, Key=key)
-    except ClientError as e:
-        click.echo(f"Problem accessing key named {key} in bucket {bucket}: {e}", err=True)
+    except (BotoCoreError, ClientError) as e:
+        click.echo(
+            f"Problem accessing key named {key} in bucket {bucket} after {time.monotonic() - start:.2f}s "
+            f"({type(e).__name__}): {e}",
+            err=True,
+        )
         return False
+    click.echo(f"Key {key} exists in bucket {bucket} ({time.monotonic() - start:.2f}s)")
 
     return True
 
@@ -489,7 +569,9 @@ def download_file(
     try:
         with tempfile.NamedTemporaryFile() as temp_file:
             click.echo(f"Downloading {key} from {bucket} to {temp_file.name}")
+            start = time.monotonic()
             s3_client.download_fileobj(Bucket=bucket, Key=key, Fileobj=temp_file)
+            click.echo(f"Downloaded {key} in {time.monotonic() - start:.2f}s")
 
             if decrypt:
                 click.echo("Decrypting downloaded file")
@@ -506,8 +588,8 @@ def download_file(
             else:
                 click.echo(f"Copying {temp_file.name} to {destination_file_path}")
                 shutil.copy2(temp_file.name, destination_file_path)
-    except ClientError as e:
-        click.echo(f"S3 download failed with client error: {e}", err=True)
+    except (BotoCoreError, ClientError) as e:
+        click.echo(f"S3 download failed with error ({type(e).__name__}): {e}", err=True)
         return False
 
     destination_file_path.chmod(0o700)

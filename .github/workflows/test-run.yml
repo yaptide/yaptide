@@ -36,6 +36,33 @@ jobs:
         run: |
           poetry install --only main
 
+      # diagnostics for #1658/#1659 investigation: is the S3 endpoint actually reachable from this
+      # runner, and what's the runner's outbound IP (useful to check against any IP allowlisting)
+      - name: Network diagnostics for S3 endpoint
+        shell: bash
+        run: |
+          S3_HOST=$(echo "$S3_ENDPOINT" | sed -E 's#^[a-zA-Z]+://##; s#/.*$##; s#:.*$##')
+          echo "S3_ENDPOINT=$S3_ENDPOINT -> host=$S3_HOST"
+
+          echo "=== Runner outbound public IP (check this against any S3 IP allowlist) ==="
+          curl -s --max-time 10 https://api.ipify.org; echo
+          curl -s --max-time 10 https://ifconfig.me; echo
+
+          echo "=== Control check: reachability of github.com (sanity check for general egress) ==="
+          curl -sS --connect-timeout 10 --max-time 15 -o /dev/null \
+            -w "connect=%{time_connect}s tls=%{time_appconnect}s total=%{time_total}s http_code=%{http_code}\n" \
+            https://github.com/ || echo "github.com check failed with exit code $?"
+
+          echo "=== S3 endpoint TCP/TLS timing: https://$S3_HOST/ ==="
+          curl -sS --connect-timeout 10 --max-time 15 -o /dev/null \
+            -w "dns=%{time_namelookup}s connect=%{time_connect}s tls=%{time_appconnect}s ttfb=%{time_starttransfer}s total=%{time_total}s http_code=%{http_code}\n" \
+            "https://$S3_HOST/" || echo "S3 endpoint check failed with exit code $?"
+
+          echo "=== S3 endpoint verbose curl (full handshake trace) ==="
+          curl -v --connect-timeout 10 --max-time 15 -o /dev/null "https://$S3_HOST/" || echo "verbose curl exited with code $?"
+        env:
+          S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
+
       # download full version of SHIELD-HIT12A from S3 (no demo/website fallback - see #1658)
       # retried up to 3 times since the S3 endpoint occasionally stalls on GitHub-hosted runners
       - name: Get simulators for Linux
