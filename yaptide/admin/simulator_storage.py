@@ -60,6 +60,17 @@ def extract_shieldhit_from_zip(archive_path: Path, unpacking_dir: Path, member_n
                     shutil.move(local_file_path, destination_file_path)
 
 
+def _is_valid_archive(archive_path: Path) -> bool:
+    """Check magic bytes to confirm the file is a real gzip/zip archive and not e.g. an HTML error page"""
+    with open(archive_path, "rb") as file_handle:
+        header = file_handle.read(4)
+    if archive_path.suffix == ".gz":
+        return header[:2] == b"\x1f\x8b"
+    if archive_path.suffix == ".zip":
+        return header[:2] == b"PK"
+    return False
+
+
 def download_shieldhit_demo_version(destination_dir: Path) -> bool:
     """Download shieldhit demo version from shieldhit.org"""
     demo_version_url = "https://shieldhit.org/download/DEMO/shield_hit12a_x86_64_demo_gfortran_v1.1.0.tar.gz"
@@ -72,23 +83,41 @@ def download_shieldhit_demo_version(destination_dir: Path) -> bool:
     with tempfile.TemporaryDirectory() as tmpdir_name:
         click.echo(f"Downloading from {demo_version_url} to {tmpdir_name}")
         headers = {"User-Agent": "Mozilla/5.0 (Windows NT x.y; rv:10.0) Gecko/20100101 Firefox/10.0"}
-        response = requests.get(demo_version_url, headers=headers)
+        try:
+            response = requests.get(demo_version_url, headers=headers, timeout=30)
+            response.raise_for_status()
+        except requests.RequestException as e:
+            click.echo(f"Failed to download demo version from shieldhit.org: {e}", err=True)
+            return False
+
         temp_file_archive = Path(tmpdir_name) / Path(demo_version_url).name
         with open(temp_file_archive, "wb") as file_handle:
             file_handle.write(response.content)
         click.echo(f"Saved to {temp_file_archive} with size {temp_file_archive.stat().st_size} bytes")
 
+        if not _is_valid_archive(temp_file_archive):
+            click.echo(
+                "Downloaded file from shieldhit.org is not a valid archive - the website may be "
+                "blocking automated downloads (e.g. behind a browser-check firewall). Skipping.",
+                err=True,
+            )
+            return False
+
         # extract
         click.echo(f"Extracting {temp_file_archive} to {destination_dir}")
         destination_dir.mkdir(parents=True, exist_ok=True)
-        if temp_file_archive.suffix == ".gz":
-            extract_shieldhit_from_tar_gz(
-                temp_file_archive, Path(tmpdir_name), "shieldhit", destination_dir=destination_dir
-            )
-        elif temp_file_archive.suffix == ".zip":
-            extract_shieldhit_from_zip(
-                temp_file_archive, Path(tmpdir_name), "shieldhit.exe", destination_dir=destination_dir
-            )
+        try:
+            if temp_file_archive.suffix == ".gz":
+                extract_shieldhit_from_tar_gz(
+                    temp_file_archive, Path(tmpdir_name), "shieldhit", destination_dir=destination_dir
+                )
+            elif temp_file_archive.suffix == ".zip":
+                extract_shieldhit_from_zip(
+                    temp_file_archive, Path(tmpdir_name), "shieldhit.exe", destination_dir=destination_dir
+                )
+        except (tarfile.TarError, zipfile.BadZipFile) as e:
+            click.echo(f"Failed to extract demo archive: {e}", err=True)
+            return False
     return True
 
 
@@ -160,9 +189,16 @@ def download_shieldhit_from_s3_or_from_website(
     salt: str,
     bucket: str,
     key: str,
+    demo_bucket: str = "",
+    demo_key: str = "",
     decrypt: bool = True,
 ):
-    """Download SHIELD-HIT12A from S3 bucket, if not available download demo version from shieldhit.org website"""
+    """Download SHIELD-HIT12A from S3 bucket.
+
+    If that fails, fall back to the demo version from the shieldhit.org website, and if that also
+    fails (e.g. the website is blocking automated downloads), fall back to a mirrored copy of the
+    demo version stored in S3, when demo_bucket/demo_key are provided.
+    """
     download_ok = download_shieldhit_from_s3(
         destination_dir=destination_dir,
         endpoint=endpoint,
@@ -176,13 +212,37 @@ def download_shieldhit_from_s3_or_from_website(
     )
     if download_ok:
         click.echo("SHIELD-HIT12A downloaded from S3")
+        return
+
+    click.echo("SHIELD-HIT12A download failed, trying to download demo version from shieldhit.org website")
+    if download_shieldhit_demo_version(destination_dir=destination_dir):
+        click.echo("SHIELD-HIT12A demo version downloaded from shieldhit.org website")
+        return
+
+    if not demo_bucket or not demo_key:
+        click.echo(
+            "SHIELD-HIT12A demo version download failed and no S3 demo mirror (demo_bucket/demo_key) "
+            "is configured, giving up",
+            err=True,
+        )
+        return
+
+    click.echo("Demo download from shieldhit.org website failed, trying mirrored demo copy from S3")
+    demo_from_s3_ok = download_shieldhit_from_s3(
+        destination_dir=destination_dir,
+        endpoint=endpoint,
+        access_key=access_key,
+        secret_key=secret_key,
+        password="",
+        salt="",
+        bucket=demo_bucket,
+        key=demo_key,
+        decrypt=False,
+    )
+    if demo_from_s3_ok:
+        click.echo("SHIELD-HIT12A demo version downloaded from S3 mirror")
     else:
-        click.echo("SHIELD-HIT12A download failed, trying to download demo version from shieldhit.org website")
-        demo_download_ok = download_shieldhit_demo_version(destination_dir=destination_dir)
-        if demo_download_ok:
-            click.echo("SHIELD-HIT12A demo version downloaded from shieldhit.org website")
-        else:
-            click.echo("SHIELD-HIT12A demo version download failed")
+        click.echo("SHIELD-HIT12A demo version download from S3 mirror failed", err=True)
 
 
 # skipcq: PY-R1000

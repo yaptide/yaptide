@@ -30,6 +30,8 @@ password = os.getenv("S3_ENCRYPTION_PASSWORD")
 salt = os.getenv("S3_ENCRYPTION_SALT")
 shieldhit_bucket = os.getenv("S3_SHIELDHIT_BUCKET")
 shieldhit_key = os.getenv("S3_SHIELDHIT_KEY")
+shieldhit_demo_bucket = os.getenv("S3_SHIELDHIT_DEMO_BUCKET")
+shieldhit_demo_key = os.getenv("S3_SHIELDHIT_DEMO_KEY")
 topas_bucket_name = os.getenv("S3_TOPAS_BUCKET")
 topas_key = os.getenv("S3_TOPAS_KEY")
 topas_version = os.getenv("S3_TOPAS_VERSION")
@@ -239,6 +241,19 @@ def download_topas(**kwargs):
 )
 @click.option("--bucket", type=click.STRING, envvar="S3_SHIELDHIT_BUCKET", help="S3 bucket name")
 @click.option("--key", type=click.STRING, envvar="S3_SHIELDHIT_KEY", help="S3 key (filename)")
+@click.option(
+    "--demo-bucket",
+    type=click.STRING,
+    envvar="S3_SHIELDHIT_DEMO_BUCKET",
+    help="S3 bucket name with a mirrored copy of the demo version, used as a fallback if shieldhit.org "
+    "cannot be downloaded from",
+)
+@click.option(
+    "--demo-key",
+    type=click.STRING,
+    envvar="S3_SHIELDHIT_DEMO_KEY",
+    help="S3 key (filename) of the mirrored demo version",
+)
 @click.option("--decrypt", is_flag=True, default=False, help="decrypt file downloaded from S3")
 @s3credentials(required=False)
 @encryption_options(required=False)
@@ -254,6 +269,8 @@ def download_shieldhit(**kwargs):
         salt=kwargs["salt"],
         bucket=kwargs["bucket"],
         key=kwargs["key"],
+        demo_bucket=kwargs["demo_bucket"],
+        demo_key=kwargs["demo_key"],
         decrypt=kwargs["decrypt"],
     )
 
