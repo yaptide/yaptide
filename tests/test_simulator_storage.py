@@ -27,7 +27,8 @@ def test_is_valid_archive_rejects_html_error_page(tmp_path):
 
 def test_download_shieldhit_demo_version_fails_gracefully_on_non_archive_response(tmp_path):
     """If shieldhit.org returns something that isn't an archive (e.g. a WAF challenge page),
-    the function should return False instead of raising an exception"""
+    the function should return False instead of raising an exception
+    """
     fake_response = Mock()
     fake_response.content = b"<!DOCTYPE html><html>blocked by firewall</html>"
     fake_response.raise_for_status = Mock()

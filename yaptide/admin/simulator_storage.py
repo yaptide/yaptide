@@ -62,6 +62,7 @@ def extract_shieldhit_from_zip(archive_path: Path, unpacking_dir: Path, member_n
 
 def _is_valid_archive(archive_path: Path) -> bool:
     """Check magic bytes to confirm the file is a real gzip/zip archive and not e.g. an HTML error page"""
+    # skipcq: PTC-W6004
     with open(archive_path, "rb") as file_handle:
         header = file_handle.read(4)
     if archive_path.suffix == ".gz":
