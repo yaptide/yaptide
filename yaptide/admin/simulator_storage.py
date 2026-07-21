@@ -190,16 +190,9 @@ def download_shieldhit_from_s3_or_from_website(
     salt: str,
     bucket: str,
     key: str,
-    demo_bucket: str = "",
-    demo_key: str = "",
     decrypt: bool = True,
 ):
-    """Download SHIELD-HIT12A from S3 bucket.
-
-    If that fails, fall back to the demo version from the shieldhit.org website, and if that also
-    fails (e.g. the website is blocking automated downloads), fall back to a mirrored copy of the
-    demo version stored in S3, when demo_bucket/demo_key are provided.
-    """
+    """Download SHIELD-HIT12A from S3 bucket, falling back to the demo version from the shieldhit.org website"""
     download_ok = download_shieldhit_from_s3(
         destination_dir=destination_dir,
         endpoint=endpoint,
@@ -218,32 +211,8 @@ def download_shieldhit_from_s3_or_from_website(
     click.echo("SHIELD-HIT12A download failed, trying to download demo version from shieldhit.org website")
     if download_shieldhit_demo_version(destination_dir=destination_dir):
         click.echo("SHIELD-HIT12A demo version downloaded from shieldhit.org website")
-        return
-
-    if not demo_bucket or not demo_key:
-        click.echo(
-            "SHIELD-HIT12A demo version download failed and no S3 demo mirror (demo_bucket/demo_key) "
-            "is configured, giving up",
-            err=True,
-        )
-        return
-
-    click.echo("Demo download from shieldhit.org website failed, trying mirrored demo copy from S3")
-    demo_from_s3_ok = download_shieldhit_from_s3(
-        destination_dir=destination_dir,
-        endpoint=endpoint,
-        access_key=access_key,
-        secret_key=secret_key,
-        password="",
-        salt="",
-        bucket=demo_bucket,
-        key=demo_key,
-        decrypt=False,
-    )
-    if demo_from_s3_ok:
-        click.echo("SHIELD-HIT12A demo version downloaded from S3 mirror")
     else:
-        click.echo("SHIELD-HIT12A demo version download from S3 mirror failed", err=True)
+        click.echo("SHIELD-HIT12A demo version download failed", err=True)
 
 
 # skipcq: PY-R1000
