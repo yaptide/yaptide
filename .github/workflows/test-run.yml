@@ -49,17 +49,16 @@ jobs:
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_LINUX_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_LINUX_SHIELDHIT_KEY }}
 
+      # Windows S3 object is an unencrypted demo shieldhit.exe, not the encrypted full version - no --decrypt
       - name: Get simulators for Windows
         if: matrix.platform == 'windows-latest'
         run: |
-          poetry run python yaptide/admin/simulators.py download-shieldhit --decrypt --dir bin/
+          poetry run python yaptide/admin/simulators.py download-shieldhit --dir bin/
         timeout-minutes: 2
         env:
           S3_ENDPOINT: ${{ vars.S3_ENDPOINT }}
           S3_ACCESS_KEY: ${{ secrets.S3_ACCESS_KEY }}
           S3_SECRET_KEY: ${{ secrets.S3_SECRET_KEY }}
-          S3_ENCRYPTION_PASSWORD: ${{ secrets.S3_ENCRYPTION_PASSWORD }}
-          S3_ENCRYPTION_SALT: ${{ secrets.S3_ENCRYPTION_SALT }}
           S3_SHIELDHIT_BUCKET: ${{ vars.S3_WINDOWS_SHIELDHIT_BUCKET }}
           S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
 
