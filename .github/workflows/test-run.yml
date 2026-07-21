@@ -16,6 +16,8 @@ jobs:
     strategy:
       matrix:
         platform: ['ubuntu-latest', 'windows-latest']
+    # Windows S3 setup is still being finalized (see PR #1659) - don't let its failures block the workflow
+    continue-on-error: ${{ matrix.platform == 'windows-latest' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -69,11 +71,12 @@ jobs:
           S3_SHIELDHIT_KEY: ${{ vars.S3_WINDOWS_SHIELDHIT_KEY }}
 
       - name: Upload artifacts
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: simulators-${{ matrix.platform }}
           path: bin/
-          if-no-files-found: error
+          if-no-files-found: warn
           retention-days: 1
 
   build-and-test:
@@ -88,6 +91,8 @@ jobs:
         include:
           - python-version: '3.12'
             platform: 'windows-latest'
+    # Windows S3 setup is still being finalized (see PR #1659) - don't let its failures block the workflow
+    continue-on-error: ${{ matrix.platform == 'windows-latest' }}
 
     steps:
       - name: Checkout
