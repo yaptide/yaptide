@@ -161,6 +161,79 @@ def remove_user(name, auth_provider):
 
 
 @run.command
+@click.argument("username")
+@click.argument("auth_provider")
+@click.option("--private-key", "-k", default="", help="Path to private key file or the key string itself")
+@click.option("--cert", "-c", default="", help="Path to certificate file or the cert string itself")
+@click.option("-v", "--verbose", count=True)
+def set_user_key(username, private_key, cert, verbose):
+    """
+    Set SSH private key and certificate for a user.
+    
+    Can accept a file path (starting with / or .) or the raw key string.
+    Automatically handles newline formatting for database storage.
+    
+    Example:
+      set_user_key testuser -k /path/to/key.pem
+      set_user_key testuser -k "-----BEGIN..."
+      set_user_key testuser -k /path/to/key.pem -c /path/to/cert.pem
+    """
+    if private_key == "" and cert == "":
+        click.echo("Error: At least one of --private-key or --cert must be provided.", err=True)
+        raise click.Abort()
+
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    users = metadata.tables[TableTypes.User.name]
+    auth_provider = "KeycloakUser"
+    
+    if not user_exists(username, auth_provider, users, con):
+        click.echo(f"Error: User '{username}' with auth provider '{auth_provider}' does not exist.", err=True)
+        raise click.Abort()
+    
+    user_id = get_user_id(username, auth_provider, users, con)
+    if user_id is None:
+        click.echo("Error: Could not retrieve user ID.", err=True)
+        raise click.Abort()
+
+    # private key handling
+    key_content = None
+    # handle file path
+    if private_key.startswith('/') or private_key.startswith('.'):
+        if not os.path.exists(private_key):
+            click.echo(f"Error: Key file not found: {private_key}", err=True)
+            raise click.Abort()
+        with open(private_key, 'r') as f:
+            key_content = f.read()
+    elif private_key != "":
+        key_content = private_key
+    
+    # cert handling
+    cert_content = None
+    # handle file path
+    if cert.startswith('/') or cert.startswith('.'):
+        if not os.path.exists(cert):
+            click.echo(f"Error: Cert file not found: {cert}", err=True)
+            raise click.Abort()
+        with open(cert, 'r') as f:
+            cert_content = f.read()
+    elif cert != "":
+        cert_content = cert
+
+    # write to db
+    target_table = metadata.tables[TableTypes.KeycloakUser.name]
+    try:
+        stmt = db.update(target_table).where(target_table.c.id == user_id).values(
+            private_key=key_content,
+            cert=cert_content
+        )
+        con.execute(stmt)
+        con.commit()
+    except Exception as e:
+        click.echo(f"Error updating database: {e}", err=True)
+        raise click.Abort()
+
+
+@run.command
 @click.option("sim_id", "--sim_id")
 @click.option("user", "--user")
 @click.option("auth_provider", "--auth-provider")
