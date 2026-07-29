@@ -1,0 +1,72 @@
+{
+  "id": "yaptide",
+  "realm": "yaptide",
+  "enabled": true,
+  "attributes": {
+    "unmanagedAttributePolicy": "ENABLED"
+  },
+  "clientScopes": [
+    {
+      "id": "profile-scope",
+      "name": "profile",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true"
+      },
+      "protocolMappers": [
+        {
+          "id": "plgrid-access-mapper",
+          "name": "plgrid_access_services",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "plgrid_access_services",
+            "claim.name": "plgridAccessServices",
+            "jsonType.label": "String",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "id": "yaptide-app-client",
+      "clientId": "yaptide-app",
+      "enabled": true,
+      "publicClient": true,
+      "protocol": "openid-connect",
+      "rootUrl": "http://127.0.0.1:3000/",
+      "baseUrl": "http://127.0.0.1:3000/",
+      "adminUrl": "http://127.0.0.1:3000/",
+      "redirectUris": ["http://127.0.0.1:3000/*"],
+      "webOrigins": ["*"],
+      "defaultClientScopes": ["web-origins", "acr", "profile", "roles", "email"]
+    }
+  ],
+  "users": [
+    {
+      "id": "devuser-id",
+      "username": "devuser",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Dev",
+      "lastName": "User",
+      "email": "devuser@example.com",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "password",
+          "temporary": false
+        }
+      ],
+      "attributes": {
+        "plgrid_access_services": ["PLG_YAPTIDE_ACCESS"]
+      }
+    }
+  ]
+}
