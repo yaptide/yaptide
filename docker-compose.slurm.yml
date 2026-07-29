@@ -1,7 +1,7 @@
 services:
   keycloak:
     image: quay.io/keycloak/keycloak:26.1.4
-    container_name: keycloak_dev
+    container_name: keycloak
     command: start-dev --import-realm
     environment:
       KC_HTTP_RELATIVE_PATH: /auth
@@ -10,7 +10,29 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./keycloak/yaptide-realm.json:/opt/keycloak/data/import/yaptide-realm.json:ro
+      - ./slurm/keycloak/yaptide-realm.json:/opt/keycloak/data/import/yaptide-realm.json:ro
+
+  certificate-authority:
+    build:
+      context: ./slurm
+      dockerfile: Dockerfile.certificate-authority
+    container_name: certificate-authority
+    hostname: certificate-authority
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./ca:/ca:ro
+    environment:
+      - CA_KEY_PATH=/ca_key/ca_key
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          'python3 -c ''import socket; s = socket.create_connection(("localhost", 5001), timeout=2); s.close()''',
+        ]
+      interval: 5s
+      timeout: 3s
+      retries: 3
 
   mysql:
     image: mariadb:12
@@ -74,7 +96,7 @@ services:
         "slurmctld",
         "/bin/bash",
         "-c",
-        "/usr/sbin/sshd && /usr/sbin/slurmctld -D",
+        "grep -q '^TrustedUserCAKeys' /etc/ssh/sshd_config || echo 'TrustedUserCAKeys /etc/ssh/ca.pub' >> /etc/ssh/sshd_config && /usr/sbin/sshd && /usr/sbin/slurmctld -D",
       ]
     container_name: slurmctld
     hostname: slurmctld
@@ -91,6 +113,7 @@ services:
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
       - ${SSH_AUTHORIZED_KEYS:-/dev/null}:/tmp/authorized_keys_host:ro,z
+      - ./slurm/ca_key/ca_key.pub:/etc/ssh/ca.pub:ro
     ports:
       - "${SSH_PORT:-3022}:22"
     expose:
