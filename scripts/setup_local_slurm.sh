@@ -4,7 +4,7 @@ set -e
 CONTAINER_NAME="slurmctld"
 SLURM_USER="devuser"
 SLURM_ACCOUNT="dev_account"
-CA_PUB_KEY="./ca/ca_key.pub"
+CA_PUB_KEY="./slurm/ca_key/ca_key.pub"
 
 # 1. Create OS user in slurmctld
 docker exec "$CONTAINER_NAME" useradd -m -s /bin/bash "$SLURM_USER" || true

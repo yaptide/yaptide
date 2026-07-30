@@ -21,7 +21,7 @@ services:
     ports:
       - "5001:5001"
     volumes:
-      - ./ca:/ca:ro
+      - ./slurm/ca_key:/ca_key:ro
     environment:
       - CA_KEY_PATH=/ca_key/ca_key
     healthcheck:

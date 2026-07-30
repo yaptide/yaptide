@@ -32,13 +32,21 @@ class CertAuthHandler(BaseHTTPRequestHandler):
             )
             
             # 3. Sign public key for the extracted principal ($username)
-            subprocess.run([
-                "ssh-keygen", "-s", CA_KEY_PATH,
-                "-I", f"{username}_cert",
-                "-n", username,
-                "-V", "+1d",
-                f"{user_key}.pub"
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            try:
+                subprocess.run([
+                    "ssh-keygen", "-s", CA_KEY_PATH,
+                    "-I", f"{username}_cert",
+                    "-n", username,
+                    "-V", "+1d",
+                    f"{user_key}.pub"
+                ], check=True, capture_output=True, text=True)
+            except subprocess.CalledProcessError as e:
+                # This will print the actual error message from ssh-keygen
+                print(f"SSH-KEYGEN FAILED: {e.stderr}", flush=True)
+                self.send_response(500)
+                self.end_headers()
+                self.wfile.write(b"Internal Server Error: Certificate signing failed")
+                return
             
             # 4. Read keys
             with open(user_key, "r") as f:
