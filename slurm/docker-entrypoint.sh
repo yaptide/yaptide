@@ -62,25 +62,29 @@ fi
 
 if [ "$1" = "slurmctld" ]
 then
-
+    SLURM_USER="${SLURM_USER:-devuser}"
+    if ! id "$SLURM_USER" &>/dev/null; then
+        echo "---> Creating OS user: $SLURM_USER"
+        useradd -m -s /bin/bash "$SLURM_USER"
+    fi
     if [ "$SSH_ENABLE" = "true" ]
     then
         echo "---> Configuring SSH ..."
-        # Require authorized_keys from host mount to exist and be a regular file
-        if [ ! -f /tmp/authorized_keys_host ]; then
-            echo "---> ERROR: host 'authorized_keys' not correctly mounted to /tmp/authorized_keys_host (file missing or SSH_AUTHORIZED_KEYS variable has wrong filename )." >&2
-            exit 1
+
+        # Optional: Copy host authorized_keys IF a valid file was actually mounted
+        if [ -s /tmp/authorized_keys_host ]; then
+            mkdir -p /root/.ssh
+            cp /tmp/authorized_keys_host /root/.ssh/authorized_keys
+            chown root:root /root/.ssh/authorized_keys
+            chmod 600 /root/.ssh/authorized_keys
+            chown root:root /root/.ssh
+            chmod 700 /root/.ssh
+            echo "---> Copied and set permissions for authorized_keys"
+        else
+            echo "---> No custom authorized_keys provided (relying on CA certificates)"
         fi
 
-        mkdir -p /root/.ssh
-        cp /tmp/authorized_keys_host /root/.ssh/authorized_keys
-        chown root:root /root/.ssh/authorized_keys
-        chmod 600 /root/.ssh/authorized_keys
-        chown root:root /root/.ssh
-        chmod 700 /root/.ssh
-        echo "---> Copied and set permissions for authorized_keys"
-
-        echo "---> Start SSHD ..."
+        echo "---> Starting SSHD ..."
         /usr/sbin/sshd -D -e &
     fi
 

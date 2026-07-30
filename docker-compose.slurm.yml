@@ -92,12 +92,16 @@ services:
     image: slurm-docker-cluster:${SLURM_VERSION:-25.11.4}
     init: true
     command:
-      [
-        "slurmctld",
-        "/bin/bash",
-        "-c",
-        "grep -q '^TrustedUserCAKeys' /etc/ssh/sshd_config || echo 'TrustedUserCAKeys /etc/ssh/ca.pub' >> /etc/ssh/sshd_config && /usr/sbin/sshd && /usr/sbin/slurmctld -D",
-      ]
+      - /bin/bash
+      - -c
+      - |
+        cp /tmp/ca.pub /etc/ssh/ca.pub
+        chown root:root /etc/ssh/ca.pub
+        chmod 644 /etc/ssh/ca.pub
+        grep -q '^TrustedUserCAKeys' /etc/ssh/sshd_config || echo 'TrustedUserCAKeys /etc/ssh/ca.pub' >> /etc/ssh/sshd_config
+        grep -q '^PubkeyAcceptedAlgorithms' /etc/ssh/sshd_config || echo 'PubkeyAcceptedAlgorithms +rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com' >> /etc/ssh/sshd_config
+        /usr/sbin/sshd
+        exec /usr/sbin/slurmctld -D
     container_name: slurmctld
     hostname: slurmctld
     privileged: true
@@ -112,8 +116,7 @@ services:
       - var_log_slurm:/var/log/slurm:z
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
-      - ${SSH_AUTHORIZED_KEYS:-/dev/null}:/tmp/authorized_keys_host:ro,z
-      - ./slurm/ca_key/ca_key.pub:/etc/ssh/ca.pub:ro
+      - ./slurm/ca_key/ca_key.pub:/tmp/ca.pub:ro
     ports:
       - "${SSH_PORT:-3022}:22"
     expose:
