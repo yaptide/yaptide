@@ -7,12 +7,13 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 
 CA_KEY_PATH = os.environ.get("CA_KEY_PATH", "/ca_key/ca_key")
 
+
 class CertAuthHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         # 1. Extract username from Keycloak Authorization header if available
         auth_header = self.headers.get("Authorization", "")
         username = "devuser"  # Fallback default
-        
+
         if auth_header.startswith("Bearer "):
             token = auth_header.replace("Bearer ", "")
             try:
@@ -24,22 +25,29 @@ class CertAuthHandler(BaseHTTPRequestHandler):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             user_key = os.path.join(tmpdir, "id_rsa")
-            
+
             # 2. Generate SSH keypair
-            subprocess.run(
-                ["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", user_key, "-N", "", "-q"],
-                check=True
-            )
-            
+            subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", user_key, "-N", "", "-q"], check=True)
+
             # 3. Sign public key for the extracted principal ($username)
             try:
-                subprocess.run([
-                    "ssh-keygen", "-s", CA_KEY_PATH,
-                    "-I", f"{username}_cert",
-                    "-n", username,
-                    "-V", "+1d",
-                    f"{user_key}.pub"
-                ], check=True, capture_output=True, text=True)
+                subprocess.run(
+                    [
+                        "ssh-keygen",
+                        "-s",
+                        CA_KEY_PATH,
+                        "-I",
+                        f"{username}_cert",
+                        "-n",
+                        username,
+                        "-V",
+                        "+1d",
+                        f"{user_key}.pub",
+                    ],
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
             except subprocess.CalledProcessError as e:
                 # This will print the actual error message from ssh-keygen
                 print(f"SSH-KEYGEN FAILED: {e.stderr}", flush=True)
@@ -47,7 +55,7 @@ class CertAuthHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(b"Internal Server Error: Certificate signing failed")
                 return
-            
+
             # 4. Read keys
             with open(user_key, "r") as f:
                 private_key = f.read()
@@ -59,6 +67,7 @@ class CertAuthHandler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.end_headers()
         self.wfile.write(json.dumps({"cert": cert, "private": private_key}).encode())
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5001))
