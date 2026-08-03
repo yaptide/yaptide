@@ -75,7 +75,13 @@ def post_update(dict_to_send):
 
 @celery_app.task()
 def submit_job(  # skipcq: PY-R1000
-    payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str
+    payload_dict: dict,
+    files_dict: dict,
+    userId: int,
+    clusterId: int,
+    sim_id: int,
+    update_key: str,
+    backend_external_url: str = "",
 ):
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
@@ -146,7 +152,12 @@ def submit_job(  # skipcq: PY-R1000
     con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
-        payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con
+        payload_dict=payload_dict,
+        job_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key,
+        con=con,
+        backend_external_url=backend_external_url,
     )
 
     array_id = collect_id = None
@@ -207,7 +218,7 @@ def submit_job(  # skipcq: PY-R1000
 
 
 def prepare_script_files(
-    payload_dict: dict, job_dir: str, sim_id: int, update_key: str, con: Connection
+    payload_dict: dict, job_dir: str, sim_id: int, update_key: str, con: Connection, backend_external_url: str = ""
 ) -> tuple[str, dict]:
     """Prepares script files to run them on cluster"""
     submit_file = f"{job_dir}/yaptide_submitter.sh"
@@ -220,7 +231,7 @@ def prepare_script_files(
     collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
 
-    backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
+    backend_url = os.environ.get("BACKEND_EXTERNAL_URL", backend_external_url)
 
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         submit_template = SUBMIT_FLUKA

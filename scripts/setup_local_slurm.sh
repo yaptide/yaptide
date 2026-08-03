@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-docker exec yaptide_flask python3 yaptide/admin/db_manage.py add-cluster localhost -p 3022
+FLASK_SQLALCHEMY_DATABASE_URI="sqlite:///instance/db.sqlite" poetry run yaptide/admin/db_manage.py add-cluster localhost -p 3022
 
 CONTAINER_NAME="slurmctld"
 SLURM_USER="devuser"
@@ -47,5 +47,22 @@ local root = "/opt/spack/modules/shieldhit"
 prepend_path("PATH", pathJoin(root, "bin"))
 EOF
 '
+
+# --- 5. Install pymchelper ---
+echo "---> Installing pymchelper..."
+
+TARGET_CONTAINERS=$(docker ps --format '{{.Names}}' | grep -E 'slurmctld|cpu-worker')
+
+for C in $TARGET_CONTAINERS; do
+    echo "--> Installing on container: $C"
+    docker exec "$C" bash -c '
+        if ! python3 -m pip --version &>/dev/null; then
+            echo "    Bootstrapping pip..."
+            curl -sS https://bootstrap.pypa.io/get-pip.py | python3 >/dev/null 2>&1
+        fi
+        python3 -m pip install --no-cache-dir pymchelper >/dev/null 2>&1
+    '
+done
+
 
 echo "Slurmctld ready to accept local CA-signed SSH connections and run SHIELD-HIT."
