@@ -197,4 +197,21 @@ then
         --conf "Feature=gpu Gres=gpu:nvidia:${GPU_COUNT}"
 fi
 
+# --- SCRATCH Directory Setup ---
+# 1. Create base scratch directory with sticky bit (like /tmp)
+mkdir -p /tmp/scratch
+chmod 1777 /tmp/scratch
+
+# 2. Automatically export $SCRATCH for logging-in users
+if [ ! -f /etc/profile.d/scratch.sh ]; then
+    cat << 'EOF' > /etc/profile.d/scratch.sh
+export SCRATCH="/tmp/scratch/${USER}"
+
+if [ ! -d "$SCRATCH" ]; then
+    mkdir -p "$SCRATCH" 2>/dev/null
+fi
+EOF
+    chmod +x /etc/profile.d/scratch.sh
+fi
+
 exec "$@"

@@ -117,6 +117,7 @@ services:
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
       - ./slurm/ca_key/ca_key.pub:/tmp/ca.pub:ro
+      - tmp_scratch:/tmp/scratch:z
     ports:
       - "${SSH_PORT:-3022}:22"
     expose:
@@ -172,6 +173,7 @@ services:
       - home_ood:/home/ood # shared with OOD for job I/O
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
+      - tmp_scratch:/tmp/scratch:z
     expose:
       - "6818"
     depends_on:
@@ -225,3 +227,4 @@ volumes:
   home_ood:
   opt_modulefiles:
   spack_root:
+  tmp_scratch:
