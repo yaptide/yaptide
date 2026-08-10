@@ -12,7 +12,7 @@ jobs:
   get-simulators:
     env:
       POETRY_VIRTUALENVS_CREATE: false
-    runs-on:  ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform == 'ubuntu-latest' && 'yaptide-runners' || matrix.platform }}
     strategy:
       matrix:
         platform: ['ubuntu-latest', 'windows-latest']
@@ -75,7 +75,7 @@ jobs:
           retention-days: 1
 
   build-and-test:
-    runs-on:  ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform == 'ubuntu-latest' && 'yaptide-runners' || matrix.platform }}
     needs: get-simulators
     env:
       POETRY_VIRTUALENVS_CREATE: false
