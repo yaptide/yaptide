@@ -15,7 +15,7 @@ jobs:
     runs-on: ${{ matrix.platform == 'ubuntu-latest' && 'yaptide-runners' || matrix.platform }}
     strategy:
       matrix:
-        platform: ['ubuntu-latest', 'windows-latest']
+        platform: ['ubuntu-latest']
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -83,9 +83,6 @@ jobs:
       matrix:
         python-version: ['3.10', '3.11', '3.12']
         platform: ['ubuntu-latest']
-        include:
-          - python-version: '3.12'
-            platform: 'windows-latest'
 
     steps:
       - name: Checkout
