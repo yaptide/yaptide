@@ -30,9 +30,9 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
     results_url = f"{backend_url}/results"
     context = ssl.SSLContext()
 
-    req = request.Request(results_url,
-                          json.dumps(dict_to_send).encode(), {'Content-Type': 'application/json'},
-                          method='POST')
+    req = request.Request(
+        results_url, json.dumps(dict_to_send).encode(), {"Content-Type": "application/json"}, method="POST"
+    )
 
     try:
         with request.urlopen(req, context=context) as res:  # skipcq: BAN-B310
@@ -48,9 +48,9 @@ def send_simulation_state_update(simulation_id: int, update_key: str, backend_ur
     jobs_url = f"{backend_url}/jobs"
     context = ssl.SSLContext()
 
-    req = request.Request(jobs_url,
-                          json.dumps(dict_to_send).encode(), {'Content-Type': 'application/json'},
-                          method='POST')
+    req = request.Request(
+        jobs_url, json.dumps(dict_to_send).encode(), {"Content-Type": "application/json"}, method="POST"
+    )
     try:
         with request.urlopen(req, context=context) as res:  # skipcq: BAN-B310
             if res.getcode() != 202:
@@ -66,9 +66,9 @@ if __name__ == "__main__":
     #    - simulation state (`--state`) to send a state update.
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
 
-    logging.basicConfig(level=logging.INFO,
-                        format="%(asctime)s %(levelname)s %(message)s",
-                        handlers=[logging.StreamHandler()])
+    logging.basicConfig(
+        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", handlers=[logging.StreamHandler()]
+    )
     parser = argparse.ArgumentParser()
     parser.add_argument("--sim_id", type=int, required=True)
     parser.add_argument("--update_key", type=str, required=True)
@@ -83,15 +83,19 @@ if __name__ == "__main__":
 
     if args.output_dir:
         logging.info("Sending simulation results for directory: %s", args.output_dir)
-        send_simulation_results(output_Path=Path(args.output_dir),
-                                simulation_id=args.sim_id,
-                                update_key=args.update_key,
-                                backend_url=args.backend_url)
+        send_simulation_results(
+            output_Path=Path(args.output_dir),
+            simulation_id=args.sim_id,
+            update_key=args.update_key,
+            backend_url=args.backend_url,
+        )
     elif args.simulation_state:
         logging.info("No output_dir provided, sending simulation state update %s", args.simulation_state)
-        send_simulation_state_update(simulation_id=args.sim_id,
-                                     update_key=args.update_key,
-                                     backend_url=args.backend_url,
-                                     simulation_state=args.simulation_state)
+        send_simulation_state_update(
+            simulation_id=args.sim_id,
+            update_key=args.update_key,
+            backend_url=args.backend_url,
+            simulation_state=args.simulation_state,
+        )
     else:
         logging.error("Either --results_dir or --simulation_state must be provided.")

@@ -1,24 +1,28 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
+  - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v3.2.0
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: check-toml
-    -   id: check-added-large-files
--   repo: https://github.com/google/yapf
-    rev: v0.40.1
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-added-large-files
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.7
     hooks:
-    -   id: yapf
--   repo: local
+      - id: ruff
+        name: ruff check
+        args: [ --fix ]
+      - id: ruff-format
+        name: ruff format
+  - repo: local
     hooks:
-    -   id: check_not_empty_env_files
+      - id: check_not_empty_env_files
         name: Check not empty env files
         language: python
         entry: python3 .pre_commit_hooks/check_not_empty_files.py
-        types: [dotenv]
-        stages: [commit, push, manual]
+        types: [ dotenv ]
+        stages: [ commit, push, manual ]
 exclude: migrations

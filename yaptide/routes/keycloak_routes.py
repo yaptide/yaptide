@@ -8,9 +8,9 @@ import json
 import jwt
 import requests
 
-from yaptide.persistence.db_methods import (add_object_to_db, fetch_keycloak_user_by_username, make_commit_to_db)
+from yaptide.persistence.db_methods import add_object_to_db, fetch_keycloak_user_by_username, make_commit_to_db
 from yaptide.persistence.models import KeycloakUserModel
-from yaptide.routes.utils.response_templates import (error_internal_response, yaptide_response)
+from yaptide.routes.utils.response_templates import error_internal_response, yaptide_response
 from yaptide.routes.utils.tokens import encode_auth_token
 from werkzeug.exceptions import Forbidden, Unauthorized
 
@@ -22,8 +22,8 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
     if not token:
         logging.error("No token provided")
         raise Unauthorized(description="No token provided")
-    keycloak_base_url = os.environ.get('KEYCLOAK_BASE_URL', '')
-    keycloak_realm = os.environ.get('KEYCLOAK_REALM', '')
+    keycloak_base_url = os.environ.get("KEYCLOAK_BASE_URL", "")
+    keycloak_realm = os.environ.get("KEYCLOAK_REALM", "")
     if not keycloak_base_url or not keycloak_realm:
         logging.error("Keycloak env variables not set")
         raise Forbidden(description="Service is not available")
@@ -42,18 +42,20 @@ def check_user_based_on_keycloak_token(token: str, username: str) -> bool:
 
         # get public key for our token, based on kid
         public_keys = {}
-        for jwk in jwks['keys']:
-            kid = jwk['kid']
+        for jwk in jwks["keys"]:
+            kid = jwk["kid"]
             public_keys[kid] = jwt.algorithms.RSAAlgorithm.from_jwk(json.dumps(jwk))
-        kid = jwt.get_unverified_header(token)['kid']
+        kid = jwt.get_unverified_header(token)["kid"]
         key = public_keys[kid]
 
         # now we can verify signature of the token
-        _ = jwt.decode(token,
-                       key=key,
-                       audience=unverified_encoded_token["aud"],
-                       algorithms=['RS256'],
-                       options={"verify_signature": True})
+        _ = jwt.decode(
+            token,
+            key=key,
+            audience=unverified_encoded_token["aud"],
+            algorithms=["RS256"],
+            options={"verify_signature": True},
+        )
 
         return True
 
@@ -85,17 +87,17 @@ class AuthKeycloak(Resource):
 
         username = payload_dict["username"]
         logging.debug("Authenticating for user: %s", username)
-        keycloak_token: str = request.headers.get('Authorization', '')
+        keycloak_token: str = request.headers.get("Authorization", "")
 
         # check if user has access to our service, if not throw an exception here
-        check_user_based_on_keycloak_token(keycloak_token.replace('Bearer ', ''), username)
+        check_user_based_on_keycloak_token(keycloak_token.replace("Bearer ", ""), username)
 
-        cert_auth_url = os.environ.get('CERT_AUTH_URL', '')
+        cert_auth_url = os.environ.get("CERT_AUTH_URL", "")
         res_json: dict = {}
         if cert_auth_url:
             # ask cert auth service for cert and private key
             session = requests.Session()
-            res: requests.Response = session.get(cert_auth_url, headers={'Authorization': keycloak_token})
+            res: requests.Response = session.get(cert_auth_url, headers={"Authorization": keycloak_token})
             logging.debug("auth cert service response code: %d", res.status_code)
             if res.status_code == 200:
                 res_json: dict = res.json()
@@ -121,12 +123,14 @@ class AuthKeycloak(Resource):
             # prepare our own tokens
             access_token, access_exp = encode_auth_token(user_id=user.id, is_keycloak=True)
 
-            resp = yaptide_response(message='Successfully logged in',
-                                    code=202,
-                                    content={
-                                        'access_exp': int(access_exp.timestamp() * 1000),
-                                    })
-            resp.set_cookie('access_token', access_token, httponly=True, samesite='Lax', expires=access_exp)
+            resp = yaptide_response(
+                message="Successfully logged in",
+                code=202,
+                content={
+                    "access_exp": int(access_exp.timestamp() * 1000),
+                },
+            )
+            resp.set_cookie("access_token", access_token, httponly=True, samesite="Lax", expires=access_exp)
             return resp
         except Exception:  # skipcq: PYL-W0703
             return error_internal_response()
@@ -134,6 +138,6 @@ class AuthKeycloak(Resource):
     @staticmethod
     def delete():
         """Method returning status of logging out"""
-        resp = yaptide_response(message='User logged out', code=200)
-        resp.delete_cookie('access_token')
+        resp = yaptide_response(message="User logged out", code=200)
+        resp.delete_cookie("access_token")
         return resp

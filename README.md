@@ -18,6 +18,14 @@ There are two main ways of build and run the app
 - [For developers](https://yaptide.github.io/for_developers/backend/for_developers/), which is setting up all components manually. It is faster then Docker.
 - [Using Docker](https://yaptide.github.io/for_developers/backend/using_docker/). Used for the deployment, takes more time.
 
+## For developers
+
+For the git blame configuration to work correctly, it is necessary to set the following configuration:
+
+```bash
+git config blame.ignoreRevsFile .git-blame-ignore-revs
+```
+
 
 ## Credits
 

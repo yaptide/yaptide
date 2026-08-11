@@ -19,12 +19,10 @@ jobs:
     runs-on:  ${{ matrix.platform }}
     strategy:
       matrix:
-        python-version: ['3.9', '3.10', '3.11', '3.12', '3.13']
+        python-version: ['3.10', '3.11', '3.12', '3.13']
         platform: [ubuntu-latest, windows-latest]
         exclude:
           - python-version: '3.11'
-            platform: windows-latest
-          - python-version: '3.9'
             platform: windows-latest
 
     # Only run if it is a PR and the comment contains /test
@@ -42,12 +40,12 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ steps.comment-branch.outputs.head_ref }}
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
             python-version: ${{ matrix.python-version }}
       - name: Update pip and install poetry
@@ -86,7 +84,7 @@ jobs:
             Get-ChildItem -Path "tests" -Filter "test_*.py" -Recurse | foreach { pytest $_.FullName }
 
       - name: Add workflow result as comment on PR
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         if: always()
         with:
           script: |
