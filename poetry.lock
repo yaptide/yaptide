@@ -1839,22 +1839,22 @@ python-dotenv = ">=0.9.1"
 
 [[package]]
 name = "pytest-env"
-version = "1.1.5"
+version = "1.2.0"
 description = "pytest plugin that allows you to add environment variables."
 optional = false
-python-versions = ">=3.8"
+python-versions = ">=3.10"
 groups = ["test"]
 files = [
-    {file = "pytest_env-1.1.5-py3-none-any.whl", hash = "sha256:ce90cf8772878515c24b31cd97c7fa1f4481cd68d588419fd45f10ecaee6bc30"},
-    {file = "pytest_env-1.1.5.tar.gz", hash = "sha256:91209840aa0e43385073ac464a554ad2947cc2fd663a9debf88d03b01e0cc1cf"},
+    {file = "pytest_env-1.2.0-py3-none-any.whl", hash = "sha256:d7e5b7198f9b83c795377c09feefa45d56083834e60d04767efd64819fc9da00"},
+    {file = "pytest_env-1.2.0.tar.gz", hash = "sha256:475e2ebe8626cee01f491f304a74b12137742397d6c784ea4bc258f069232b80"},
 ]
 
 [package.dependencies]
-pytest = ">=8.3.3"
-tomli = {version = ">=2.0.1", markers = "python_version < \"3.11\""}
+pytest = ">=8.4.2"
+tomli = {version = ">=2.2.1", markers = "python_version < \"3.11\""}
 
 [package.extras]
-testing = ["covdefaults (>=2.3)", "coverage (>=7.6.1)", "pytest-mock (>=3.14)"]
+testing = ["covdefaults (>=2.3)", "coverage (>=7.10.7)", "pytest-mock (>=3.15.1)"]
 
 [[package]]
 name = "pytest-flask"
@@ -2466,4 +2466,4 @@ resolved_reference = "69f615d0fb391984793017b7eaa0336c38fa1f4b"
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "6c85ae7088130d0fca28a4280a48f5bed5865df4dc5a418178a0d6d95cf0bb24"
+content-hash = "2eb32e95f7a6dc4414b6851bf32f30f9906c5267f51ccd80207008f2f158556b"
