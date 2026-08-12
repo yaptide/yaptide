@@ -8,8 +8,8 @@ import threading
 from typing import Optional
 
 from yaptide.batch.batch_methods import post_update
+from yaptide.celery.utils.averaging import EstimatorsAverager
 from yaptide.celery.utils.pymc import (
-    average_estimators,
     command_to_run_fluka,
     command_to_run_shieldhit,
     execute_simulation_subprocess,
@@ -257,7 +257,7 @@ def merge_results(results: list[dict]) -> dict:
     logging.debug("Merging results from %d tasks", len(results))
     logfiles = {}
 
-    averaged_estimators = None
+    averager = EstimatorsAverager()
     simulation_id = results[0].pop("simulation_id", None)
     update_key = results[0].pop("update_key", None)
     if simulation_id and update_key:
@@ -267,7 +267,7 @@ def merge_results(results: list[dict]) -> dict:
             "update_key": update_key,
         }
         post_update(dict_to_send)
-    for i, result in enumerate(results):
+    for result in results:
         if simulation_id is None:
             simulation_id = result.pop("simulation_id", None)
         if update_key is None:
@@ -276,12 +276,9 @@ def merge_results(results: list[dict]) -> dict:
             logfiles.update(result["logfiles"])
             continue
 
-        if averaged_estimators is None:
-            averaged_estimators: list[dict] = result.get("estimators", [])
-            # There is nothing to average yet
-            continue
+        averager.add(result.get("estimators", []))
 
-        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
+    averaged_estimators = averager.averaged()
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
