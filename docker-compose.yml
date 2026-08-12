@@ -4,6 +4,17 @@ services:
   redis:
     image: redis:8-alpine
     container_name: yaptide_redis
+    command:
+      - redis-server
+      - --appendonly
+      - "yes"
+      - --requirepass
+      - "${REDIS_PASSWORD}"
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - HOST_IP=${HOST_IP}
+    ports:
+      - "${HOST_IP}:6379:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -32,13 +43,16 @@ services:
     container_name: yaptide_flask
     restart: unless-stopped
     environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@yaptide_redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@yaptide_redis:6379/0
       - CERT_AUTH_URL=${CERT_AUTH_URL:-}
       - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
       - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+      - HOST_IP=${HOST_IP}
+    ports:
+      - "${HOST_IP}:6000:6000"
     depends_on:
       redis:
         condition: service_healthy
@@ -61,8 +75,8 @@ services:
           cpus: ${MAX_CORES-1.0}
     env_file: .env
     environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@yaptide_redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@yaptide_redis:6379/0
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
     healthcheck:
@@ -86,8 +100,8 @@ services:
           cpus: '1.0'
     env_file: .env
     environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
+      - CELERY_BROKER_URL=redis://:${REDIS_PASSWORD}@yaptide_redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://:${REDIS_PASSWORD}@yaptide_redis:6379/0
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
