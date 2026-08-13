@@ -107,6 +107,7 @@ def run_single_simulation(
 
             # finally we return from the celery task, returning the logfiles and stdout/stderr as result
             return {
+                "task_state": EntityState.FAILED.value,
                 "logfiles": logfiles,
                 "stdout": simulation_result.command_stdout,
                 "stderr": simulation_result.command_stderr,
@@ -131,7 +132,12 @@ def run_single_simulation(
 
     # finally return from the celery task, returning the estimators and stdout/stderr as result
     # the estimators will be merged by subsequent celery task
-    return {"estimators": estimators, "simulation_id": simulation_id, "update_key": update_key}
+    return {
+        "estimators": estimators,
+        "simulation_id": simulation_id,
+        "update_key": update_key,
+        "task_state": EntityState.COMPLETED.value,
+    }
 
 
 @dataclass
@@ -252,14 +258,45 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
 
 
 @celery_app.task
+# skipcq:  PY-R1000
 def merge_results(results: list[dict]) -> dict:
     """Merge results from multiple simulation's tasks"""
-    logging.debug("Merging results from %d tasks", len(results))
-    logfiles = {}
+    final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
-    averaged_estimators = None
-    simulation_id = results[0].pop("simulation_id", None)
-    update_key = results[0].pop("update_key", None)
+    # malformed results, there's no simulation_id and update_key so we can't notify the backend
+    if results is None or len(results) == 0:
+        logging.info("Received empty or None 'results' list in merge_results(): %s", results)
+        return final_result
+
+    # find simulation_id and update_key for sending updates to the backend and get all logfiles from the results
+    simulation_id = None
+    update_key = None
+    logfiles = {}
+    for i, result in enumerate(results):
+        if simulation_id is None:
+            simulation_id = result.get("simulation_id", None)
+        if update_key is None:
+            update_key = result.get("update_key", None)
+        if "logfiles" in result:
+            logfiles.update(result["logfiles"])
+            continue
+
+    # send logfiles to the backend before averaging the estimators, as they may contain useful
+    # information about the simulation failure
+    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
+        simulation_id=simulation_id, update_key=update_key, logfiles=logfiles
+    ):
+        final_result["logfiles"] = logfiles
+
+    # if no task completed set the job state as failed
+    if not any(result.get("task_state") == EntityState.COMPLETED.value for result in results):
+        if simulation_id and update_key:
+            dict_to_send = {"sim_id": simulation_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
+            post_update(dict_to_send)
+        logging.info("No tasks have completed for simulation %s, setting job state as FAILED", simulation_id)
+        return final_result
+
+    logging.debug("Merging results from %d tasks", len(results))
     if simulation_id and update_key:
         dict_to_send = {
             "sim_id": simulation_id,
@@ -267,28 +304,17 @@ def merge_results(results: list[dict]) -> dict:
             "update_key": update_key,
         }
         post_update(dict_to_send)
-    for i, result in enumerate(results):
-        if simulation_id is None:
-            simulation_id = result.pop("simulation_id", None)
-        if update_key is None:
-            update_key = result.pop("update_key", None)
-        if "logfiles" in result:
-            logfiles.update(result["logfiles"])
-            continue
 
+    # average the estimators
+    averaged_estimators = None
+    for i, result in enumerate(
+        r for r in results if r.get("task_state") == EntityState.COMPLETED.value and "estimators" in r
+    ):
         if averaged_estimators is None:
-            averaged_estimators: list[dict] = result.get("estimators", [])
+            averaged_estimators: list[dict] = result["estimators"]
             # There is nothing to average yet
             continue
-
-        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
-
-    final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
-
-    if len(logfiles.keys()) > 0 and not send_simulation_logfiles(
-        simulation_id=simulation_id, update_key=update_key, logfiles=logfiles
-    ):
-        final_result["logfiles"] = logfiles
+        averaged_estimators = average_estimators(averaged_estimators, result["estimators"], i)
 
     if averaged_estimators:
         # send results to the backend and mark whole simulation as completed
