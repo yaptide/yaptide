@@ -1,4 +1,4 @@
-.PHONY: help build build-no-cache up start down clean logs test test-monitoring status shell logs-slurmctld logs-slurmdbd update-slurm reload-slurm version set-version build-all test-all test-version rebuild jobs quick-test run-examples scale-cpu-workers
+.PHONY: help build build-no-cache up start down clean logs test status shell logs-slurmctld logs-slurmdbd update-slurm reload-slurm version set-version build-all rebuild jobs quick-test run-examples scale-cpu-workers
 
 # Default target
 .DEFAULT_GOAL := help
@@ -56,14 +56,12 @@ help:  ## Show this help message
 	@printf "  ${CYAN}%-15s${RESET} %s\n" "version" "Show current Slurm version"
 	@printf "  ${CYAN}%-15s${RESET} %s\n" "set-version" "Set Slurm version (requires VER=...)"
 	@printf "  ${CYAN}%-15s${RESET} %s\n" "build-all" "Build all supported versions"
-	@printf "  ${CYAN}%-15s${RESET} %s\n" "test-version" "Test a specific version (requires VER=...)"
 	@printf "  ${CYAN}%-15s${RESET} %s\n" "test-all" "Test all supported versions"
 	@echo ""
 	@echo "Examples:"
 	@echo "  make update-slurm FILES=\"slurm.conf slurmdbd.conf\""
 	@echo "  make set-version VER=25.11.4"
 	@echo "  make scale-cpu-workers N=3"
-	@echo "  make test-version VER=25.11.4"
 	@echo ""
 	@echo "Monitoring:"
 	@echo "  Enable:  Set ELASTICSEARCH_HOST=http://elasticsearch:9200 in .env"
@@ -87,12 +85,6 @@ clean:  ## Remove containers and volumes
 logs:  ## Show container logs
 	docker compose logs -f
 
-test:  ## Run test suite
-	./test_cluster.sh
-
-test-monitoring:  ## Run monitoring profile test suite
-	./test_monitoring.sh
-
 status:  ## Show cluster status
 	@echo "=== Containers ==="
 	@docker compose ps
@@ -112,20 +104,8 @@ logs-slurmdbd:  ## Show slurmdbd logs
 quick-test:  ## Submit a quick test job
 	docker exec slurmctld bash -c "cd /data && sbatch --wrap='hostname' && sleep 3 && squeue && cat slurm-*.out 2>/dev/null | tail -5"
 
-run-examples:  ## Run example jobs
-	./run_examples.sh
-
 jobs:  ## View job queue
 	docker exec slurmctld squeue
-
-update-slurm:  ## Update Slurm config files (usage: make update-slurm FILES="slurm.conf slurmdbd.conf")
-	@if [ -z "$(FILES)" ]; then \
-		echo "Error: FILES parameter required"; \
-		echo "Usage: make update-slurm FILES=\"slurm.conf slurmdbd.conf\""; \
-		echo "Available: slurm.conf, slurmdbd.conf, cgroup.conf"; \
-		exit 1; \
-	fi
-	./update_slurmfiles.sh $(FILES)
 
 reload-slurm:  ## Reload Slurm config without restart (after live editing)
 	@echo "Reloading Slurm configuration..."
@@ -188,42 +168,5 @@ build-all:  ## Build Docker images for all supported versions
 	echo "✓ All versions built successfully"; \
 	echo "========================================"; \
 	docker images | grep slurm-docker-cluster
-
-test-version:  ## Test a specific version (usage: make test-version VER=25.05.6)
-	@if [ -z "$(VER)" ]; then \
-		echo "Error: VER parameter required. Usage: make test-version VER=25.05.6"; \
-		echo "Supported versions: $(SUPPORTED_VERSIONS)"; \
-		exit 1; \
-	fi
-	@echo "========================================"; \
-	echo "Testing Slurm $(VER)"; \
-	echo "========================================"; \
-	echo "SLURM_VERSION=$(VER)" > .env
-	@$(MAKE) clean
-	@echo "Starting cluster with Slurm $(VER)..."
-	@docker compose up -d
-	@echo "Waiting for services to start and auto-register..."
-	@sleep 20
-	@echo "Running test suite..."
-	@./test_cluster.sh
-	@echo ""
-	@echo "✓ Slurm $(VER) tests completed"
-	@$(MAKE) clean
-
-test-all:  ## Run test suite against all supported versions
-	@echo "Testing all supported Slurm versions..."
-	@echo "Supported versions: $(SUPPORTED_VERSIONS)"
-	@echo ""
-	@for version in $(SUPPORTED_VERSIONS); do \
-		echo ""; \
-		echo "========================================"; \
-		echo "Testing Slurm $$version"; \
-		echo "========================================"; \
-		$(MAKE) test-version VER=$$version || exit 1; \
-	done
-	@echo ""
-	@echo "========================================"; \
-	echo "✓ All version tests passed!"; \
-	echo "========================================";
 
 rebuild: clean build up status

@@ -21,9 +21,6 @@ readme/
 
 # Build and development scripts
 Makefile
-test_cluster.sh
-run_examples.sh
-update_slurmfiles.sh
 
 # Environment files (these should be set at build time via --build-arg)
 .env
