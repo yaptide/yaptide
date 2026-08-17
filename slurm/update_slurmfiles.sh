@@ -7,13 +7,8 @@ if [ ! -f .env ]; then
     exit 1
 fi
 
-SLURM_VERSION=$(grep "^SLURM_VERSION=" .env | cut -d'=' -f2)
-if [ -z "$SLURM_VERSION" ]; then
-    echo "Error: SLURM_VERSION not found in .env"
-    exit 1
-fi
+SLURM_VERSION=25.11.4
 
-# Extract major.minor version (e.g., 25.05 from 25.05.x)
 VERSION_DIR=$(echo "$SLURM_VERSION" | cut -d. -f1-2)
 
 restart=false

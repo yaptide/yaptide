@@ -60,7 +60,6 @@ services:
         SLURM_VERSION: ${SLURM_VERSION:-25.11.4}
         LMOD_VERSION: ${LMOD_VERSION:-9.1.2}
         SPACK_VERSION: ${SPACK_VERSION:-v1.1.1}
-        GPU_ENABLE: ${GPU_ENABLE:-false}
         BUILDER_BASE: ${BUILDER_BASE:-rockylinux/rockylinux:9}
         RUNTIME_BASE: ${RUNTIME_BASE:-rockylinux/rockylinux:9}
       cache_from:
@@ -89,7 +88,7 @@ services:
       start_period: 20s
 
   slurmctld:
-    image: slurm-docker-cluster:${SLURM_VERSION:-25.11.4}
+    image: slurm-docker-cluster:25.11.4
     init: true
     command:
       - /bin/bash
@@ -170,7 +169,6 @@ services:
       - etc_slurm:/etc/slurm
       - slurm_jobdir:/data
       - var_log_slurm:/var/log/slurm
-      - home_ood:/home/ood # shared with OOD for job I/O
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
       - tmp_scratch:/tmp/scratch:z
@@ -188,43 +186,12 @@ services:
     deploy:
       replicas: ${CPU_WORKER_COUNT:-2}
 
-  # Open OnDemand web portal (OPTIONAL)
-  # Start with: docker compose --profile ondemand up -d
-  #   or set OOD_ENABLE=true in .env
-  ondemand:
-    build:
-      context: ./slurm
-      dockerfile: Dockerfile.ondemand
-      args:
-        SLURM_VERSION: ${SLURM_VERSION:-25.11.4}
-        RUNTIME_BASE: ${RUNTIME_BASE:-rockylinux/rockylinux:9}
-    profiles: ["ondemand"]
-    container_name: ondemand
-    hostname: ondemand
-    volumes:
-      - etc_munge:/etc/munge
-      - etc_slurm:/etc/slurm
-      - slurm_jobdir:/data
-      - home_ood:/home/ood
-    ports:
-      - "${OOD_PORT:-8080}:8080"
-    depends_on:
-      slurmctld:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/ || exit 1"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 30s
-
 volumes:
   etc_munge:
   etc_slurm:
   slurm_jobdir:
   var_lib_mysql:
   var_log_slurm:
-  home_ood:
   opt_modulefiles:
   spack_root:
   tmp_scratch:

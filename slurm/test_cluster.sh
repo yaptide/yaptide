@@ -200,26 +200,8 @@ test_config_consistency() {
         ALL_CONSISTENT=false
     fi
 
-    # Check GPU: slurm.conf NodeSet feature must match entrypoint's slurmd-gpu Feature
-    GPU_CONF_FEATURE=$(echo "$SLURM_CONF" | grep 'NodeSet=gpu_nodes' | sed -n 's/.*Feature=\([^ ]*\).*/\1/p' || true)
-    GPU_ENTRY_FEATURE=$(echo "$ENTRYPOINT" | sed -n '/slurmd-gpu/,/^fi$/p' | sed -n 's/.*Feature=\([a-zA-Z0-9_]*\).*/\1/p' | head -1 || true)
-
-    if [ -z "$GPU_CONF_FEATURE" ]; then
-        print_fail "  No gpu_nodes NodeSet Feature found in slurm.conf"
-        ALL_CONSISTENT=false
-    elif [ -z "$GPU_ENTRY_FEATURE" ]; then
-        print_fail "  No Feature found in entrypoint for slurmd-gpu"
-        ALL_CONSISTENT=false
-    elif [ "$GPU_CONF_FEATURE" = "$GPU_ENTRY_FEATURE" ]; then
-        print_info "  ✓ GPU Feature matches: slurm.conf($GPU_CONF_FEATURE) = entrypoint($GPU_ENTRY_FEATURE)"
-    else
-        print_fail "  GPU Feature mismatch: slurm.conf($GPU_CONF_FEATURE) != entrypoint($GPU_ENTRY_FEATURE)"
-        ALL_CONSISTENT=false
-    fi
-
-    # Verify CPU and GPU partitions reference their respective NodeSets
+    # Verify CPU partitions reference their respective NodeSets
     CPU_PARTITION_NODES=$(echo "$SLURM_CONF" | grep 'PartitionName=cpu ' | sed -n 's/.*Nodes=\([^ ]*\).*/\1/p' || true)
-    GPU_PARTITION_NODES=$(echo "$SLURM_CONF" | grep 'PartitionName=gpu ' | sed -n 's/.*Nodes=\([^ ]*\).*/\1/p' || true)
 
     if [ "$CPU_PARTITION_NODES" = "cpu_nodes" ]; then
         print_info "  ✓ cpu partition references cpu_nodes NodeSet"
@@ -228,15 +210,8 @@ test_config_consistency() {
         ALL_CONSISTENT=false
     fi
 
-    if [ "$GPU_PARTITION_NODES" = "gpu_nodes" ]; then
-        print_info "  ✓ gpu partition references gpu_nodes NodeSet"
-    else
-        print_fail "  gpu partition references '$GPU_PARTITION_NODES' instead of 'gpu_nodes'"
-        ALL_CONSISTENT=false
-    fi
-
     if [ "$ALL_CONSISTENT" = true ]; then
-        print_pass "Config consistency verified (CPU=Feature=$CPU_CONF_FEATURE, GPU=Feature=$GPU_CONF_FEATURE)"
+        print_pass "Config consistency verified (CPU=Feature=$CPU_CONF_FEATURE)"
     else
         print_fail "Config inconsistencies detected"
         return 1

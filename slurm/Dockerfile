@@ -3,11 +3,10 @@
 # Stage 2: Build RPMs using the builder image
 # Stage 3: Install RPMs in a clean runtime image
 
-ARG SLURM_VERSION
+ARG SLURM_VERSION=25.11.4
 ARG GOSU_VERSION=1.19
 ARG LMOD_VERSION=9.1.2
 ARG SPACK_VERSION=v1.1.1
-# BUILDER_BASE and RUNTIME_BASE overridden when GPU_ENABLE=true is set in .env
 ARG BUILDER_BASE=rockylinux/rockylinux:9
 ARG RUNTIME_BASE=rockylinux/rockylinux:9
 
@@ -37,9 +36,8 @@ RUN set -ex \
 # ============================================================================
 FROM ${BUILDER_BASE} AS builder
 
-ARG SLURM_VERSION
+ARG SLURM_VERSION=25.11.4
 ARG TARGETARCH
-ARG GPU_ENABLE
 
 # Enable CRB and EPEL repositories for development packages
 # Install RPM build tools and dependencies
@@ -94,16 +92,6 @@ RUN rpmdev-setuptree
 # Copy RPM macros
 COPY rpmbuild/slurm.rpmmacros /root/.rpmmacros
 
-# When GPU_ENABLE=true, the builder base image (nvidia/cuda:*-devel-*) provides
-# NVML headers. Symlink them to standard paths and enable --with-nvml for rpmbuild.
-RUN if [ "${GPU_ENABLE}" = "true" ]; then \
-        set -ex && \
-        CUDA_TARGET=$(case "${TARGETARCH}" in amd64) echo "x86_64-linux" ;; arm64) echo "sbsa-linux" ;; esac) && \
-        ln -sf /usr/local/cuda/include/nvml.h /usr/include/nvml.h && \
-        ln -sf /usr/local/cuda/targets/${CUDA_TARGET}/lib/stubs/libnvidia-ml.so /usr/lib64/libnvidia-ml.so && \
-        echo "%_with_nvml --with-nvml=/usr" >> /root/.rpmmacros; \
-    fi
-
 # Download official Slurm release tarball and build RPMs with slurmrestd enabled
 # Architecture mapping: Docker TARGETARCH (amd64, arm64) -> RPM arch (x86_64, aarch64)
 RUN set -ex \
@@ -121,7 +109,6 @@ RUN set -ex \
 
 # ============================================================================
 # Stage 3: Build Lmod from source
-# (hardcoded Rocky Linux 9 base — GPU CUDA images are not needed to build Lmod)
 # ============================================================================
 FROM rockylinux/rockylinux:9 AS lmod-builder
 
@@ -155,7 +142,6 @@ RUN set -ex \
 
 # ============================================================================
 # Stage 4: Clone Spack from source
-# (hardcoded Rocky Linux 9 — no GPU overhead needed for this stage)
 # ============================================================================
 FROM rockylinux/rockylinux:9 AS spack-builder
 
@@ -192,9 +178,8 @@ LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docke
       org.opencontainers.image.description="Slurm Docker cluster on Rocky Linux 9" \
       maintainer="Giovanni Torres"
 
-ARG SLURM_VERSION
+ARG SLURM_VERSION=25.11.4
 ARG TARGETARCH
-ARG GPU_ENABLE
 
 # Enable CRB and EPEL repositories, then install runtime dependencies
 RUN set -ex \
@@ -307,8 +292,7 @@ RUN set -x \
         /var/spool/slurm \
         /var/lib/slurm \
         /var/log/slurm \
-        /etc/slurm \
-    && useradd -m -u 1001 ood
+        /etc/slurm
 
 # Copy Slurm configuration files
 # Version-specific configs: Extract major.minor from SLURM_VERSION (e.g., "24.11" from "24.11.6")
@@ -332,20 +316,10 @@ RUN set -ex \
          echo "Using common cgroup.conf"; \
          cp /tmp/slurm-config/common/cgroup.conf /etc/slurm/cgroup.conf; \
        fi \
-    && if [ "$GPU_ENABLE" = "true" ]; then \
-         echo "GPU support enabled, installing gres.conf"; \
-         cp /tmp/slurm-config/common/gres.conf /etc/slurm/gres.conf; \
-         chown slurm:slurm /etc/slurm/gres.conf; \
-         chmod 644 /etc/slurm/gres.conf; \
-       else \
-         echo "GPU support disabled, skipping gres.conf"; \
-       fi \
     && chown slurm:slurm /etc/slurm/slurm.conf /etc/slurm/cgroup.conf /etc/slurm/slurmdbd.conf /etc/slurm/job_submit.lua \
     && chmod 644 /etc/slurm/slurm.conf /etc/slurm/cgroup.conf \
     && chmod 600 /etc/slurm/slurmdbd.conf \
     && rm -rf /tmp/slurm-config
-
-COPY --chown=slurm:slurm --chmod=0600 examples /root/examples
 
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 RUN chmod +x /usr/local/bin/docker-entrypoint.sh

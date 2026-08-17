@@ -12,7 +12,7 @@ usage.
 ```bash
 git clone https://github.com/giovtorres/slurm-docker-cluster.git
 cd slurm-docker-cluster
-cp .env.example .env    # optional: edit to change version, enable GPU, etc.
+cp .env.example .env
 
 # Option A: Pull pre-built image from Docker Hub (fastest)
 docker pull giovtorres/slurm-docker-cluster:latest
@@ -25,7 +25,7 @@ make build
 make up
 ```
 
-**Supported Slurm versions:** 25.11, 25.05
+**Supported Slurm versions:** 25.11
 
 **Supported architectures (auto-detected):** AMD64, ARM64
 
@@ -38,8 +38,6 @@ make up
 - **slurmctld** - Controller for job scheduling
 - **slurmrestd** - REST API daemon (HTTP/JSON access)
 - **c1, c2** - CPU compute nodes (dynamically scalable)
-- **g1** - (optional) GPU compute node with NVIDIA support (dynamically scalable)
-- **ondemand** - (optional) Open OnDemand web portal
 - **elasticsearch** - (optional) indexing jobs
 - **kibana** - (optional) visualization for elasticsearch
 
@@ -50,7 +48,6 @@ make up
 - Job files (`slurm_jobdir`)
 - Database (`var_lib_mysql`)
 - Authentication (`etc_munge`)
-- OOD user home (`home_ood`)
 
 ## 🖥️ Using the Cluster
 
@@ -71,7 +68,7 @@ make run-examples
 ## 📈 Scaling
 
 Compute nodes use Slurm's dynamic registration (`slurmd -Z`) and self-register
-with sequential hostnames (c1, c2, c3... for CPU; g1, g2... for GPU). Scale up
+with sequential hostnames (c1, c2, c3... for CPU). Scale up
 or down at any time without rebuilding.
 
 ### Scale CPU Workers
@@ -84,15 +81,6 @@ make scale-cpu-workers N=5
 CPU_WORKER_COUNT=4
 make up
 ```
-
-### Scale GPU Workers
-
-```bash
-# Scale to 3 GPU workers (requires GPU_ENABLE=true)
-make scale-gpu-workers N=3
-```
-
-Verify with `make status`.
 
 ## 📊 Monitoring
 
@@ -135,61 +123,6 @@ make test-monitoring
 ```
 
 **Indexed data:** Job ID, user, partition, state, times, nodes, exit code
-
-## 🌐 Open OnDemand (Optional)
-
-Enable the [Open OnDemand](https://openondemand.org/) web portal for browser-based cluster access — submit jobs, manage files, and monitor the queue without the command line:
-
-```bash
-# Enable in .env
-OOD_ENABLE=true
-
-# Build and start (OOD profile auto-enabled)
-make build
-make up
-
-# Access at http://localhost:8080
-# Login: ood@localhost / password
-
-# Test OOD integration
-make test-ondemand
-```
-
-OOD connects to the Slurm cluster as the `ood` user and shares a home directory
-across compute nodes for job I/O. OOD config files live in `ood/`.Changes
-require `make rebuild`.
-
-> **Note:** This setup uses Dex with a static password for development
-> purposes. See the [OOD authentication docs](https://osc.github.io/ood-documentation/latest/authentication/dex.html).
-
-## 🎮 GPU Support (NVIDIA)
-
-Enable optional NVIDIA GPU support using [NVIDIA's official CUDA base images](https://hub.docker.com/r/nvidia/cuda/tags):
-
-```bash
-# 1. One-time host setup (add NVIDIA repo and install nvidia-container-toolkit)
-curl -s -L https://nvidia.github.io/libnvidia-container/stable/rpm/nvidia-container-toolkit.repo \
-  | sudo tee /etc/yum.repos.d/nvidia-container-toolkit.repo
-sudo dnf install -y nvidia-container-toolkit
-sudo nvidia-ctk runtime configure --runtime=docker
-sudo systemctl restart docker
-
-# 2. Enable GPU in .env (uses NVIDIA's official CUDA base images)
-GPU_ENABLE=true
-BUILDER_BASE=nvidia/cuda:13.1.1-devel-rockylinux9
-RUNTIME_BASE=nvidia/cuda:13.1.1-base-rockylinux9
-
-# 3. Build with GPU support
-make rebuild
-
-# 4. Verify GPU detection
-docker exec g1 nvidia-smi
-
-# Test GPU functionality
-make test-gpu
-```
-
-> **Note:** GPU testing is not included in CI (GitHub-hosted runners have no GPUs). Run `make test-gpu` manually on a host with an NVIDIA GPU and `nvidia-container-toolkit` installed.
 
 ## 📦 Software Installation
 
@@ -238,11 +171,6 @@ Pre-built multi-arch images (amd64 + arm64) are published on each [GitHub releas
 docker pull giovtorres/slurm-docker-cluster:latest
 docker pull giovtorres/slurm-docker-cluster:25.11.4          # latest build for this Slurm version
 docker pull giovtorres/slurm-docker-cluster:25.11.4-2.1.0   # pinned to a specific release
-
-# GPU images (built on nvidia/cuda base)
-docker pull giovtorres/slurm-docker-cluster:latest-gpu
-docker pull giovtorres/slurm-docker-cluster:25.11.4-gpu
-docker pull giovtorres/slurm-docker-cluster:25.11.4-gpu-2.1.0
 ```
 
 ## ⚙️ Advanced
@@ -250,7 +178,7 @@ docker pull giovtorres/slurm-docker-cluster:25.11.4-gpu-2.1.0
 ### Version Management
 
 ```bash
-make set-version VER=25.05.7   # Switch Slurm version
+make set-version VER=25.11.4   # Switch Slurm version
 make version                   # Show current version
 make build-all                 # Build all supported versions
 make test-all                  # Test all versions
@@ -264,7 +192,7 @@ docker exec -it slurmctld vi /etc/slurm/slurm.conf
 make reload-slurm
 
 # Push local changes
-vi config/25.05/slurm.conf
+vi config/25.11/slurm.conf
 make update-slurm FILES="slurm.conf"
 
 # Permanent changes
@@ -276,8 +204,8 @@ make rebuild
 ```bash
 # Cross-platform build (uses QEMU emulation)
 docker buildx build --platform linux/arm64 \
-  --build-arg SLURM_VERSION=25.05.7 \
-  --load -t slurm-docker-cluster:25.05.7 .
+  --build-arg SLURM_VERSION=25.11.4 \
+  --load -t slurm-docker-cluster:25.11.4 .
 ```
 
 ## 📚 Documentation

@@ -171,32 +171,6 @@ then
         --conf "Feature=cpu"
 fi
 
-if [ "$1" = "slurmd-gpu" ]
-then
-    echo "---> Waiting for slurmctld to become active before starting GPU slurmd..."
-
-    until 2>/dev/null >/dev/tcp/slurmctld/6817
-    do
-        echo "-- slurmctld is not available.  Sleeping ..."
-        sleep 2
-    done
-    echo "-- slurmctld is now active ..."
-
-    # Derive a sequential node name from the Docker Compose replica number.
-    # e.g., slurm-gpu-worker-1 -> g1, slurm-gpu-worker-2 -> g2
-    # Falls back to container ID if replica detection fails.
-    REPLICA=$(detect_replica_number "gpu-worker")
-    NODE_NAME="g${REPLICA}"
-    hostname "${NODE_NAME}"
-
-    echo "---> Dynamic GPU worker registering as: ${NODE_NAME}"
-    echo "---> Starting slurmd in dynamic GPU registration mode (-Z)..."
-
-    GPU_COUNT=$(ls /dev/nvidia[0-9] 2>/dev/null | wc -l)
-    exec /usr/sbin/slurmd -Z -Dvvv \
-        --conf "Feature=gpu Gres=gpu:nvidia:${GPU_COUNT}"
-fi
-
 # --- SCRATCH Directory Setup ---
 # 1. Create base scratch directory with sticky bit (like /tmp)
 mkdir -p /tmp/scratch
