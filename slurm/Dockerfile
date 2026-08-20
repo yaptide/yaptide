@@ -188,43 +188,44 @@ RUN set -ex \
     && dnf config-manager --set-enabled crb \
     && dnf makecache \
     && dnf -y install \
-       apptainer \
-       bash-completion \
-       bzip2 \
-       bzip2-devel \
-       file \
-       gcc \
-       gcc-c++ \
-       gcc-gfortran \
-       gettext \
-       git \
-       hdf5 \
-       http-parser \
-       hwloc \
-       json-c \
-       jq \
-       libaec \
-       libyaml \
-       lua \
-       lua-posix \
-       lua-filesystem \
-       lz4 \
-       make \
-       mariadb \
-       munge \
-       numactl \
-       openssh-server \
-       patch \
-       perl \
-       procps-ng \
-       psmisc \
-       python3.12 \
-       readline \
-       tcl \
-       vim-enhanced \
-       wget \
-       xz \
-       libjwt \
+        apptainer \
+        bash-completion \
+        bzip2 \
+        bzip2-devel \
+        file \
+        gcc \
+        gcc-c++ \
+        gcc-gfortran \
+        gettext \
+        git \
+        hdf5 \
+        http-parser \
+        hwloc \
+        json-c \
+        jq \
+        libaec \
+        libyaml \
+        lua \
+        lua-posix \
+        lua-filesystem \
+        lz4 \
+        make \
+        mariadb \
+        munge \
+        numactl \
+        openssh-server \
+        patch \
+        perl \
+        procps-ng \
+        psmisc \
+        python3.12 \
+        python3.12-pip \
+        readline \
+        tcl \
+        vim-enhanced \
+        wget \
+        xz \
+        libjwt \
     && dnf clean all \
     && rm -rf /var/cache/dnf \
     && alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
@@ -232,6 +233,9 @@ RUN set -ex \
     && ssh-keygen -A \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+# Install pymchelper
+RUN python3 -m pip install --no-cache-dir pymchelper
 
 # Install gosu
 COPY --from=gosu-builder /go/bin/gosu /usr/local/bin/gosu

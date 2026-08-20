@@ -24,12 +24,9 @@ services:
       - ./slurm/ca_key:/ca_key:ro
     environment:
       - CA_KEY_PATH=/ca_key/ca_key
+      - PYTHONUNBUFFERED=1
     healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          'python3 -c ''import socket; s = socket.create_connection(("localhost", 5001), timeout=2); s.close()''',
-        ]
+      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('localhost', 5001), timeout=2); s.close()"]
       interval: 5s
       timeout: 3s
       retries: 3
@@ -90,24 +87,16 @@ services:
   slurmctld:
     image: slurm-docker-cluster:25.11.4
     init: true
-    command:
-      - /bin/bash
-      - -c
-      - |
-        cp /tmp/ca.pub /etc/ssh/ca.pub
-        chown root:root /etc/ssh/ca.pub
-        chmod 644 /etc/ssh/ca.pub
-        grep -q '^TrustedUserCAKeys' /etc/ssh/sshd_config || echo 'TrustedUserCAKeys /etc/ssh/ca.pub' >> /etc/ssh/sshd_config
-        grep -q '^PubkeyAcceptedAlgorithms' /etc/ssh/sshd_config || echo 'PubkeyAcceptedAlgorithms +rsa-sha2-512-cert-v01@openssh.com,rsa-sha2-256-cert-v01@openssh.com' >> /etc/ssh/sshd_config
-        /usr/sbin/sshd
-        exec /usr/sbin/slurmctld -D
+    command: ["slurmctld"]
     container_name: slurmctld
     hostname: slurmctld
     privileged: true
     working_dir: /data
     environment:
       ELASTICSEARCH_HOST: ${ELASTICSEARCH_HOST:-}
-      SSH_ENABLE: ${SSH_ENABLE:-false}
+      SSH_ENABLE: ${SSH_ENABLE:-true}
+      SLURM_USER: ${SLURM_USER:-devuser}
+      SLURM_ACCOUNT: ${SLURM_ACCOUNT:-dev_account}
     volumes:
       - etc_munge:/etc/munge:z
       - etc_slurm:/etc/slurm:z
@@ -116,6 +105,7 @@ services:
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
       - ./slurm/ca_key/ca_key.pub:/tmp/ca.pub:ro
+      - ./bin:/opt/spack/modules/shieldhit/bin:ro
       - tmp_scratch:/tmp/scratch:z
     ports:
       - "${SSH_PORT:-3022}:22"
@@ -163,7 +153,7 @@ services:
     working_dir: /data
     privileged: true
     environment:
-      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-slurm}
+      SLURM_USER: ${SLURM_USER:-devuser}
     volumes:
       - etc_munge:/etc/munge
       - etc_slurm:/etc/slurm
@@ -171,6 +161,7 @@ services:
       - var_log_slurm:/var/log/slurm
       - opt_modulefiles:/opt/modulefiles
       - spack_root:/opt/spack
+      - ./bin:/opt/spack/modules/shieldhit/bin:ro
       - tmp_scratch:/tmp/scratch:z
     expose:
       - "6818"

@@ -2,7 +2,6 @@
 # copy these values to .env if using Slurm
 
 # Docker Compose project name (affects container and volume name prefixes)
-COMPOSE_PROJECT_NAME=slurm
 LMOD_VERSION=9.1.2
 SPACK_VERSION=v1.1.1
 MYSQL_USER=slurm
