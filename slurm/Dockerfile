@@ -8,6 +8,7 @@ ARG GOSU_VERSION=1.19
 ARG LMOD_VERSION=9.1.2
 ARG SPACK_VERSION=v1.1.1
 ARG PYMCHELPER_VERSION=2.7.0
+ARG NUMPY_VERSION=2.2.3
 ARG BUILDER_BASE=rockylinux/rockylinux:9
 ARG RUNTIME_BASE=rockylinux/rockylinux:9
 
@@ -184,6 +185,7 @@ LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docke
 
 ARG SLURM_VERSION=25.11.4
 ARG PYMCHELPER_VERSION=2.7.0
+ARG NUMPY_VERSION=2.2.3
 ARG TARGETARCH
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
@@ -241,7 +243,9 @@ RUN set -ex \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 
-RUN python3 -m pip install --no-cache-dir "pymchelper==${PYMCHELPER_VERSION}"
+RUN python3 -m pip install --no-cache-dir \
+    "numpy==${NUMPY_VERSION}" \
+    "pymchelper==${PYMCHELPER_VERSION}"
 
 COPY --from=gosu-builder /go/bin/gosu /usr/local/bin/gosu
 RUN gosu --version && gosu nobody true
