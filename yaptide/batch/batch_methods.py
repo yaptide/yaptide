@@ -61,6 +61,7 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
 
     con = Connection(
         host=f"{user.username}@{cluster.cluster_name}",
+        port=cluster.port,
         connect_kwargs={"pkey": pkey, "allow_agent": False, "look_for_keys": False},
     )
     return con
@@ -74,7 +75,12 @@ def post_update(dict_to_send):
 
 @celery_app.task()
 def submit_job(  # skipcq: PY-R1000
-    payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str
+    payload_dict: dict,
+    files_dict: dict,
+    userId: int,
+    clusterId: int,
+    sim_id: int,
+    update_key: str,
 ):
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
@@ -145,7 +151,11 @@ def submit_job(  # skipcq: PY-R1000
     con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
-        payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con
+        payload_dict=payload_dict,
+        job_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key,
+        con=con,
     )
 
     array_id = collect_id = None
@@ -220,6 +230,8 @@ def prepare_script_files(
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
+
+    logging.warning(backend_url)
 
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         submit_template = SUBMIT_FLUKA
