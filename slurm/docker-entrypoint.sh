@@ -88,7 +88,7 @@ then
     fi
 
     # Wait for MySQL using environment variables directly
-    until echo "SELECT 1" | mysql -h mysql -uslurm -ppassword 2>&1 > /dev/null
+    until echo "SELECT 1" | mysql -h mysql -uslurm -ppassword > /dev/null 2>&1
     do
         echo "-- Waiting for database to become active ..."
         sleep 2

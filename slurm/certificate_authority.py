@@ -1,15 +1,22 @@
+"""Mock Certificate Authority HTTP server for signing SSH keys."""
+
 import json
 import os
+import shutil
 import subprocess
 import tempfile
 import jwt  # Make sure PyJWT is in your Dockerfile or requirements
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 CA_KEY_PATH = os.environ.get("CA_KEY_PATH", "/ca_key/ca_key")
+SSH_KEYGEN_BIN = shutil.which("ssh-keygen") or "/usr/bin/ssh-keygen"
 
 
 class CertAuthHandler(BaseHTTPRequestHandler):
+    """HTTP request handler for signing user SSH keys using the CA key."""
+
     def do_GET(self):
+        """Handle GET requests to issue signed SSH certificates."""
         # 1. Extract username from Keycloak Authorization header if available
         auth_header = self.headers.get("Authorization", "")
         username = "devuser"  # Fallback default
@@ -27,13 +34,16 @@ class CertAuthHandler(BaseHTTPRequestHandler):
             user_key = os.path.join(tmpdir, "id_rsa")
 
             # 2. Generate SSH keypair
-            subprocess.run(["ssh-keygen", "-t", "rsa", "-b", "2048", "-f", user_key, "-N", "", "-q"], check=True)
+            subprocess.run(
+                [SSH_KEYGEN_BIN, "-t", "rsa", "-b", "2048", "-f", user_key, "-N", "", "-q"],
+                check=True,
+            )
 
             # 3. Sign public key for the extracted principal ($username)
             try:
                 subprocess.run(
                     [
-                        "ssh-keygen",
+                        SSH_KEYGEN_BIN,
                         "-s",
                         CA_KEY_PATH,
                         "-I",
@@ -57,9 +67,9 @@ class CertAuthHandler(BaseHTTPRequestHandler):
                 return
 
             # 4. Read keys
-            with open(user_key, "r") as f:
+            with open(user_key, "r", encoding="utf-8") as f:
                 private_key = f.read()
-            with open(f"{user_key}-cert.pub", "r") as f:
+            with open(f"{user_key}-cert.pub", "r", encoding="utf-8") as f:
                 cert = f.read()
 
         # 5. Respond with JSON payload expected by Flask backend
@@ -70,7 +80,8 @@ class CertAuthHandler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))
-    server = HTTPServer(("0.0.0.0", port), CertAuthHandler)
-    print(f"Cert Auth Server listening on 0.0.0.0:{port}...")
+    host = os.environ.get("CA_HOST", "0.0.0.0")  # nosec B104
+    port = int(os.environ.get("CA_PORT", 5001))
+    server = HTTPServer((host, port), CertAuthHandler)
+    print(f"Cert Auth Server listening on {host}:{port}...")
     server.serve_forever()

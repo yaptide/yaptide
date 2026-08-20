@@ -12,8 +12,6 @@ ARG RUNTIME_BASE=rockylinux/rockylinux:9
 
 # ============================================================================
 # Stage 1: Build gosu from source
-# (pre-built binaries use an old Go version that triggers CVEs)
-# https://github.com/tianon/gosu/issues/136
 # ============================================================================
 FROM golang:1.26-bookworm AS gosu-builder
 
@@ -22,11 +20,14 @@ ARG TARGETOS
 ARG TARGETARCH
 
 RUN set -ex \
-    && git clone --branch ${GOSU_VERSION} --depth 1 \
-       https://github.com/tianon/gosu.git /go/src/github.com/tianon/gosu \
-    && cd /go/src/github.com/tianon/gosu \
+    && git clone --branch "${GOSU_VERSION}" --depth 1 \
+       https://github.com/tianon/gosu.git /go/src/github.com/tianon/gosu
+
+WORKDIR /go/src/github.com/tianon/gosu
+
+RUN set -ex \
     && go mod download \
-    && CGO_ENABLED=0 GOOS=${TARGETOS} GOARCH=${TARGETARCH} \
+    && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
        go build -v -trimpath -ldflags '-d -w' \
        -o /go/bin/gosu . \
     && chmod +x /go/bin/gosu
@@ -86,14 +87,16 @@ RUN set -ex \
     && dnf clean all \
     && rm -rf /var/cache/dnf
 
-# Setup RPM build environment
 RUN rpmdev-setuptree
 
-# Copy RPM macros
 COPY rpmbuild/slurm.rpmmacros /root/.rpmmacros
 
-# Download official Slurm release tarball and build RPMs with slurmrestd enabled
-# Architecture mapping: Docker TARGETARCH (amd64, arm64) -> RPM arch (x86_64, aarch64)
+RUN set -ex \
+    && wget -q -O "/root/rpmbuild/SOURCES/slurm-${SLURM_VERSION}.tar.bz2" \
+       "https://download.schedmd.com/slurm/slurm-${SLURM_VERSION}.tar.bz2"
+
+WORKDIR /root/rpmbuild/SOURCES
+
 RUN set -ex \
     && RPM_ARCH=$(case "${TARGETARCH}" in \
          amd64) echo "x86_64" ;; \
@@ -101,11 +104,8 @@ RUN set -ex \
          *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
        esac) \
     && echo "Building Slurm RPMs for architecture: ${RPM_ARCH}" \
-    && wget -O /root/rpmbuild/SOURCES/slurm-${SLURM_VERSION}.tar.bz2 \
-       https://download.schedmd.com/slurm/slurm-${SLURM_VERSION}.tar.bz2 \
-    && cd /root/rpmbuild/SOURCES \
-    && rpmbuild -ta slurm-${SLURM_VERSION}.tar.bz2 \
-    && ls -lh /root/rpmbuild/RPMS/${RPM_ARCH}/
+    && rpmbuild -ta "slurm-${SLURM_VERSION}.tar.bz2" \
+    && ls -lh "/root/rpmbuild/RPMS/${RPM_ARCH}/"
 
 # ============================================================================
 # Stage 3: Build Lmod from source
@@ -133,10 +133,13 @@ RUN set -ex \
     && rm -rf /var/cache/dnf
 
 RUN set -ex \
-    && wget -O /tmp/Lmod-${LMOD_VERSION}.tar.gz \
-       https://github.com/TACC/Lmod/archive/refs/tags/${LMOD_VERSION}.tar.gz \
-    && tar -xzf /tmp/Lmod-${LMOD_VERSION}.tar.gz -C /tmp \
-    && cd /tmp/Lmod-${LMOD_VERSION} \
+    && wget -q -O "/tmp/Lmod-${LMOD_VERSION}.tar.gz" \
+       "https://github.com/TACC/Lmod/archive/refs/tags/${LMOD_VERSION}.tar.gz" \
+    && tar -xzf "/tmp/Lmod-${LMOD_VERSION}.tar.gz" -C /tmp
+
+WORKDIR /tmp/Lmod-${LMOD_VERSION}
+
+RUN set -ex \
     && ./configure --prefix=/usr/local \
     && make install
 
@@ -147,17 +150,14 @@ FROM rockylinux/rockylinux:9 AS spack-builder
 
 ARG SPACK_VERSION
 
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 RUN dnf -y install git gcc && dnf clean all
 
 RUN git clone --depth=1 --branch "${SPACK_VERSION}" \
         https://github.com/spack/spack.git /usr/local/spack
 
-# Write site-level Spack config:
-# - modules.yaml: generate Lmod modulefiles using the system GCC as the core compiler
-# - config.yaml:  store installed packages and generated modules under /opt/spack (the named volume)
-# - packages.yaml: pin target to the base ISA (x86_64 or aarch64) so the module
-#                  path is predictable and matches the MODULEPATH baked into lmod.sh
-RUN set -ex \
+RUN set -exo pipefail \
     && GCC_VER=$(gcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) \
     && ARCH=$(uname -m) \
     && mkdir -p /usr/local/spack/etc/spack \
@@ -181,51 +181,52 @@ LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docke
 ARG SLURM_VERSION=25.11.4
 ARG TARGETARCH
 
-# Enable CRB and EPEL repositories, then install runtime dependencies
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 RUN set -ex \
     && dnf -y update \
     && dnf -y install dnf-plugins-core epel-release \
     && dnf config-manager --set-enabled crb \
     && dnf makecache \
     && dnf -y install \
-        apptainer \
-        bash-completion \
-        bzip2 \
-        bzip2-devel \
-        file \
-        gcc \
-        gcc-c++ \
-        gcc-gfortran \
-        gettext \
-        git \
-        hdf5 \
-        http-parser \
-        hwloc \
-        json-c \
-        jq \
-        libaec \
-        libyaml \
-        lua \
-        lua-posix \
-        lua-filesystem \
-        lz4 \
-        make \
-        mariadb \
-        munge \
-        numactl \
-        openssh-server \
-        patch \
-        perl \
-        procps-ng \
-        psmisc \
-        python3.12 \
-        python3.12-pip \
-        readline \
-        tcl \
-        vim-enhanced \
-        wget \
-        xz \
-        libjwt \
+       apptainer \
+       bash-completion \
+       bzip2 \
+       bzip2-devel \
+       file \
+       gcc \
+       gcc-c++ \
+       gcc-gfortran \
+       gettext \
+       git \
+       hdf5 \
+       http-parser \
+       hwloc \
+       json-c \
+       jq \
+       libaec \
+       libyaml \
+       lua \
+       lua-posix \
+       lua-filesystem \
+       lz4 \
+       make \
+       mariadb \
+       munge \
+       numactl \
+       openssh-server \
+       patch \
+       perl \
+       procps-ng \
+       psmisc \
+       python3.12 \
+       python3.12-pip \
+       readline \
+       tcl \
+       vim-enhanced \
+       wget \
+       xz \
+       libjwt \
     && dnf clean all \
     && rm -rf /var/cache/dnf \
     && alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
@@ -234,22 +235,14 @@ RUN set -ex \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 
-# Install pymchelper
 RUN python3 -m pip install --no-cache-dir pymchelper
 
-# Install gosu
 COPY --from=gosu-builder /go/bin/gosu /usr/local/bin/gosu
 RUN gosu --version && gosu nobody true
 
-# Install Lmod
 COPY --from=lmod-builder /usr/local/lmod /usr/local/lmod
-
-# Install Spack
 COPY --from=spack-builder /usr/local/spack /usr/local/spack
 
-# Configure Lmod system-wide and source Spack's shell integration.
-# MODULEPATH uses the base ISA arch (x86_64/aarch64 from uname -m) which matches
-# the target forced in packages.yaml, avoiding microarch mismatches (e.g. zen2).
 RUN ARCH=$(uname -m) \
     && printf '%s\n' \
       'source /usr/local/lmod/lmod/init/bash' \
@@ -262,7 +255,6 @@ RUN ARCH=$(uname -m) \
 
 COPY --from=builder /root/rpmbuild/RPMS/*/*.rpm /tmp/rpms/
 
-# Install Slurm RPMs
 RUN set -ex \
     && dnf -y install /tmp/rpms/slurm-[0-9]*.rpm \
        /tmp/rpms/slurm-perlapi-*.rpm \
@@ -277,7 +269,6 @@ RUN set -ex \
     && rm -rf /tmp/rpms \
     && dnf clean all
 
-# Create users, generate munge key, and set up directories
 RUN set -x \
     && groupadd -r --gid=990 slurm \
     && useradd -r -g slurm --uid=990 slurm \
@@ -298,15 +289,13 @@ RUN set -x \
         /var/log/slurm \
         /etc/slurm
 
-# Copy Slurm configuration files
-# Version-specific configs: Extract major.minor from SLURM_VERSION (e.g., "24.11" from "24.11.6")
 COPY config/ /tmp/slurm-config/
 RUN set -ex \
-    && MAJOR_MINOR=$(echo ${SLURM_VERSION} | cut -d. -f1,2) \
+    && MAJOR_MINOR=$(echo "${SLURM_VERSION}" | cut -d. -f1,2) \
     && echo "Detected Slurm version: ${MAJOR_MINOR}" \
     && if [ -f "/tmp/slurm-config/${MAJOR_MINOR}/slurm.conf" ]; then \
          echo "Using version-specific config for ${MAJOR_MINOR}"; \
-         cp /tmp/slurm-config/${MAJOR_MINOR}/slurm.conf /etc/slurm/slurm.conf; \
+         cp "/tmp/slurm-config/${MAJOR_MINOR}/slurm.conf" /etc/slurm/slurm.conf; \
        else \
          echo "No version-specific config found for ${MAJOR_MINOR}, using latest (25.11)"; \
          cp /tmp/slurm-config/25.11/slurm.conf /etc/slurm/slurm.conf; \
@@ -315,7 +304,7 @@ RUN set -ex \
     && cp /tmp/slurm-config/common/job_submit.lua /etc/slurm/job_submit.lua \
     && if [ -f "/tmp/slurm-config/${MAJOR_MINOR}/cgroup.conf" ]; then \
          echo "Using version-specific cgroup.conf for ${MAJOR_MINOR}"; \
-         cp /tmp/slurm-config/${MAJOR_MINOR}/cgroup.conf /etc/slurm/cgroup.conf; \
+         cp "/tmp/slurm-config/${MAJOR_MINOR}/cgroup.conf" /etc/slurm/cgroup.conf; \
        else \
          echo "Using common cgroup.conf"; \
          cp /tmp/slurm-config/common/cgroup.conf /etc/slurm/cgroup.conf; \
