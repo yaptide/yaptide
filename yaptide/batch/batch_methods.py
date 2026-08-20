@@ -81,7 +81,6 @@ def submit_job(  # skipcq: PY-R1000
     clusterId: int,
     sim_id: int,
     update_key: str,
-    backend_external_url: str = "",
 ):
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
@@ -157,7 +156,6 @@ def submit_job(  # skipcq: PY-R1000
         sim_id=sim_id,
         update_key=update_key,
         con=con,
-        backend_external_url=backend_external_url,
     )
 
     array_id = collect_id = None
@@ -218,7 +216,7 @@ def submit_job(  # skipcq: PY-R1000
 
 
 def prepare_script_files(
-    payload_dict: dict, job_dir: str, sim_id: int, update_key: str, con: Connection, backend_external_url: str = ""
+    payload_dict: dict, job_dir: str, sim_id: int, update_key: str, con: Connection
 ) -> tuple[str, dict]:
     """Prepares script files to run them on cluster"""
     submit_file = f"{job_dir}/yaptide_submitter.sh"
@@ -231,7 +229,9 @@ def prepare_script_files(
     collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
 
-    backend_url = os.environ.get("BACKEND_EXTERNAL_URL", backend_external_url)
+    backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
+
+    logging.warning(backend_url)
 
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         submit_template = SUBMIT_FLUKA

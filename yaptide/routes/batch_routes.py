@@ -1,4 +1,3 @@
-import os
 import uuid
 from datetime import datetime
 
@@ -97,7 +96,6 @@ class JobsBatch(Resource):
             clusterId=cluster.id,
             sim_id=simulation.id,
             update_key=update_key,
-            backend_external_url=os.environ.get("BACKEND_EXTERNAL_URL", ""),
         )
 
         requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
