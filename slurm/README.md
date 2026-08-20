@@ -78,7 +78,7 @@ or down at any time without rebuilding.
 make scale-cpu-workers N=5
 
 # Or set the default count in .env
-CPU_WORKER_COUNT=4
+SLURM_CPU_WORKER_COUNT=4
 make up
 ```
 
