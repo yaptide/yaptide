@@ -7,6 +7,7 @@ ARG SLURM_VERSION=25.11.4
 ARG GOSU_VERSION=1.19
 ARG LMOD_VERSION=9.1.2
 ARG SPACK_VERSION=v1.1.1
+ARG PYMCHELPER_VERSION=2.7.0
 ARG BUILDER_BASE=rockylinux/rockylinux:9
 ARG RUNTIME_BASE=rockylinux/rockylinux:9
 
@@ -42,6 +43,7 @@ ARG TARGETARCH
 
 # Enable CRB and EPEL repositories for development packages
 # Install RPM build tools and dependencies
+# skipcq: DOK-W1005
 RUN set -ex \
     && dnf makecache \
     && dnf -y install dnf-plugins-core epel-release \
@@ -114,6 +116,7 @@ FROM rockylinux/rockylinux:9 AS lmod-builder
 
 ARG LMOD_VERSION
 
+# skipcq: DOK-W1005
 RUN set -ex \
     && dnf -y install dnf-plugins-core epel-release \
     && dnf config-manager --set-enabled crb \
@@ -152,6 +155,7 @@ ARG SPACK_VERSION
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# skipcq: DOK-W1005
 RUN dnf -y install git gcc && dnf clean all
 
 RUN git clone --depth=1 --branch "${SPACK_VERSION}" \
@@ -179,10 +183,12 @@ LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docke
       maintainer="Giovanni Torres"
 
 ARG SLURM_VERSION=25.11.4
+ARG PYMCHELPER_VERSION=2.7.0
 ARG TARGETARCH
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
+# skipcq: DOK-W1005
 RUN set -ex \
     && dnf -y update \
     && dnf -y install dnf-plugins-core epel-release \
@@ -235,7 +241,7 @@ RUN set -ex \
     && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
     && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
 
-RUN python3 -m pip install --no-cache-dir pymchelper
+RUN python3 -m pip install --no-cache-dir "pymchelper==${PYMCHELPER_VERSION}"
 
 COPY --from=gosu-builder /go/bin/gosu /usr/local/bin/gosu
 RUN gosu --version && gosu nobody true
@@ -255,6 +261,7 @@ RUN ARCH=$(uname -m) \
 
 COPY --from=builder /root/rpmbuild/RPMS/*/*.rpm /tmp/rpms/
 
+# skipcq: DOK-W1005
 RUN set -ex \
     && dnf -y install /tmp/rpms/slurm-[0-9]*.rpm \
        /tmp/rpms/slurm-perlapi-*.rpm \
