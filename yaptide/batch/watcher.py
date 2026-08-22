@@ -14,7 +14,10 @@ from typing import Optional
 from urllib import request
 import math
 
-import zmq
+try:
+    import zmq
+except ImportError:  # the cluster may not provide pyzmq, updates then go straight to the backend
+    zmq = None
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -122,7 +125,7 @@ class AggregatorSender:
 
 def connect_to_aggregator(auth_path: Optional[Path]) -> Optional[AggregatorSender]:
     """Builds the sender, returns None when no aggregator is available and REST should be used instead"""
-    if auth_path is None:
+    if auth_path is None or zmq is None:
         return None
     try:
         return AggregatorSender(auth_path=auth_path)
