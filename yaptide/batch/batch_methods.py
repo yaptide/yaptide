@@ -144,11 +144,14 @@ def submit_job(  # skipcq: PY-R1000
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
     SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
+    AGGREGATOR_SCRIPT = Path(__file__).parent.resolve() / "aggregator.py"
 
     logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
     logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
     con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+    logging.debug("Transfering aggregator script %s to %s", AGGREGATOR_SCRIPT, job_dir)
+    con.put(AGGREGATOR_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
         payload_dict=payload_dict,
@@ -253,6 +256,9 @@ def prepare_script_files(
         root_dir=job_dir,
         n_tasks=str(payload_dict["ntasks"]),
         convertmc_version=pymchelper.__version__,
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url,
     )
     array_script = array_template.format(
         array_header=array_header, root_dir=job_dir, sim_id=sim_id, update_key=update_key, backend_url=backend_url
