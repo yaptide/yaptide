@@ -110,6 +110,28 @@ def fetch_task_by_sim_id_and_task_id(sim_id: int, task_id: int) -> Union[BatchTa
     return task
 
 
+def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
+    """Updates many tasks of one simulation in a single query and a single commit.
+
+    `task_updates` is a list of `{"task_id": int, "update_dict": dict}` entries.
+    Returns the number of tasks that were found and updated.
+    """
+    updates_by_task_id = {update["task_id"]: update["update_dict"] for update in task_updates}
+    TaskPoly = with_polymorphic(TaskModel, [BatchTaskModel, CeleryTaskModel])
+    tasks = (
+        db.session.query(TaskPoly)
+        .filter(TaskModel.simulation_id == sim_id, TaskModel.task_id.in_(updates_by_task_id.keys()))
+        .all()
+    )
+    for task in tasks:
+        task.update_state(updates_by_task_id[task.task_id])
+    db.session.commit()
+    if len(tasks) != len(updates_by_task_id):
+        missing = set(updates_by_task_id.keys()) - {task.task_id for task in tasks}
+        logging.warning("Simulation %d has no tasks with ids %s, skipping their updates", sim_id, sorted(missing))
+    return len(tasks)
+
+
 def fetch_tasks_by_sim_id(sim_id: int) -> Union[list[BatchTaskModel], list[CeleryTaskModel]]:
     """Fetches tasks by simulation id, sorted by task_id"""
     TaskPoly = with_polymorphic(TaskModel, [BatchTaskModel, CeleryTaskModel])

@@ -15,6 +15,23 @@ COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
 
+# the aggregator batches the progress updates of all tasks into single requests to the backend
+AUTH_FILE=$ROOT_DIR/.zmq_auth
+nohup python3 $ROOT_DIR/aggregator.py --sim_id={sim_id} --update_key={update_key} \
+    --backend_url={backend_url} --root_dir=$ROOT_DIR --ntasks={n_tasks} \
+    > $ROOT_DIR/aggregator.log 2>&1 &
+AGGREGATOR_PID=$!
+
+# tasks need the address the aggregator bound to, it writes it once the socket is up
+for _ in $(seq 1 30); do
+    [ -f $AUTH_FILE ] && break
+    sleep 1
+done
+if [ ! -f $AUTH_FILE ] ; then
+    echo "Aggregator failed to start, tasks will report directly to the backend"
+    kill $AGGREGATOR_PID 2>/dev/null
+fi
+
 SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
@@ -25,6 +42,10 @@ if [ -n "$JOB_ID" ] ; then
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
+else
+    # nothing will ever report to the aggregator, do not leave it running on the login node
+    kill $AGGREGATOR_PID 2>/dev/null
+    rm -f $AUTH_FILE
 fi
 """  # skipcq: FLK-E501
 
@@ -83,6 +104,7 @@ python3 $ROOT_DIR/watcher.py \\
     --task_id=$SLURM_ARRAY_TASK_ID\\
     --update_key={update_key}\\
     --backend_url={backend_url}\\
+    --zmq_auth=$ROOT_DIR/.zmq_auth\\
     --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 trap 'sig_handler' SIGUSR1
