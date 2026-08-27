@@ -12,6 +12,68 @@ CA_KEY_PATH = os.environ.get("CA_KEY_PATH", "/ca_key/ca_key")
 SSH_KEYGEN_BIN = shutil.which("ssh-keygen") or "/usr/bin/ssh-keygen"
 
 
+def resolve_principal_from_token(token):
+    """Return the principal name from a bearer token.
+
+    This mock CA must not trust bearer tokens by default. When a signing secret is
+    configured, the token signature is verified before principal selection. The only
+    insecure escape hatch is an explicit dev-only override for local testing.
+    """
+    if not token or not isinstance(token, str):
+        raise ValueError("Invalid JWT: missing bearer token")
+
+    if token.count(".") != 2:
+        raise ValueError("Invalid JWT: malformed token")
+
+    allow_insecure_tokens = os.environ.get("CA_ALLOW_INSECURE_TOKENS", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+    try:
+        header = jwt.get_unverified_header(token)
+    except jwt.InvalidTokenError as exc:
+        raise ValueError("Invalid JWT: malformed token header") from exc
+
+    algorithm = header.get("alg")
+    signing_secret = os.environ.get("CA_JWT_SECRET")
+
+    if allow_insecure_tokens:
+        try:
+            claims = jwt.decode(token, options={"verify_signature": False})
+        except jwt.InvalidTokenError as exc:
+            raise ValueError("Invalid JWT: token could not be decoded") from exc
+        if not isinstance(claims, dict):
+            raise ValueError("Invalid JWT: payload is not an object")
+        username = claims.get("preferred_username") or claims.get("username")
+        if not username:
+            raise ValueError("Invalid JWT: missing preferred_username claim")
+        return str(username)
+
+    if not signing_secret:
+        raise ValueError(
+            "JWT signature must be verified before trusting a principal; "
+            "set CA_JWT_SECRET or CA_ALLOW_INSECURE_TOKENS=1 only for local dev/test use."
+        )
+
+    try:
+        claims = jwt.decode(token, key=signing_secret, algorithms=[algorithm] if algorithm else ["HS256"])
+    except jwt.InvalidTokenError as exc:
+        raise ValueError("Invalid JWT: signature verification failed") from exc
+    except Exception as exc:  # pragma: no cover - defensive fallback
+        raise ValueError("Invalid JWT: token parse failed") from exc
+
+    if not isinstance(claims, dict):
+        raise ValueError("Invalid JWT: payload is not an object")
+
+    username = claims.get("preferred_username") or claims.get("username")
+    if not username:
+        raise ValueError("Invalid JWT: missing preferred_username claim")
+    return str(username)
+
+
 class CertAuthHandler(BaseHTTPRequestHandler):
     """HTTP request handler for signing user SSH keys using the CA key."""
 
@@ -19,16 +81,23 @@ class CertAuthHandler(BaseHTTPRequestHandler):
         """Handle GET requests to issue signed SSH certificates."""
         # 1. Extract username from Keycloak Authorization header if available
         auth_header = self.headers.get("Authorization", "")
-        username = "devuser"  # Fallback default
 
         if auth_header.startswith("Bearer "):
-            token = auth_header.replace("Bearer ", "")
+            token = auth_header.replace("Bearer ", "", 1).strip()
             try:
-                # Unverified decode just to inspect claims
-                decoded = jwt.decode(token, options={"verify_signature": False})
-                username = decoded.get("preferred_username") or decoded.get("username") or "devuser"
-            except Exception as e:
-                print(f"Warning: Failed to parse Bearer token in Mock CA: {e}")
+                username = resolve_principal_from_token(token)
+            except ValueError as exc:
+                self.send_response(401)
+                self.send_header("Content-Type", "application/json")
+                self.end_headers()
+                self.wfile.write(json.dumps({"error": str(exc)}).encode())
+                return
+        else:
+            self.send_response(401)
+            self.send_header("Content-Type", "application/json")
+            self.end_headers()
+            self.wfile.write(b'{"error": "Missing bearer token"}')
+            return
 
         with tempfile.TemporaryDirectory() as tmpdir:
             user_key = os.path.join(tmpdir, "id_rsa")

@@ -25,8 +25,16 @@ services:
     environment:
       - CA_KEY_PATH=/ca_key/ca_key
       - PYTHONUNBUFFERED=1
+      - CA_ALLOW_INSECURE_TOKENS=${CA_ALLOW_INSECURE_TOKENS:-false}
+      - CA_JWT_SECRET=${CA_JWT_SECRET:-}
     healthcheck:
-      test: ["CMD", "python", "-c", "import socket; s = socket.create_connection(('localhost', 5001), timeout=2); s.close()"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import socket; s = socket.create_connection(('localhost', 5001), timeout=2); s.close()",
+        ]
       interval: 5s
       timeout: 3s
       retries: 3
