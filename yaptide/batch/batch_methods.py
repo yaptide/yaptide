@@ -61,7 +61,6 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
 
     con = Connection(
         host=f"{user.username}@{cluster.cluster_name}",
-        port=cluster.port,
         connect_kwargs={"pkey": pkey, "allow_agent": False, "look_for_keys": False},
     )
     return con
