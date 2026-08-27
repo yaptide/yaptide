@@ -230,8 +230,6 @@ def prepare_script_files(
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
-    logging.warning(backend_url)
-
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         submit_template = SUBMIT_FLUKA
         array_template = ARRAY_FLUKA_BASH
