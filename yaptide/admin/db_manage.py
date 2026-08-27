@@ -301,9 +301,8 @@ def remove_simulation(simulation_id, verbose):
 
 @run.command
 @click.argument("cluster_name")
-@click.option("-p", "--port", default=22)
 @click.option("-v", "--verbose", count=True)
-def add_cluster(cluster_name, port, verbose):
+def add_cluster(cluster_name, verbose):
     """Adds cluster with provided name to database if it does not exist"""
     con, metadata, _ = connect_to_db(verbose=verbose)
     cluster_table = metadata.tables[TableTypes.Cluster.name]
@@ -315,7 +314,7 @@ def add_cluster(cluster_name, port, verbose):
         click.echo(f"Cluster {cluster_name} already exists in DB")
         raise click.Abort()
 
-    stmt = db.insert(cluster_table).values(cluster_name=cluster_name, port=port)
+    stmt = db.insert(cluster_table).values(cluster_name=cluster_name)
     con.execute(stmt)
     con.commit()
     click.echo(f"Cluster {cluster_name} added to DB")

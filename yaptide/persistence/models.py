@@ -66,7 +66,6 @@ class ClusterModel(db.Model):
     __tablename__ = "Cluster"
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     cluster_name: Column[str] = db.Column(db.String, nullable=False)
-    port: Column[int] = db.Column(db.Integer, nullable=False, default=22)
     simulations = relationship("BatchSimulationModel")
 
 
