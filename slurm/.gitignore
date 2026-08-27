@@ -65,7 +65,6 @@ build/
 # Local overrides
 docker-compose.override.yml
 
-rpmbuild/
 archive/
 .claude/
 *.md
