@@ -159,6 +159,7 @@ services:
     privileged: true
     environment:
       SLURM_USER: ${SLURM_USER:-devuser}
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME:-yaptide}
     volumes:
       - etc_munge:/etc/munge
       - etc_slurm:/etc/slurm
