@@ -5,7 +5,7 @@ import os
 import shutil
 import subprocess
 import tempfile
-import jwt  # Make sure PyJWT is in your Dockerfile or requirements
+import jwt
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 CA_KEY_PATH = os.environ.get("CA_KEY_PATH", "/ca_key/ca_key")
