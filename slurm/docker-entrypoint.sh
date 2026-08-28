@@ -154,6 +154,37 @@ whatis("Category: Physics Simulation")
 local root = "/opt/spack/modules/shieldhit"
 prepend_path("PATH", pathJoin(root, "bin"))
 EOF
+    # --- PYZMQ Lmod Module Setup & Download ---
+    echo "---> Provisioning pyzmq Lmod module..."
+
+    PYZMQ_VERSION="25.1.2"
+    PYZMQ_MOD="25.1.2-gcccore-13.2.0"
+    PYZMQ_ROOT="/opt/spack/software/pyzmq/$PYZMQ_MOD"
+
+    if [ ! -d "$PYZMQ_ROOT/lib" ]; then
+        echo "---> Downloading pyzmq $PYZMQ_VERSION via pip..."
+        mkdir -p "$PYZMQ_ROOT"
+        python3 -m pip install "pyzmq==$PYZMQ_VERSION" --prefix="$PYZMQ_ROOT" --ignore-installed
+    fi
+
+    PY_VER=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")' 2>/dev/null || echo "3")
+
+    mkdir -p /opt/modulefiles/pyzmq
+    cat << EOF > /opt/modulefiles/pyzmq/${PYZMQ_MOD}.lua
+help([[
+Loads the pyzmq (ZeroMQ) Python library.
+]])
+
+whatis("Name: pyzmq")
+whatis("Version: ${PYZMQ_MOD}")
+whatis("Category: Python Library")
+
+local root = "${PYZMQ_ROOT}"
+
+prepend_path("PYTHONPATH", pathJoin(root, "lib/python${PY_VER}/site-packages"))
+prepend_path("PYTHONPATH", pathJoin(root, "lib64/python${PY_VER}/site-packages"))
+prepend_path("PATH", pathJoin(root, "bin"))
+EOF
 
     # Configure Elasticsearch for job completion if ELASTICSEARCH_HOST is set
     if [ -n "${ELASTICSEARCH_HOST}" ]; then
