@@ -65,6 +65,7 @@ services:
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "celery --app yaptide.celery.simulation_worker inspect ping"]
     depends_on:
@@ -91,6 +92,7 @@ services:
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+      - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
     healthcheck:
       test: ["CMD-SHELL", "celery --app yaptide.utils.helper_worker inspect ping"]
     depends_on:

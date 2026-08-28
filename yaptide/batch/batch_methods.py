@@ -74,7 +74,12 @@ def post_update(dict_to_send):
 
 @celery_app.task()
 def submit_job(  # skipcq: PY-R1000
-    payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str
+    payload_dict: dict,
+    files_dict: dict,
+    userId: int,
+    clusterId: int,
+    sim_id: int,
+    update_key: str,
 ):
     """Submits job to cluster"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
@@ -145,7 +150,11 @@ def submit_job(  # skipcq: PY-R1000
     con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
-        payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con
+        payload_dict=payload_dict,
+        job_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key,
+        con=con,
     )
 
     array_id = collect_id = None
