@@ -12,6 +12,7 @@ CA_KEY_PATH = os.environ.get("CA_KEY_PATH", "/ca_key/ca_key")
 SSH_KEYGEN_BIN = shutil.which("ssh-keygen") or "/usr/bin/ssh-keygen"
 
 
+# skipcq: PY-R1000
 def resolve_principal_from_token(token):
     """Return the principal name from a bearer token.
 
