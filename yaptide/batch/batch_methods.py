@@ -13,9 +13,18 @@ import pymchelper
 from fabric import Connection, Result
 from paramiko import RSAKey
 
-from yaptide.batch.shieldhit_string_templates import ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT
+from yaptide.batch.shieldhit_string_templates import (
+    AGGREGATOR_SHIELDHIT_BASH,
+    ARRAY_SHIELDHIT_BASH,
+    COLLECT_SHIELDHIT_BASH,
+    SUBMIT_SHIELDHIT,
+)
 from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH, SUBMIT_FLUKA
-from yaptide.batch.utils.utils import convert_dict_to_sbatch_options, extract_sbatch_header
+from yaptide.batch.utils.utils import (
+    convert_dict_to_aggregator_sbatch_options,
+    convert_dict_to_sbatch_options,
+    extract_sbatch_header,
+)
 from yaptide.persistence.models import BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel
 from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import write_simulation_input_files
@@ -138,11 +147,14 @@ def submit_job(  # skipcq: PY-R1000
 
     WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
     SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
+    AGGREGATOR_SCRIPT = Path(__file__).parent.resolve() / "aggregator.py"
 
     logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
     con.put(WATCHER_SCRIPT, job_dir)
     logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
     con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+    logging.debug("Transfering aggregator script %s to %s", AGGREGATOR_SCRIPT, job_dir)
+    con.put(AGGREGATOR_SCRIPT, job_dir)
 
     submit_file, sh_files = prepare_script_files(
         payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con
@@ -212,6 +224,7 @@ def prepare_script_files(
     submit_file = f"{job_dir}/yaptide_submitter.sh"
     array_file = f"{job_dir}/array_script.sh"
     collect_file = f"{job_dir}/collect_script.sh"
+    aggregator_file = f"{job_dir}/aggregator_script.sh"
 
     array_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="array_options")
     array_header = extract_sbatch_header(payload_dict=payload_dict, target_key="array_header")
@@ -219,21 +232,29 @@ def prepare_script_files(
     collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
 
+    aggregator_options = convert_dict_to_aggregator_sbatch_options(
+        payload_dict=payload_dict, sim_id=sim_id, job_dir=job_dir
+    )
+    aggregator_header = extract_sbatch_header(payload_dict=payload_dict, target_key="aggregator_header")
+
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         submit_template = SUBMIT_FLUKA
         array_template = ARRAY_FLUKA_BASH
         collect_template = COLLECT_FLUKA_BASH
+        aggregator_template = ""
     elif payload_dict["sim_type"] == SimulationType.SHIELDHIT.value:
         submit_template = SUBMIT_SHIELDHIT
         array_template = ARRAY_SHIELDHIT_BASH
         collect_template = COLLECT_SHIELDHIT_BASH
+        aggregator_template = AGGREGATOR_SHIELDHIT_BASH
     else:
         # Ready for future simulators
         submit_template = ""
         array_template = ""
         collect_template = ""
+        aggregator_template = ""
 
     submit_script = submit_template.format(
         array_options=array_options,
@@ -241,6 +262,10 @@ def prepare_script_files(
         root_dir=job_dir,
         n_tasks=str(payload_dict["ntasks"]),
         convertmc_version=pymchelper.__version__,
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url,
+        aggregator_options=aggregator_options,
     )
     array_script = array_template.format(
         array_header=array_header, root_dir=job_dir, sim_id=sim_id, update_key=update_key, backend_url=backend_url
@@ -261,7 +286,22 @@ def prepare_script_files(
     con.run(f"echo '{collect_script}' >> {collect_file}")
     con.run(f"chmod +x {collect_file}")
 
-    return submit_file, {"submit": submit_script, "array": array_script, "collect": collect_script}
+    sh_files = {"submit": submit_script, "array": array_script, "collect": collect_script}
+
+    if aggregator_template:
+        aggregator_script = aggregator_template.format(
+            aggregator_header=aggregator_header,
+            root_dir=job_dir,
+            n_tasks=str(payload_dict["ntasks"]),
+            sim_id=sim_id,
+            update_key=update_key,
+            backend_url=backend_url,
+        )
+        con.run(f"echo '{aggregator_script}' >> {aggregator_file}")
+        con.run(f"chmod +x {aggregator_file}")
+        sh_files["aggregator"] = aggregator_script
+
+    return submit_file, sh_files
 
 
 def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
@@ -335,6 +375,7 @@ def delete_job(
 
         con.run(f"scancel {array_id}")
         con.run(f"scancel {collect_id}")
+        con.run(f"scancel --name=yaptide_aggregator_{simulation.id}", warn=True)
         con.run(f"rm -rf {job_dir}")
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)

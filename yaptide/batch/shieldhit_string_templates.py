@@ -1,6 +1,7 @@
 SUBMIT_SHIELDHIT: str = """#!/bin/bash
 OUT=`mktemp`
 module load shieldhit
+module load pyzmq/25.1.2-gcccore-13.2.0
 
 ROOT_DIR={root_dir}
 cd $ROOT_DIR
@@ -11,6 +12,7 @@ mkdir -p $ROOT_DIR/input
 INPUT_DIR=$ROOT_DIR/input
 ARRAY_SCRIPT=$ROOT_DIR/array_script.sh
 COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
+AGGREGATOR_SCRIPT=$ROOT_DIR/aggregator_script.sh
 
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
@@ -21,6 +23,13 @@ JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
 
 if [ -n "$JOB_ID" ] ; then
+    # the aggregator batches the progress updates of all tasks into single requests to the backend
+    # it gets its own small allocation and starts once the array does, so nothing runs on the login node
+    AGGREGATOR_CMD="sbatch --dependency=after:$JOB_ID --kill-on-invalid-dep=yes {aggregator_options} --parsable $AGGREGATOR_SCRIPT > $OUT"
+    eval $AGGREGATOR_CMD
+    AGGREGATOR_ID=`cat $OUT | cut -d ";" -f 1`
+    echo "Aggregator id: $AGGREGATOR_ID"
+
     COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
@@ -83,6 +92,7 @@ python3 $ROOT_DIR/watcher.py \\
     --task_id=$SLURM_ARRAY_TASK_ID\\
     --update_key={update_key}\\
     --backend_url={backend_url}\\
+    --zmq_auth=$ROOT_DIR/.zmq_auth\\
     --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 trap 'sig_handler' SIGUSR1
@@ -91,4 +101,11 @@ trap 'sig_handler' SIGUSR1
 srun shieldhit -N $RNG_SEED $WORK_DIR &
 
 wait
+"""  # skipcq: FLK-E501
+
+AGGREGATOR_SHIELDHIT_BASH: str = """#!/bin/bash
+{aggregator_header}
+ROOT_DIR={root_dir}
+python3 $ROOT_DIR/aggregator.py --sim_id={sim_id} --update_key={update_key} \\
+    --backend_url={backend_url} --root_dir=$ROOT_DIR --ntasks={n_tasks}
 """  # skipcq: FLK-E501
