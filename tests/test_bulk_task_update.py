@@ -137,7 +137,7 @@ def test_aggregator_batches_updates_from_tasks(tmp_path, monkeypatch):
     push_socket.connect(f"tcp://{auth['host']}:{auth['port']}")
     for task_id in (1, 2):
         message = {
-            "secret": auth["secret"],
+            "update_key": "key",
             "task_id": task_id,
             "update_dict": {"task_state": EntityState.COMPLETED.value},
         }
@@ -155,16 +155,16 @@ def test_aggregator_batches_updates_from_tasks(tmp_path, monkeypatch):
     assert all(payload["update_key"] == "key" for payload in sent_payloads)
 
 
-def test_aggregator_drops_messages_with_wrong_secret(tmp_path):
-    """A message that does not carry the ephemeral secret never reaches the backend"""
+def test_aggregator_drops_messages_with_wrong_update_key(tmp_path):
+    """A message that does not carry the update key of the simulation never reaches the backend"""
     aggregator = TaskUpdateAggregator(
         sim_id=1, update_key="key", backend_url="http://localhost:5000", root_dir=tmp_path, ntasks=1
     )
 
-    aggregator.handle_message({"secret": "wrong", "task_id": 1, "update_dict": {"simulated_primaries": 10}})
+    aggregator.handle_message({"update_key": "wrong", "task_id": 1, "update_dict": {"simulated_primaries": 10}})
     assert aggregator._pending == {}
 
-    aggregator.handle_message({"secret": aggregator.secret, "task_id": 1, "update_dict": {"simulated_primaries": 10}})
+    aggregator.handle_message({"update_key": "key", "task_id": 1, "update_dict": {"simulated_primaries": 10}})
     assert aggregator._pending == {1: {"simulated_primaries": 10}}
 
 
@@ -182,6 +182,7 @@ def test_aggregator_drops_batch_rejected_by_backend(tmp_path, monkeypatch):
     aggregator = make_aggregator(tmp_path)
 
     def reject(*args, **kwargs):
+        """Backend answering 400"""
         raise HTTPError("http://localhost:5000/tasks/bulk", 400, "Bad Request", {}, BytesIO(b"Invalid update key"))
 
     monkeypatch.setattr(aggregator_module.request, "urlopen", reject)
@@ -194,6 +195,7 @@ def test_aggregator_keeps_batch_when_backend_unreachable(tmp_path, monkeypatch):
     aggregator = make_aggregator(tmp_path)
 
     def unreachable(*args, **kwargs):
+        """Backend that cannot be reached"""
         raise URLError("connection refused")
 
     monkeypatch.setattr(aggregator_module.request, "urlopen", unreachable)

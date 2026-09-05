@@ -64,7 +64,7 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
     global AGGREGATOR_SENDER  # skipcq: PYL-W0603
     if AGGREGATOR_SENDER is None:
         # the aggregator runs in its own job, it may still have been queued when this task started
-        AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH)
+        AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
     if AGGREGATOR_SENDER is not None and AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
         return True
     # without the aggregator hundreds of tasks talk to flask directly - the load that made it unresponsive,
@@ -110,9 +110,9 @@ def post_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
 class AggregatorSender:
     """Pushes task updates to the aggregator of the simulation over a persistent ZeroMQ socket"""
 
-    def __init__(self, auth_path: Path):
+    def __init__(self, auth_path: Path, update_key: str):
         auth = json.loads(auth_path.read_text())
-        self.secret = auth["secret"]
+        self.update_key = update_key
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUSH)
         # a dead aggregator must fail the send instead of silently queueing - the REST fallback then takes over,
@@ -125,7 +125,7 @@ class AggregatorSender:
 
     def send(self, task_id: int, update_dict: dict) -> bool:
         """Returns False when the update could not be handed over to the aggregator"""
-        message = {"secret": self.secret, "task_id": task_id, "update_dict": update_dict}
+        message = {"update_key": self.update_key, "task_id": task_id, "update_dict": update_dict}
         try:
             self.socket.send(json.dumps(message).encode(), flags=zmq.NOBLOCK)
         except zmq.ZMQError as e:
@@ -134,12 +134,12 @@ class AggregatorSender:
         return True
 
 
-def connect_to_aggregator(auth_path: Optional[Path]) -> Optional[AggregatorSender]:
+def connect_to_aggregator(auth_path: Optional[Path], update_key: str) -> Optional[AggregatorSender]:
     """Builds the sender, returns None when no aggregator is available and REST should be used instead"""
     if auth_path is None or not auth_path.exists():
         return None
     try:
-        return AggregatorSender(auth_path=auth_path)
+        return AggregatorSender(auth_path=auth_path, update_key=update_key)
     except Exception as e:  # skipcq: PYL-W0703
         logging.warning("Could not connect to the aggregator described by %s: %s", auth_path, e)
         return None
@@ -314,7 +314,7 @@ if __name__ == "__main__":
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
     AGGREGATOR_AUTH_PATH = Path(args.zmq_auth) if args.zmq_auth else None
-    AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH)
+    AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, args.update_key)
     read_shieldhit_file(
         filepath=Path(args.filepath),
         sim_id=args.sim_id,

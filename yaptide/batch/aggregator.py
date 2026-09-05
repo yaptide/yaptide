@@ -7,10 +7,10 @@ instead of calling the backend directly - with hundreds of tasks the REST calls 
 """
 
 import argparse
+import hmac
 import json
 import logging
 import os
-import secrets
 import signal
 import socket
 import threading
@@ -51,15 +51,14 @@ def advertised_ip(interface: str) -> str:
     return interface_ip(interface) or socket.gethostbyname(socket.gethostname())
 
 
-def write_auth_file(auth_path: Path, host: str, port: int, secret: str) -> None:
-    """Writes connection details for the watchers, readable only by the owner of the simulation.
+def write_auth_file(auth_path: Path, host: str, port: int) -> None:
+    """Writes the address the watchers connect to.
 
     Written to a temporary file first, so a watcher on another node never reads a half written file.
+    The watchers authenticate with the update_key of the simulation, which they already hold.
     """
     tmp_path = auth_path.with_suffix(".tmp")
-    tmp_path.touch(mode=0o600)
-    tmp_path.chmod(0o600)
-    tmp_path.write_text(json.dumps({"host": host, "port": port, "secret": secret}))
+    tmp_path.write_text(json.dumps({"host": host, "port": port}))
     os.replace(tmp_path, auth_path)
 
 
@@ -86,7 +85,6 @@ class TaskUpdateAggregator:
         self.flush_interval_seconds = flush_interval_seconds
         self.idle_timeout_seconds = idle_timeout_seconds
 
-        self.secret = secrets.token_hex(32)
         self.stop_event = threading.Event()
         self._pending: dict[int, dict] = {}
         self._finished_tasks: set[int] = set()
@@ -138,8 +136,12 @@ class TaskUpdateAggregator:
                     return False
         except HTTPError as e:
             if 400 <= e.code < 500:
-                logging.error("Bulk update to %s rejected with code %d, dropping %d task updates",
-                              bulk_url, e.code, len(payload["tasks"]))
+                logging.error(
+                    "Bulk update to %s rejected with code %d, dropping %d task updates",
+                    bulk_url,
+                    e.code,
+                    len(payload["tasks"]),
+                )
                 return True
             logging.warning("Bulk update to %s failed with code %d", bulk_url, e.code)
             return False
@@ -153,8 +155,8 @@ class TaskUpdateAggregator:
         if not isinstance(message, dict):
             logging.warning("Dropping malformed message: %s", message)
             return
-        if not secrets.compare_digest(str(message.get("secret", "")), self.secret):
-            logging.warning("Dropping message with invalid secret")
+        if not hmac.compare_digest(str(message.get("update_key", "")), self.update_key):
+            logging.warning("Dropping message with invalid update key")
             return
         task_id = message.get("task_id")
         update_dict = message.get("update_dict")
@@ -170,7 +172,7 @@ class TaskUpdateAggregator:
         host = advertised_ip(self.interface)
         # listen only where the watchers are told to connect - the cluster internal network
         port = socket_pull.bind_to_random_port(f"tcp://{host}")
-        write_auth_file(self.root_dir / AUTH_FILE_NAME, host=host, port=port, secret=self.secret)
+        write_auth_file(self.root_dir / AUTH_FILE_NAME, host=host, port=port)
         logging.info("Aggregator for simulation %d listening on %s:%d", self.sim_id, host, port)
 
         poller = zmq.Poller()

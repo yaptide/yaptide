@@ -48,8 +48,13 @@ def test_watcher_falls_back_to_rest_until_the_aggregator_job_starts(monkeypatch,
     monkeypatch.setattr(watcher, "REST_FALLBACK", {"last_progress_seconds": 0.0})
 
     def update(update_dict: dict) -> dict:
+        """Arguments of send_task_update for the given update"""
         return {
-            "sim_id": 1, "task_id": 2, "update_key": "key", "backend_url": "http://backend", "update_dict": update_dict
+            "sim_id": 1,
+            "task_id": 2,
+            "update_key": "key",
+            "backend_url": "http://backend",
+            "update_dict": update_dict,
         }
 
     # the aggregator job is still queued, its auth file does not exist yet - state changes always reach flask,
@@ -76,7 +81,7 @@ def test_watcher_falls_back_to_rest_until_the_aggregator_job_starts(monkeypatch,
             return True
 
     sender = FakeSender()
-    monkeypatch.setattr(watcher, "connect_to_aggregator", lambda auth_path: sender)
+    monkeypatch.setattr(watcher, "connect_to_aggregator", lambda auth_path, update_key: sender)
 
     assert watcher.send_task_update(**update({"simulated_primaries": 30}))
     assert len(posted) == 3
