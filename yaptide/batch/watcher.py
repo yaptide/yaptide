@@ -10,8 +10,11 @@ import time
 from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
+from typing import Optional
 from urllib import request
 import math
+
+import zmq
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -57,6 +60,27 @@ def log_generator(
 
 
 def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
+    """Sends task update to the aggregator, or directly to flask when no aggregator is reachable"""
+    global AGGREGATOR_SENDER  # skipcq: PYL-W0603
+    if AGGREGATOR_SENDER is None:
+        # the aggregator runs in its own job, it may still have been queued when this task started
+        AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
+    if AGGREGATOR_SENDER is not None and AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
+        return True
+    # without the aggregator hundreds of tasks talk to flask directly - the load that made it unresponsive,
+    # so state changes always go through, progress alone is throttled (only where an aggregator is expected)
+    now = time.monotonic()
+    if AGGREGATOR_AUTH_PATH is not None and "task_state" not in update_dict:
+        if now - REST_FALLBACK["last_progress_seconds"] < REST_FALLBACK_PROGRESS_INTERVAL_SECONDS:
+            logging.debug("No aggregator, skipping progress update for task %d", task_id)
+            return True
+        REST_FALLBACK["last_progress_seconds"] = now
+    return post_task_update(
+        sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
+    )
+
+
+def post_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
     """Sends task update to flask to update database"""
     if not backend_url:
         logging.error("Backend url not specified")
@@ -81,6 +105,50 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         logging.debug("Sending update to %s failed", tasks_url)
         return False
     return True
+
+
+class AggregatorSender:
+    """Pushes task updates to the aggregator of the simulation over a persistent ZeroMQ socket"""
+
+    def __init__(self, auth_path: Path, update_key: str):
+        auth = json.loads(auth_path.read_text())
+        self.update_key = update_key
+        self.context = zmq.Context()
+        self.socket = self.context.socket(zmq.PUSH)
+        # a dead aggregator must fail the send instead of silently queueing - the REST fallback then takes over,
+        # so messages are queued only to a live connection and just a handful of them
+        self.socket.setsockopt(zmq.IMMEDIATE, 1)
+        self.socket.setsockopt(zmq.SNDHWM, 100)
+        self.socket.setsockopt(zmq.LINGER, 1000)
+        self.socket.connect(f"tcp://{auth['host']}:{auth['port']}")
+        logging.debug("Connected to aggregator at %s:%s", auth["host"], auth["port"])
+
+    def send(self, task_id: int, update_dict: dict) -> bool:
+        """Returns False when the update could not be handed over to the aggregator"""
+        message = {"update_key": self.update_key, "task_id": task_id, "update_dict": update_dict}
+        try:
+            self.socket.send(json.dumps(message).encode(), flags=zmq.NOBLOCK)
+        except zmq.ZMQError as e:
+            logging.warning("Sending update to the aggregator failed: %s", e)
+            return False
+        return True
+
+
+def connect_to_aggregator(auth_path: Optional[Path], update_key: str) -> Optional[AggregatorSender]:
+    """Builds the sender, returns None when no aggregator is available and REST should be used instead"""
+    if auth_path is None or not auth_path.exists():
+        return None
+    try:
+        return AggregatorSender(auth_path=auth_path, update_key=update_key)
+    except Exception as e:  # skipcq: PYL-W0703
+        logging.warning("Could not connect to the aggregator described by %s: %s", auth_path, e)
+        return None
+
+
+AGGREGATOR_AUTH_PATH: Optional[Path] = None
+AGGREGATOR_SENDER: Optional[AggregatorSender] = None
+REST_FALLBACK_PROGRESS_INTERVAL_SECONDS = 30
+REST_FALLBACK = {"last_progress_seconds": 0.0}
 
 
 def read_shieldhit_file(
@@ -229,6 +297,7 @@ if __name__ == "__main__":
     parser.add_argument("--task_id", type=int)
     parser.add_argument("--update_key", type=str)
     parser.add_argument("--backend_url", type=str)
+    parser.add_argument("--zmq_auth", type=str, default=None, help="path to the .zmq_auth file of the aggregator")
     parser.add_argument("--verbose", action="store_true")
     args = parser.parse_args()
 
@@ -244,6 +313,8 @@ if __name__ == "__main__":
     logging.info("task_id %s", args.task_id)
     logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
+    AGGREGATOR_AUTH_PATH = Path(args.zmq_auth) if args.zmq_auth else None
+    AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, args.update_key)
     read_shieldhit_file(
         filepath=Path(args.filepath),
         sim_id=args.sim_id,
