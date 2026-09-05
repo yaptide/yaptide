@@ -26,22 +26,9 @@ def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str) -> str:
     return " ".join(opt_list)
 
 
-# resources of the array job say nothing about the aggregator, its accounting does
-AGGREGATOR_IGNORED_ARRAY_OPTIONS = {
-    "array",
-    "nodes",
-    "ntasks",
-    "ntasks-per-node",
-    "ntasks-per-core",
-    "cpus-per-task",
-    "mem",
-    "mem-per-cpu",
-    "gres",
-    "gpus",
-    "job-name",
-    "output",
-    "error",
-}
+# only the queue placement of the array job applies to the aggregator, never its resources -
+# the UI lets users type any sbatch option (exclusive, constraint, nodelist...), so this is an allowlist
+AGGREGATOR_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "reservation"}
 
 
 def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str) -> str:
@@ -52,7 +39,7 @@ def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, j
     """
     options_dict = {"time": "00:59:59"}
     array_options = payload_dict.get("batch_options", {}).get("array_options", {})
-    options_dict.update({key: val for key, val in array_options.items() if key not in AGGREGATOR_IGNORED_ARRAY_OPTIONS})
+    options_dict.update({key: val for key, val in array_options.items() if key in AGGREGATOR_INHERITED_ARRAY_OPTIONS})
     options_dict.update(
         {
             "ntasks": "1",

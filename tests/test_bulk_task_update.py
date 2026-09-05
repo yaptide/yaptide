@@ -1,10 +1,13 @@
 import json
 import threading
 import time
+from io import BytesIO
+from urllib.error import HTTPError, URLError
 
 import pytest
 import zmq
 from yaptide.application import create_app
+from yaptide.batch import aggregator as aggregator_module
 from yaptide.batch.aggregator import TaskUpdateAggregator
 from yaptide.persistence.database import db
 from yaptide.persistence.models import CelerySimulationModel, CeleryTaskModel, YaptideUserModel
@@ -67,6 +70,25 @@ def test_bulk_update_updates_all_tasks(app, simulation_with_tasks: CelerySimulat
     assert all(task.task_state == EntityState.RUNNING.value for task in tasks)
 
 
+def test_bulk_update_skips_invalid_task_update_and_keeps_the_rest(app, simulation_with_tasks: CelerySimulationModel):
+    """One malformed update must not fail the batch, the aggregator would retry the whole batch forever"""
+    client = app.test_client()
+
+    payload = {
+        "simulation_id": simulation_with_tasks.id,
+        "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
+        "tasks": [
+            {"task_id": 1, "update_dict": {"end_time": "not a date"}},
+            {"task_id": 2, "update_dict": {"simulated_primaries": 600}},
+        ],
+    }
+    resp = client.post("/tasks/bulk", json=payload)
+
+    assert resp.status_code == 202
+    task = CeleryTaskModel.query.filter_by(simulation_id=simulation_with_tasks.id, task_id=2).first()
+    assert task.simulated_primaries == 600
+
+
 def test_bulk_update_rejects_invalid_update_key(app, simulation_with_tasks: CelerySimulationModel):
     """Updates signed for another simulation are refused"""
     client = app.test_client()
@@ -85,6 +107,8 @@ def test_bulk_update_rejects_invalid_update_key(app, simulation_with_tasks: Cele
 
 def test_aggregator_batches_updates_from_tasks(tmp_path, monkeypatch):
     """Updates pushed by several tasks leave the aggregator as one bulk request"""
+    # the aggregator listens on the cluster internal network only, here that has to be the loopback
+    monkeypatch.setattr(aggregator_module, "advertised_ip", lambda interface: "127.0.0.1")
     aggregator = TaskUpdateAggregator(
         sim_id=1,
         update_key="key",
@@ -109,7 +133,8 @@ def test_aggregator_batches_updates_from_tasks(tmp_path, monkeypatch):
 
     context = zmq.Context()
     push_socket = context.socket(zmq.PUSH)
-    push_socket.connect(f"tcp://127.0.0.1:{auth['port']}")
+    push_socket.setsockopt(zmq.LINGER, 0)
+    push_socket.connect(f"tcp://{auth['host']}:{auth['port']}")
     for task_id in (1, 2):
         message = {
             "secret": auth["secret"],
@@ -140,4 +165,37 @@ def test_aggregator_drops_messages_with_wrong_secret(tmp_path):
     assert aggregator._pending == {}
 
     aggregator.handle_message({"secret": aggregator.secret, "task_id": 1, "update_dict": {"simulated_primaries": 10}})
+    assert aggregator._pending == {1: {"simulated_primaries": 10}}
+
+
+def make_aggregator(tmp_path) -> TaskUpdateAggregator:
+    """Aggregator with one pending update, never started"""
+    aggregator = TaskUpdateAggregator(
+        sim_id=1, update_key="key", backend_url="http://localhost:5000", root_dir=tmp_path, ntasks=1
+    )
+    aggregator.store_update(1, {"simulated_primaries": 10})
+    return aggregator
+
+
+def test_aggregator_drops_batch_rejected_by_backend(tmp_path, monkeypatch):
+    """A 4xx answer means the batch is invalid, retrying it would block every later update"""
+    aggregator = make_aggregator(tmp_path)
+
+    def reject(*args, **kwargs):
+        raise HTTPError("http://localhost:5000/tasks/bulk", 400, "Bad Request", {}, BytesIO(b"Invalid update key"))
+
+    monkeypatch.setattr(aggregator_module.request, "urlopen", reject)
+    aggregator.flush()
+    assert aggregator._pending == {}
+
+
+def test_aggregator_keeps_batch_when_backend_unreachable(tmp_path, monkeypatch):
+    """Connection problems are transient, the updates wait for the next flush"""
+    aggregator = make_aggregator(tmp_path)
+
+    def unreachable(*args, **kwargs):
+        raise URLError("connection refused")
+
+    monkeypatch.setattr(aggregator_module.request, "urlopen", unreachable)
+    aggregator.flush()
     assert aggregator._pending == {1: {"simulated_primaries": 10}}

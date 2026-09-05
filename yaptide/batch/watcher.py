@@ -67,6 +67,14 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH)
     if AGGREGATOR_SENDER is not None and AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
         return True
+    # without the aggregator hundreds of tasks talk to flask directly - the load that made it unresponsive,
+    # so state changes always go through, progress alone is throttled (only where an aggregator is expected)
+    now = time.monotonic()
+    if AGGREGATOR_AUTH_PATH is not None and "task_state" not in update_dict:
+        if now - REST_FALLBACK["last_progress_seconds"] < REST_FALLBACK_PROGRESS_INTERVAL_SECONDS:
+            logging.debug("No aggregator, skipping progress update for task %d", task_id)
+            return True
+        REST_FALLBACK["last_progress_seconds"] = now
     return post_task_update(
         sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
     )
@@ -107,8 +115,10 @@ class AggregatorSender:
         self.secret = auth["secret"]
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUSH)
-        # updates are progress reports - dropping them beats blocking the task when the aggregator is gone
-        self.socket.setsockopt(zmq.SNDHWM, 1000)
+        # a dead aggregator must fail the send instead of silently queueing - the REST fallback then takes over,
+        # so messages are queued only to a live connection and just a handful of them
+        self.socket.setsockopt(zmq.IMMEDIATE, 1)
+        self.socket.setsockopt(zmq.SNDHWM, 100)
         self.socket.setsockopt(zmq.LINGER, 1000)
         self.socket.connect(f"tcp://{auth['host']}:{auth['port']}")
         logging.debug("Connected to aggregator at %s:%s", auth["host"], auth["port"])
@@ -137,6 +147,8 @@ def connect_to_aggregator(auth_path: Optional[Path]) -> Optional[AggregatorSende
 
 AGGREGATOR_AUTH_PATH: Optional[Path] = None
 AGGREGATOR_SENDER: Optional[AggregatorSender] = None
+REST_FALLBACK_PROGRESS_INTERVAL_SECONDS = 30
+REST_FALLBACK = {"last_progress_seconds": 0.0}
 
 
 def read_shieldhit_file(

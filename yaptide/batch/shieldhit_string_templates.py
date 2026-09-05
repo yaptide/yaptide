@@ -25,7 +25,8 @@ echo "Job id: $JOB_ID"
 if [ -n "$JOB_ID" ] ; then
     # the aggregator batches the progress updates of all tasks into single requests to the backend
     # it gets its own small allocation and starts once the array does, so nothing runs on the login node
-    AGGREGATOR_CMD="sbatch --dependency=after:$JOB_ID --kill-on-invalid-dep=yes {aggregator_options} --parsable $AGGREGATOR_SCRIPT > $OUT"
+    AGGREGATOR_OPTS="--dependency=after:$JOB_ID --kill-on-invalid-dep=yes {aggregator_options}"
+    AGGREGATOR_CMD="sbatch $AGGREGATOR_OPTS --parsable $AGGREGATOR_SCRIPT > $OUT"
     eval $AGGREGATOR_CMD
     AGGREGATOR_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Aggregator id: $AGGREGATOR_ID"
@@ -106,6 +107,7 @@ wait
 AGGREGATOR_SHIELDHIT_BASH: str = """#!/bin/bash
 {aggregator_header}
 ROOT_DIR={root_dir}
-python3 $ROOT_DIR/aggregator.py --sim_id={sim_id} --update_key={update_key} \\
+# exec, so the SIGTERM slurm sends at the time limit reaches the aggregator itself and it can flush what it holds
+exec python3 $ROOT_DIR/aggregator.py --sim_id={sim_id} --update_key={update_key} \\
     --backend_url={backend_url} --root_dir=$ROOT_DIR --ntasks={n_tasks}
 """  # skipcq: FLK-E501

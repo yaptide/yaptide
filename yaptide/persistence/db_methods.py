@@ -123,9 +123,27 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
         .filter(TaskModel.simulation_id == sim_id, TaskModel.task_id.in_(updates_by_task_id.keys()))
         .all()
     )
+    # one malformed update must not fail the whole batch - the aggregator would retry it forever
     for task in tasks:
-        task.update_state(updates_by_task_id[task.task_id])
-    db.session.commit()
+        try:
+            task.update_state(updates_by_task_id[task.task_id])
+        except Exception as e:  # skipcq: PYL-W0703
+            logging.error("Skipping invalid update for task %d of simulation %d: %s", task.task_id, sim_id, e)
+    try:
+        db.session.commit()
+    except Exception as e:  # skipcq: PYL-W0703
+        # a value the database rejects only shows up here - retry the tasks one by one, so the others still land
+        logging.error("Bulk update of simulation %d rejected by the database, retrying task by task: %s", sim_id, e)
+        db.session.rollback()
+        for task in tasks:
+            try:
+                task.update_state(updates_by_task_id[task.task_id])
+                db.session.commit()
+            except Exception as task_error:  # skipcq: PYL-W0703
+                logging.error(
+                    "Skipping invalid update for task %d of simulation %d: %s", task.task_id, sim_id, task_error
+                )
+                db.session.rollback()
     if len(tasks) != len(updates_by_task_id):
         missing = set(updates_by_task_id.keys()) - {task.task_id for task in tasks}
         logging.warning("Simulation %d has no tasks with ids %s, skipping their updates", sim_id, sorted(missing))

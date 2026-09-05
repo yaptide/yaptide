@@ -91,6 +91,8 @@ class TasksBulkResource(Resource):
         for task_update in task_updates:
             if not isinstance(task_update, dict) or {"task_id", "update_dict"} != set(task_update.keys()):
                 return yaptide_response(message="Each task requires exactly task_id and update_dict keys", code=400)
+            if not isinstance(task_update["task_id"], int) or not isinstance(task_update["update_dict"], dict):
+                return yaptide_response(message="task_id must be an integer and update_dict a dictionary", code=400)
 
         updated_count = bulk_update_task_states(sim_id=simulation.id, task_updates=task_updates)
 
