@@ -1,15 +1,15 @@
 import re
 
 
-def sanitize_string(target_str: str, allowed_chars: str = r"\w\-.,=/:") -> str:
-    """Function clearing unaccepted signs"""
-    return re.sub(f"[^\\s{allowed_chars}]", "", target_str)
+def sanitize_string(target_str: str, allowed_chars: str = r"\w\-.,=/: ") -> str:
+    """Function clearing unaccepted signs - by default also newlines, which would split the sbatch command line"""
+    return re.sub(f"[^{allowed_chars}]", "", target_str)
 
 
 def extract_sbatch_header(payload_dict: dict, target_key: str) -> str:
     """Function extracting header for slurm script"""
     return (
-        sanitize_string(payload_dict["batch_options"][target_key], r"\w\-.,=/:#")
+        sanitize_string(payload_dict["batch_options"][target_key], r"\s\w\-.,=/:#")
         if "batch_options" in payload_dict and target_key in payload_dict["batch_options"]
         else ""
     )
