@@ -15,8 +15,8 @@ def create_app():
     app.logger.info("Creating Flask app %s", flask_name)
 
     # Print env variables
-    for item in os.environ.items():
-        app.logger.debug("Environment variable: %s", item)
+    for key, value in os.environ.items():
+        app.logger.debug("Environment variable: %s", (key, "***" if "SECRET" in key else value))
 
     # Load configuration from environment variables
     # Load any environment variables that start with FLASK_, dropping the prefix from the env key for the config key.
