@@ -1,9 +1,13 @@
 """The aggregator runs in its own SLURM job, so it can be queued after the tasks it collects from"""
 
+import json
+import subprocess
+import sys
 from pathlib import Path
 
 from yaptide.batch import watcher
-from yaptide.batch.utils.utils import convert_dict_to_aggregator_sbatch_options
+from yaptide.batch.shieldhit_string_templates import COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT
+from yaptide.batch.utils.utils import convert_dict_to_aggregator_sbatch_options, extract_aggregator_header
 
 
 def sbatch_options_as_dict(options: str) -> dict:
@@ -45,7 +49,8 @@ def test_watcher_falls_back_to_rest_until_the_aggregator_job_starts(monkeypatch,
     monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: posted.append(kwargs) or True)
     monkeypatch.setattr(watcher, "AGGREGATOR_AUTH_PATH", Path(tmp_path) / ".zmq_auth")
     monkeypatch.setattr(watcher, "AGGREGATOR_SENDER", None)
-    monkeypatch.setattr(watcher, "REST_FALLBACK", {"last_progress_seconds": 0.0})
+    monkeypatch.setattr(watcher, "REST_FALLBACK", {"next_progress_seconds": 0.0, "startup_delay_pending": False})
+    monkeypatch.setattr(watcher, "REPORTED_STATE", {})
 
     def update(update_dict: dict) -> dict:
         """Arguments of send_task_update for the given update"""
@@ -98,3 +103,92 @@ def test_aggregator_options_ignore_unknown_array_options():
 
     assert options["account"] == "plg-cpu"
     assert "exclusive" not in options and "constraint" not in options
+
+
+def test_terminal_state_also_goes_straight_to_the_backend(monkeypatch):
+    """A send to the aggregator only queues the update - a lost COMPLETED would leave the task RUNNING forever"""
+    posted = []
+    monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: posted.append(kwargs["update_dict"]) or True)
+
+    class FakeSender:
+        """Aggregator that accepts everything"""
+
+        @staticmethod
+        def send(task_id: int, update_dict: dict) -> bool:
+            """Accepts the update"""
+            return True
+
+    monkeypatch.setattr(watcher, "AGGREGATOR_SENDER", FakeSender())
+    monkeypatch.setattr(watcher, "REPORTED_STATE", {})
+    arguments = {"sim_id": 1, "task_id": 2, "update_key": "key", "backend_url": "http://backend"}
+
+    running = {"task_state": "RUNNING", "start_time": "2026-09-29 10:00:00.000000", "simulated_primaries": 0}
+    assert watcher.send_task_update(update_dict=running, **arguments)
+    assert watcher.send_task_update(update_dict={"simulated_primaries": 10}, **arguments)
+    assert watcher.send_task_update(update_dict={"task_state": "COMPLETED"}, **arguments)
+    # it can overtake the aggregator's batch with RUNNING, after which flask ignores the finished task's start_time
+    assert posted == [
+        {"task_state": "COMPLETED", "start_time": "2026-09-29 10:00:00.000000", "simulated_primaries": 10}
+    ]
+
+
+def test_first_update_after_connecting_reaches_the_aggregator(tmp_path):
+    """The sender waits for the connection, instead of failing its first send and falling back to REST"""
+    import zmq  # skipcq: PYL-C0415
+
+    context = zmq.Context()
+    pull_socket = context.socket(zmq.PULL)
+    port = pull_socket.bind_to_random_port("tcp://127.0.0.1")
+    auth_path = Path(tmp_path) / ".zmq_auth"
+    auth_path.write_text(json.dumps({"host": "127.0.0.1", "port": port}))
+
+    sender = None
+    try:
+        sender = watcher.connect_to_aggregator(auth_path, "key")
+        assert sender.send(task_id=1, update_dict={"task_state": "RUNNING"})
+        assert pull_socket.poll(2000)
+    finally:
+        pull_socket.close(linger=0)
+        context.term()
+        if sender is not None:
+            sender.close()
+
+
+def test_watcher_imports_without_pyzmq():
+    """Without pyzmq on the cluster the watcher still has to report through REST"""
+    code = "import sys; sys.modules['zmq'] = None; import yaptide.batch.watcher as w; print(w.connect_to_aggregator)"
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=False)
+    assert result.returncode == 0, result.stderr
+
+
+def test_aggregator_starts_with_the_first_array_task_and_collect_stops_it():
+    """A dependency on the whole array is satisfied only once its last task started"""
+    assert "--dependency=after:${JOB_ID}_1" in SUBMIT_SHIELDHIT.format(
+        array_options="",
+        collect_options="",
+        root_dir="/scratch/run",
+        n_tasks="4",
+        convertmc_version="2.8.5",
+        sim_id=1,
+        update_key="key",
+        backend_url="http://backend",
+        aggregator_options="",
+    )
+    collect_script = COLLECT_SHIELDHIT_BASH.format(
+        collect_header="",
+        root_dir="/scratch/run",
+        remove_output_from_workspace="true",
+        sim_id=1,
+        update_key="key",
+        backend_url="http://backend",
+    )
+    assert "scancel `cat $ROOT_DIR/aggregator_job_id`" in collect_script
+
+
+def test_aggregator_header_keeps_only_queue_placement():
+    """Account or partition typed as #SBATCH lines of the array header apply to the aggregator too"""
+    array_header = "#SBATCH --account=plg-cpu\n#SBATCH -p plgrid\n#SBATCH --nodes=4\n#SBATCH --mem=16G"
+    assert extract_aggregator_header(array_header) == "#SBATCH --account=plg-cpu\n#SBATCH -p plgrid"
+    # attached short values, space separated long ones, other options on the same line stay with the array
+    array_header = "#SBATCH -Aplg-cpu --exclusive\n#SBATCH --qos normal --comment=x-pz"
+    assert extract_aggregator_header(array_header) == "#SBATCH -Aplg-cpu\n#SBATCH --qos normal"

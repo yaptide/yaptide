@@ -26,7 +26,15 @@ DEFAULT_INTERFACE = "ib0"
 DEFAULT_FLUSH_INTERVAL_SECONDS = 10
 DEFAULT_IDLE_TIMEOUT_SECONDS = 3600
 BACKEND_TIMEOUT_SECONDS = 30
-FINAL_FLUSH_DEADLINE_SECONDS = 300
+# stays below KillWait (300 s on Ares), so the SIGKILL after a time limit never cuts the final flush short
+FINAL_FLUSH_DEADLINE_SECONDS = 200
+# a watcher message is a few hundred bytes, anything bigger is not from a watcher and must not exhaust memory
+MAX_MESSAGE_BYTES = 64 * 1024
+# the backend treats these as a broken batch - retrying cannot help; everything else (404 during a deploy,
+# 429, 5xx, timeouts) is transient and the batch waits for the next flush
+DROPPED_BATCH_STATUS_CODES = {400, 401, 403, 422}
+MAX_MESSAGES_PER_WAKEUP = 10000
+MAX_MESSAGES_AT_SHUTDOWN = 1000000
 TERMINAL_TASK_STATES = {"COMPLETED", "FAILED", "CANCELED"}
 AUTH_FILE_NAME = ".zmq_auth"
 SIOCGIFADDR = 0x8915
@@ -121,21 +129,22 @@ class TaskUpdateAggregator:
     def send_bulk_update(self, payload: dict) -> bool:
         """Posts the batch to the backend.
 
-        Returns True when the batch is done with - accepted, or rejected as invalid (4xx), because
+        Returns True when the batch is done with - accepted, or rejected as invalid by the backend, because
         retrying an invalid batch would only block every later update of the simulation.
-        Returns False when the backend could not be reached or failed (5xx), so the batch is retried.
+        Returns False when the backend could not be reached or did not accept it for now, so the batch is retried.
         """
         bulk_url = f"{self.backend_url}/tasks/bulk"
-        req = request.Request(
-            bulk_url, json.dumps(payload).encode(), {"Content-Type": "application/json"}, method="POST"
-        )
         try:
+            req = request.Request(
+                bulk_url, json.dumps(payload).encode(), {"Content-Type": "application/json"}, method="POST"
+            )
             with request.urlopen(req, timeout=BACKEND_TIMEOUT_SECONDS) as res:  # skipcq: BAN-B310
-                if res.getcode() != 202:
-                    logging.warning("Bulk update to %s failed with code %d", bulk_url, res.getcode())
-                    return False
+                if 200 <= res.getcode() < 300:
+                    return True
+                logging.warning("Bulk update to %s answered with code %d, retrying", bulk_url, res.getcode())
+                return False
         except HTTPError as e:
-            if 400 <= e.code < 500:
+            if e.code in DROPPED_BATCH_STATUS_CODES:
                 logging.error(
                     "Bulk update to %s rejected with code %d, dropping %d task updates",
                     bulk_url,
@@ -143,12 +152,11 @@ class TaskUpdateAggregator:
                     len(payload["tasks"]),
                 )
                 return True
-            logging.warning("Bulk update to %s failed with code %d", bulk_url, e.code)
+            logging.warning("Bulk update to %s failed with code %d, retrying", bulk_url, e.code)
             return False
         except Exception as e:  # skipcq: PYL-W0703
             logging.warning("Bulk update to %s failed: %s", bulk_url, e)
             return False
-        return True
 
     def handle_message(self, message: dict) -> None:
         """Validates a single watcher message and stores its update"""
@@ -165,13 +173,33 @@ class TaskUpdateAggregator:
             return
         self.store_update(task_id=int(task_id), update_dict=update_dict)
 
+    def receive_pending(self, socket_pull: zmq.Socket, max_messages: int = MAX_MESSAGES_PER_WAKEUP) -> int:
+        """Handles the messages already queued on the socket, returns how many there were.
+
+        Bounded, so a flood of messages cannot keep the loop from flushing and from noticing a stop signal.
+        """
+        received = 0
+        while received < max_messages:
+            try:
+                raw_message = socket_pull.recv(zmq.NOBLOCK)
+            except zmq.Again:
+                return received
+            received += 1
+            try:
+                self.handle_message(json.loads(raw_message.decode()))
+            except Exception as e:  # skipcq: PYL-W0703 - one bad message must never stop the loop
+                logging.warning("Dropping invalid message: %s", e)
+        return received
+
     def run(self) -> None:
         """Receives updates until all tasks finish, the idle timeout expires or a signal arrives"""
         context = zmq.Context()
         socket_pull = context.socket(zmq.PULL)
+        socket_pull.setsockopt(zmq.MAXMSGSIZE, MAX_MESSAGE_BYTES)
         host = advertised_ip(self.interface)
         # listen only where the watchers are told to connect - the cluster internal network
         port = socket_pull.bind_to_random_port(f"tcp://{host}")
+        endpoint = f"tcp://{host}:{port}"
         write_auth_file(self.root_dir / AUTH_FILE_NAME, host=host, port=port)
         logging.info("Aggregator for simulation %d listening on %s:%d", self.sim_id, host, port)
 
@@ -181,29 +209,30 @@ class TaskUpdateAggregator:
 
         try:
             while not self.stop_event.is_set():
-                events = dict(poller.poll(timeout=1000))
-                if socket_pull in events:
-                    try:
-                        self.handle_message(json.loads(socket_pull.recv().decode()))
-                    except Exception as e:  # skipcq: PYL-W0703 - one bad message must never stop the loop
-                        logging.warning("Dropping undecodable message: %s", e)
+                # drain everything that is queued - a flush can block for up to BACKEND_TIMEOUT_SECONDS,
+                # reading one message per wakeup would then fall further behind with every flush
+                if poller.poll(timeout=1000) and self.receive_pending(socket_pull):
                     last_message = time.monotonic()
 
-                now = time.monotonic()
-                if now - last_flush >= self.flush_interval_seconds:
+                if time.monotonic() - last_flush >= self.flush_interval_seconds:
                     self.flush()
-                    last_flush = now
+                    last_flush = time.monotonic()
                 if self.all_tasks_finished():
                     logging.info("All %d tasks reported a terminal state", self.ntasks)
                     break
-                if now - last_message >= self.idle_timeout_seconds:
+                if time.monotonic() - last_message >= self.idle_timeout_seconds:
                     logging.warning("No updates for %.0f seconds, shutting down", self.idle_timeout_seconds)
                     break
         finally:
             try:
+                # stop accepting first: the watchers' sends fail from now on and go to the backend directly,
+                # then take what was already queued - nothing accepted by the socket is left unread
+                socket_pull.unbind(endpoint)
+                (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
+                self.receive_pending(socket_pull, max_messages=MAX_MESSAGES_AT_SHUTDOWN)
                 self.final_flush()
             finally:
-                socket_pull.close()
+                socket_pull.close(linger=0)
                 context.term()
                 (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
                 logging.info("Aggregator for simulation %d finished", self.sim_id)

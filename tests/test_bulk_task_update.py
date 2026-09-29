@@ -201,3 +201,152 @@ def test_aggregator_keeps_batch_when_backend_unreachable(tmp_path, monkeypatch):
     monkeypatch.setattr(aggregator_module.request, "urlopen", unreachable)
     aggregator.flush()
     assert aggregator._pending == {1: {"simulated_primaries": 10}}
+
+
+def test_bulk_update_keeps_other_tasks_when_the_database_rejects_a_value(
+    app, simulation_with_tasks: CelerySimulationModel
+):
+    """A value only the database refuses fails the commit - the other tasks still land and the request succeeds"""
+    client = app.test_client()
+
+    payload = {
+        "simulation_id": simulation_with_tasks.id,
+        "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
+        "tasks": [
+            {"task_id": 1, "update_dict": {"requested_primaries": 2**70}},
+            {"task_id": 2, "update_dict": {"simulated_primaries": 600}},
+        ],
+    }
+    resp = client.post("/tasks/bulk", json=payload)
+
+    assert resp.status_code == 202
+    tasks = {task.task_id: task for task in CeleryTaskModel.query.filter_by(simulation_id=simulation_with_tasks.id)}
+    assert tasks[1].requested_primaries == 1000
+    assert tasks[2].simulated_primaries == 600
+
+
+def test_bulk_update_skips_a_malformed_update_as_a_whole(app, simulation_with_tasks: CelerySimulationModel):
+    """Fields set before the malformed one must not be saved - the task would end COMPLETED without end_time"""
+    client = app.test_client()
+
+    payload = {
+        "simulation_id": simulation_with_tasks.id,
+        "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
+        "tasks": [{"task_id": 1, "update_dict": {"task_state": EntityState.COMPLETED.value, "end_time": "not a date"}}],
+    }
+    resp = client.post("/tasks/bulk", json=payload)
+
+    assert resp.status_code == 202
+    task = CeleryTaskModel.query.filter_by(simulation_id=simulation_with_tasks.id, task_id=1).first()
+    assert task.task_state == EntityState.PENDING.value
+    assert task.end_time is None
+
+
+def test_bulk_update_rejects_payload_that_is_not_an_object(app):
+    """A JSON list is not a bulk update"""
+    resp = app.test_client().post("/tasks/bulk", json=[1, 2])
+    assert resp.status_code == 400
+
+
+def test_aggregator_keeps_batch_when_bulk_endpoint_is_missing(tmp_path, monkeypatch):
+    """A 404 means a backend without /tasks/bulk, e.g. during a deploy - the updates wait for the next flush"""
+    aggregator = make_aggregator(tmp_path)
+
+    def not_found(*args, **kwargs):
+        """Backend without the bulk endpoint"""
+        raise HTTPError("http://localhost:5000/tasks/bulk", 404, "Not Found", {}, BytesIO(b""))
+
+    monkeypatch.setattr(aggregator_module.request, "urlopen", not_found)
+    aggregator.flush()
+    assert aggregator._pending == {1: {"simulated_primaries": 10}}
+
+
+def test_aggregator_delivers_messages_still_queued_when_it_stops(tmp_path, monkeypatch):
+    """Whatever the socket accepted before a SIGTERM ends up in the final flush, even if the loop never read it"""
+
+    class IdlePoller:
+        """Poller that never reports incoming messages, so they stay queued until shutdown"""
+
+        def register(self, *args):
+            """Ignores the socket"""
+
+        @staticmethod
+        def poll(timeout: int) -> list:
+            """Nothing ready"""
+            time.sleep(timeout / 1000)
+            return []
+
+    monkeypatch.setattr(aggregator_module.zmq, "Poller", IdlePoller)
+    monkeypatch.setattr(aggregator_module, "advertised_ip", lambda interface: "127.0.0.1")
+    aggregator = TaskUpdateAggregator(
+        sim_id=1,
+        update_key="key",
+        backend_url="http://localhost:5000",
+        root_dir=tmp_path,
+        ntasks=100,
+        flush_interval_seconds=3600,
+    )
+    sent_payloads = []
+    monkeypatch.setattr(aggregator, "send_bulk_update", lambda payload: sent_payloads.append(payload) or True)
+    thread = threading.Thread(target=aggregator.run)
+    thread.start()
+
+    auth_path = tmp_path / ".zmq_auth"
+    for _ in range(50):
+        if auth_path.exists():
+            break
+        time.sleep(0.1)
+    auth = json.loads(auth_path.read_text())
+
+    context = zmq.Context()
+    push_socket = context.socket(zmq.PUSH)
+    try:
+        push_socket.connect(f"tcp://{auth['host']}:{auth['port']}")
+        for task_id in range(1, 21):
+            message = {"update_key": "key", "task_id": task_id, "update_dict": {"simulated_primaries": task_id}}
+            push_socket.send(json.dumps(message).encode())
+        time.sleep(0.5)
+    finally:
+        aggregator.stop_event.set()
+        thread.join(timeout=10)
+        push_socket.close(linger=0)
+        context.term()
+
+    assert not thread.is_alive()
+    delivered = sorted(task["task_id"] for payload in sent_payloads for task in payload["tasks"])
+    assert delivered == list(range(1, 21))
+
+
+@pytest.mark.parametrize("code, dropped", [(500, False), (503, False), (429, False), (422, True), (401, True)])
+def test_aggregator_retries_transient_errors_and_drops_invalid_batches(tmp_path, monkeypatch, code, dropped):
+    """Only answers saying the batch itself is wrong drop it, everything else waits for the next flush"""
+    aggregator = make_aggregator(tmp_path)
+
+    def answer(*args, **kwargs):
+        """Backend answering with the given code"""
+        raise HTTPError("http://localhost:5000/tasks/bulk", code, "", {}, BytesIO(b""))
+
+    monkeypatch.setattr(aggregator_module.request, "urlopen", answer)
+    aggregator.flush()
+    assert (aggregator._pending == {}) is dropped
+
+
+def test_bulk_update_fails_when_the_database_rejects_every_task(app, simulation_with_tasks, monkeypatch):
+    """No task could be saved - that is a database failure, the aggregator has to retry instead of dropping"""
+
+    def failing_commit():
+        """Database refusing every write"""
+        raise RuntimeError("database unavailable")
+
+    monkeypatch.setattr(db.session, "commit", failing_commit)
+    payload = {
+        "simulation_id": simulation_with_tasks.id,
+        "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
+        "tasks": [
+            {"task_id": 1, "update_dict": {"simulated_primaries": 500}},
+            {"task_id": 2, "update_dict": {"simulated_primaries": 600}},
+        ],
+    }
+    # the test app propagates the exception, a deployed flask answers it with 500
+    with pytest.raises(RuntimeError, match="Database rejected every task update"):
+        app.test_client().post("/tasks/bulk", json=payload)

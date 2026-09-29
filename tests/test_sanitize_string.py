@@ -32,3 +32,9 @@ def test_custom_allowed_chars_hash():
     """Extra allowed characters extend the default set"""
     assert sanitize_string("#SBATCH --time=00:59:59", r"\w\-.,=/:# ") == "#SBATCH --time=00:59:59"
     assert sanitize_string("#SBATCH --time=00:59:59") == "SBATCH --time=00:59:59"
+
+
+def test_keeps_characters_of_valid_sbatch_values():
+    """Mail addresses, filename patterns, relative times and node lists are valid option values"""
+    for value in ("user@agh.edu.pl", "%x_%A_%a.out", "USR1@60", "now+1hour", "ac[0001-0004]"):
+        assert sanitize_string(value) == value

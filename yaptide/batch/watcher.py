@@ -2,6 +2,7 @@ import argparse
 from collections.abc import Iterator
 import json
 import logging
+import random
 import re
 import signal
 import ssl
@@ -13,8 +14,6 @@ from pathlib import Path
 from typing import Optional
 from urllib import request
 import math
-
-import zmq
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -62,19 +61,41 @@ def log_generator(
 def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
     """Sends task update to the aggregator, or directly to flask when no aggregator is reachable"""
     global AGGREGATOR_SENDER  # skipcq: PYL-W0603
+    REPORTED_STATE.update(update_dict)
     if AGGREGATOR_SENDER is None:
         # the aggregator runs in its own job, it may still have been queued when this task started
         AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
     if AGGREGATOR_SENDER is not None and AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
+        if update_dict.get("task_state") in TERMINAL_TASK_STATES:
+            # a successful send only means the update is queued, it is not delivered yet - a task that never
+            # reaches the backend as finished stays RUNNING forever, so the terminal state also goes to flask
+            # directly; it is one request per task and flask ignores updates of an already finished task.
+            # It carries everything reported so far - it can overtake the aggregator's batch with start_time,
+            # which flask would then ignore for the finished task
+            post_task_update(
+                sim_id=sim_id,
+                task_id=task_id,
+                update_key=update_key,
+                update_dict=dict(REPORTED_STATE),
+                backend_url=backend_url,
+            )
         return True
     # without the aggregator hundreds of tasks talk to flask directly - the load that made it unresponsive,
-    # so state changes always go through, progress alone is throttled (only where an aggregator is expected)
+    # so state changes always go through, progress alone is throttled (only where an aggregator is expected);
+    # the interval is randomized per update, so tasks started together do not report in lock-step
     now = time.monotonic()
     if AGGREGATOR_AUTH_PATH is not None and "task_state" not in update_dict:
-        if now - REST_FALLBACK["last_progress_seconds"] < REST_FALLBACK_PROGRESS_INTERVAL_SECONDS:
+        if now < REST_FALLBACK["next_progress_seconds"]:
             logging.debug("No aggregator, skipping progress update for task %d", task_id)
             return True
-        REST_FALLBACK["last_progress_seconds"] = now
+        REST_FALLBACK["next_progress_seconds"] = now + REST_FALLBACK_PROGRESS_INTERVAL_SECONDS * random.uniform(
+            0.8, 1.2
+        )
+    if AGGREGATOR_AUTH_PATH is not None and REST_FALLBACK["startup_delay_pending"]:
+        # tasks of one array start within the same second - a random delay before the first request spreads them;
+        # the log line was already read, so the timestamps in update_dict are not shifted
+        REST_FALLBACK["startup_delay_pending"] = False
+        time.sleep(random.uniform(0, STARTUP_JITTER_SECONDS))
     return post_task_update(
         sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
     )
@@ -96,7 +117,7 @@ def post_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
     )
 
     try:
-        with request.urlopen(req, context=context) as res:  # skipcq: BAN-B310
+        with request.urlopen(req, context=context, timeout=30) as res:  # skipcq: BAN-B310
             if res.getcode() != 202:
                 logging.warning("Sending update to %s failed", tasks_url)
                 return False
@@ -111,27 +132,43 @@ class AggregatorSender:
     """Pushes task updates to the aggregator of the simulation over a persistent ZeroMQ socket"""
 
     def __init__(self, auth_path: Path, update_key: str):
+        # imported here, so a cluster without pyzmq still gets its updates through the REST fallback
+        import zmq  # skipcq: PYL-C0415
+
+        self.zmq = zmq
         auth = json.loads(auth_path.read_text())
         self.update_key = update_key
         self.context = zmq.Context()
         self.socket = self.context.socket(zmq.PUSH)
         # a dead aggregator must fail the send instead of silently queueing - the REST fallback then takes over,
-        # so messages are queued only to a live connection and just a handful of them
+        # so messages are queued only to a live connection
         self.socket.setsockopt(zmq.IMMEDIATE, 1)
         self.socket.setsockopt(zmq.SNDHWM, 100)
         self.socket.setsockopt(zmq.LINGER, 1000)
+        # without heartbeats a frozen aggregator or a dead node keeps the connection "alive" and swallows updates
+        self.socket.setsockopt(zmq.HEARTBEAT_IVL, 2000)
+        self.socket.setsockopt(zmq.HEARTBEAT_TIMEOUT, 6000)
         self.socket.connect(f"tcp://{auth['host']}:{auth['port']}")
+        # with IMMEDIATE a send fails until the TCP handshake is done - wait for it once instead of losing
+        # the first update to the fallback
+        if not self.socket.poll(500, zmq.POLLOUT):
+            logging.debug("Aggregator at %s:%s not reachable yet", auth["host"], auth["port"])
         logging.debug("Connected to aggregator at %s:%s", auth["host"], auth["port"])
 
     def send(self, task_id: int, update_dict: dict) -> bool:
         """Returns False when the update could not be handed over to the aggregator"""
         message = {"update_key": self.update_key, "task_id": task_id, "update_dict": update_dict}
         try:
-            self.socket.send(json.dumps(message).encode(), flags=zmq.NOBLOCK)
-        except zmq.ZMQError as e:
+            self.socket.send(json.dumps(message).encode(), flags=self.zmq.NOBLOCK)
+        except self.zmq.ZMQError as e:
             logging.warning("Sending update to the aggregator failed: %s", e)
             return False
         return True
+
+    def close(self) -> None:
+        """Waits up to the linger period for queued updates to leave - pyzmq skips that at interpreter exit"""
+        self.socket.close()
+        self.context.term()
 
 
 def connect_to_aggregator(auth_path: Optional[Path], update_key: str) -> Optional[AggregatorSender]:
@@ -147,8 +184,12 @@ def connect_to_aggregator(auth_path: Optional[Path], update_key: str) -> Optiona
 
 AGGREGATOR_AUTH_PATH: Optional[Path] = None
 AGGREGATOR_SENDER: Optional[AggregatorSender] = None
+TERMINAL_TASK_STATES = {"COMPLETED", "FAILED", "CANCELED"}
 REST_FALLBACK_PROGRESS_INTERVAL_SECONDS = 30
-REST_FALLBACK = {"last_progress_seconds": 0.0}
+REST_FALLBACK = {"next_progress_seconds": 0.0, "startup_delay_pending": True}
+STARTUP_JITTER_SECONDS = 15
+# everything this task reported so far, merged - the direct terminal update carries it along
+REPORTED_STATE: dict = {}
 
 
 def read_shieldhit_file(
@@ -315,10 +356,15 @@ if __name__ == "__main__":
     logging.info("backend_url %s", args.backend_url)
     AGGREGATOR_AUTH_PATH = Path(args.zmq_auth) if args.zmq_auth else None
     AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, args.update_key)
-    read_shieldhit_file(
-        filepath=Path(args.filepath),
-        sim_id=args.sim_id,
-        task_id=args.task_id,
-        update_key=args.update_key,
-        backend_url=args.backend_url,
-    )
+    try:
+        read_shieldhit_file(
+            filepath=Path(args.filepath),
+            sim_id=args.sim_id,
+            task_id=args.task_id,
+            update_key=args.update_key,
+            backend_url=args.backend_url,
+        )
+    finally:
+        # the sender may have been created lazily inside read_shieldhit_file
+        if AGGREGATOR_SENDER is not None:
+            AGGREGATOR_SENDER.close()

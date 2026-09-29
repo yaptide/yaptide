@@ -23,6 +23,7 @@ from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA
 from yaptide.batch.utils.utils import (
     convert_dict_to_aggregator_sbatch_options,
     convert_dict_to_sbatch_options,
+    extract_aggregator_header,
     extract_sbatch_header,
 )
 from yaptide.persistence.models import BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel
@@ -235,7 +236,8 @@ def prepare_script_files(
     aggregator_options = convert_dict_to_aggregator_sbatch_options(
         payload_dict=payload_dict, sim_id=sim_id, job_dir=job_dir
     )
-    aggregator_header = extract_sbatch_header(payload_dict=payload_dict, target_key="aggregator_header")
+    # options typed as #SBATCH lines of the array header apply to the aggregator too, the command line ones win
+    aggregator_header = extract_aggregator_header(array_header)
 
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
@@ -375,7 +377,8 @@ def delete_job(
 
         con.run(f"scancel {array_id}")
         con.run(f"scancel {collect_id}")
-        con.run(f"scancel --name=yaptide_aggregator_{simulation.id}", warn=True)
+        # by id, not by name - several yaptide deployments may share one cluster account
+        con.run(f"test -s {job_dir}/aggregator_job_id && scancel `cat {job_dir}/aggregator_job_id`", warn=True)
         con.run(f"rm -rf {job_dir}")
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(e)

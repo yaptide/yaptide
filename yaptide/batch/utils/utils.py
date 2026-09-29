@@ -1,7 +1,9 @@
 import re
 
 
-def sanitize_string(target_str: str, allowed_chars: str = r"\w\-.,=/: ") -> str:
+# @ % + [ ] appear in valid sbatch values: --mail-user=a@b.pl, --output=%x_%j.out, --signal=USR1@60,
+# --begin=now+1hour, --nodelist=ac[0001-0004]; none of them can start a command or end a quoted string
+def sanitize_string(target_str: str, allowed_chars: str = r"\w\-.,=/: @%+\[\]") -> str:
     """Function clearing unaccepted signs - by default also newlines, which would split the sbatch command line"""
     return re.sub(f"[^{allowed_chars}]", "", target_str)
 
@@ -9,7 +11,7 @@ def sanitize_string(target_str: str, allowed_chars: str = r"\w\-.,=/: ") -> str:
 def extract_sbatch_header(payload_dict: dict, target_key: str) -> str:
     """Function extracting header for slurm script"""
     return (
-        sanitize_string(payload_dict["batch_options"][target_key], r"\s\w\-.,=/:#")
+        sanitize_string(payload_dict["batch_options"][target_key], r"\s\w\-.,=/:#@%+\[\]")
         if "batch_options" in payload_dict and target_key in payload_dict["batch_options"]
         else ""
     )
@@ -29,6 +31,16 @@ def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str) -> str:
 # only the queue placement of the array job applies to the aggregator, never its resources -
 # the UI lets users type any sbatch option (exclusive, constraint, nodelist...), so this is an allowlist
 AGGREGATOR_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "reservation"}
+
+
+def extract_aggregator_header(array_header: str) -> str:
+    """Queue placement lines of the array header - the aggregator has to land in the same account and partition"""
+    placement = re.compile(r"(?<!\S)(--(?:account|partition|qos|reservation)(?:=|\s+)\S+|-[Apq]\s*\S+)")
+    options = []
+    for line in array_header.splitlines():
+        if line.strip().startswith("#SBATCH"):
+            options.extend(placement.findall(line))
+    return "\n".join(f"#SBATCH {option}" for option in options)
 
 
 def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str) -> str:

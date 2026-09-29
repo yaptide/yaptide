@@ -123,31 +123,44 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
         .filter(TaskModel.simulation_id == sim_id, TaskModel.task_id.in_(updates_by_task_id.keys()))
         .all()
     )
+    found_task_ids = [task.task_id for task in tasks]
     # one malformed update must not fail the whole batch - the aggregator would retry it forever
     for task in tasks:
-        try:
-            task.update_state(updates_by_task_id[task.task_id])
-        except Exception as e:  # skipcq: PYL-W0703
-            logging.error("Skipping invalid update for task %d of simulation %d: %s", task.task_id, sim_id, e)
+        _apply_task_update(task, updates_by_task_id[task.task_id], sim_id)
     try:
         db.session.commit()
     except Exception as e:  # skipcq: PYL-W0703
         # a value the database rejects only shows up here - retry the tasks one by one, so the others still land
         logging.error("Bulk update of simulation %d rejected by the database, retrying task by task: %s", sim_id, e)
         db.session.rollback()
-        for task in tasks:
+        failed_commits = 0
+        for task, task_id in zip(tasks, found_task_ids):
+            _apply_task_update(task, updates_by_task_id[task_id], sim_id)
             try:
-                task.update_state(updates_by_task_id[task.task_id])
                 db.session.commit()
             except Exception as task_error:  # skipcq: PYL-W0703
-                logging.error(
-                    "Skipping invalid update for task %d of simulation %d: %s", task.task_id, sim_id, task_error
-                )
+                # rollback first - the failed commit leaves the session unusable, even for reading task attributes
                 db.session.rollback()
+                failed_commits += 1
+                logging.error("Skipping invalid update for task %d of simulation %d: %s", task_id, sim_id, task_error)
+        if len(tasks) > 1 and failed_commits == len(tasks):
+            # no task could be saved - the database is failing, not the data; an error lets the aggregator retry
+            raise RuntimeError(f"Database rejected every task update of simulation {sim_id}")
     if len(tasks) != len(updates_by_task_id):
-        missing = set(updates_by_task_id.keys()) - {task.task_id for task in tasks}
+        missing = set(updates_by_task_id.keys()) - set(found_task_ids)
         logging.warning("Simulation %d has no tasks with ids %s, skipping their updates", sim_id, sorted(missing))
     return len(tasks)
+
+
+def _apply_task_update(task: Union[BatchTaskModel, CeleryTaskModel], update_dict: dict, sim_id: int) -> None:
+    """Applies a single task update, a malformed one leaves the task untouched"""
+    task_id = task.task_id
+    try:
+        task.update_state(update_dict)
+    except Exception as e:  # skipcq: PYL-W0703
+        # update_state may have set some fields before it failed - expiring drops them, the update is skipped whole
+        db.session.expire(task)
+        logging.error("Skipping invalid update for task %d of simulation %d: %s", task_id, sim_id, e)
 
 
 def fetch_tasks_by_sim_id(sim_id: int) -> Union[list[BatchTaskModel], list[CeleryTaskModel]]:

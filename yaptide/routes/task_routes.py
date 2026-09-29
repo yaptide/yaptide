@@ -70,12 +70,16 @@ class TasksBulkResource(Resource):
         }
         """
         payload_dict: dict = request.get_json(force=True)
+        if not isinstance(payload_dict, dict):
+            return yaptide_response(message="Payload must be a JSON object", code=400)
         required_keys = {"simulation_id", "update_key", "tasks"}
         if required_keys != set(payload_dict.keys()):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         sim_id: int = payload_dict["simulation_id"]
+        if not isinstance(sim_id, int) or isinstance(sim_id, bool):
+            return yaptide_response(message="simulation_id must be an integer", code=400)
         simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
 
         if not simulation:
@@ -91,7 +95,12 @@ class TasksBulkResource(Resource):
         for task_update in task_updates:
             if not isinstance(task_update, dict) or {"task_id", "update_dict"} != set(task_update.keys()):
                 return yaptide_response(message="Each task requires exactly task_id and update_dict keys", code=400)
-            if not isinstance(task_update["task_id"], int) or not isinstance(task_update["update_dict"], dict):
+            task_id = task_update["task_id"]
+            if (
+                not isinstance(task_id, int)
+                or isinstance(task_id, bool)
+                or not isinstance(task_update["update_dict"], dict)
+            ):
                 return yaptide_response(message="task_id must be an integer and update_dict a dictionary", code=400)
 
         updated_count = bulk_update_task_states(sim_id=simulation.id, task_updates=task_updates)

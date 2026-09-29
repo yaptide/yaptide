@@ -24,12 +24,17 @@ echo "Job id: $JOB_ID"
 
 if [ -n "$JOB_ID" ] ; then
     # the aggregator batches the progress updates of all tasks into single requests to the backend
-    # it gets its own small allocation and starts once the array does, so nothing runs on the login node
-    AGGREGATOR_OPTS="--dependency=after:$JOB_ID --kill-on-invalid-dep=yes {aggregator_options}"
+    # it gets its own small allocation, so nothing runs on the login node; it depends on the first task only -
+    # a dependency on the whole array is satisfied once no task is pending, i.e. when the LAST one starts
+    AGGREGATOR_OPTS="--dependency=after:${{JOB_ID}}_1 {aggregator_options}"
     AGGREGATOR_CMD="sbatch $AGGREGATOR_OPTS --parsable $AGGREGATOR_SCRIPT > $OUT"
     eval $AGGREGATOR_CMD
     AGGREGATOR_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Aggregator id: $AGGREGATOR_ID"
+    # the collect job and job deletion stop the aggregator by this id
+    if [ -n "$AGGREGATOR_ID" ] ; then
+        echo "$AGGREGATOR_ID" > $ROOT_DIR/aggregator_job_id
+    fi
 
     COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
     eval $COLLECT_CMD
@@ -41,6 +46,11 @@ fi
 COLLECT_SHIELDHIT_BASH: str = """#!/bin/bash
 {collect_header}
 ROOT_DIR={root_dir}
+# every array task has ended - stop the aggregator (it flushes what it holds on SIGTERM), otherwise it would
+# wait until its time limit whenever some task reported its final state straight to the backend
+if [ -s $ROOT_DIR/aggregator_job_id ] ; then
+    scancel `cat $ROOT_DIR/aggregator_job_id`
+fi
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
       --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
