@@ -24,8 +24,9 @@ echo "Job id: $JOB_ID"
 
 if [ -n "$JOB_ID" ] ; then
     # the aggregator batches the progress updates of all tasks into single requests to the backend
-    # it gets its own small allocation, so nothing runs on the login node; it depends on the first task only -
-    # a dependency on the whole array is satisfied once no task is pending, i.e. when the LAST one starts
+    # it gets its own small allocation, so nothing runs on the login node; it becomes eligible once the first task
+    # started (a dependency on the whole array waits for the LAST one), starting takes up to a scheduler cycle more -
+    # until then the watchers report through the throttled REST fallback
     AGGREGATOR_OPTS="--dependency=after:${{JOB_ID}}_1 {aggregator_options}"
     AGGREGATOR_CMD="sbatch $AGGREGATOR_OPTS --parsable $AGGREGATOR_SCRIPT > $OUT"
     eval $AGGREGATOR_CMD

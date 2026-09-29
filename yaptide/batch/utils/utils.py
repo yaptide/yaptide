@@ -38,8 +38,9 @@ def extract_aggregator_header(array_header: str) -> str:
     placement = re.compile(r"(?<!\S)(--(?:account|partition|qos|reservation)(?:=|\s+)\S+|-[Apq]\s*\S+)")
     options = []
     for line in array_header.splitlines():
-        if line.strip().startswith("#SBATCH"):
-            options.extend(placement.findall(line))
+        # like sbatch: only lines starting with #SBATCH in the first column, anything after the next # is a comment
+        if line.startswith("#SBATCH"):
+            options.extend(placement.findall(line[len("#SBATCH") :].split("#", 1)[0]))
     return "\n".join(f"#SBATCH {option}" for option in options)
 
 

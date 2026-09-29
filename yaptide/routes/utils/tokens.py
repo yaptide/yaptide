@@ -67,5 +67,5 @@ def decode_auth_token(token: str, is_refresh: bool = False, payload_key_to_retur
         return int(payload[payload_key_to_return])
     except jwt.ExpiredSignatureError:
         return "Signature expired."
-    except jwt.InvalidTokenError:
+    except (jwt.InvalidTokenError, KeyError, ValueError, TypeError, OverflowError):
         return "Invalid token."

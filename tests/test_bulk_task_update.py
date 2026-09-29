@@ -6,6 +6,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 import zmq
+from sqlalchemy.exc import OperationalError
 from yaptide.application import create_app
 from yaptide.batch import aggregator as aggregator_module
 from yaptide.batch.aggregator import TaskUpdateAggregator
@@ -285,22 +286,23 @@ def test_aggregator_delivers_messages_still_queued_when_it_stops(tmp_path, monke
         root_dir=tmp_path,
         ntasks=100,
         flush_interval_seconds=3600,
+        idle_timeout_seconds=30,
     )
     sent_payloads = []
     monkeypatch.setattr(aggregator, "send_bulk_update", lambda payload: sent_payloads.append(payload) or True)
-    thread = threading.Thread(target=aggregator.run)
+    # daemon and a short idle timeout - a failing test must not keep pytest waiting for the aggregator
+    thread = threading.Thread(target=aggregator.run, daemon=True)
     thread.start()
-
-    auth_path = tmp_path / ".zmq_auth"
-    for _ in range(50):
-        if auth_path.exists():
-            break
-        time.sleep(0.1)
-    auth = json.loads(auth_path.read_text())
 
     context = zmq.Context()
     push_socket = context.socket(zmq.PUSH)
     try:
+        auth_path = tmp_path / ".zmq_auth"
+        for _ in range(50):
+            if auth_path.exists():
+                break
+            time.sleep(0.1)
+        auth = json.loads(auth_path.read_text())
         push_socket.connect(f"tcp://{auth['host']}:{auth['port']}")
         for task_id in range(1, 21):
             message = {"update_key": "key", "task_id": task_id, "update_dict": {"simulated_primaries": task_id}}
@@ -317,7 +319,30 @@ def test_aggregator_delivers_messages_still_queued_when_it_stops(tmp_path, monke
     assert delivered == list(range(1, 21))
 
 
-@pytest.mark.parametrize("code, dropped", [(500, False), (503, False), (429, False), (422, True), (401, True)])
+def test_aggregator_reads_at_most_the_given_number_of_messages_per_wakeup(tmp_path):
+    """A flood of messages must not keep the loop from flushing and from noticing a stop signal"""
+    aggregator = make_aggregator(tmp_path)
+    context = zmq.Context()
+    pull_socket = context.socket(zmq.PULL)
+    push_socket = context.socket(zmq.PUSH)
+    try:
+        port = pull_socket.bind_to_random_port("tcp://127.0.0.1")
+        push_socket.connect(f"tcp://127.0.0.1:{port}")
+        for task_id in range(1, 16):
+            push_socket.send(json.dumps({"update_key": "key", "task_id": task_id, "update_dict": {}}).encode())
+        assert pull_socket.poll(2000)
+        time.sleep(0.2)
+        assert aggregator.receive_pending(pull_socket, max_messages=10) == 10
+        assert aggregator.receive_pending(pull_socket, max_messages=10) == 5
+    finally:
+        push_socket.close(linger=0)
+        pull_socket.close(linger=0)
+        context.term()
+
+
+@pytest.mark.parametrize(
+    "code, dropped", [(500, False), (503, False), (429, False), (404, False), (422, True), (401, True), (403, True)]
+)
 def test_aggregator_retries_transient_errors_and_drops_invalid_batches(tmp_path, monkeypatch, code, dropped):
     """Only answers saying the batch itself is wrong drop it, everything else waits for the next flush"""
     aggregator = make_aggregator(tmp_path)
@@ -331,22 +356,29 @@ def test_aggregator_retries_transient_errors_and_drops_invalid_batches(tmp_path,
     assert (aggregator._pending == {}) is dropped
 
 
-def test_bulk_update_fails_when_the_database_rejects_every_task(app, simulation_with_tasks, monkeypatch):
-    """No task could be saved - that is a database failure, the aggregator has to retry instead of dropping"""
+@pytest.mark.parametrize("task_ids", [(1,), (1, 2)])
+def test_bulk_update_fails_when_the_database_itself_fails(app, simulation_with_tasks, monkeypatch, task_ids):
+    """An unavailable database is not bad data - the request fails, so the aggregator retries the batch"""
 
     def failing_commit():
         """Database refusing every write"""
-        raise RuntimeError("database unavailable")
+        raise OperationalError("COMMIT", {}, Exception("server closed the connection"))
 
     monkeypatch.setattr(db.session, "commit", failing_commit)
     payload = {
         "simulation_id": simulation_with_tasks.id,
         "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
-        "tasks": [
-            {"task_id": 1, "update_dict": {"simulated_primaries": 500}},
-            {"task_id": 2, "update_dict": {"simulated_primaries": 600}},
-        ],
+        "tasks": [{"task_id": task_id, "update_dict": {"simulated_primaries": 500}} for task_id in task_ids],
     }
     # the test app propagates the exception, a deployed flask answers it with 500
-    with pytest.raises(RuntimeError, match="Database rejected every task update"):
+    with pytest.raises(OperationalError):
         app.test_client().post("/tasks/bulk", json=payload)
+
+
+def test_bulk_update_rejects_a_user_token_as_update_key(app, simulation_with_tasks):
+    """A token without simulation_id is an invalid update key, not a server error"""
+    from yaptide.routes.utils.tokens import encode_auth_token  # skipcq: PYL-C0415
+
+    token, _ = encode_auth_token(user_id=1)
+    payload = {"simulation_id": simulation_with_tasks.id, "update_key": token, "tasks": []}
+    assert app.test_client().post("/tasks/bulk", json=payload).status_code == 400

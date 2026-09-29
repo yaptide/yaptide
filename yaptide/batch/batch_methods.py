@@ -72,6 +72,8 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     con = Connection(
         host=f"{user.username}@{cluster.cluster_name}",
         connect_kwargs={"pkey": pkey, "allow_agent": False, "look_for_keys": False},
+        # requests to the backend wait on this connection - an unreachable login node must not block a worker
+        connect_timeout=30,
     )
     return con
 

@@ -65,7 +65,12 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
     if AGGREGATOR_SENDER is None:
         # the aggregator runs in its own job, it may still have been queued when this task started
         AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
-    if AGGREGATOR_SENDER is not None and AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
+    if AGGREGATOR_SENDER is not None and not AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
+        # the aggregator is gone (time limit, crash) - drop the sender, the next update checks .zmq_auth again,
+        # which an aggregator that shut down has removed
+        AGGREGATOR_SENDER.close(linger=0)
+        AGGREGATOR_SENDER = None
+    elif AGGREGATOR_SENDER is not None:
         if update_dict.get("task_state") in TERMINAL_TASK_STATES:
             # a successful send only means the update is queued, it is not delivered yet - a task that never
             # reaches the backend as finished stays RUNNING forever, so the terminal state also goes to flask
@@ -93,9 +98,12 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         )
     if AGGREGATOR_AUTH_PATH is not None and REST_FALLBACK["startup_delay_pending"]:
         # tasks of one array start within the same second - a random delay before the first request spreads them;
-        # the log line was already read, so the timestamps in update_dict are not shifted
+        # timestamps already in update_dict are not shifted, lines read after the delay can be up to it late
         REST_FALLBACK["startup_delay_pending"] = False
         time.sleep(random.uniform(0, STARTUP_JITTER_SECONDS))
+    if update_dict.get("task_state") in TERMINAL_TASK_STATES:
+        # carry everything reported so far - an earlier update with start_time may have been lost with the aggregator
+        update_dict = dict(REPORTED_STATE)
     return post_task_update(
         sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
     )
@@ -165,9 +173,9 @@ class AggregatorSender:
             return False
         return True
 
-    def close(self) -> None:
+    def close(self, linger: Optional[int] = None) -> None:
         """Waits up to the linger period for queued updates to leave - pyzmq skips that at interpreter exit"""
-        self.socket.close()
+        self.socket.close(linger=linger)
         self.context.term()
 
 

@@ -68,10 +68,11 @@ def test_watcher_falls_back_to_rest_until_the_aggregator_job_starts(monkeypatch,
     assert watcher.send_task_update(**update({"simulated_primaries": 10}))
     assert watcher.send_task_update(**update({"simulated_primaries": 20}))
     assert watcher.send_task_update(**update({"task_state": "COMPLETED"}))
+    # the terminal state carries everything reported so far
     assert [kwargs["update_dict"] for kwargs in posted] == [
         {"task_state": "RUNNING"},
         {"simulated_primaries": 10},
-        {"task_state": "COMPLETED"},
+        {"task_state": "COMPLETED", "simulated_primaries": 20},
     ]
 
     class FakeSender:
@@ -161,7 +162,7 @@ def test_watcher_imports_without_pyzmq():
     assert result.returncode == 0, result.stderr
 
 
-def test_aggregator_starts_with_the_first_array_task_and_collect_stops_it():
+def test_aggregator_depends_on_the_first_array_task_and_collect_stops_it():
     """A dependency on the whole array is satisfied only once its last task started"""
     assert "--dependency=after:${JOB_ID}_1" in SUBMIT_SHIELDHIT.format(
         array_options="",
@@ -192,3 +193,51 @@ def test_aggregator_header_keeps_only_queue_placement():
     # attached short values, space separated long ones, other options on the same line stay with the array
     array_header = "#SBATCH -Aplg-cpu --exclusive\n#SBATCH --qos normal --comment=x-pz"
     assert extract_aggregator_header(array_header) == "#SBATCH -Aplg-cpu\n#SBATCH --qos normal"
+    # sbatch ignores comments and lines not starting in the first column, so does the aggregator
+    array_header = "#SBATCH --account=plg-cpu # -p plgrid-gpu was too slow\n  #SBATCH -p indented"
+    assert extract_aggregator_header(array_header) == "#SBATCH --account=plg-cpu"
+
+
+def test_watcher_drops_a_sender_whose_aggregator_is_gone(monkeypatch):
+    """A failed send means the aggregator ended - later updates must not keep trying the dead connection"""
+    monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: True)
+    monkeypatch.setattr(watcher, "REST_FALLBACK", {"next_progress_seconds": 0.0, "startup_delay_pending": False})
+    monkeypatch.setattr(watcher, "REPORTED_STATE", {})
+    monkeypatch.setattr(watcher, "AGGREGATOR_AUTH_PATH", None)
+
+    class DeadSender:
+        """Aggregator that stopped"""
+
+        closed = False
+
+        @staticmethod
+        def send(task_id: int, update_dict: dict) -> bool:
+            """Refuses the update"""
+            return False
+
+        def close(self, linger=None):
+            """Records the close"""
+            self.closed = True
+
+    sender = DeadSender()
+    monkeypatch.setattr(watcher, "AGGREGATOR_SENDER", sender)
+    assert watcher.send_task_update(
+        sim_id=1, task_id=2, update_key="key", update_dict={"simulated_primaries": 10}, backend_url="http://backend"
+    )
+    assert sender.closed and watcher.AGGREGATOR_SENDER is None
+
+
+def test_rest_fallback_delays_only_its_first_request(monkeypatch):
+    """The startup jitter spreads the first requests of an array, later ones are not delayed again"""
+    sleeps = []
+    monkeypatch.setattr(watcher.time, "sleep", sleeps.append)
+    monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: True)
+    monkeypatch.setattr(watcher, "REST_FALLBACK", {"next_progress_seconds": 0.0, "startup_delay_pending": True})
+    monkeypatch.setattr(watcher, "REPORTED_STATE", {})
+    monkeypatch.setattr(watcher, "AGGREGATOR_SENDER", None)
+    monkeypatch.setattr(watcher, "AGGREGATOR_AUTH_PATH", Path("/nonexistent/.zmq_auth"))
+    arguments = {"sim_id": 1, "task_id": 2, "update_key": "key", "backend_url": "http://backend"}
+
+    watcher.send_task_update(update_dict={"task_state": "RUNNING"}, **arguments)
+    watcher.send_task_update(update_dict={"task_state": "COMPLETED"}, **arguments)
+    assert len(sleeps) == 1 and 0 <= sleeps[0] <= watcher.STARTUP_JITTER_SECONDS

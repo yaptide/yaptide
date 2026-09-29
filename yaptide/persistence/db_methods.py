@@ -2,6 +2,7 @@ import logging
 from typing import Optional, Union
 
 from sqlalchemy import and_
+from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
@@ -110,6 +111,10 @@ def fetch_task_by_sim_id_and_task_id(sim_id: int, task_id: int) -> Union[BatchTa
     return task
 
 
+# errors of the database or the connection, not of the data - retrying later can succeed
+DATABASE_FAILURES = (OperationalError, InterfaceError, InternalError)
+
+
 def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
     """Updates many tasks of one simulation in a single query and a single commit.
 
@@ -129,23 +134,25 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
         _apply_task_update(task, updates_by_task_id[task.task_id], sim_id)
     try:
         db.session.commit()
+    except DATABASE_FAILURES:
+        # the database itself is failing, not the data - an error answer makes the aggregator retry the batch
+        db.session.rollback()
+        raise
     except Exception as e:  # skipcq: PYL-W0703
         # a value the database rejects only shows up here - retry the tasks one by one, so the others still land
         logging.error("Bulk update of simulation %d rejected by the database, retrying task by task: %s", sim_id, e)
         db.session.rollback()
-        failed_commits = 0
         for task, task_id in zip(tasks, found_task_ids):
             _apply_task_update(task, updates_by_task_id[task_id], sim_id)
             try:
                 db.session.commit()
+            except DATABASE_FAILURES:
+                db.session.rollback()
+                raise
             except Exception as task_error:  # skipcq: PYL-W0703
                 # rollback first - the failed commit leaves the session unusable, even for reading task attributes
                 db.session.rollback()
-                failed_commits += 1
                 logging.error("Skipping invalid update for task %d of simulation %d: %s", task_id, sim_id, task_error)
-        if len(tasks) > 1 and failed_commits == len(tasks):
-            # no task could be saved - the database is failing, not the data; an error lets the aggregator retry
-            raise RuntimeError(f"Database rejected every task update of simulation {sim_id}")
     if len(tasks) != len(updates_by_task_id):
         missing = set(updates_by_task_id.keys()) - set(found_task_ids)
         logging.warning("Simulation %d has no tasks with ids %s, skipping their updates", sim_id, sorted(missing))
