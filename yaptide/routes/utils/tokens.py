@@ -1,11 +1,13 @@
+import os
 from datetime import datetime, timedelta
 from secrets import token_hex
 from typing import Union
 
 import jwt
 
-SECRET_KEY_TOKEN = token_hex(256)
-SECRET_KEY_TOKEN_REFRESH = token_hex(256)
+# with several server processes (gunicorn workers) the secrets have to come from outside, see run_flask.sh
+SECRET_KEY_TOKEN = os.environ.get("YAPTIDE_TOKEN_SECRET") or token_hex(256)
+SECRET_KEY_TOKEN_REFRESH = os.environ.get("YAPTIDE_REFRESH_TOKEN_SECRET") or token_hex(256)
 _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
 _Keycloak_Token_Expiration_Time = 30  # minutes
@@ -65,5 +67,5 @@ def decode_auth_token(token: str, is_refresh: bool = False, payload_key_to_retur
         return int(payload[payload_key_to_return])
     except jwt.ExpiredSignatureError:
         return "Signature expired."
-    except jwt.InvalidTokenError:
+    except (jwt.InvalidTokenError, KeyError, ValueError, TypeError, OverflowError):
         return "Invalid token."

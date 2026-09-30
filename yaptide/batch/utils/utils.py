@@ -1,15 +1,17 @@
 import re
 
 
-def sanitize_string(target_str: str, allowed_chars: str = r"[\w\-.,=/:]+") -> str:
-    """Function clearing unaccepted signs"""
-    return re.sub(f"[^\\s{allowed_chars}]", "", target_str)
+# @ % + [ ] appear in valid sbatch values: --mail-user=a@b.pl, --output=%x_%j.out, --signal=USR1@60,
+# --begin=now+1hour, --nodelist=ac[0001-0004]; none of them can start a command or end a quoted string
+def sanitize_string(target_str: str, allowed_chars: str = r"\w\-.,=/: @%+\[\]") -> str:
+    """Function clearing unaccepted signs - by default also newlines, which would split the sbatch command line"""
+    return re.sub(f"[^{allowed_chars}]", "", target_str)
 
 
 def extract_sbatch_header(payload_dict: dict, target_key: str) -> str:
     """Function extracting header for slurm script"""
     return (
-        sanitize_string(payload_dict["batch_options"][target_key], r"[\w\-.,=/:#]+")
+        sanitize_string(payload_dict["batch_options"][target_key], r"\s\w\-.,=/:#@%+\[\]")
         if "batch_options" in payload_dict and target_key in payload_dict["batch_options"]
         else ""
     )
@@ -23,4 +25,44 @@ def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str) -> str:
     opt_list = []
     for key, val in options_dict.items():
         opt_list.append(f"--{sanitize_string(key)}={sanitize_string(val)}")
+    return " ".join(opt_list)
+
+
+# only the queue placement of the array job applies to the aggregator, never its resources -
+# the UI lets users type any sbatch option (exclusive, constraint, nodelist...), so this is an allowlist
+AGGREGATOR_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "reservation"}
+
+
+def extract_aggregator_header(array_header: str) -> str:
+    """Queue placement lines of the array header - the aggregator has to land in the same account and partition"""
+    placement = re.compile(r"(?<!\S)(--(?:account|partition|qos|reservation)(?:=|\s+)\S+|-[Apq]\s*\S+)")
+    options = []
+    for line in array_header.splitlines():
+        # like sbatch: only lines starting with #SBATCH in the first column, anything after the next # is a comment
+        if line.startswith("#SBATCH"):
+            options.extend(placement.findall(line[len("#SBATCH") :].split("#", 1)[0]))
+    return "\n".join(f"#SBATCH {option}" for option in options)
+
+
+def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str) -> str:
+    """Function building sbatch options for the aggregator job
+
+    It keeps whatever the array job needs to be accepted by the queue (account, partition, time, qos)
+    and asks for a single cheap cpu, because the aggregator only forwards updates.
+    """
+    options_dict = {"time": "00:59:59"}
+    array_options = payload_dict.get("batch_options", {}).get("array_options", {})
+    options_dict.update({key: val for key, val in array_options.items() if key in AGGREGATOR_INHERITED_ARRAY_OPTIONS})
+    options_dict.update(
+        {
+            "ntasks": "1",
+            "cpus-per-task": "1",
+            "mem": "1G",
+            "job-name": f"yaptide_aggregator_{sim_id}",
+            "output": f"{job_dir}/aggregator.log",
+        }
+    )
+    opt_list = []
+    for key, val in options_dict.items():
+        opt_list.append(f"--{sanitize_string(key)}={sanitize_string(str(val))}")
     return " ".join(opt_list)

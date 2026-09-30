@@ -6,7 +6,7 @@ from yaptide.routes.celery_routes import JobsDirect
 from yaptide.routes.common_sim_routes import JobsResource, InputsResource, LogfilesResource, ResultsResource
 from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
-from yaptide.routes.task_routes import TasksResource
+from yaptide.routes.task_routes import TasksBulkResource, TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
 
@@ -30,6 +30,7 @@ def initialize_routes(api: Api):
     api.add_resource(JobsResource, "/jobs")
 
     api.add_resource(TasksResource, "/tasks")
+    api.add_resource(TasksBulkResource, "/tasks/bulk")
 
     api.add_resource(ResultsResource, "/results")
     api.add_resource(InputsResource, "/inputs")
