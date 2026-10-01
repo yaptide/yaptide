@@ -9,6 +9,7 @@ from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
+from yaptide.routes.utils.utils import local_users_enabled, registration_enabled
 
 
 class HelloWorld(Resource):
@@ -16,8 +17,15 @@ class HelloWorld(Resource):
 
     @staticmethod
     def get():
-        """Root route get method"""
-        return yaptide_response(message="Hello World!", code=200)
+        """Root route get method, also advertising which login methods are available to the UI"""
+        return yaptide_response(
+            message="Hello World!",
+            code=200,
+            content={
+                "local_users_enabled": local_users_enabled(),
+                "registration_enabled": registration_enabled(),
+            },
+        )
 
 
 def initialize_routes(api: Api):
