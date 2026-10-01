@@ -1,4 +1,5 @@
 import logging
+import os
 
 from flask import request
 from flask_restful import Resource
@@ -15,6 +16,19 @@ from yaptide.routes.utils.response_templates import (  # skipcq: FLK-E101
 from yaptide.routes.utils.tokens import encode_auth_token
 
 
+def registration_enabled() -> bool:
+    """Whether local user registration via the /auth/register endpoint is enabled.
+
+    On deployments that rely on Keycloak for authentication (e.g. yap-dev and yaptide)
+    there is no need for a local user database, so registration can be switched off by
+    setting the ENABLE_USER_REGISTRATION environment variable to a falsy value
+    (e.g. "false", "0", "no"). When the variable is unset, registration stays enabled
+    to preserve the behaviour for local development and tests.
+    """
+    value = os.environ.get("ENABLE_USER_REGISTRATION", "true")
+    return value.strip().lower() not in {"false", "0", "no", "off", ""}
+
+
 class AuthRegister(Resource):
     """Class responsible for user registration"""
 
@@ -27,6 +41,10 @@ class AuthRegister(Resource):
     @staticmethod
     def put():
         """Method returning status of registration"""
+        if not registration_enabled():
+            logging.warning("Rejected user registration attempt: registration is disabled on this instance")
+            return yaptide_response(message="User registration is disabled on this instance", code=403)
+
         try:
             json_data: dict = AuthRegister.APIParametersSchema().load(request.get_json(force=True))
         except ValidationError:
