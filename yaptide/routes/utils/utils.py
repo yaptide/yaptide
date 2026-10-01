@@ -1,6 +1,7 @@
 from typing import Optional
 import logging
-import os
+
+from environs import env, EnvValidationError
 
 from yaptide.persistence.db_methods import fetch_simulation_by_job_id
 from yaptide.persistence.models import UserModel, YaptideUserModel
@@ -8,33 +9,18 @@ from yaptide.utils.enums import InputType
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
 
 
-def _env_flag(name: str, default: bool = True) -> bool:
-    """Read a boolean flag from the environment; falsy values are false/0/no/off/empty"""
-    value = os.environ.get(name)
-    if value is None:
-        return default
-    return value.strip().lower() not in {"false", "0", "no", "off", ""}
-
-
 def local_users_enabled() -> bool:
     """Whether local (username/password) users can register, log in and use the service.
 
-    On deployments that rely solely on Keycloak for authentication (e.g. yap-dev and yaptide)
-    local users can be switched off completely by setting the ENABLE_LOCAL_USERS environment
-    variable to a falsy value. When the variable is unset, local users stay enabled
-    to preserve the behaviour for local development and tests.
+    Local users are enabled only when the ENABLE_LOCAL_USERS environment variable is set to
+    a truthy value (true/1/yes/on). When it is unset, the instance accepts Keycloak users only.
+    An invalid value is logged and treated as disabled.
     """
-    return _env_flag("ENABLE_LOCAL_USERS")
-
-
-def registration_enabled() -> bool:
-    """Whether local user registration via the /auth/register endpoint is enabled.
-
-    Registration can be switched off on its own by setting the ENABLE_USER_REGISTRATION
-    environment variable to a falsy value, while still allowing existing local users to log in.
-    It is always disabled when local users are disabled (see local_users_enabled).
-    """
-    return local_users_enabled() and _env_flag("ENABLE_USER_REGISTRATION")
+    try:
+        return env.bool("ENABLE_LOCAL_USERS", False)
+    except EnvValidationError as e:
+        logging.error("Local users disabled due to invalid ENABLE_LOCAL_USERS: %s", e)
+        return False
 
 
 def is_disabled_local_user(user: UserModel) -> bool:

@@ -9,7 +9,7 @@ from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.task_routes import TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
-from yaptide.routes.utils.utils import local_users_enabled, registration_enabled
+from yaptide.routes.utils.utils import local_users_enabled
 
 
 class HelloWorld(Resource):
@@ -21,10 +21,7 @@ class HelloWorld(Resource):
         return yaptide_response(
             message="Hello World!",
             code=200,
-            content={
-                "local_users_enabled": local_users_enabled(),
-                "registration_enabled": registration_enabled(),
-            },
+            content={"local_users_enabled": local_users_enabled()},
         )
 
 

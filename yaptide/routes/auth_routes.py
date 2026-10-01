@@ -13,7 +13,7 @@ from yaptide.routes.utils.response_templates import (  # skipcq: FLK-E101
     yaptide_response,
 )
 from yaptide.routes.utils.tokens import encode_auth_token
-from yaptide.routes.utils.utils import local_users_enabled, registration_enabled
+from yaptide.routes.utils.utils import local_users_enabled
 
 
 class AuthRegister(Resource):
@@ -28,7 +28,7 @@ class AuthRegister(Resource):
     @staticmethod
     def put():
         """Method returning status of registration"""
-        if not registration_enabled():
+        if not local_users_enabled():
             logging.warning("Rejected user registration attempt: registration is disabled on this instance")
             return yaptide_response(message="User registration is disabled on this instance", code=403)
 
