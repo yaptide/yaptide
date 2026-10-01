@@ -126,3 +126,42 @@ def test_user_status_after_logout(client, db_good_username: str, db_good_passwor
     data = json.loads(resp.data.decode())
     assert {"message"} == set(data.keys())
     assert resp.status_code == 401  # skipcq: BAN-B101
+
+
+@pytest.mark.parametrize("flag", ["false", None])
+def test_local_users_disabled(client, monkeypatch, flag, db_good_username: str, db_good_password: str):
+    """Test that local users can neither register, log in nor use issued tokens unless ENABLE_LOCAL_USERS is true"""
+    client.put(
+        "/auth/register",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
+    client.post(
+        "/auth/login",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
+    assert client.get("/auth/status").status_code == 200  # skipcq: BAN-B101
+
+    if flag is None:
+        monkeypatch.delenv("ENABLE_LOCAL_USERS")
+    else:
+        monkeypatch.setenv("ENABLE_LOCAL_USERS", flag)
+
+    resp = client.put(
+        "/auth/register",
+        data=json.dumps(dict(username=f"{db_good_username}_new", password=db_good_password)),
+        content_type="application/json",
+    )
+    assert resp.status_code == 403  # skipcq: BAN-B101
+
+    resp = client.post(
+        "/auth/login",
+        data=json.dumps(dict(username=db_good_username, password=db_good_password)),
+        content_type="application/json",
+    )
+    assert resp.status_code == 403  # skipcq: BAN-B101
+
+    # tokens issued before local users were disabled are rejected as well
+    assert client.get("/auth/status").status_code == 403  # skipcq: BAN-B101
+    assert client.get("/auth/refresh").status_code == 403  # skipcq: BAN-B101
