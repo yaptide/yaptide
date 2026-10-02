@@ -1,7 +1,7 @@
 import pytest
 from pytest import param
 
-from yaptide.utils.sim_utils import adjust_primaries_for_fluka_files
+from yaptide.utils.sim_utils import adjust_primaries_for_fluka_files, write_simulation_input_files
 
 
 @pytest.mark.parametrize(
@@ -22,3 +22,16 @@ def test_adjust_primaries_for_fluka_files(start_line: str, tasks: int, expected:
     assert len(files_dict) == 1
     assert total_primaries == 50000
     assert files_dict["fluka.inp"] == expected
+
+
+@pytest.mark.parametrize("filename", ["../x.inp", "/tmp/x.inp", "a/b.inp", "..", ".", ""])
+def test_write_simulation_input_files_rejects_paths(tmp_path, filename: str):
+    """Test that filenames escaping the output directory are rejected."""
+    with pytest.raises(ValueError):
+        write_simulation_input_files({filename: "x"}, tmp_path)
+
+
+def test_write_simulation_input_files_keeps_unicode_names(tmp_path):
+    """Test that non-ASCII filenames are written unchanged."""
+    write_simulation_input_files({"原子.inp": "x"}, tmp_path)
+    assert (tmp_path / "原子.inp").read_text() == "x"

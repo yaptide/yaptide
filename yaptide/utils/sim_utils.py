@@ -5,8 +5,6 @@ import re
 from pathlib import Path
 from typing import Optional
 
-from werkzeug.utils import secure_filename
-
 from pymchelper.estimator import Estimator
 from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
@@ -305,7 +303,9 @@ def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -
 def write_simulation_input_files(files_dict: dict, output_dir: Path) -> None:
     """Save files from provided dict (filenames as keys and content as values) into the provided directory"""
     for filename, file_contents in files_dict.items():
-        with open(output_dir / secure_filename(filename), "w", newline="\n") as writer:  # skipcq: PTC-W6004
+        if Path(filename).name != filename or filename in ("", ".", ".."):
+            raise ValueError(f"Invalid input filename: {filename!r}")
+        with open(output_dir / filename, "w", newline="\n") as writer:  # skipcq: PTC-W6004
             writer.write(file_contents)
 
 
