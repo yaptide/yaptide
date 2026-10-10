@@ -1,0 +1,17 @@
+FROM python:3.11-slim
+
+# Install OpenSSH client for ssh-keygen and clean up APT caches
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    openssh-client \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Install PyJWT to decode JWT tokens inside server.py
+RUN pip install --no-cache-dir PyJWT
+
+COPY certificate_authority.py /app/certificate_authority.py
+
+EXPOSE 5001
+
+CMD ["python", "certificate_authority.py"]
