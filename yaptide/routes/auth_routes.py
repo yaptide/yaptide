@@ -13,6 +13,7 @@ from yaptide.routes.utils.response_templates import (  # skipcq: FLK-E101
     yaptide_response,
 )
 from yaptide.routes.utils.tokens import encode_auth_token
+from yaptide.routes.utils.utils import local_users_enabled
 
 
 class AuthRegister(Resource):
@@ -27,6 +28,10 @@ class AuthRegister(Resource):
     @staticmethod
     def put():
         """Method returning status of registration"""
+        if not local_users_enabled():
+            logging.warning("Rejected user registration attempt: registration is disabled on this instance")
+            return yaptide_response(message="User registration is disabled on this instance", code=403)
+
         try:
             json_data: dict = AuthRegister.APIParametersSchema().load(request.get_json(force=True))
         except ValidationError:
@@ -56,6 +61,10 @@ class AuthLogIn(Resource):
     @staticmethod
     def post():
         """Method returning status of logging in (and token if it was successful)"""
+        if not local_users_enabled():
+            logging.warning("Rejected local user login attempt: local users are disabled on this instance")
+            return yaptide_response(message="Local user login is disabled on this instance", code=403)
+
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)

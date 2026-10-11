@@ -300,9 +300,16 @@ def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -
     return {}, 0
 
 
+def is_plain_filename(filename: str) -> bool:
+    """Accept only a bare file name, so the file lands directly in the target directory."""
+    return filename not in ("", "..") and Path(filename).name == filename
+
+
 def write_simulation_input_files(files_dict: dict, output_dir: Path) -> None:
     """Save files from provided dict (filenames as keys and content as values) into the provided directory"""
     for filename, file_contents in files_dict.items():
+        if not is_plain_filename(filename):
+            raise ValueError(f"Invalid input filename: {filename!r}")
         with open(output_dir / filename, "w", newline="\n") as writer:  # skipcq: PTC-W6004
             writer.write(file_contents)
 
