@@ -6,7 +6,7 @@ class PlatformType(Enum):
 
     DIRECT = "DIRECT"
     """
-    Simulation run with Celery directly on the server.
+    Simulation run directly on the server, on its Ray cluster.
     """
     BATCH = "BATCH"
     """

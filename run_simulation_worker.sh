@@ -29,4 +29,15 @@ else
     ./yaptide/admin/simulators.py download-fluka --dir /simulators
 fi
 
-celery --app yaptide.celery.simulation_worker worker --events --loglevel="$LOG_LEVEL_ROOT" --pool eventlet --hostname yaptide-simulation-worker --queues simulations
+# simulations running before a restart are lost, so the working directories they left can go
+rm -rf "${TMPDIR:-/tmp}"/yaptide_task_*
+
+NUM_CPUS="${RAY_NUM_CPUS%.*}"
+if [ "${NUM_CPUS:-0}" -lt 1 ]; then
+    NUM_CPUS=1
+fi
+
+# without GRPC_ENABLE_FORK_SUPPORT=0 the Ray client server crashes when a Flask worker connects
+GRPC_ENABLE_FORK_SUPPORT=0 exec ray start --head --port=6379 --ray-client-server-port=10001 \
+    --num-cpus="$NUM_CPUS" --object-store-memory=$((768 * 1024 * 1024)) \
+    --include-dashboard=false --disable-usage-stats --block

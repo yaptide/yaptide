@@ -133,7 +133,7 @@ class CelerySimulationModel(SimulationModel):
 
     __tablename__ = "CelerySimulation"
     id: Column[int] = db.Column(db.Integer, db.ForeignKey("Simulation.id", ondelete="CASCADE"), primary_key=True)
-    merge_id: Column[str] = db.Column(db.String, nullable=True, doc="Celery collect job ID")
+    merge_id: Column[str] = db.Column(db.String, nullable=True, doc="Name of the Ray supervisor running the simulation")
 
     __mapper_args__ = {"polymorphic_identity": PlatformType.DIRECT.value, "polymorphic_load": "inline"}
 

@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pymchelper.run import main as convertmc
 
-from yaptide.celery import tasks
+from yaptide.direct import simulation
 from yaptide.utils.sim_utils import merge_simulation_outputs
 
 # two SHIELD-HIT12A tasks of the test input with tiny meshes, run with 100 and 300 primaries
@@ -61,12 +61,12 @@ def test_merge_without_output_files(tmp_path: Path):
 
 @pytest.fixture
 def task_outputs(tmp_path: Path) -> list[Path]:
-    """Copies of the task directories, as run_single_simulation leaves them for merge_results"""
+    """Copies of the task directories, as run_simulation leaves them for finish_simulation"""
     return [Path(shutil.copytree(task_dir, tmp_path / task_dir.name)) for task_dir in TASK_DIRS]
 
 
-def test_merge_results_task_merges_and_removes_directories(task_outputs: list[Path], monkeypatch):
-    """merge_results merges the successful tasks, keeps the failed task's logfiles and removes the directories"""
+def test_finish_simulation_merges_and_removes_directories(task_outputs: list[Path], monkeypatch):
+    """finish_simulation merges the successful tasks, sends the failed task's logfiles and removes the directories"""
     sent_logfiles = {}
 
     def fake_send_logfiles(logfiles: dict, **_) -> bool:
@@ -74,89 +74,78 @@ def test_merge_results_task_merges_and_removes_directories(task_outputs: list[Pa
         sent_logfiles.update(logfiles)
         return True
 
-    monkeypatch.setattr(tasks, "send_simulation_logfiles", fake_send_logfiles)
+    monkeypatch.setattr(simulation, "send_simulation_logfiles", fake_send_logfiles)
     results = [
-        {"output_dir": str(task_outputs[0]), "keep_output_dir": False, "simulation_id": None, "update_key": None},
-        {"logfiles": {"shieldhit_0003.log": "crashed"}, "simulation_id": None, "update_key": None},
-        {"output_dir": str(task_outputs[1]), "keep_output_dir": True, "simulation_id": None, "update_key": None},
+        {"output_dir": str(task_outputs[0])},
+        {"logfiles": {"shieldhit_0003.log": "crashed"}},
+        {"output_dir": str(task_outputs[1])},
     ]
 
-    final_result = tasks.merge_results(results)
+    final_result = simulation.finish_simulation(results, simulation_id=None, update_key=None)
 
     # without an update key the results cannot be sent, so they are returned
     assert [estimator["name"] for estimator in final_result["estimators"]] == ESTIMATOR_NAMES
     assert sent_logfiles == {"shieldhit_0003.log": "crashed"}
     assert not task_outputs[0].exists()
-    assert task_outputs[1].exists()
+    assert not task_outputs[1].exists()
 
 
-def test_failed_task_removes_its_work_dir(tmp_path: Path, monkeypatch):
+def test_failed_task_removes_its_work_dir(tmp_path: Path):
     """A task that raises leaves no working directory behind"""
-    monkeypatch.setenv("TMPDIR", str(tmp_path))
-    monkeypatch.delenv("TEMP", raising=False)
-    monkeypatch.delenv("TMP", raising=False)
+    work_dir = tmp_path / f"{simulation.WORK_DIR_PREFIX}1_0"
 
-    # an unknown simulator type raises after the working directory was created
-    with pytest.raises(NameError):
-        tasks.run_single_simulation.run(files_dict={"beam.dat": ""}, task_id=1, sim_type="unknown")
+    with pytest.raises(ValueError):
+        simulation.run_simulation({"beam.dat": ""}, 0, "unknown", work_dir, simulation_id=1, report=print)
 
-    assert not list(tmp_path.glob(f"{tasks.WORK_DIR_PREFIX}*"))
-
-
-def test_worker_start_removes_stale_work_dirs(tmp_path: Path, monkeypatch):
-    """Working directories left by jobs that never merged are removed when the worker starts"""
-    monkeypatch.setenv("TMPDIR", str(tmp_path))
-    monkeypatch.delenv("TEMP", raising=False)
-    monkeypatch.delenv("TMP", raising=False)
-    stale = tmp_path / f"{tasks.WORK_DIR_PREFIX}abc"
-    stale.mkdir()
-    other = tmp_path / "other"
-    other.mkdir()
-
-    tasks.remove_stale_work_dirs()
-
-    assert not stale.exists()
-    assert other.exists()
+    assert not work_dir.exists()
 
 
 @pytest.fixture
 def backend_posts(monkeypatch) -> list:
-    """Records what merge_results would send to the backend"""
+    """Records what finish_simulation would send to the backend"""
     posts = []
 
-    def fake_post_update(dict_to_send: dict) -> None:
+    def fake_send_job_state(simulation_id: int, update_key: str, update_dict: dict, **_) -> bool:
         """Records a job state update"""
-        posts.append(("jobs", dict_to_send["job_state"]))
+        posts.append(("jobs", update_dict["job_state"]))
+        return True
 
     def fake_send(**kwargs) -> bool:
         """Records sent results or logfiles"""
         posts.append(("results" if "estimators" in kwargs else "logfiles", None))
         return True
 
-    monkeypatch.setattr(tasks, "post_update", fake_post_update)
-    monkeypatch.setattr(tasks, "send_simulation_results", fake_send)
-    monkeypatch.setattr(tasks, "send_simulation_logfiles", fake_send)
+    monkeypatch.setattr(simulation, "send_job_state", fake_send_job_state)
+    monkeypatch.setattr(simulation, "send_simulation_results", fake_send)
+    monkeypatch.setattr(simulation, "send_simulation_logfiles", fake_send)
     return posts
 
 
-def test_merge_results_fails_simulation_when_task_results_are_missing(task_outputs: list[Path], backend_posts: list):
-    """A missing working directory (e.g. after a worker restart) marks the simulation failed, not partially merged"""
+def test_finish_simulation_fails_when_task_results_are_missing(task_outputs: list[Path], backend_posts: list):
+    """A missing working directory (e.g. after a Ray restart) marks the simulation failed, not partially merged"""
     shutil.rmtree(task_outputs[1])
-    results = [
-        {"output_dir": str(path), "keep_output_dir": False, "simulation_id": 1, "update_key": "key"}
-        for path in task_outputs
-    ]
+    results = [{"output_dir": str(path)} for path in task_outputs]
 
-    tasks.merge_results(results)
+    simulation.finish_simulation(results, simulation_id=1, update_key="key")
 
     assert backend_posts == [("jobs", "MERGING_RUNNING"), ("jobs", "FAILED")]
     assert not task_outputs[0].exists()
 
 
-def test_merge_results_fails_simulation_when_all_tasks_failed(backend_posts: list):
+def test_finish_simulation_fails_when_all_tasks_failed(backend_posts: list):
     """When every task failed the logfiles are sent and the simulation is marked failed"""
-    results = [{"logfiles": {"shieldhit_0001.log": "crashed"}, "simulation_id": 1, "update_key": "key"}]
+    results = [{"logfiles": {"shieldhit_0001.log": "crashed"}}]
 
-    tasks.merge_results(results)
+    simulation.finish_simulation(results, simulation_id=1, update_key="key")
 
     assert backend_posts == [("jobs", "MERGING_RUNNING"), ("logfiles", None), ("jobs", "FAILED")]
+
+
+def test_finish_simulation_sends_nothing_after_cancel(task_outputs: list[Path], backend_posts: list):
+    """A simulation cancelled while merging stores no results, but its directories are still removed"""
+    results = [{"output_dir": str(path)} for path in task_outputs]
+
+    simulation.finish_simulation(results, simulation_id=1, update_key="key", cancelled=lambda: True)
+
+    assert backend_posts == [("jobs", "MERGING_RUNNING")]
+    assert not any(path.exists() for path in task_outputs)

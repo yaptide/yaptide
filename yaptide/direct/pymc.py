@@ -7,14 +7,13 @@ import threading
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Callable, Optional, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
 
 from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator
-from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
-from yaptide.celery.utils.requests import send_task_update
+from yaptide.direct.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.utils.enums import EntityState
 
 
@@ -132,7 +131,7 @@ def read_shieldhit_file(
     filepath: Path,
     simulation_id: int,
     task_id: int,
-    update_key: str,
+    report: Callable[[dict], None],
     max_wait_for_file_seconds: float = 20,
     max_idle_seconds: float = 5 * 60,
     update_interval_seconds: float = 2,
@@ -149,7 +148,7 @@ def read_shieldhit_file(
         filepath: Path to the log file to monitor.
         simulation_id: Simulation ID.
         task_id: Task ID.
-        update_key: Simulation auth token for backend updates.
+        report: Called with every task state update, e.g. the simulation supervisor collecting them.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
@@ -181,7 +180,7 @@ def read_shieldhit_file(
         if logfile is None:
             logging.error("Log file for task %d not found", task_id)
             up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            report(up_dict)
             return
         logging.debug("Log file for task %d found", task_id)
 
@@ -223,7 +222,7 @@ def read_shieldhit_file(
                     logging.error("Cannot parse estimated time in line: %s", line.rstrip())
                 up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
                 logging.debug("Sending update for task %d, simulated primaries %d", task_id, simulated_primaries)
-                send_task_update(simulation_id, task_id, update_key, up_dict)
+                report(up_dict)
 
             elif re.search(REQUESTED_MATCH, line):
                 logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
@@ -237,7 +236,7 @@ def read_shieldhit_file(
                     "task_state": EntityState.RUNNING.value,
                 }
                 logging.debug("Sending update for task %d", task_id)
-                send_task_update(simulation_id, task_id, update_key, up_dict)
+                report(up_dict)
             elif re.search(COMPLETE_MATCH, line):
                 logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
                 logging.info("Parsing log file for task %d finished", task_id)
@@ -247,7 +246,7 @@ def read_shieldhit_file(
                     "task_state": EntityState.COMPLETED.value,
                 }
                 logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
-                send_task_update(simulation_id, task_id, update_key, up_dict)
+                report(up_dict)
                 return
 
         if not event.is_set():
@@ -258,11 +257,11 @@ def read_shieldhit_file(
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     except Exception as err:  # skipcq: PYL-W0703
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     finally:
         if logfile is not None:
             logfile.close()
@@ -273,7 +272,7 @@ def read_fluka_file(
     dirpath: Path,
     simulation_id: int,
     task_id: int,
-    update_key: str,
+    report: Callable[[dict], None],
     max_wait_for_file_seconds: float = 20,
     max_idle_seconds: float = 5 * 60,
     update_interval_seconds: float = 2,
@@ -290,7 +289,7 @@ def read_fluka_file(
         dirpath: Path to the directory containing the log file to monitor.
         simulation_id: Simulation ID.
         task_id: Task ID.
-        update_key: Simulation auth token for backend updates.
+        report: Called with every task state update, e.g. the simulation supervisor collecting them.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
@@ -331,7 +330,7 @@ def read_fluka_file(
         if logfile is None:
             logging.error("Log file for task %d not found", task_id)
             up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            report(up_dict)
             return
         logging.debug("Log file for task %d found", task_id)
 
@@ -345,17 +344,17 @@ def read_fluka_file(
             event,
             loglines,
             update_interval_seconds=update_interval_seconds,
-            details=TaskDetails(simulation_id, task_id, update_key),
+            details=TaskDetails(simulation_id, task_id, report),
             verbose=logging_level <= logging.INFO,
         )
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     except Exception as err:  # skipcq: PYL-W0703
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     finally:
         if logfile is not None:
             logfile.close()

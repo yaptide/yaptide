@@ -282,6 +282,7 @@ pyrightconfig.json
 
 # shieldhit binary
 shieldhit
+!tests/res/fake_shieldhit/shieldhit
 bin/
 
 # database

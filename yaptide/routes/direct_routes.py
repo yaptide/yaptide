@@ -1,20 +1,17 @@
 import logging
 from collections import Counter
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
 from uuid import uuid4
 
-from yaptide.celery.simulation_worker import celery_app
-from yaptide.celery.utils.manage_tasks import get_job_results, run_job
+from yaptide.direct.job_manager import cancel_simulation, submit_simulation
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_celery_simulation_by_job_id,
     fetch_celery_tasks_by_sim_id,
-    fetch_estimators_by_sim_id,
-    fetch_pages_by_estimator_id,
     make_commit_to_db,
     update_simulation_state,
     update_task_state,
@@ -22,9 +19,7 @@ from yaptide.persistence.db_methods import (
 from yaptide.persistence.models import (
     CelerySimulationModel,
     CeleryTaskModel,
-    EstimatorModel,
     InputModel,
-    PageModel,
     UserModel,
 )
 from yaptide.routes.utils.decorators import requires_auth
@@ -37,16 +32,35 @@ from yaptide.routes.utils.utils import (
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
-from yaptide.utils.helper_tasks import terminate_unfinished_tasks
+
+
+# a running simulation reports at least every minute (heartbeat), a merge may take long for large results
+ABANDONED_TASKS_SECONDS = 10 * 60
+ABANDONED_MERGE_SECONDS = 60 * 60
+FINAL_STATES = (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value)
+
+
+def is_abandoned(simulation: CelerySimulationModel, tasks: list[CeleryTaskModel]) -> bool:
+    """True when an unfinished simulation has stopped reporting, i.e. its supervisor died or Ray was restarted"""
+    if simulation.job_state in FINAL_STATES or simulation.job_state == EntityState.UNKNOWN.value:
+        return False
+    update_times = [task.last_update_time for task in tasks if task.last_update_time]
+    if not update_times:
+        return False
+    last_update = max(time if time.tzinfo else time.replace(tzinfo=timezone.utc) for time in update_times)
+    limit = (
+        ABANDONED_MERGE_SECONDS if all(task.task_state in FINAL_STATES for task in tasks) else ABANDONED_TASKS_SECONDS
+    )
+    return (datetime.now(timezone.utc) - last_update).total_seconds() > limit
 
 
 class JobsDirect(Resource):
-    """Class responsible for simulations run directly with celery"""
+    """Class responsible for simulations run directly on the Ray cluster"""
 
     @staticmethod
     @requires_auth()
     def post(user: UserModel):
-        """Submit simulation job to celery"""
+        """Submit simulation job to the Ray cluster"""
         payload_dict: dict = request.get_json(force=True)
         if not payload_dict:
             return yaptide_response(message="No JSON in body", code=400)
@@ -81,28 +95,31 @@ class JobsDirect(Resource):
 
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
         # create tasks in the database in the default PENDING state
-        celery_ids = [str(uuid4()) for _ in range(payload_dict["ntasks"])]
         requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
         for i in range(payload_dict["ntasks"]):
-            task = CeleryTaskModel(
-                simulation_id=simulation.id, task_id=i, celery_id=celery_ids[i], requested_primaries=requested_primaries
-            )
+            task = CeleryTaskModel(simulation_id=simulation.id, task_id=i, requested_primaries=requested_primaries)
             add_object_to_db(task, make_commit=False)
         make_commit_to_db()
 
-        # submit the asynchronous job to celery
-        simulation.merge_id = run_job(
-            input_dict["input_files"],
-            update_key,
-            simulation.id,
-            payload_dict["ntasks"],
-            celery_ids,
-            payload_dict["sim_type"],
-        )
-
+        # stored before the start: the results handler reads the input, and a short simulation may finish quickly
         input_model = InputModel(simulation_id=simulation.id)
         input_model.data = input_dict
         add_object_to_db(input_model)
+
+        # the supervisor on the Ray cluster runs the simulation to the end and reports back over HTTP
+        try:
+            simulation.merge_id = submit_simulation(
+                simulation_id=simulation.id,
+                update_key=update_key,
+                files_dict=input_dict["input_files"],
+                ntasks=payload_dict["ntasks"],
+                sim_type=payload_dict["sim_type"],
+            )
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Submitting simulation %d to the Ray cluster failed", simulation.id)
+            update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.FAILED.value})
+            return yaptide_response(message="Simulation could not be started, try again later", code=503)
+
         if simulation.update_state({"job_state": EntityState.PENDING.value}):
             make_commit_to_db()
 
@@ -134,6 +151,16 @@ class JobsDirect(Resource):
         simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
 
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
+        if is_abandoned(simulation, tasks):
+            logging.warning(
+                "Simulation %d stopped reporting, its supervisor is gone - marking it failed", simulation.id
+            )
+            end_time = datetime.utcnow().isoformat(sep=" ")
+            for task in tasks:
+                update_task_state(task=task, update_dict={"task_state": EntityState.FAILED.value, "end_time": end_time})
+            update_simulation_state(
+                simulation=simulation, update_dict={"job_state": EntityState.FAILED.value, "end_time": end_time}
+            )
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
@@ -195,86 +222,14 @@ class JobsDirect(Resource):
                 },
             )
 
+        try:
+            if not cancel_simulation(simulation_id=simulation.id):
+                logging.warning("Supervisor of simulation %d not found, marking it canceled anyway", simulation.id)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Cancelling simulation %d on the Ray cluster failed, marking it canceled", simulation.id)
         tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
-        celery_ids = [
-            task.celery_id
-            for task in tasks
-            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value, EntityState.UNKNOWN.value]
-        ]
-
-        # The merge_id is canceled first because merge task starts after run simulation tasks are finished/canceled.
-        # We don't want it to run accidentally.
-        celery_app.control.revoke(simulation.merge_id, terminate=True, signal="SIGINT")
-        celery_app.control.revoke(celery_ids, terminate=True, signal="SIGINT")
         update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
         for task in tasks:
             if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
                 update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
-
-        terminate_unfinished_tasks.delay(simulation_id=simulation.id)
         return yaptide_response(message="Cancelled sucessfully", code=200)
-
-
-class ResultsDirect(Resource):
-    """Class responsible for returning simulation results"""
-
-    class APIParametersSchema(Schema):
-        """Class specifies API parameters"""
-
-        job_id = fields.String()
-
-    @staticmethod
-    @requires_auth()
-    def get(user: UserModel):
-        """Method returning job status and results"""
-        schema = ResultsDirect.APIParametersSchema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        param_dict: dict = schema.load(request.args)
-
-        job_id = param_dict["job_id"]
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
-        if not is_owned:
-            return yaptide_response(message=error_message, code=res_code)
-
-        simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
-
-        estimators: list[EstimatorModel] = fetch_estimators_by_sim_id(sim_id=simulation.id)
-        if len(estimators) > 0:
-            logging.debug("Returning results from database")
-            result_estimators = []
-            for estimator in estimators:
-                pages: list[PageModel] = fetch_pages_by_estimator_id(est_id=estimator.id)
-                estimator_dict = {
-                    "metadata": estimator.data,
-                    "name": estimator.name,
-                    "pages": [page.data for page in pages],
-                }
-                result_estimators.append(estimator_dict)
-            return yaptide_response(
-                message=f"Results for job: {job_id}", code=200, content={"estimators": result_estimators}
-            )
-
-        result: dict = get_job_results(job_id=job_id)
-        if "estimators" not in result:
-            logging.debug("Results for job %s are unavailable", job_id)
-            return yaptide_response(message="Results are unavailable", code=404, content=result)
-
-        for estimator_dict in result["estimators"]:
-            estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
-            estimator.data = estimator_dict["metadata"]
-            add_object_to_db(estimator)
-            for page_dict in estimator_dict["pages"]:
-                page = PageModel(
-                    estimator_id=estimator.id,
-                    page_number=int(page_dict["metadata"]["page_number"]),
-                    page_dimension=int(page_dict["dimensions"]),
-                    page_name=str(page_dict["metadata"]["name"]),
-                )
-                page.data = page_dict
-                add_object_to_db(page, False)
-            make_commit_to_db()
-
-        logging.debug("Returning results from Celery")
-        return yaptide_response(message=f"Results for job: {job_id}, results from Celery", code=200, content=result)

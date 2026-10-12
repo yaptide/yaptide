@@ -49,6 +49,11 @@ services:
       # Local (username/password) users are disabled unless explicitly enabled, so that
       # Keycloak-authenticated deployments (yap-dev, yaptide) do not expose /auth/register and /auth/login.
       - ENABLE_LOCAL_USERS=${ENABLE_LOCAL_USERS:-false}
+      # direct simulations run on the Ray head in yaptide_simulation_worker, reached through the Ray client port
+      - RAY_ADDRESS=ray://yaptide_simulation_worker:10001
+      # anyone who can reach the Ray ports can run code there; with a token set in .env, only Flask can
+      - RAY_AUTH_TOKEN=${RAY_AUTH_TOKEN:-}
+      - RAY_AUTH_MODE=${RAY_AUTH_TOKEN:+token}
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
     depends_on:
       redis:
@@ -65,6 +70,8 @@ services:
     restart: unless-stopped
     volumes:
       - simulators:/simulators:rw
+    # Ray's object store lives in /dev/shm; it only carries the simulation input, the results stay on disk
+    shm_size: 1gb
     deploy:
       resources:
         limits:
@@ -72,15 +79,18 @@ services:
           cpus: ${MAX_CORES-1.0}
     env_file: .env
     environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      # one simulation task per core the container may use
+      - RAY_NUM_CPUS=${MAX_CORES:-1}
+      - RAY_AUTH_TOKEN=${RAY_AUTH_TOKEN:-}
+      - RAY_AUTH_MODE=${RAY_AUTH_TOKEN:+token}
+      - PYTHONPATH=/usr/local/app
+    # no ports are published: the Ray ports are reachable only from the containers of this compose project
     healthcheck:
-      test: ["CMD-SHELL", "celery --app yaptide.celery.simulation_worker inspect ping"]
+      # GCS answering is not enough: without the raylet no task can run, while the container keeps running
+      test: ["CMD-SHELL", "ray health-check --address localhost:6379 && grep -qx raylet /proc/[0-9]*/comm"]
     depends_on:
-      redis:
-        condition: service_healthy
       yaptide_flask:
         condition: service_healthy
 
