@@ -175,7 +175,8 @@ class JobsBatch(Resource):
                 },
             )
 
-        if slurm_status_due(simulation.id):
+        # the job ids arrive from the helper worker a few seconds after submitting, until then SLURM has nothing to say
+        if simulation.array_id is not None and slurm_status_due(simulation.id):
             cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
             job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
             update_simulation_state(simulation=simulation, update_dict=job_info)

@@ -320,6 +320,8 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
 
     fabric_result: Result = con.run(f"sacct -j {array_id} --format State", hide=True)
     job_state = fabric_result.stdout.split()[-1].split()[0]
+    # after the header: a line per started array task and job step, one more for the tasks still waiting
+    array_states = set(fabric_result.stdout.split()[2:])
 
     fabric_result: Result = con.run(f"sacct -j {collect_id} --format State", hide=True)
     collect_state = fabric_result.stdout.split()[-1].split()[0]
@@ -336,8 +338,9 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
         return {"job_state": EntityState.MERGING_QUEUED.value}
     if job_state == "RUNNING":
         logging.debug("Main job is in RUNNING state")
-    if job_state == "PENDING":
+    if array_states == {"PENDING"}:
         logging.debug("Main job is in PENDING state")
+        return {"job_state": EntityState.PENDING.value}
 
     return {"job_state": EntityState.RUNNING.value}
 
