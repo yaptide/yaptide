@@ -1,4 +1,5 @@
 import os
+import time
 import uuid
 from datetime import datetime
 
@@ -40,21 +41,33 @@ from yaptide.utils.enums import EntityState, PlatformType
 # an open simulations page polls job status every 1.5 s and every SLURM query is a new SSH login to the cluster
 SLURM_STATUS_INTERVAL = 30  # seconds
 _broker_url = os.environ.get("CELERY_BROKER_URL", "")
+# Redis runs next to the server - a short timeout, as every status request waits for it while holding a worker
 _redis = (
-    redis.Redis.from_url(_broker_url, socket_timeout=1, socket_connect_timeout=1)
+    redis.Redis.from_url(_broker_url, socket_timeout=0.2, socket_connect_timeout=0.2)
     if _broker_url.startswith(("redis://", "rediss://"))
     else None
 )
+_redis_down_until = 0.0
+_last_local_check: dict[int, float] = {}
 
 
 def slurm_status_due(sim_id: int) -> bool:
-    """True for at most one caller per SLURM_STATUS_INTERVAL and simulation, shared by all server processes"""
-    if _redis is None:
-        return True
-    try:
-        return bool(_redis.set(f"slurm_status:{sim_id}", 1, nx=True, ex=SLURM_STATUS_INTERVAL))
-    except redis.RedisError:
-        return True
+    """True for at most one caller per SLURM_STATUS_INTERVAL and simulation, shared by all server processes.
+
+    Without Redis it is one caller per server process; after a Redis error Redis is not asked again for an interval,
+    so a hanging Redis does not slow down every request.
+    """
+    global _redis_down_until  # skipcq: PYL-W0603
+    now = time.monotonic()
+    if _redis is not None and now >= _redis_down_until:
+        try:
+            return bool(_redis.set(f"slurm_status:{sim_id}", 1, nx=True, ex=SLURM_STATUS_INTERVAL))
+        except redis.RedisError:
+            _redis_down_until = now + SLURM_STATUS_INTERVAL
+    if now - _last_local_check.get(sim_id, -SLURM_STATUS_INTERVAL) < SLURM_STATUS_INTERVAL:
+        return False
+    _last_local_check[sim_id] = now
+    return True
 
 
 class JobsBatch(Resource):

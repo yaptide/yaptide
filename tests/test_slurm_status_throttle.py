@@ -14,24 +14,41 @@ from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
 
-def test_slurm_status_checked_once_per_interval(monkeypatch):
+@pytest.fixture
+def throttle(monkeypatch):
+    """Throttle of GET /jobs/batch with nothing remembered, the tests set its Redis client"""
+    monkeypatch.setattr(batch_routes, "_last_local_check", {})
+    monkeypatch.setattr(batch_routes, "_redis_down_until", 0.0)
+    return batch_routes
+
+
+def test_slurm_status_checked_once_per_interval(throttle, monkeypatch):
     """Redis lets the first caller of an interval through and answers None to the others"""
     client = Mock()
     client.set.side_effect = [True, None]
-    monkeypatch.setattr(batch_routes, "_redis", client)
-    assert batch_routes.slurm_status_due(7)
-    assert not batch_routes.slurm_status_due(7)
-    client.set.assert_called_with("slurm_status:7", 1, nx=True, ex=batch_routes.SLURM_STATUS_INTERVAL)
+    monkeypatch.setattr(throttle, "_redis", client)
+    assert throttle.slurm_status_due(7)
+    assert not throttle.slurm_status_due(7)
+    client.set.assert_called_with("slurm_status:7", 1, nx=True, ex=throttle.SLURM_STATUS_INTERVAL)
 
 
-def test_slurm_status_always_checked_without_redis(monkeypatch):
-    """Without a working Redis every request queries SLURM, as before the throttle"""
-    monkeypatch.setattr(batch_routes, "_redis", None)
-    assert batch_routes.slurm_status_due(7)
+def test_slurm_status_checked_once_per_interval_without_redis(throttle, monkeypatch):
+    """Without Redis every server process lets one caller per interval and simulation through"""
+    monkeypatch.setattr(throttle, "_redis", None)
+    assert throttle.slurm_status_due(7)
+    assert not throttle.slurm_status_due(7)
+    assert throttle.slurm_status_due(8)
+
+
+def test_failing_redis_is_left_alone_for_an_interval(throttle, monkeypatch):
+    """A Redis error falls back to the per-process throttle and Redis is not asked again for an interval"""
     client = Mock()
-    client.set.side_effect = redis.ConnectionError("down")
-    monkeypatch.setattr(batch_routes, "_redis", client)
-    assert batch_routes.slurm_status_due(7)
+    client.set.side_effect = redis.TimeoutError("hangs")
+    monkeypatch.setattr(throttle, "_redis", client)
+    assert throttle.slurm_status_due(7)
+    assert not throttle.slurm_status_due(7)
+    assert throttle.slurm_status_due(8)
+    assert client.set.call_count == 1
 
 
 def fake_sacct(monkeypatch, array_states: list[str], collect_states: list[str]) -> None:
