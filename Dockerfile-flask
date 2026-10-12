@@ -28,6 +28,6 @@ HEALTHCHECK CMD python -c "import requests; exit(0) if requests.get('http://loca
 
 # Run Flask app with gunicorn - the flask run development server handles one connection backlog of 128
 # and a single process, which the burst of status updates from a large HPC job array overflows
-COPY run_flask.sh ./
+COPY run_flask.sh gunicorn.conf.py ./
 RUN sed -i 's/\r$//' run_flask.sh
 ENTRYPOINT ["sh", "run_flask.sh"]
