@@ -117,3 +117,46 @@ def test_worker_start_removes_stale_work_dirs(tmp_path: Path, monkeypatch):
 
     assert not stale.exists()
     assert other.exists()
+
+
+@pytest.fixture
+def backend_posts(monkeypatch) -> list:
+    """Records what merge_results would send to the backend"""
+    posts = []
+
+    def fake_post_update(dict_to_send: dict) -> None:
+        """Records a job state update"""
+        posts.append(("jobs", dict_to_send["job_state"]))
+
+    def fake_send(**kwargs) -> bool:
+        """Records sent results or logfiles"""
+        posts.append(("results" if "estimators" in kwargs else "logfiles", None))
+        return True
+
+    monkeypatch.setattr(tasks, "post_update", fake_post_update)
+    monkeypatch.setattr(tasks, "send_simulation_results", fake_send)
+    monkeypatch.setattr(tasks, "send_simulation_logfiles", fake_send)
+    return posts
+
+
+def test_merge_results_fails_simulation_when_task_results_are_missing(task_outputs: list[Path], backend_posts: list):
+    """A missing working directory (e.g. after a worker restart) marks the simulation failed, not partially merged"""
+    shutil.rmtree(task_outputs[1])
+    results = [
+        {"output_dir": str(path), "keep_output_dir": False, "simulation_id": 1, "update_key": "key"}
+        for path in task_outputs
+    ]
+
+    tasks.merge_results(results)
+
+    assert backend_posts == [("jobs", "MERGING_RUNNING"), ("jobs", "FAILED")]
+    assert not task_outputs[0].exists()
+
+
+def test_merge_results_fails_simulation_when_all_tasks_failed(backend_posts: list):
+    """When every task failed the logfiles are sent and the simulation is marked failed"""
+    results = [{"logfiles": {"shieldhit_0001.log": "crashed"}, "simulation_id": 1, "update_key": "key"}]
+
+    tasks.merge_results(results)
+
+    assert backend_posts == [("jobs", "MERGING_RUNNING"), ("logfiles", None), ("jobs", "FAILED")]
