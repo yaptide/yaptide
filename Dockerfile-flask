@@ -26,9 +26,10 @@ RUN python -c "import os; content = open('yaptide/admin/db_manage.py', 'rb').rea
 # Health check using Python and requests, we are not using curl or wget as they are not installed by default
 HEALTHCHECK CMD python -c "import requests; exit(0) if requests.get('http://localhost:6000/').ok else exit(1)"
 
-# Run Flask app with gunicorn instead of the flask run development server. That server is a single process and
-# keeps at most 128 connections waiting to be accepted (the listen backlog Werkzeug sets) - when hundreds of HPC
-# tasks report at once, every connection beyond those 128 is refused and its status update is lost
+# Run Flask app with gunicorn instead of the flask run development server. That server is a single process (its
+# threads share one CPU) and keeps at most 128 connections waiting to be accepted (the listen backlog Werkzeug
+# sets) - when hundreds of HPC tasks report at once, the connections beyond those wait for the client to retry
+# and many time out, so their status updates are lost
 COPY run_flask.sh gunicorn.conf.py ./
 # remove Windows line endings (\r at the end of each line), same reason as for db_manage.py above
 RUN sed -i 's/\r$//' run_flask.sh
