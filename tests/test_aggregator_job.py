@@ -199,8 +199,7 @@ def test_aggregator_header_keeps_only_queue_placement():
 
 
 def test_watcher_drops_a_sender_whose_aggregator_is_gone(monkeypatch):
-    """A failed send means the aggregator ended - the update goes to the backend at once, with everything reported
-    so far (updates sent just before may have been lost with the aggregator), and the dead connection is dropped"""
+    """A failed send drops the dead aggregator and sends everything reported so far to the backend at once"""
     posted = []
     monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: posted.append(kwargs["update_dict"]) or True)
     # the progress throttle of the REST fallback would hold this update back for a while

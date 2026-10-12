@@ -386,8 +386,7 @@ def test_bulk_update_rejects_a_user_token_as_update_key(app, simulation_with_tas
 
 
 def test_watcher_sends_fail_while_the_final_flush_retries(tmp_path, monkeypatch):
-    """Once the aggregator shuts down, a watcher send must fail and go to the backend directly - not be accepted by
-    a connection nobody reads any more while the final flush retries"""
+    """Watcher sends fail once the aggregator shuts down, instead of vanishing while its final flush retries"""
     monkeypatch.setattr(aggregator_module, "advertised_ip", lambda interface: "127.0.0.1")
     monkeypatch.setattr(aggregator_module, "FINAL_FLUSH_DEADLINE_SECONDS", 1)
     aggregator = TaskUpdateAggregator(
