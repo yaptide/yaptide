@@ -1,4 +1,5 @@
 import os
+import re
 
 from flask import Flask
 from flask_restful import Api
@@ -9,9 +10,15 @@ from yaptide.persistence.database import db
 from yaptide.routes.main_routes import initialize_routes
 
 
-def _is_sensitive(key: str) -> bool:
-    """Settings that carry secrets or credentials, e.g. the database URI with its password"""
-    return any(word in key for word in ("SECRET", "PASSWORD", "URI", "KEY", "TOKEN", "CREDENTIAL"))
+SENSITIVE_NAME_PARTS = ("SECRET", "PASS", "URI", "KEY", "TOKEN", "CREDENTIAL", "DSN", "AUTH", "COOKIE", "SALT", "BINDS")
+
+
+def _loggable(key: str, value) -> str:
+    """Setting value safe to log: hidden for names that suggest a secret, credentials in URLs replaced everywhere"""
+    if any(part in key for part in SENSITIVE_NAME_PARTS):
+        return "***"
+    # e.g. CELERY_BROKER_URL=redis://:password@host
+    return re.sub(r"(?<=://)[^/@\s]+@", "***@", str(value))
 
 
 def create_app():
@@ -22,14 +29,14 @@ def create_app():
 
     # Print env variables
     for key, value in os.environ.items():
-        app.logger.debug("Environment variable: %s", (key, "***" if _is_sensitive(key) else value))
+        app.logger.debug("Environment variable: %s", (key, _loggable(key, value)))
 
     # Load configuration from environment variables
     # Load any environment variables that start with FLASK_, dropping the prefix from the env key for the config key.
     # Values are passed through a loading function to attempt to convert them to more specific types than strings.
     app.config.from_prefixed_env()
     for key, value in app.config.items():
-        app.logger.debug("Flask config variable: %s", (key, "***" if _is_sensitive(key) else value))
+        app.logger.debug("Flask config variable: %s", (key, _loggable(key, value)))
 
     if app.config.get("USE_CORS"):
         app.logger.info("enabling cors")

@@ -51,6 +51,7 @@ def default_workers() -> int:
 # sync workers - for the short CPU-bound status requests they kept p99 at 0.3-0.4 s where gthread 4x8 reached
 # 3.5-11 s (replayed 5000-task Ares traffic, 2 CPUs); each one serves a single request at a time, so slow
 # requests are absorbed by having more of them
+# GUNICORN_WORKERS is taken as given, also above MAX_WORKERS - then raise Postgres' max_connections to match
 workers = max(1, int(os.environ.get("GUNICORN_WORKERS") or default_workers()))
 # lets large /results uploads finish instead of killing them mid-write after the default 30 s
 timeout = int(os.environ.get("GUNICORN_TIMEOUT") or 300)
