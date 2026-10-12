@@ -201,10 +201,7 @@ class JobsBatch(Resource):
             except InvalidRequestError:  # the user deleted the simulation meanwhile
                 return yaptide_response(message="Simulation no longer exists", code=404)
             update_simulation_state(simulation=simulation, update_dict=job_info)
-            job_info = {"job_state": simulation.job_state}
-        else:
-            job_info = {"job_state": simulation.job_state}
-        job_info["job_tasks_status"] = job_tasks_status
+        job_info = {"job_state": simulation.job_state, "job_tasks_status": job_tasks_status}
 
         return yaptide_response(message="", code=200, content=job_info)
 

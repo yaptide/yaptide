@@ -6,7 +6,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 import zmq
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DataError, OperationalError
 from yaptide.application import create_app
 from yaptide.batch import aggregator as aggregator_module
 from yaptide.batch import watcher
@@ -357,8 +357,7 @@ def test_aggregator_retries_transient_errors_and_drops_invalid_batches(tmp_path,
     assert (aggregator._pending == {}) is dropped
 
 
-@pytest.mark.parametrize("task_ids", [(1,), (1, 2)])
-def test_bulk_update_fails_when_the_database_itself_fails(app, simulation_with_tasks, monkeypatch, task_ids):
+def test_bulk_update_fails_when_the_database_itself_fails(app, simulation_with_tasks, monkeypatch):
     """An unavailable database is not bad data - the request fails, so the aggregator retries the batch"""
 
     def failing_commit():
@@ -369,9 +368,31 @@ def test_bulk_update_fails_when_the_database_itself_fails(app, simulation_with_t
     payload = {
         "simulation_id": simulation_with_tasks.id,
         "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
-        "tasks": [{"task_id": task_id, "update_dict": {"simulated_primaries": 500}} for task_id in task_ids],
+        "tasks": [{"task_id": 1, "update_dict": {"simulated_primaries": 500}}],
     }
     # the test app propagates the exception, a deployed flask answers it with 500
+    with pytest.raises(OperationalError):
+        app.test_client().post("/tasks/bulk", json=payload)
+
+
+def test_bulk_update_fails_when_the_database_fails_during_the_task_by_task_retry(
+    app, simulation_with_tasks, monkeypatch
+):
+    """A database outage during the task-by-task retry is not bad data either - the request fails"""
+    errors = iter(
+        [DataError("COMMIT", {}, Exception("out of range")), OperationalError("COMMIT", {}, Exception("gone"))]
+    )
+
+    def failing_commit():
+        """First commit rejects a value, the next one finds the database gone"""
+        raise next(errors)
+
+    monkeypatch.setattr(db.session, "commit", failing_commit)
+    payload = {
+        "simulation_id": simulation_with_tasks.id,
+        "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
+        "tasks": [{"task_id": 1, "update_dict": {"simulated_primaries": 500}}],
+    }
     with pytest.raises(OperationalError):
         app.test_client().post("/tasks/bulk", json=payload)
 
@@ -388,7 +409,7 @@ def test_bulk_update_rejects_a_user_token_as_update_key(app, simulation_with_tas
 def test_watcher_sends_fail_while_the_final_flush_retries(tmp_path, monkeypatch):
     """Watcher sends fail once the aggregator shuts down, instead of vanishing while its final flush retries"""
     monkeypatch.setattr(aggregator_module, "advertised_ip", lambda interface: "127.0.0.1")
-    monkeypatch.setattr(aggregator_module, "FINAL_FLUSH_DEADLINE_SECONDS", 1)
+    monkeypatch.setattr(aggregator_module, "FINAL_FLUSH_DEADLINE_SECONDS", 0)
     aggregator = TaskUpdateAggregator(
         sim_id=1,
         update_key="key",

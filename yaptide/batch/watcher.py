@@ -174,9 +174,10 @@ class AggregatorSender:
         self.socket.connect(f"tcp://{auth['host']}:{auth['port']}")
         # with IMMEDIATE a send fails until the TCP handshake is done - wait for it once instead of losing
         # the first update to the fallback
-        if not self.socket.poll(500, zmq.POLLOUT):
-            logging.debug("Aggregator at %s:%s not reachable yet", auth["host"], auth["port"])
-        logging.debug("Connected to aggregator at %s:%s", auth["host"], auth["port"])
+        reachable = self.socket.poll(500, zmq.POLLOUT)
+        logging.debug(
+            "Aggregator at %s:%s %s", auth["host"], auth["port"], "connected" if reachable else "not reachable yet"
+        )
 
     def send(self, task_id: int, update_dict: dict) -> bool:
         """Returns False when the update could not be handed over to the aggregator"""

@@ -142,11 +142,9 @@ class TaskUpdateAggregator:
             req = request.Request(
                 bulk_url, json.dumps(payload).encode(), {"Content-Type": "application/json"}, method="POST"
             )
-            with request.urlopen(req, timeout=BACKEND_TIMEOUT_SECONDS) as res:  # skipcq: BAN-B310
-                if 200 <= res.getcode() < 300:
-                    return True
-                logging.warning("Bulk update to %s answered with code %d, retrying", bulk_url, res.getcode())
-                return False
+            # urllib raises HTTPError for every answer that is not 2xx
+            with request.urlopen(req, timeout=BACKEND_TIMEOUT_SECONDS):  # skipcq: BAN-B310
+                return True
         except HTTPError as e:
             if e.code in DROPPED_BATCH_STATUS_CODES:
                 logging.error(
@@ -175,7 +173,8 @@ class TaskUpdateAggregator:
         task_id = message.get("task_id")
         update_dict = message.get("update_dict")
         if task_id is None or not isinstance(update_dict, dict):
-            logging.warning("Dropping malformed message: %s", message)
+            # without the update key - it is valid here and must not end up in the job log
+            logging.warning("Dropping malformed message for task %s: %s", task_id, update_dict)
             return
         self.store_update(task_id=int(task_id), update_dict=update_dict)
 
