@@ -17,9 +17,9 @@ def extract_sbatch_header(payload_dict: dict, target_key: str) -> str:
     )
 
 
-def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str, default_time: str = "00:59:59") -> str:
-    """Function converting dict to sbatch command line options, the time limit applies unless the user sets one"""
-    options_dict = {"time": default_time}
+def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str) -> str:
+    """Function converting dict to sbatch command line options"""
+    options_dict = {"time": "00:59:59"}
     if "batch_options" in payload_dict and target_key in payload_dict["batch_options"]:
         options_dict.update(payload_dict["batch_options"][target_key])
     opt_list = []
