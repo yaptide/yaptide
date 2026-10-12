@@ -83,11 +83,12 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
 def post_update(dict_to_send):
     """For sending requests with information to flask"""
     flask_url = os.environ.get("BACKEND_INTERNAL_URL")
-    return requests.Session().post(url=f"{flask_url}/jobs", json=dict_to_send)
+    return requests.Session().post(url=f"{flask_url}/jobs", json=dict_to_send, timeout=30)
 
 
-JOB_IDS_REPORT_ATTEMPTS = 3
-JOB_IDS_REPORT_RETRY_SECONDS = 10
+# about 3 minutes - long enough to outlast a redeploy of the backend
+JOB_IDS_REPORT_ATTEMPTS = 6
+JOB_IDS_REPORT_RETRY_SECONDS = 30
 
 
 @celery_app.task()
@@ -373,13 +374,22 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
 
     # the collect job starts once every array task has ended, whatever the outcome, and it decides the result
     if collect_states == {"COMPLETED"}:
-        return {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        return {
+            "job_state": EntityState.COMPLETED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
+        }
     if "CANCELLED" in collect_states:
         # also while a cancel request is still removing the job, before it stores CANCELED itself
-        return {"job_state": EntityState.CANCELED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        return {
+            "job_state": EntityState.CANCELED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
+        }
     if collect_states & SLURM_FAILED_STATES:
         # also a collect job past its time limit or memory - waiting for it would leave the simulation running forever
-        return {"job_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        return {
+            "job_state": EntityState.FAILED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
+        }
     if "RUNNING" in collect_states:
         return {"job_state": EntityState.MERGING_RUNNING.value}
     if array_states <= {"PENDING"}:
@@ -417,7 +427,7 @@ def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, c
 def delete_job(
     simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel
 ) -> tuple[dict, int]:  # skipcq: PYL-W0613
-    """Dummy version of delete_job"""
+    """Cancels the SLURM jobs of the simulation and removes its directory on the cluster"""
     job_dir = simulation.job_dir
     array_id = simulation.array_id
     collect_id = simulation.collect_id
@@ -426,8 +436,9 @@ def delete_job(
         con = get_connection(user=user, cluster=cluster)
 
         # collect first - cancelling the array first lets SLURM start the collect, which then reports FAILED
-        con.run(f"scancel {collect_id}")
-        con.run(f"scancel {array_id}")
+        # warn: a job already purged from SLURM makes scancel fail, the rest must still be cancelled
+        con.run(f"scancel {collect_id}", warn=True)
+        con.run(f"scancel {array_id}", warn=True)
         # by id, not by name - several yaptide deployments may share one cluster account
         con.run(f"test -s {job_dir}/aggregator_job_id && scancel `cat {job_dir}/aggregator_job_id`", warn=True)
         con.run(f"rm -rf {job_dir}")

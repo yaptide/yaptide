@@ -252,6 +252,11 @@ class JobsBatch(Resource):
         if status_code != 200:
             return error_internal_response(content=result)
 
+        # cancelling takes several SSH calls - a final state stored meanwhile (results upload) must be kept
+        try:
+            db.session.refresh(simulation)
+        except InvalidRequestError:  # the user deleted the simulation meanwhile
+            return yaptide_response(message="Simulation no longer exists", code=404)
         update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
 
         tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)

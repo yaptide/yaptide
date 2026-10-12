@@ -211,3 +211,18 @@ def test_simulation_deleted_during_the_slurm_query(client, batch_simulation, mon
     monkeypatch.setattr(batch_routes, "get_job_status", delete_during_the_query)
     monkeypatch.setattr(batch_routes, "slurm_status_due", lambda sim_id: True)
     assert job_state(client)[0] == 404
+
+
+def test_cancel_does_not_undo_results_stored_meanwhile(client, batch_simulation, monkeypatch):
+    """A results upload that completes the simulation while the cancel runs its SSH calls is kept"""
+
+    def results_arrive_during_the_cancel(simulation, user, cluster):
+        """Another request stores COMPLETED while this one cancels the SLURM jobs"""
+        db.session.query(SimulationModel).filter_by(id=simulation.id).update(
+            {"job_state": EntityState.COMPLETED.value}, synchronize_session=False
+        )
+        return {"message": "Job canceled"}, 200
+
+    monkeypatch.setattr(batch_routes, "delete_job", results_arrive_during_the_cancel)
+    assert job_state(client, "delete")[0] == 200
+    assert db.session.get(BatchSimulationModel, batch_simulation.id).job_state == "COMPLETED"

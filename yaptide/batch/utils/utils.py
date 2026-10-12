@@ -28,8 +28,9 @@ def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str) -> str:
     return " ".join(opt_list)
 
 
-# only the queue placement of the array job applies to the aggregator, never its resources -
-# the UI lets users type any sbatch option (exclusive, constraint, nodelist...), so this is an allowlist
+# only the queue placement and the time limit of the array job apply to the aggregator, never its resources -
+# the UI lets users type any sbatch option (exclusive, constraint, nodelist...), so this is an allowlist;
+# a --time in the array header is overridden for the array too by the --time on the command line
 AGGREGATOR_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "reservation"}
 
 
@@ -51,7 +52,7 @@ def extract_aggregator_header(array_header: str) -> str:
 def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str) -> str:
     """Function building sbatch options for the aggregator job
 
-    It keeps whatever the array job needs to be accepted by the queue (account, partition, time, qos)
+    It keeps whatever the array job needs to be accepted by the queue (account, partition, qos, reservation, time)
     and asks for a single cheap cpu, because the aggregator only forwards updates.
     """
     options_dict = {"time": "00:59:59"}
