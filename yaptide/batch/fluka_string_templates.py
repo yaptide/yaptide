@@ -42,7 +42,12 @@ python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={upda
       --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
 module load pymchelper
-convertmc json --many "$INPUT_WILDCARD"
+if ! convertmc json --many "$INPUT_WILDCARD" ; then
+    # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
+    python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
+          --backend_url={backend_url} --simulation_state=FAILED
+    exit 1
+fi
 
 CLEAR_FORTS={remove_output_from_workspace}
 
