@@ -2,10 +2,12 @@ import copy
 import json
 import logging
 import re
+import tempfile
 from pathlib import Path
 from typing import Optional
 
 from pymchelper.estimator import Estimator
+from pymchelper.input_output import frompattern
 from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
 from converter.api import get_parser_from_str, run_parser
@@ -35,6 +37,26 @@ def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
             result_estimators.append(est_dict)
 
     return result_estimators
+
+
+def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
+    """Merge the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*) of all tasks into estimators ready for the UI
+
+    nan=False makes pymchelper choose the aggregation of each page from its normalisation and weight the tasks
+    by their primaries, as convertmc does for batch simulations. JSON is produced once, from the merged result.
+    The list is sorted by name, as POST /results matches estimators to editor outputs by sorted name.
+    """
+    files = [
+        str(file) for path in output_dirs for pattern in ("*.bdo", "*_fort.*") for file in sorted(path.glob(pattern))
+    ]
+    if not files:
+        return []
+    estimators = {estimator.file_corename: estimator for estimator in frompattern(files, nan=False) if estimator}
+    if not estimators:
+        return []
+    with tempfile.TemporaryDirectory() as json_dir:
+        merged = estimators_to_list(estimators_dict=estimators, dir_path=Path(json_dir))
+    return sorted(merged, key=lambda estimator: estimator["name"])
 
 
 def get_json_type(payload_dict: dict) -> InputType:
