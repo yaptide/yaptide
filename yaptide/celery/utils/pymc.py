@@ -7,11 +7,10 @@ import threading
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Protocol
+from typing import Optional, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
-from pymchelper.input_output import frompattern
 
 from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator
 from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
@@ -56,25 +55,6 @@ def command_to_run_shieldhit(dir_path: Path, task_id: int) -> list[str]:
     command_as_list = str(settings).split()
     command_as_list.append(str(dir_path))
     return command_as_list
-
-
-def get_shieldhit_estimators(dir_path: Path) -> dict:
-    """Function to get estimators from SHIELD-HIT12A output files."""
-    estimators_dict = {}
-
-    matching_files = list(dir_path.glob("*.bdo"))
-    if len(matching_files) == 0:
-        logging.error("No *.bdo files found in %s", dir_path)
-        return estimators_dict
-
-    logging.debug("Found %d *.bdo files in %s", len(matching_files), dir_path)
-    files_pattern_pattern = str(dir_path / "*.bdo")
-    estimators_list = frompattern(pattern=files_pattern_pattern)
-    for estimator in estimators_list:
-        logging.debug("Appending estimator for %s", estimator.file_corename)
-        estimators_dict[estimator.file_corename] = estimator
-
-    return estimators_dict
 
 
 def command_to_run_fluka(dir_path: Path, task_id: int) -> list[str]:
@@ -144,63 +124,6 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
         logging.error("Exception while running simulation: %s", e)
 
     return process_exit_success, command_stdout, command_stderr
-
-
-def get_fluka_estimators(dir_path: Path) -> dict:
-    """Function to get estimators from FLUKA output files."""
-    estimators_dict = {}
-
-    matching_files = list(dir_path.glob("*_fort.*"))
-    if len(matching_files) == 0:
-        logging.error("No *_fort.* files found in %s", dir_path)
-        return estimators_dict
-
-    logging.debug("Found %d *_fort.* files in %s", len(matching_files), dir_path)
-    files_pattern_pattern = str(dir_path / "*_fort.*")
-    estimators_list = frompattern(pattern=files_pattern_pattern)
-    for estimator in estimators_list:
-        logging.debug("Appending estimator for %s", estimator.file_corename)
-
-        estimators_dict[estimator.file_corename] = estimator
-
-    return estimators_dict
-
-
-def average_values(base_values: List[float], new_values: List[float], count: int) -> List[float]:
-    """Average two lists of values"""
-    return [sum(x) / (count + 1) for x in zip(map(lambda x: x * count, base_values), new_values)]
-
-
-def average_estimators(base_list: list[dict], list_to_add: list[dict], averaged_count: int) -> list:
-    """Averages estimators from two dicts"""
-    logging.debug("Averaging estimators - already averaged: %d", averaged_count)
-    for est_i, estimator_dict in enumerate(list_to_add):
-        # check if estimator names are the same and if not, find matching estimator's index in base_list
-        if estimator_dict["name"] != base_list[est_i]["name"]:
-            est_i = next((i for i, item in enumerate(base_list) if item["name"] == estimator_dict["name"]), None)
-        logging.debug("Averaging estimator %s", estimator_dict["name"])
-        for page_i, page_dict in enumerate(estimator_dict["pages"]):
-            # check if page numbers are the same and if not, find matching page's index in base_list
-            if page_dict["metadata"]["page_number"] != base_list[est_i]["pages"][page_i]["metadata"]["page_number"]:
-                page_i = next(
-                    (
-                        i
-                        for i, item in enumerate(base_list[est_i]["pages"])
-                        if item["metadata"]["page_number"] == page_dict["metadata"]["page_number"]
-                    ),
-                    None,
-                )
-
-            base_list[est_i]["pages"][page_i]["data"]["values"] = average_values(
-                base_list[est_i]["pages"][page_i]["data"]["values"], page_dict["data"]["values"], averaged_count
-            )
-
-            logging.debug(
-                "Averaged page %s with %d elements",
-                page_dict["metadata"]["page_number"],
-                len(page_dict["data"]["values"]),
-            )
-    return base_list
 
 
 # skipcq:  PY-R1000
