@@ -26,7 +26,8 @@ if [ -n "$JOB_ID" ] ; then
     # the aggregator batches the progress updates of all tasks into single requests to the backend
     # it gets its own small allocation, so nothing runs on the login node; it becomes eligible once the first task
     # started (a dependency on the whole array waits for the LAST one), starting takes up to a scheduler cycle more -
-    # until then the watchers report through the throttled REST fallback
+    # until then, and after it reaches its time limit (it inherits the time of the array tasks), the watchers report
+    # through the throttled REST fallback, so tasks that start later than that are still tracked
     AGGREGATOR_OPTS="--dependency=after:${{JOB_ID}}_1 {aggregator_options}"
     AGGREGATOR_CMD="sbatch $AGGREGATOR_OPTS --parsable $AGGREGATOR_SCRIPT > $OUT"
     eval $AGGREGATOR_CMD

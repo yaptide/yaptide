@@ -35,6 +35,10 @@ AGGREGATOR_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "re
 
 def extract_aggregator_header(array_header: str) -> str:
     """Queue placement lines of the array header - the aggregator has to land in the same account and partition"""
+    # matches the long and short sbatch forms, with "=" or a space:
+    #   --account=plgccbmc15-cpu   --partition plgrid   --qos=normal   --reservation=demo
+    #   -A plgccbmc15-cpu   -p plgrid   -pplgrid   -q normal
+    # and skips everything else, e.g. --time=02:00:00, --mem=4G, -N 1 or --exclusive
     placement = re.compile(r"(?<!\S)(--(?:account|partition|qos|reservation)(?:=|\s+)\S+|-[Apq]\s*\S+)")
     options = []
     for line in array_header.splitlines():

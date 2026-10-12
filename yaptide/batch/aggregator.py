@@ -37,6 +37,8 @@ MAX_MESSAGES_PER_WAKEUP = 10000
 MAX_MESSAGES_AT_SHUTDOWN = 1000000
 TERMINAL_TASK_STATES = {"COMPLETED", "FAILED", "CANCELED"}
 AUTH_FILE_NAME = ".zmq_auth"
+# Linux ioctl request "get the address of a network interface" (linux/sockios.h); the socket module has no
+# function for it, and it saves running "ip addr" just to find the address on ib0
 SIOCGIFADDR = 0x8915
 
 
@@ -67,7 +69,7 @@ def write_auth_file(auth_path: Path, host: str, port: int) -> None:
     """
     tmp_path = auth_path.with_suffix(".tmp")
     tmp_path.write_text(json.dumps({"host": host, "port": port}))
-    os.replace(tmp_path, auth_path)
+    tmp_path.replace(auth_path)
 
 
 class TaskUpdateAggregator:
