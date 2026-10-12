@@ -15,10 +15,10 @@ SENSITIVE_NAME_PARTS = ("SECRET", "PASS", "URI", "KEY", "TOKEN", "CREDENTIAL", "
 
 def _loggable(key: str, value) -> str:
     """Setting value safe to log: hidden for names that suggest a secret, credentials in URLs replaced everywhere"""
-    if any(part in key for part in SENSITIVE_NAME_PARTS):
+    if any(part in key.upper() for part in SENSITIVE_NAME_PARTS):
         return "***"
     # e.g. CELERY_BROKER_URL=redis://:password@host
-    return re.sub(r"(?<=://)[^/@\s]+@", "***@", str(value))
+    return re.sub(r"(?<=://)[^/\s]*@", "***@", str(value))
 
 
 def create_app():
