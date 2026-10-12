@@ -7,7 +7,11 @@ from pathlib import Path
 
 from yaptide.batch import watcher
 from yaptide.batch.shieldhit_string_templates import COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT
-from yaptide.batch.utils.utils import convert_dict_to_aggregator_sbatch_options, extract_aggregator_header
+from yaptide.batch.utils.utils import (
+    convert_dict_to_aggregator_sbatch_options,
+    convert_dict_to_sbatch_options,
+    extract_aggregator_header,
+)
 
 
 def sbatch_options_as_dict(options: str) -> dict:
@@ -241,3 +245,10 @@ def test_rest_fallback_delays_only_its_first_request(monkeypatch):
     watcher.send_task_update(update_dict={"task_state": "RUNNING"}, **arguments)
     watcher.send_task_update(update_dict={"task_state": "COMPLETED"}, **arguments)
     assert len(sleeps) == 1 and 0 <= sleeps[0] <= watcher.STARTUP_JITTER_SECONDS
+
+
+def test_collect_time_limit_defaults_to_15_minutes():
+    """The collect job only merges results, so it asks for 15 minutes unless the user sets a time"""
+    assert convert_dict_to_sbatch_options({}, "collect_options", default_time="00:15:00") == "--time=00:15:00"
+    payload = {"batch_options": {"collect_options": {"time": "02:00:00"}}}
+    assert convert_dict_to_sbatch_options(payload, "collect_options", default_time="00:15:00") == "--time=02:00:00"

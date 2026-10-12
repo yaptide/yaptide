@@ -232,7 +232,10 @@ def prepare_script_files(
     array_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="array_options")
     array_header = extract_sbatch_header(payload_dict=payload_dict, target_key="array_header")
 
-    collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
+    # merging the results takes minutes; for very large runs users set a longer time in the collect options
+    collect_options = convert_dict_to_sbatch_options(
+        payload_dict=payload_dict, target_key="collect_options", default_time="00:15:00"
+    )
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
 
     aggregator_options = convert_dict_to_aggregator_sbatch_options(
