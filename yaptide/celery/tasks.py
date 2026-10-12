@@ -122,7 +122,7 @@ def run_single_simulation(
 def remove_stale_work_dirs(**_) -> None:
     """Removes working directories left by tasks whose merge never ran - no task is running when a worker starts"""
     for work_dir in get_tmp_dir().glob(f"{WORK_DIR_PREFIX}*"):
-        logging.info("Removing stale working directory %s", work_dir)
+        logging.warning("Removing stale working directory %s", work_dir)
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
@@ -248,34 +248,39 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
 
 
 @celery_app.task
-def merge_results(results: list[dict]) -> dict:
+def merge_results(results: list[dict]) -> dict:  # skipcq: PY-R1000
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
     simulation_id, update_key = None, None
     for result in results:
         simulation_id = simulation_id or result.get("simulation_id")
         update_key = update_key or result.get("update_key")
-    if simulation_id and update_key:
-        dict_to_send = {
-            "sim_id": simulation_id,
-            "job_state": EntityState.MERGING_RUNNING.value,
-            "update_key": update_key,
-        }
-        post_update(dict_to_send)
-
-    logfiles = {}
-    for result in results:
-        logfiles.update(result.get("logfiles", {}))
     output_dirs = [Path(result["output_dir"]) for result in results if "output_dir" in result]
-    for output_dir in output_dirs:
-        if not output_dir.is_dir():
-            logging.error("Results of a task are missing, %s does not exist on this worker", output_dir)
     try:
-        merged_estimators = merge_simulation_outputs(output_dirs)
+        if simulation_id and update_key:
+            dict_to_send = {
+                "sim_id": simulation_id,
+                "job_state": EntityState.MERGING_RUNNING.value,
+                "update_key": update_key,
+            }
+            post_update(dict_to_send)
+
+        # a directory is missing after a worker restart, a result without files or logfiles comes from older code
+        missing = [str(path) for path in output_dirs if not path.is_dir()]
+        missing += [
+            f"result with keys {sorted(result)}" for result in results if not {"output_dir", "logfiles"} & set(result)
+        ]
+        for item in missing:
+            logging.error("Results of a task are missing: %s", item)
+        merged_estimators = [] if missing else merge_simulation_outputs(output_dirs)
     finally:
         for result in results:
             if "output_dir" in result and not result.get("keep_output_dir"):
                 shutil.rmtree(result["output_dir"], ignore_errors=True)
+
+    logfiles = {}
+    for result in results:
+        logfiles.update(result.get("logfiles", {}))
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
@@ -291,6 +296,16 @@ def merge_results(results: list[dict]) -> dict:
         )
         if not sending_results_ok:
             final_result["estimators"] = merged_estimators
+    elif simulation_id and update_key:
+        # nothing to show - mark the simulation failed instead of leaving it merging forever
+        post_update(
+            {
+                "sim_id": simulation_id,
+                "job_state": EntityState.FAILED.value,
+                "end_time": final_result["end_time"],
+                "update_key": update_key,
+            }
+        )
 
     return final_result
 
