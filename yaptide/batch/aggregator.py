@@ -15,6 +15,7 @@ import signal
 import socket
 import threading
 import time
+from contextlib import suppress
 from pathlib import Path
 from typing import Optional
 from urllib import request
@@ -227,16 +228,19 @@ class TaskUpdateAggregator:
                     break
         finally:
             try:
-                # stop accepting new connections, take what was already queued, then close the socket - only closing
-                # breaks the connections the watchers already hold, from then on their sends fail and go to the backend
-                # directly; closing after the final flush would swallow everything sent while it retries
+                # stop accepting, take what was already queued, then close the socket before the final flush:
+                # unbind drops the watchers' connections only once the socket next processes its commands, which
+                # may not happen before the flush - sends in that window would be accepted and never read, while
+                # after close they fail and the watchers go to the backend directly
                 socket_pull.unbind(endpoint)
-                (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
+                with suppress(OSError):  # a shared filesystem (Lustre) can refuse it - the flush matters more
+                    (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
                 self.receive_pending(socket_pull, max_messages=MAX_MESSAGES_AT_SHUTDOWN)
             finally:
                 socket_pull.close(linger=0)
                 context.term()
-                (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
+                with suppress(OSError):
+                    (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
             self.final_flush()
             logging.info("Aggregator for simulation %d finished", self.sim_id)
 

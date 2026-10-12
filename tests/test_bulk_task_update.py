@@ -9,6 +9,7 @@ import zmq
 from sqlalchemy.exc import OperationalError
 from yaptide.application import create_app
 from yaptide.batch import aggregator as aggregator_module
+from yaptide.batch import watcher
 from yaptide.batch.aggregator import TaskUpdateAggregator
 from yaptide.persistence.database import db
 from yaptide.persistence.models import CelerySimulationModel, CeleryTaskModel, YaptideUserModel
@@ -382,3 +383,49 @@ def test_bulk_update_rejects_a_user_token_as_update_key(app, simulation_with_tas
     token, _ = encode_auth_token(user_id=1)
     payload = {"simulation_id": simulation_with_tasks.id, "update_key": token, "tasks": []}
     assert app.test_client().post("/tasks/bulk", json=payload).status_code == 400
+
+
+def test_watcher_sends_fail_while_the_final_flush_retries(tmp_path, monkeypatch):
+    """Once the aggregator shuts down, a watcher send must fail and go to the backend directly - not be accepted by
+    a connection nobody reads any more while the final flush retries"""
+    monkeypatch.setattr(aggregator_module, "advertised_ip", lambda interface: "127.0.0.1")
+    monkeypatch.setattr(aggregator_module, "FINAL_FLUSH_DEADLINE_SECONDS", 1)
+    aggregator = TaskUpdateAggregator(
+        sim_id=1,
+        update_key="key",
+        backend_url="http://unused",
+        root_dir=tmp_path,
+        ntasks=10,
+        flush_interval_seconds=0.2,
+        idle_timeout_seconds=30,
+    )
+    monkeypatch.setattr(aggregator, "send_bulk_update", lambda payload: False)
+    # the drain at shutdown reads nothing - as when the socket has not yet processed the end of the connections
+    monkeypatch.setattr(aggregator, "receive_pending", lambda socket_pull, max_messages=0: 0)
+    sends_during_flush = []
+    original_final_flush = aggregator.final_flush
+
+    def final_flush():
+        """Sends from the watcher while the final flush is retrying"""
+        time.sleep(0.3)
+        sends_during_flush.append(sender.send(task_id=1, update_dict={"simulated_primaries": 1}))
+        original_final_flush()
+
+    monkeypatch.setattr(aggregator, "final_flush", final_flush)
+    aggregator.store_update(1, {"simulated_primaries": 0})
+    thread = threading.Thread(target=aggregator.run, daemon=True)
+    thread.start()
+    auth_path = tmp_path / ".zmq_auth"
+    for _ in range(50):
+        if auth_path.exists():
+            break
+        time.sleep(0.1)
+    sender = watcher.connect_to_aggregator(auth_path, "key")
+    try:
+        assert sender.send(task_id=1, update_dict={"simulated_primaries": 0})
+        time.sleep(0.2)
+        aggregator.stop_event.set()
+        thread.join(timeout=10)
+    finally:
+        sender.close(linger=0)
+    assert sends_during_flush == [False]

@@ -199,11 +199,14 @@ def test_aggregator_header_keeps_only_queue_placement():
 
 
 def test_watcher_drops_a_sender_whose_aggregator_is_gone(monkeypatch):
-    """A failed send means the aggregator ended - later updates must not keep trying the dead connection"""
-    monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: True)
-    monkeypatch.setattr(watcher, "REST_FALLBACK", {"next_progress_seconds": 0.0, "startup_delay_pending": False})
-    monkeypatch.setattr(watcher, "REPORTED_STATE", {})
-    monkeypatch.setattr(watcher, "AGGREGATOR_AUTH_PATH", None)
+    """A failed send means the aggregator ended - the update goes to the backend at once, with everything reported
+    so far (updates sent just before may have been lost with the aggregator), and the dead connection is dropped"""
+    posted = []
+    monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: posted.append(kwargs["update_dict"]) or True)
+    # the progress throttle of the REST fallback would hold this update back for a while
+    monkeypatch.setattr(watcher, "REST_FALLBACK", {"next_progress_seconds": 1e12, "startup_delay_pending": False})
+    monkeypatch.setattr(watcher, "REPORTED_STATE", {"task_state": "RUNNING", "start_time": "2026-10-12 18:22:35.0"})
+    monkeypatch.setattr(watcher, "AGGREGATOR_AUTH_PATH", Path("/nonexistent/.zmq_auth"))
 
     class DeadSender:
         """Aggregator that stopped"""
@@ -225,6 +228,7 @@ def test_watcher_drops_a_sender_whose_aggregator_is_gone(monkeypatch):
         sim_id=1, task_id=2, update_key="key", update_dict={"simulated_primaries": 10}, backend_url="http://backend"
     )
     assert sender.closed and watcher.AGGREGATOR_SENDER is None
+    assert posted == [{"task_state": "RUNNING", "start_time": "2026-10-12 18:22:35.0", "simulated_primaries": 10}]
 
 
 def test_rest_fallback_delays_only_its_first_request(monkeypatch):

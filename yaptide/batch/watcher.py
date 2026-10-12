@@ -65,11 +65,13 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
     if AGGREGATOR_SENDER is None:
         # the aggregator runs in its own job, it may still have been queued when this task started
         AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
+    aggregator_lost = False
     if AGGREGATOR_SENDER is not None and not AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
         # the aggregator is gone (time limit, crash) - drop the sender, the next update checks .zmq_auth again,
         # which an aggregator that shut down has removed
         AGGREGATOR_SENDER.close(linger=0)
         AGGREGATOR_SENDER = None
+        aggregator_lost = True
     elif AGGREGATOR_SENDER is not None:
         if update_dict.get("task_state") in TERMINAL_TASK_STATES:
             # a successful send only means the update is queued, it is not delivered yet - a task that never
@@ -89,7 +91,7 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
     # so state changes always go through, progress alone is throttled (only where an aggregator is expected);
     # the interval is randomized per update, so tasks started together do not report in lock-step
     now = time.monotonic()
-    if AGGREGATOR_AUTH_PATH is not None and "task_state" not in update_dict:
+    if AGGREGATOR_AUTH_PATH is not None and "task_state" not in update_dict and not aggregator_lost:
         if now < REST_FALLBACK["next_progress_seconds"]:
             logging.debug("No aggregator, skipping progress update for task %d", task_id)
             return True
@@ -101,8 +103,9 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         # timestamps already in update_dict are not shifted, lines read after the delay can be up to it late
         REST_FALLBACK["startup_delay_pending"] = False
         time.sleep(random.uniform(0, STARTUP_JITTER_SECONDS))
-    if update_dict.get("task_state") in TERMINAL_TASK_STATES:
-        # carry everything reported so far - an earlier update with start_time may have been lost with the aggregator
+    if update_dict.get("task_state") in TERMINAL_TASK_STATES or aggregator_lost:
+        # carry everything reported so far - the updates sent just before the aggregator went away may be lost,
+        # e.g. RUNNING with start_time
         update_dict = dict(REPORTED_STATE)
     return post_task_update(
         sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
