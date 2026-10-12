@@ -58,7 +58,9 @@ def log_generator(
         yield line
 
 
-def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
+def send_task_update(  # skipcq: PY-R1000
+    sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str
+) -> bool:
     """Sends task update to the aggregator, or directly to flask when no aggregator is reachable"""
     global AGGREGATOR_SENDER  # skipcq: PYL-W0603
     REPORTED_STATE.update(update_dict)
@@ -113,6 +115,13 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         update_dict = dict(REPORTED_STATE)
     # a final state that never arrives leaves the task RUNNING forever - worth a few retries (e.g. during a deploy)
     attempts = TERMINAL_STATE_ATTEMPTS if update_dict.get("task_state") in TERMINAL_TASK_STATES else 1
+    return post_task_update_with_retries(sim_id, task_id, update_key, update_dict, backend_url, attempts)
+
+
+def post_task_update_with_retries(  # skipcq: PYL-R0913
+    sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str, attempts: int
+) -> bool:
+    """Sends the update to flask, trying up to `attempts` times"""
     for attempt in range(attempts):
         if post_task_update(
             sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url

@@ -379,13 +379,11 @@ def test_bulk_update_fails_when_the_database_fails_during_the_task_by_task_retry
     app, simulation_with_tasks, monkeypatch
 ):
     """A database outage during the task-by-task retry is not bad data either - the request fails"""
-    errors = iter(
-        [DataError("COMMIT", {}, Exception("out of range")), OperationalError("COMMIT", {}, Exception("gone"))]
-    )
+    errors = [DataError("COMMIT", {}, Exception("out of range")), OperationalError("COMMIT", {}, Exception("gone"))]
 
     def failing_commit():
         """First commit rejects a value, the next one finds the database gone"""
-        raise next(errors)
+        raise errors.pop(0)
 
     monkeypatch.setattr(db.session, "commit", failing_commit)
     payload = {
