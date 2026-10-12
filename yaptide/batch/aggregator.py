@@ -227,17 +227,18 @@ class TaskUpdateAggregator:
                     break
         finally:
             try:
-                # stop accepting first: the watchers' sends fail from now on and go to the backend directly,
-                # then take what was already queued - nothing accepted by the socket is left unread
+                # stop accepting new connections, take what was already queued, then close the socket - only closing
+                # breaks the connections the watchers already hold, from then on their sends fail and go to the backend
+                # directly; closing after the final flush would swallow everything sent while it retries
                 socket_pull.unbind(endpoint)
                 (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
                 self.receive_pending(socket_pull, max_messages=MAX_MESSAGES_AT_SHUTDOWN)
-                self.final_flush()
             finally:
                 socket_pull.close(linger=0)
                 context.term()
                 (self.root_dir / AUTH_FILE_NAME).unlink(missing_ok=True)
-                logging.info("Aggregator for simulation %d finished", self.sim_id)
+            self.final_flush()
+            logging.info("Aggregator for simulation %d finished", self.sim_id)
 
     def final_flush(self) -> None:
         """Retries the last batch for a while - it carries the terminal states and the job still holds its allocation"""
