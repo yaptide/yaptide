@@ -33,7 +33,8 @@ fi
 rm -rf "${TMPDIR:-/tmp}"/yaptide_task_*
 
 NUM_CPUS="${RAY_NUM_CPUS%.*}"
-if [ "${NUM_CPUS:-0}" -lt 1 ]; then
+NUM_CPUS="${NUM_CPUS:-$(nproc)}"
+if [ "$NUM_CPUS" -lt 1 ]; then
     NUM_CPUS=1
 fi
 

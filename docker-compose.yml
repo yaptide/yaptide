@@ -81,8 +81,8 @@ services:
     environment:
       - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
-      # one simulation task per core the container may use
-      - RAY_NUM_CPUS=${MAX_CORES:-1}
+      # simulation tasks run at once; empty means one per core of the machine, as with the Celery worker before
+      - RAY_NUM_CPUS=${RAY_NUM_CPUS:-}
       - RAY_AUTH_TOKEN=${RAY_AUTH_TOKEN:-}
       - RAY_AUTH_MODE=${RAY_AUTH_TOKEN:+token}
       - PYTHONPATH=/usr/local/app
