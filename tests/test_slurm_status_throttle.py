@@ -4,6 +4,7 @@ from unittest.mock import Mock
 
 import pytest
 import redis
+import requests
 
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
@@ -183,16 +184,30 @@ def test_submit_error_marks_the_simulation_failed(monkeypatch):
 
 
 def test_job_ids_report_failure_does_not_mark_queued_jobs_failed(monkeypatch):
-    """Once sbatch queued the jobs, a failed report of their ids must not turn into a FAILED simulation"""
+    """Once sbatch queued the jobs, reporting their ids is retried and never turns into a FAILED simulation"""
     posted = []
 
     def report(update):
         """The backend got the ids, but the answer never arrived"""
         posted.append(update)
-        raise ConnectionError("connection reset")
+        raise requests.ConnectionError("connection reset")
 
     monkeypatch.setattr(batch_methods, "post_update", report)
+    monkeypatch.setattr(batch_methods.time, "sleep", lambda seconds: None)
     monkeypatch.setattr(batch_methods, "_submit_job", Mock(return_value={"sim_id": 5, "array_id": 11}))
-    with pytest.raises(ConnectionError):
+    with pytest.raises(requests.ConnectionError):
         batch_methods.submit_job.run({}, {}, 1, 1, sim_id=5, update_key="key")
-    assert posted == [{"sim_id": 5, "array_id": 11}]
+    assert posted == [{"sim_id": 5, "array_id": 11}] * batch_methods.JOB_IDS_REPORT_ATTEMPTS
+
+
+def test_simulation_deleted_during_the_slurm_query(client, batch_simulation, monkeypatch):
+    """The user may delete the simulation while its SLURM state is being read - the answer is 404, not a crash"""
+
+    def delete_during_the_query(simulation, user, cluster):
+        """Another request deletes the simulation while this one waits for SSH"""
+        db.session.query(SimulationModel).filter_by(id=simulation.id).delete(synchronize_session=False)
+        return {"job_state": EntityState.RUNNING.value}
+
+    monkeypatch.setattr(batch_routes, "get_job_status", delete_during_the_query)
+    monkeypatch.setattr(batch_routes, "slurm_status_due", lambda sim_id: True)
+    assert job_state(client)[0] == 404

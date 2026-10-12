@@ -63,8 +63,9 @@ mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
 
-if ! convertmc json --many "$INPUT_WILDCARD" ; then
+if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
     # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
+    # with empty results; task outputs are kept for a manual look
     python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
           --backend_url={backend_url} --simulation_state=FAILED
     exit 1

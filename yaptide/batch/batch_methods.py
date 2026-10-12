@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import tempfile
+import time
 from typing import Optional
 import requests
 from datetime import datetime
@@ -85,6 +86,10 @@ def post_update(dict_to_send):
     return requests.Session().post(url=f"{flask_url}/jobs", json=dict_to_send)
 
 
+JOB_IDS_REPORT_ATTEMPTS = 3
+JOB_IDS_REPORT_RETRY_SECONDS = 10
+
+
 @celery_app.task()
 def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
     """Submits job to cluster - an unexpected error marks the simulation as FAILED instead of leaving it pending"""
@@ -103,7 +108,15 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
         return
     # outside the try - once the jobs are in the queue, a failure to report their ids must not mark them FAILED
     if job_ids_update:
-        post_update(job_ids_update)
+        # retried - without the ids the simulation can neither be followed nor cancelled; storing them is idempotent
+        for attempt in range(JOB_IDS_REPORT_ATTEMPTS):
+            try:
+                post_update(job_ids_update).raise_for_status()
+                break
+            except requests.RequestException:
+                if attempt == JOB_IDS_REPORT_ATTEMPTS - 1:
+                    raise
+                time.sleep(JOB_IDS_REPORT_RETRY_SECONDS)
 
 
 def _submit_job(  # skipcq: PY-R1000
@@ -129,7 +142,7 @@ def _submit_job(  # skipcq: PY-R1000
             "log": {"error": f"User {user.username} has no certificate or private key"},
         }
         post_update(dict_to_send)
-        return
+        return None
 
     try:
         con = get_connection(user=user, cluster=cluster)
@@ -142,7 +155,7 @@ def _submit_job(  # skipcq: PY-R1000
             "log": {"error": str(e)},
         }
         post_update(dict_to_send)
-        return
+        return None
 
     scratch = fabric_result.stdout.split()[0]
     logging.debug("Scratch directory: %s", scratch)
@@ -155,7 +168,7 @@ def _submit_job(  # skipcq: PY-R1000
     except Exception:
         dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
         post_update(dict_to_send)
-        return
+        return None
     with tempfile.TemporaryDirectory() as tmp_dir_path:
         logging.debug("Preparing simulation input in: %s", tmp_dir_path)
         zip_path = Path(tmp_dir_path) / "input.zip"
@@ -194,7 +207,7 @@ def _submit_job(  # skipcq: PY-R1000
             "log": {"error": "Job submission failed due to invalid submit file path"},
         }
         post_update(dict_to_send)
-        return
+        return None
     fabric_result: Result = con.run(f"sh {submit_file}", hide=True)
     submit_stdout = fabric_result.stdout
     submit_stderr = fabric_result.stderr
@@ -226,7 +239,7 @@ def _submit_job(  # skipcq: PY-R1000
             },
         }
         post_update(dict_to_send)
-        return
+        return None
 
     dict_to_send = {
         "sim_id": sim_id,
@@ -412,8 +425,9 @@ def delete_job(
     try:
         con = get_connection(user=user, cluster=cluster)
 
-        con.run(f"scancel {array_id}")
+        # collect first - cancelling the array first lets SLURM start the collect, which then reports FAILED
         con.run(f"scancel {collect_id}")
+        con.run(f"scancel {array_id}")
         # by id, not by name - several yaptide deployments may share one cluster account
         con.run(f"test -s {job_dir}/aggregator_job_id && scancel `cat {job_dir}/aggregator_job_id`", warn=True)
         con.run(f"rm -rf {job_dir}")
