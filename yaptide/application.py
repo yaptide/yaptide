@@ -11,7 +11,7 @@ from yaptide.routes.main_routes import initialize_routes
 
 def _is_sensitive(key: str) -> bool:
     """Settings that carry secrets or credentials, e.g. the database URI with its password"""
-    return any(word in key for word in ("SECRET", "PASSWORD", "URI", "KEY"))
+    return any(word in key for word in ("SECRET", "PASSWORD", "URI", "KEY", "TOKEN", "CREDENTIAL"))
 
 
 def create_app():
