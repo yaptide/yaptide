@@ -3,6 +3,7 @@
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 from yaptide.batch import watcher
@@ -198,36 +199,59 @@ def test_aggregator_header_keeps_only_queue_placement():
     assert extract_aggregator_header(array_header) == "#SBATCH --account=plg-cpu"
 
 
-def test_watcher_drops_a_sender_whose_aggregator_is_gone(monkeypatch):
-    """A failed send drops the dead aggregator and sends everything reported so far to the backend at once"""
+class DeadSender:
+    """Aggregator connection whose sends fail - `delivered` tells whether earlier sends went through"""
+
+    def __init__(self, delivered: bool):
+        self.delivered = delivered
+        self.closed = False
+
+    @staticmethod
+    def send(task_id: int, update_dict: dict) -> bool:
+        """Refuses the update"""
+        return False
+
+    def close(self, linger=None):
+        """Records the close"""
+        self.closed = True
+
+
+def watcher_without_aggregator(monkeypatch) -> list:
+    """Watcher whose REST progress throttle would hold progress back for a long time, returns its posted updates"""
     posted = []
     monkeypatch.setattr(watcher, "post_task_update", lambda **kwargs: posted.append(kwargs["update_dict"]) or True)
-    # the progress throttle of the REST fallback would hold this update back for a while
     monkeypatch.setattr(watcher, "REST_FALLBACK", {"next_progress_seconds": 1e12, "startup_delay_pending": False})
     monkeypatch.setattr(watcher, "REPORTED_STATE", {"task_state": "RUNNING", "start_time": "2026-10-12 18:22:35.0"})
     monkeypatch.setattr(watcher, "AGGREGATOR_AUTH_PATH", Path("/nonexistent/.zmq_auth"))
+    monkeypatch.setattr(watcher, "UNREACHABLE_AGGREGATOR", {"retry_after": 0.0})
+    return posted
 
-    class DeadSender:
-        """Aggregator that stopped"""
 
-        closed = False
-
-        @staticmethod
-        def send(task_id: int, update_dict: dict) -> bool:
-            """Refuses the update"""
-            return False
-
-        def close(self, linger=None):
-            """Records the close"""
-            self.closed = True
-
-    sender = DeadSender()
+def test_watcher_drops_a_sender_whose_aggregator_is_gone(monkeypatch):
+    """A failed send drops the dead aggregator and sends everything reported so far to the backend at once"""
+    posted = watcher_without_aggregator(monkeypatch)
+    sender = DeadSender(delivered=True)
     monkeypatch.setattr(watcher, "AGGREGATOR_SENDER", sender)
     assert watcher.send_task_update(
         sim_id=1, task_id=2, update_key="key", update_dict={"simulated_primaries": 10}, backend_url="http://backend"
     )
     assert sender.closed and watcher.AGGREGATOR_SENDER is None
     assert posted == [{"task_state": "RUNNING", "start_time": "2026-10-12 18:22:35.0", "simulated_primaries": 10}]
+
+
+def test_unreachable_aggregator_keeps_the_rest_throttle(monkeypatch):
+    """An address no send ever reached (left by a killed aggregator) is not retried at once and the progress
+    throttle stays - otherwise every progress update would go straight to the backend
+    """
+    posted = watcher_without_aggregator(monkeypatch)
+    sender = DeadSender(delivered=False)
+    monkeypatch.setattr(watcher, "AGGREGATOR_SENDER", sender)
+    assert watcher.send_task_update(
+        sim_id=1, task_id=2, update_key="key", update_dict={"simulated_primaries": 10}, backend_url="http://backend"
+    )
+    assert sender.closed and watcher.AGGREGATOR_SENDER is None
+    assert posted == []
+    assert watcher.UNREACHABLE_AGGREGATOR["retry_after"] > time.monotonic()
 
 
 def test_rest_fallback_delays_only_its_first_request(monkeypatch):

@@ -13,6 +13,7 @@ import logging
 import os
 import signal
 import socket
+import ssl
 import threading
 import time
 from contextlib import suppress
@@ -158,7 +159,9 @@ class TaskUpdateAggregator:
             logging.warning("Bulk update to %s failed with code %d, retrying", bulk_url, e.code)
             return False
         except Exception as e:  # skipcq: PYL-W0703
-            logging.warning("Bulk update to %s failed: %s", bulk_url, e)
+            # a certificate problem will not go away by retrying - make it visible in the job log
+            level = logging.ERROR if isinstance(getattr(e, "reason", e), ssl.SSLError) else logging.WARNING
+            logging.log(level, "Bulk update to %s failed: %s", bulk_url, e)
             return False
 
     def handle_message(self, message: dict) -> None:

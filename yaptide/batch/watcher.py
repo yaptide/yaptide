@@ -67,11 +67,15 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
     aggregator_lost = False
     if AGGREGATOR_SENDER is not None and not AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
-        # the aggregator is gone (time limit, crash) - drop the sender, the next update checks .zmq_auth again,
-        # which an aggregator that shut down has removed
+        # the aggregator is gone (time limit, crash) - drop the sender, a later update checks .zmq_auth again,
+        # which an aggregator that shut down normally has removed
+        aggregator_lost = AGGREGATOR_SENDER.delivered
+        if not aggregator_lost:
+            # never reached it - an address left behind by a killed aggregator, or one this node cannot reach;
+            # trying it on every update would add a connection attempt per update, so wait before the next try
+            UNREACHABLE_AGGREGATOR["retry_after"] = time.monotonic() + UNREACHABLE_AGGREGATOR_RETRY_SECONDS
         AGGREGATOR_SENDER.close(linger=0)
         AGGREGATOR_SENDER = None
-        aggregator_lost = True
     elif AGGREGATOR_SENDER is not None:
         if update_dict.get("task_state") in TERMINAL_TASK_STATES:
             # a successful send only means the update is queued, it is not delivered yet - a task that never
@@ -107,9 +111,16 @@ def send_task_update(sim_id: int, task_id: int, update_key: str, update_dict: di
         # carry everything reported so far - the updates sent just before the aggregator went away may be lost,
         # e.g. RUNNING with start_time
         update_dict = dict(REPORTED_STATE)
-    return post_task_update(
-        sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
-    )
+    # a final state that never arrives leaves the task RUNNING forever - worth a few retries (e.g. during a deploy)
+    attempts = TERMINAL_STATE_ATTEMPTS if update_dict.get("task_state") in TERMINAL_TASK_STATES else 1
+    for attempt in range(attempts):
+        if post_task_update(
+            sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
+        ):
+            return True
+        if attempt < attempts - 1:
+            time.sleep(TERMINAL_STATE_RETRY_SECONDS)
+    return False
 
 
 def post_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
@@ -147,6 +158,7 @@ class AggregatorSender:
         import zmq  # skipcq: PYL-C0415
 
         self.zmq = zmq
+        self.delivered = False
         auth = json.loads(auth_path.read_text())
         self.update_key = update_key
         self.context = zmq.Context()
@@ -174,6 +186,7 @@ class AggregatorSender:
         except self.zmq.ZMQError as e:
             logging.warning("Sending update to the aggregator failed: %s", e)
             return False
+        self.delivered = True
         return True
 
     def close(self, linger: Optional[int] = None) -> None:
@@ -184,7 +197,7 @@ class AggregatorSender:
 
 def connect_to_aggregator(auth_path: Optional[Path], update_key: str) -> Optional[AggregatorSender]:
     """Builds the sender, returns None when no aggregator is available and REST should be used instead"""
-    if auth_path is None or not auth_path.exists():
+    if auth_path is None or not auth_path.exists() or time.monotonic() < UNREACHABLE_AGGREGATOR["retry_after"]:
         return None
     try:
         return AggregatorSender(auth_path=auth_path, update_key=update_key)
@@ -201,6 +214,10 @@ REST_FALLBACK = {"next_progress_seconds": 0.0, "startup_delay_pending": True}
 STARTUP_JITTER_SECONDS = 15
 # everything this task reported so far, merged - the direct terminal update carries it along
 REPORTED_STATE: dict = {}
+UNREACHABLE_AGGREGATOR_RETRY_SECONDS = 60
+UNREACHABLE_AGGREGATOR = {"retry_after": 0.0}
+TERMINAL_STATE_ATTEMPTS = 3
+TERMINAL_STATE_RETRY_SECONDS = 20
 
 
 def read_shieldhit_file(
@@ -250,7 +267,7 @@ def read_shieldhit_file(
             logging.debug("Log file for task %s not found", task_id)
             up_dict = {  # skipcq: PYL-W0612
                 "task_state": "FAILED",
-                "end_time": datetime.utcnow().isoformat(sep=" "),
+                "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
             }
             send_task_update(
                 sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
@@ -289,7 +306,7 @@ def read_shieldhit_file(
                 up_dict = {  # skipcq: PYL-W0612
                     "simulated_primaries": 0,
                     "requested_primaries": int(splitted[1]),
-                    "start_time": utc_now.isoformat(sep=" "),
+                    "start_time": utc_now.isoformat(sep=" ", timespec="microseconds"),
                     "task_state": "RUNNING",
                 }
                 send_task_update(
@@ -300,7 +317,7 @@ def read_shieldhit_file(
             elif re.search(COMPLETE_MATCH, line):
                 logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
                 up_dict = {  # skipcq: PYL-W0612
-                    "end_time": utc_now.isoformat(sep=" "),
+                    "end_time": utc_now.isoformat(sep=" ", timespec="microseconds"),
                     "task_state": "COMPLETED",
                 }
                 send_task_update(
@@ -319,7 +336,7 @@ def read_shieldhit_file(
         logging.warning("Log monitoring timed out for file %s and task %s: %s", filepath, task_id, err)
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED",
-            "end_time": datetime.utcnow().isoformat(sep=" "),
+            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
         }
         send_task_update(
             sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
@@ -329,7 +346,7 @@ def read_shieldhit_file(
         logging.error("Error while monitoring log file %s for task %s: %s", filepath, task_id, err)
         up_dict = {  # skipcq: PYL-W0612
             "task_state": "FAILED",
-            "end_time": datetime.utcnow().isoformat(sep=" "),
+            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
         }
         send_task_update(
             sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
