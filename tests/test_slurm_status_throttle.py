@@ -73,6 +73,7 @@ def fake_sacct(monkeypatch, array_states: list[str], collect_states: list[str]) 
         (["COMPLETED", "COMPLETED"], ["COMPLETED"], "COMPLETED"),
         (["COMPLETED", "COMPLETED"], ["TIMEOUT"], "FAILED"),  # a collect job past its time limit never finishes
         (["COMPLETED", "COMPLETED"], ["OUT_OF_MEMORY"], "FAILED"),
+        (["CANCELLED by 116752"], ["CANCELLED by 116752"], "CANCELED"),  # a cancel request is removing the jobs
     ],
 )
 def test_job_status_from_sacct(monkeypatch, array_states, collect_states, expected):
@@ -149,7 +150,7 @@ def test_slow_slurm_query_does_not_undo_the_final_state(client, batch_simulation
     """While SLURM still shows the collect job running, its results upload completes the simulation"""
 
     def collect_finishes_during_the_query(simulation, user, cluster):
-        # another request stores COMPLETED while this one waits for SSH - its loaded simulation is now stale
+        """Another request stores COMPLETED while this one waits for SSH - its loaded simulation is now stale"""
         db.session.query(SimulationModel).filter_by(id=simulation.id).update(
             {"job_state": EntityState.COMPLETED.value}, synchronize_session=False
         )
@@ -159,3 +160,39 @@ def test_slow_slurm_query_does_not_undo_the_final_state(client, batch_simulation
     monkeypatch.setattr(batch_routes, "slurm_status_due", lambda sim_id: True)
     assert job_state(client) == (200, "COMPLETED")
     assert db.session.get(BatchSimulationModel, batch_simulation.id).job_state == "COMPLETED"
+
+
+def test_cancelled_simulation_answered_from_database(client, batch_simulation, monkeypatch):
+    """A cancelled simulation is final - SLURM is not asked about it any more"""
+    batch_simulation.job_state = EntityState.CANCELED.value
+    db.session.commit()
+    get_job_status = Mock()
+    monkeypatch.setattr(batch_routes, "get_job_status", get_job_status)
+    monkeypatch.setattr(batch_routes, "slurm_status_due", lambda sim_id: True)
+    assert job_state(client) == (200, "CANCELED")
+    get_job_status.assert_not_called()
+
+
+def test_submit_error_marks_the_simulation_failed(monkeypatch):
+    """An unexpected error before the jobs are queued reports FAILED instead of leaving the simulation pending"""
+    posted = []
+    monkeypatch.setattr(batch_methods, "post_update", posted.append)
+    monkeypatch.setattr(batch_methods, "_submit_job", Mock(side_effect=OSError("connection lost")))
+    batch_methods.submit_job.run({}, {}, 1, 1, sim_id=5, update_key="key")
+    assert [update["job_state"] for update in posted] == ["FAILED"]
+
+
+def test_job_ids_report_failure_does_not_mark_queued_jobs_failed(monkeypatch):
+    """Once sbatch queued the jobs, a failed report of their ids must not turn into a FAILED simulation"""
+    posted = []
+
+    def report(update):
+        """The backend got the ids, but the answer never arrived"""
+        posted.append(update)
+        raise ConnectionError("connection reset")
+
+    monkeypatch.setattr(batch_methods, "post_update", report)
+    monkeypatch.setattr(batch_methods, "_submit_job", Mock(return_value={"sim_id": 5, "array_id": 11}))
+    with pytest.raises(ConnectionError):
+        batch_methods.submit_job.run({}, {}, 1, 1, sim_id=5, update_key="key")
+    assert posted == [{"sim_id": 5, "array_id": 11}]

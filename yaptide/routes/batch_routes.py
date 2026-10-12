@@ -7,6 +7,7 @@ import redis
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
+from sqlalchemy.exc import InvalidRequestError
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
 from yaptide.persistence.database import db
@@ -195,7 +196,10 @@ class JobsBatch(Resource):
             job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
             # the SLURM query takes seconds - meanwhile the results upload or a cancel may have ended the simulation,
             # which update_state must see to keep the final state
-            db.session.refresh(simulation)
+            try:
+                db.session.refresh(simulation)
+            except InvalidRequestError:  # the user deleted the simulation meanwhile
+                return yaptide_response(message="Simulation no longer exists", code=404)
             update_simulation_state(simulation=simulation, update_dict=job_info)
             job_info = {"job_state": simulation.job_state}
         else:

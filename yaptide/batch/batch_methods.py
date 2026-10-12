@@ -3,6 +3,7 @@ import json
 import logging
 import os
 import tempfile
+from typing import Optional
 import requests
 from datetime import datetime
 from pathlib import Path
@@ -88,7 +89,7 @@ def post_update(dict_to_send):
 def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
     """Submits job to cluster - an unexpected error marks the simulation as FAILED instead of leaving it pending"""
     try:
-        _submit_job(payload_dict, files_dict, userId, clusterId, sim_id, update_key)
+        job_ids_update = _submit_job(payload_dict, files_dict, userId, clusterId, sim_id, update_key)
     except Exception as e:  # skipcq: PYL-W0703
         logging.exception("Submitting simulation %d failed", sim_id)
         post_update(
@@ -99,12 +100,16 @@ def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int
                 "log": {"error": str(e)},
             }
         )
+        return
+    # outside the try - once the jobs are in the queue, a failure to report their ids must not mark them FAILED
+    if job_ids_update:
+        post_update(job_ids_update)
 
 
 def _submit_job(  # skipcq: PY-R1000
     payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str
-):
-    """Submits job to cluster"""
+) -> Optional[dict]:
+    """Submits job to cluster, returns the update with the job ids - None if it already reported a failure"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
         db_con, metadata, _ = (
@@ -232,8 +237,7 @@ def _submit_job(  # skipcq: PY-R1000
         "submit_stdout": submit_stdout,
         "sh_files": sh_files,
     }
-    post_update(dict_to_send)
-    return
+    return dict_to_send
 
 
 def prepare_script_files(
@@ -337,7 +341,8 @@ SLURM_ENDED_STATES = {
     "DEADLINE",
     "PREEMPTED",
 }
-SLURM_FAILED_STATES = SLURM_ENDED_STATES - {"COMPLETED"}
+# CANCELLED is left out: scancel comes from a user cancel (the simulation becomes CANCELED) or an admin
+SLURM_FAILED_STATES = SLURM_ENDED_STATES - {"COMPLETED", "CANCELLED"}
 
 
 def sacct_states(con: Connection, job_id: int) -> set[str]:
@@ -356,6 +361,9 @@ def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cl
     # the collect job starts once every array task has ended, whatever the outcome, and it decides the result
     if collect_states == {"COMPLETED"}:
         return {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+    if "CANCELLED" in collect_states:
+        # also while a cancel request is still removing the job, before it stores CANCELED itself
+        return {"job_state": EntityState.CANCELED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     if collect_states & SLURM_FAILED_STATES:
         # also a collect job past its time limit or memory - waiting for it would leave the simulation running forever
         return {"job_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
