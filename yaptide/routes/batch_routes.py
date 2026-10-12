@@ -1,6 +1,8 @@
+import os
 import uuid
 from datetime import datetime
 
+import redis
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
@@ -33,6 +35,25 @@ from yaptide.routes.utils.utils import (
     get_clamped_ntasks_value,
 )
 from yaptide.utils.enums import EntityState, PlatformType
+
+# an open simulations page polls job status every 1.5 s and every SLURM query is a new SSH login to the cluster
+SLURM_STATUS_INTERVAL = 30  # seconds
+_broker_url = os.environ.get("CELERY_BROKER_URL", "")
+_redis = (
+    redis.Redis.from_url(_broker_url, socket_timeout=1, socket_connect_timeout=1)
+    if _broker_url.startswith(("redis://", "rediss://"))
+    else None
+)
+
+
+def slurm_status_due(sim_id: int) -> bool:
+    """True for at most one caller per SLURM_STATUS_INTERVAL and simulation, shared by all server processes"""
+    if _redis is None:
+        return True
+    try:
+        return bool(_redis.set(f"slurm_status:{sim_id}", 1, nx=True, ex=SLURM_STATUS_INTERVAL))
+    except redis.RedisError:
+        return True
 
 
 class JobsBatch(Resource):
@@ -154,12 +175,13 @@ class JobsBatch(Resource):
                 },
             )
 
-        cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
-
-        job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
-        update_simulation_state(simulation=simulation, update_dict=job_info)
-
-        job_info.pop("end_time", None)
+        if slurm_status_due(simulation.id):
+            cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
+            job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
+            update_simulation_state(simulation=simulation, update_dict=job_info)
+            job_info.pop("end_time", None)
+        else:
+            job_info = {"job_state": simulation.job_state}
         job_info["job_tasks_status"] = job_tasks_status
 
         return yaptide_response(message="", code=200, content=job_info)
