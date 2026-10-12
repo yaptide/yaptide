@@ -85,7 +85,23 @@ def post_update(dict_to_send):
 
 
 @celery_app.task()
-def submit_job(  # skipcq: PY-R1000
+def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
+    """Submits job to cluster - an unexpected error marks the simulation as FAILED instead of leaving it pending"""
+    try:
+        _submit_job(payload_dict, files_dict, userId, clusterId, sim_id, update_key)
+    except Exception as e:  # skipcq: PYL-W0703
+        logging.exception("Submitting simulation %d failed", sim_id)
+        post_update(
+            {
+                "sim_id": sim_id,
+                "job_state": EntityState.FAILED.value,
+                "update_key": update_key,
+                "log": {"error": str(e)},
+            }
+        )
+
+
+def _submit_job(  # skipcq: PY-R1000
     payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str
 ):
     """Submits job to cluster"""
@@ -308,37 +324,48 @@ def prepare_script_files(
     return submit_file, sh_files
 
 
+# states of a SLURM job that has stopped running, whatever the reason; any other state (PENDING, RUNNING,
+# REQUEUED, SUSPENDED...) means the job is still queued or running
+SLURM_ENDED_STATES = {
+    "COMPLETED",
+    "FAILED",
+    "CANCELLED",
+    "TIMEOUT",
+    "OUT_OF_MEMORY",
+    "NODE_FAIL",
+    "BOOT_FAIL",
+    "DEADLINE",
+    "PREEMPTED",
+}
+SLURM_FAILED_STATES = SLURM_ENDED_STATES - {"COMPLETED"}
+
+
+def sacct_states(con: Connection, job_id: int) -> set[str]:
+    """States of a job and of each of its array tasks - empty until the job reaches the SLURM accounting"""
+    fabric_result: Result = con.run(f"sacct -n -P -X -j {job_id} --format State", hide=True)
+    # "CANCELLED by 116752" counts as CANCELLED
+    return {line.split()[0] for line in fabric_result.stdout.splitlines() if line.strip()}
+
+
 def get_job_status(simulation: BatchSimulationModel, user: KeycloakUserModel, cluster: ClusterModel) -> dict:
     """Get SLURM job status"""
-    array_id = simulation.array_id
-    collect_id = simulation.collect_id
-
     con = get_connection(user=user, cluster=cluster)
+    array_states = sacct_states(con, simulation.array_id)
+    collect_states = sacct_states(con, simulation.collect_id)
 
-    fabric_result: Result = con.run(f"sacct -j {array_id} --format State", hide=True)
-    job_state = fabric_result.stdout.split()[-1].split()[0]
-    # after the header: a line per started array task and job step, one more for the tasks still waiting
-    array_states = set(fabric_result.stdout.split()[2:])
-
-    fabric_result: Result = con.run(f"sacct -j {collect_id} --format State", hide=True)
-    collect_state = fabric_result.stdout.split()[-1].split()[0]
-
-    if job_state == "FAILED" or collect_state == "FAILED":
-        return {"job_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-    if collect_state == "COMPLETED":
+    # the collect job starts once every array task has ended, whatever the outcome, and it decides the result
+    if collect_states == {"COMPLETED"}:
         return {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-    if collect_state == "RUNNING":
-        logging.debug("Collect job is in RUNNING state")
+    if collect_states & SLURM_FAILED_STATES:
+        # also a collect job past its time limit or memory - waiting for it would leave the simulation running forever
+        return {"job_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+    if "RUNNING" in collect_states:
         return {"job_state": EntityState.MERGING_RUNNING.value}
-    if job_state == "COMPLETED" and collect_state == "PENDING":
-        logging.debug("Collect job is in PENDING state")
-        return {"job_state": EntityState.MERGING_QUEUED.value}
-    if job_state == "RUNNING":
-        logging.debug("Main job is in RUNNING state")
-    if array_states == {"PENDING"}:
-        logging.debug("Main job is in PENDING state")
+    if array_states <= {"PENDING"}:
+        # no task has started yet, or the job is not in the accounting yet right after submitting
         return {"job_state": EntityState.PENDING.value}
-
+    if array_states <= SLURM_ENDED_STATES:
+        return {"job_state": EntityState.MERGING_QUEUED.value}
     return {"job_state": EntityState.RUNNING.value}
 
 
@@ -349,10 +376,7 @@ def get_job_results(simulation: BatchSimulationModel, user: KeycloakUserModel, c
 
     con = get_connection(user=user, cluster=cluster)
 
-    fabric_result: Result = con.run(f"sacct -j {collect_id} --format State", hide=True)
-    collect_state = fabric_result.stdout.split()[-1].split()[0]
-
-    if collect_state == "COMPLETED":
+    if sacct_states(con, collect_id) == {"COMPLETED"}:
         fabric_result: Result = con.run(f"ls -f {job_dir}/output | grep .json", hide=True)
         result_estimators = []
         with tempfile.TemporaryDirectory() as tmp_dir_path:

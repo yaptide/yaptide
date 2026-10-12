@@ -8,6 +8,7 @@ from flask_restful import Resource
 from marshmallow import Schema, fields
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
+from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_all_clusters,
@@ -165,7 +166,7 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return yaptide_response(
                 message=f"Job state: {simulation.job_state}",
                 code=200,
@@ -179,8 +180,11 @@ class JobsBatch(Resource):
         if simulation.array_id is not None and slurm_status_due(simulation.id):
             cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
             job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
+            # the SLURM query takes seconds - meanwhile the results upload or a cancel may have ended the simulation,
+            # which update_state must see to keep the final state
+            db.session.refresh(simulation)
             update_simulation_state(simulation=simulation, update_dict=job_info)
-            job_info.pop("end_time", None)
+            job_info = {"job_state": simulation.job_state}
         else:
             job_info = {"job_state": simulation.job_state}
         job_info["job_tasks_status"] = job_tasks_status
@@ -221,6 +225,9 @@ class JobsBatch(Resource):
                     "job_state": simulation.job_state,
                 },
             )
+
+        if simulation.array_id is None:
+            return yaptide_response(message="Job is still being submitted, try again in a moment", code=409)
 
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
