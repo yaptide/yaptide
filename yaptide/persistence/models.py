@@ -165,6 +165,16 @@ class BatchSimulationModel(SimulationModel):
         return db_commit_required
 
 
+class SlurmStatusCheckModel(db.Model):
+    """When SLURM was last asked about the state of a batch simulation, shared by all server processes"""
+
+    __tablename__ = "SlurmStatusCheck"
+    simulation_id: Column[int] = db.Column(
+        db.Integer, db.ForeignKey("BatchSimulation.id", ondelete="CASCADE"), primary_key=True
+    )
+    checked_at: Column[datetime] = db.Column(db.DateTime, nullable=False)
+
+
 def allowed_state_change(current_state: str, next_state: str):
     """Ensures that no such change like Completed -> Canceled happens"""
     return not (

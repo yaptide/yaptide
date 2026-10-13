@@ -86,6 +86,10 @@ services:
       - RAY_AUTH_TOKEN=${RAY_AUTH_TOKEN:-}
       - RAY_AUTH_MODE=${RAY_AUTH_TOKEN:+token}
       - PYTHONPATH=/usr/local/app
+      # HPC jobs are submitted from here too, with the users' certificates read from the database; the jobs report
+      # to the backend at its external URL
+      - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
+      - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
     # no ports are published: the Ray ports are reachable only from the containers of this compose project
     healthcheck:
       # GCS answering is not enough: without the raylet no task can run, while the container keeps running

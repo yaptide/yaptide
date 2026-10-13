@@ -1,7 +1,9 @@
 import logging
+from datetime import datetime, timedelta
 from typing import Optional, Union
 
 from sqlalchemy import and_
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
 from sqlalchemy.orm import with_polymorphic
 
@@ -18,6 +20,7 @@ from yaptide.persistence.models import (
     LogfilesModel,
     PageModel,
     SimulationModel,
+    SlurmStatusCheckModel,
     TaskModel,
     UserModel,
     YaptideUserModel,
@@ -283,6 +286,28 @@ def fetch_logfiles_by_sim_id(sim_id: int) -> LogfilesModel:
     """Fetches logfiles by simulation id"""
     logfiles = db.session.query(LogfilesModel).filter_by(simulation_id=sim_id).first()
     return logfiles
+
+
+def claim_slurm_status_check(sim_id: int, interval_seconds: int) -> bool:
+    """Records a SLURM status check of a simulation unless one was recorded within the interval; True if recorded"""
+    now = datetime.utcnow()
+    insert = postgresql.insert if db.engine.dialect.name == "postgresql" else sqlite.insert
+    table = SlurmStatusCheckModel.__table__
+    # one statement, so concurrent requests of all server processes cannot both claim the same interval
+    statement = (
+        insert(table)
+        .values(simulation_id=sim_id, checked_at=now)
+        .on_conflict_do_update(
+            index_elements=[table.c.simulation_id],
+            set_={"checked_at": now},
+            where=table.c.checked_at <= now - timedelta(seconds=interval_seconds),
+        )
+        .returning(table.c.simulation_id)
+    )
+    # a row comes back only if it was inserted or updated; rowcount is -1 here with psycopg
+    claimed = db.session.execute(statement).scalar() is not None
+    db.session.commit()
+    return claimed
 
 
 def update_task_state(task: Union[BatchTaskModel, CeleryTaskModel], update_dict: dict) -> None:

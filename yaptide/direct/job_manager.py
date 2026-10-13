@@ -43,6 +43,23 @@ def submit_simulation(simulation_id: int, update_key: str, files_dict: dict, nta
     return name
 
 
+def submit_batch_job(**submit_kwargs) -> None:
+    """Hands an HPC job to the submitter on the Ray cluster, returning once the submitter has it"""
+    import ray  # skipcq: PYL-C0415
+    from ray.exceptions import ActorAlreadyExistsError  # skipcq: PYL-C0415
+    from yaptide.batch.submitter import SUBMITTER_NAME, BatchSubmitter  # skipcq: PYL-C0415
+
+    with ray_connection():
+        # a detached actor, as Ray kills a plain task once this request disconnects; created by the first submit
+        # after the Ray head starts, and again if it ever dies
+        submitter = BatchSubmitter.options(name=SUBMITTER_NAME, lifetime="detached", get_if_exists=True).remote()
+        try:
+            ray.get(submitter.submit.remote(**submit_kwargs), timeout=START_TIMEOUT_SECONDS)
+        except ActorAlreadyExistsError:
+            # through Ray Client the actor is created only now - another request was quicker, its actor serves both
+            ray.get(ray.get_actor(SUBMITTER_NAME).submit.remote(**submit_kwargs), timeout=START_TIMEOUT_SECONDS)
+
+
 def cancel_simulation(simulation_id: int) -> bool:
     """Stops all tasks of a simulation; False when its supervisor is already gone"""
     import ray  # skipcq: PYL-C0415

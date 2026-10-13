@@ -33,7 +33,6 @@ from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 from yaptide.admin.db_manage import TableTypes, connect_to_db
-from yaptide.utils.helper_worker import celery_app
 
 
 def get_user(db_con, metadata, userId):
@@ -91,7 +90,6 @@ JOB_IDS_REPORT_ATTEMPTS = 6
 JOB_IDS_REPORT_RETRY_SECONDS = 30
 
 
-@celery_app.task()
 def submit_job(payload_dict: dict, files_dict: dict, userId: int, clusterId: int, sim_id: int, update_key: str):
     """Submits job to cluster - an unexpected error marks the simulation as FAILED instead of leaving it pending"""
     try:
@@ -126,14 +124,17 @@ def _submit_job(  # skipcq: PY-R1000
     """Submits job to cluster, returns the update with the job ids - None if it already reported a failure"""
     utc_now = int(datetime.utcnow().timestamp() * 1e6)
     try:
-        db_con, metadata, _ = (
+        db_con, metadata, engine = (
             connect_to_db()
-        )  # Connection to database and quering objects looks like that because celery task works outside flask context
+        )  # Connection to database and quering objects looks like that because the submit runs outside flask context
     except Exception as e:
         logging.error('Async worker couldn\'t connect to db. Error message:"%s"', str(e))
 
     user = get_user(db_con=db_con, metadata=metadata, userId=userId)
     cluster = get_cluster(db_con=db_con, metadata=metadata, clusterId=clusterId)
+    # the submit runs in a long-lived process - left to the garbage collector, the connections pile up in Postgres
+    db_con.close()
+    engine.dispose()
 
     if user.cert is None or user.private_key is None:
         dict_to_send = {
@@ -145,113 +146,116 @@ def _submit_job(  # skipcq: PY-R1000
         post_update(dict_to_send)
         return None
 
-    try:
-        con = get_connection(user=user, cluster=cluster)
-        fabric_result: Result = con.run("echo $SCRATCH", hide=True)
-    except Exception as e:
+    # connects on the first command; an error in reading the key is reported as FAILED by submit_job
+    con = get_connection(user=user, cluster=cluster)
+    # the submit runs in a long-lived process - an unclosed connection would stay open on the login node
+    with con:
+        try:
+            fabric_result: Result = con.run("echo $SCRATCH", hide=True)
+        except Exception as e:
+            dict_to_send = {
+                "sim_id": sim_id,
+                "job_state": EntityState.FAILED.value,
+                "update_key": update_key,
+                "log": {"error": str(e)},
+            }
+            post_update(dict_to_send)
+            return None
+
+        scratch = fabric_result.stdout.split()[0]
+        logging.debug("Scratch directory: %s", scratch)
+
+        job_dir = f"{scratch}/yaptide_runs/{utc_now}"
+        logging.debug("Job directory: %s", job_dir)
+
+        try:
+            con.run(f"mkdir -p {job_dir}")
+        except Exception:
+            dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
+            post_update(dict_to_send)
+            return None
+        with tempfile.TemporaryDirectory() as tmp_dir_path:
+            logging.debug("Preparing simulation input in: %s", tmp_dir_path)
+            zip_path = Path(tmp_dir_path) / "input.zip"
+            write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
+            logging.debug("Zipping simulation input to %s", zip_path)
+            with ZipFile(zip_path, mode="w") as archive:
+                for file in Path(tmp_dir_path).iterdir():
+                    if file.name == "input.zip":
+                        continue
+                    archive.write(file, arcname=file.name)
+            con.put(zip_path, job_dir)
+            logging.debug("Transfering simulation input %s to %s", zip_path, job_dir)
+
+        WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
+        SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
+        AGGREGATOR_SCRIPT = Path(__file__).parent.resolve() / "aggregator.py"
+
+        logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
+        con.put(WATCHER_SCRIPT, job_dir)
+        logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+        con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
+        logging.debug("Transfering aggregator script %s to %s", AGGREGATOR_SCRIPT, job_dir)
+        con.put(AGGREGATOR_SCRIPT, job_dir)
+
+        submit_file, sh_files = prepare_script_files(
+            payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con
+        )
+
+        array_id = collect_id = None
+        if not submit_file.startswith(job_dir):
+            logging.error("Invalid submit file path: %s", submit_file)
+            dict_to_send = {
+                "sim_id": sim_id,
+                "job_state": EntityState.FAILED.value,
+                "update_key": update_key,
+                "log": {"error": "Job submission failed due to invalid submit file path"},
+            }
+            post_update(dict_to_send)
+            return None
+        fabric_result: Result = con.run(f"sh {submit_file}", hide=True)
+        submit_stdout = fabric_result.stdout
+        submit_stderr = fabric_result.stderr
+        for line in submit_stdout.split("\n"):
+            if line.startswith("Job id"):
+                try:
+                    array_id = int(line.split()[-1])
+                except (ValueError, IndexError):
+                    logging.error("Could not parse array id from line: %s", line)
+            if line.startswith("Collect id"):
+                try:
+                    collect_id = int(line.split()[-1])
+                except (ValueError, IndexError):
+                    logging.error("Could not parse collect id from line: %s", line)
+
+        if array_id is None or collect_id is None:
+            logging.debug("Job submission failed")
+            logging.debug("Sbatch stdout: %s", submit_stdout)
+            logging.debug("Sbatch stderr: %s", submit_stderr)
+            dict_to_send = {
+                "sim_id": sim_id,
+                "job_state": EntityState.FAILED.value,
+                "update_key": update_key,
+                "log": {
+                    "message": "Job submission failed",
+                    "submit_stdout": submit_stdout,
+                    "sh_files": sh_files,
+                    "submit_stderr": submit_stderr,
+                },
+            }
+            post_update(dict_to_send)
+            return None
+
         dict_to_send = {
             "sim_id": sim_id,
-            "job_state": EntityState.FAILED.value,
             "update_key": update_key,
-            "log": {"error": str(e)},
+            "job_dir": job_dir,
+            "array_id": array_id,
+            "collect_id": collect_id,
+            "submit_stdout": submit_stdout,
+            "sh_files": sh_files,
         }
-        post_update(dict_to_send)
-        return None
-
-    scratch = fabric_result.stdout.split()[0]
-    logging.debug("Scratch directory: %s", scratch)
-
-    job_dir = f"{scratch}/yaptide_runs/{utc_now}"
-    logging.debug("Job directory: %s", job_dir)
-
-    try:
-        con.run(f"mkdir -p {job_dir}")
-    except Exception:
-        dict_to_send = {"sim_id": sim_id, "job_state": EntityState.FAILED.value, "update_key": update_key}
-        post_update(dict_to_send)
-        return None
-    with tempfile.TemporaryDirectory() as tmp_dir_path:
-        logging.debug("Preparing simulation input in: %s", tmp_dir_path)
-        zip_path = Path(tmp_dir_path) / "input.zip"
-        write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_dir_path))
-        logging.debug("Zipping simulation input to %s", zip_path)
-        with ZipFile(zip_path, mode="w") as archive:
-            for file in Path(tmp_dir_path).iterdir():
-                if file.name == "input.zip":
-                    continue
-                archive.write(file, arcname=file.name)
-        con.put(zip_path, job_dir)
-        logging.debug("Transfering simulation input %s to %s", zip_path, job_dir)
-
-    WATCHER_SCRIPT = Path(__file__).parent.resolve() / "watcher.py"
-    SIMULATION_DATA_SENDER_SCRIPT = Path(__file__).parent.resolve() / "simulation_data_sender.py"
-    AGGREGATOR_SCRIPT = Path(__file__).parent.resolve() / "aggregator.py"
-
-    logging.debug("Transfering watcher script %s to %s", WATCHER_SCRIPT, job_dir)
-    con.put(WATCHER_SCRIPT, job_dir)
-    logging.debug("Transfering result sender script %s to %s", SIMULATION_DATA_SENDER_SCRIPT, job_dir)
-    con.put(SIMULATION_DATA_SENDER_SCRIPT, job_dir)
-    logging.debug("Transfering aggregator script %s to %s", AGGREGATOR_SCRIPT, job_dir)
-    con.put(AGGREGATOR_SCRIPT, job_dir)
-
-    submit_file, sh_files = prepare_script_files(
-        payload_dict=payload_dict, job_dir=job_dir, sim_id=sim_id, update_key=update_key, con=con
-    )
-
-    array_id = collect_id = None
-    if not submit_file.startswith(job_dir):
-        logging.error("Invalid submit file path: %s", submit_file)
-        dict_to_send = {
-            "sim_id": sim_id,
-            "job_state": EntityState.FAILED.value,
-            "update_key": update_key,
-            "log": {"error": "Job submission failed due to invalid submit file path"},
-        }
-        post_update(dict_to_send)
-        return None
-    fabric_result: Result = con.run(f"sh {submit_file}", hide=True)
-    submit_stdout = fabric_result.stdout
-    submit_stderr = fabric_result.stderr
-    for line in submit_stdout.split("\n"):
-        if line.startswith("Job id"):
-            try:
-                array_id = int(line.split()[-1])
-            except (ValueError, IndexError):
-                logging.error("Could not parse array id from line: %s", line)
-        if line.startswith("Collect id"):
-            try:
-                collect_id = int(line.split()[-1])
-            except (ValueError, IndexError):
-                logging.error("Could not parse collect id from line: %s", line)
-
-    if array_id is None or collect_id is None:
-        logging.debug("Job submission failed")
-        logging.debug("Sbatch stdout: %s", submit_stdout)
-        logging.debug("Sbatch stderr: %s", submit_stderr)
-        dict_to_send = {
-            "sim_id": sim_id,
-            "job_state": EntityState.FAILED.value,
-            "update_key": update_key,
-            "log": {
-                "message": "Job submission failed",
-                "submit_stdout": submit_stdout,
-                "sh_files": sh_files,
-                "submit_stderr": submit_stderr,
-            },
-        }
-        post_update(dict_to_send)
-        return None
-
-    dict_to_send = {
-        "sim_id": sim_id,
-        "update_key": update_key,
-        "job_dir": job_dir,
-        "array_id": array_id,
-        "collect_id": collect_id,
-        "submit_stdout": submit_stdout,
-        "sh_files": sh_files,
-    }
-    return dict_to_send
+        return dict_to_send
 
 
 def prepare_script_files(

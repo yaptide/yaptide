@@ -1,4 +1,4 @@
-"""Direct simulations on a local Ray cluster: the supervisor, its batched status updates, merge and cancel"""
+"""Direct simulations and HPC submits on a local Ray cluster: supervisor, batched updates, merge, cancel, submitter"""
 
 import itertools
 import json
@@ -13,7 +13,8 @@ import numpy as np
 import pytest
 import ray
 
-from yaptide.direct.job_manager import cancel_simulation, submit_simulation
+from yaptide.batch.submitter import SUBMITTER_NAME
+from yaptide.direct.job_manager import cancel_simulation, submit_batch_job, submit_simulation
 from yaptide.direct.simulation import WORK_DIR_PREFIX
 from yaptide.direct.supervisor import NAMESPACE, supervisor_name
 
@@ -196,3 +197,17 @@ def test_fluka_mock_results(ray_cluster, fluka_payload_files_dict_data: dict):
         np.testing.assert_array_equal(
             values, np.around(np.swapaxes(np.array(expected[estimator["name"]]), 0, 1).flatten(), 4)
         )
+
+
+def test_batch_submit_runs_on_the_cluster_and_reports_failure(ray_cluster):
+    """The submitter outlives the request and runs submit_job: without a database it reports the simulation failed"""
+    sim_ids = [next(SIMULATION_IDS), next(SIMULATION_IDS)]  # skipcq: PTC-W0063
+    for sim_id in sim_ids:
+        submit_batch_job(payload_dict={}, files_dict={}, userId=1, clusterId=1, sim_id=sim_id, update_key="key")
+
+    for sim_id in sim_ids:
+        assert wait_for(lambda sim_id=sim_id: requests_of(sim_id))
+        [(path, body)] = requests_of(sim_id)
+        assert (path, body["job_state"]) == ("/jobs", "FAILED")
+    # one submitter serves all submits
+    assert ray.get_actor(SUBMITTER_NAME)
