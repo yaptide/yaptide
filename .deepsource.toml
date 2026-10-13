@@ -35,8 +35,7 @@ enabled = true
   [analyzers.meta]
   dockerfile_paths = [
     "Dockerfile-flask",
-    "Dockerfile-simulation-worker",
-    "Dockerfile-helper-worker"
+    "Dockerfile-simulation-worker"
   ]
 
 [[analyzers]]

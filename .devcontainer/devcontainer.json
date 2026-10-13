@@ -8,13 +8,12 @@
 	// Features to add to the dev container. More info: https://containers.dev/features.
 	"features": {
 		"ghcr.io/warrenbuckley/codespace-features/sqlite:1": {},
-		"ghcr.io/itsmechlark/features/redis-server:1": {},
 		"ghcr.io/devcontainers/features/docker-in-docker:4": {},
 		"ghcr.io/devcontainers-contrib/features/poetry:2": {}
 	},
 
 	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	"forwardPorts": [5000, 6000, 6379, 8443],
+	"forwardPorts": [5000, 6000, 8443],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
 	"postCreateCommand": "poetry install"

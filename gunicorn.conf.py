@@ -4,7 +4,7 @@ import os
 
 # measured: ~110-150 MB per sync worker, up to ~300 MB while it handles a large /results upload
 MB_PER_WORKER = 300
-# every worker keeps a Postgres connection open, next to the Celery workers - more would run into Postgres'
+# every worker keeps a Postgres connection open - more would run into Postgres'
 # default limit of 100 connections on a big machine, and the workers that can't connect stop the whole server
 MAX_WORKERS = 32
 
