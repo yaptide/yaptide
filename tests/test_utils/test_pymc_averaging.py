@@ -7,6 +7,7 @@ import pytest
 
 from yaptide.celery.utils.averaging import EstimatorsAverager
 
+
 def merge(results: list[dict]) -> list[dict] | None:
     """Averages task results the way merge_results does it"""
     averager = EstimatorsAverager()
