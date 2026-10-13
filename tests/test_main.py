@@ -27,3 +27,21 @@ def test_app_started(client):
     resp = client.get("/")
 
     assert resp.json["message"] == "Hello World!"
+
+
+def test_app_advertises_local_users(client, monkeypatch):
+    """Test if the root route reports whether local users are enabled."""
+    resp = client.get("/")
+    assert resp.json["local_users_enabled"] is True
+
+    monkeypatch.setenv("ENABLE_LOCAL_USERS", "false")
+    resp = client.get("/")
+    assert resp.json["local_users_enabled"] is False
+
+    monkeypatch.delenv("ENABLE_LOCAL_USERS")
+    resp = client.get("/")
+    assert resp.json["local_users_enabled"] is False
+
+    monkeypatch.setenv("ENABLE_LOCAL_USERS", "not-a-bool")
+    resp = client.get("/")
+    assert resp.json["local_users_enabled"] is False
