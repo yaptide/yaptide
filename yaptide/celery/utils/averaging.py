@@ -2,6 +2,7 @@ import logging
 from typing import Optional
 
 import numpy as np
+from pymchelper.averaging import WeightedStatsAggregator
 
 # Explicit type, so whole numbers don't get misinterpreted as ints
 VALUES_DTYPE = np.float64
@@ -24,16 +25,16 @@ class EstimatorsAverager:
     """
     Accumulates estimator values across simulation tasks and averages them on demand.
 
-    Values of each page are summed into a numpy array as tasks are added and divided
-    by the number of added tasks only once, when the average is requested. Pages are
-    matched between tasks by estimator name and page number, not by position.
+    Values of each page are fed into a pymchelper WeightedStatsAggregator, which keeps
+    a numerically stable running mean. Pages are matched between tasks by estimator
+    name and page number, not by position.
     """
 
     def __init__(self) -> None:
         # Estimators of the first added task, reused as the carrier of metadata,
         # dimensions and axes. Its values are replaced by the averages in averaged().
         self._estimators: Optional[list[dict]] = None
-        self._sums: dict[PageKey, np.ndarray] = {}
+        self._aggregators: dict[PageKey, WeightedStatsAggregator] = {}
         self._count = 0
 
     @property
@@ -54,16 +55,16 @@ class EstimatorsAverager:
         for estimator in estimators:
             for page in estimator["pages"]:
                 key = page_key(estimator["name"], page)
-                accumulated = self._sums.get(key)
-                if accumulated is None:
+                aggregator = self._aggregators.get(key)
+                if aggregator is None:
                     raise ValueError(f"Estimator {key[0]}, page {key[1]} is missing from the results of the first task")
                 values = np.asarray(page["data"]["values"], dtype=VALUES_DTYPE)
-                if values.shape != accumulated.shape:
+                if values.shape != aggregator.data.shape:
                     raise ValueError(
                         f"Estimator {key[0]}, page {key[1]} has {values.shape} values in this task "
-                        f"but {accumulated.shape} in the first one"
+                        f"but {aggregator.data.shape} in the first one"
                     )
-                accumulated += values
+                aggregator.update(values)
 
         self._count += 1
         logging.debug("Accumulated estimators of %d tasks", self._count)
@@ -81,22 +82,23 @@ class EstimatorsAverager:
         for estimator in self._estimators:
             for page in estimator["pages"]:
                 key = page_key(estimator["name"], page)
-                page["data"]["values"] = (self._sums[key] / self._count).tolist()
+                page["data"]["values"] = self._aggregators[key].mean.tolist()
                 logging.debug("Averaged page %s of estimator %s over %d tasks", key[1], key[0], self._count)
 
         return self._estimators
 
     def _adopt(self, estimators: list[dict]) -> None:
         """Takes the estimators of the first task as the base of the accumulation"""
-        sums: dict[PageKey, np.ndarray] = {}
+        aggregators: dict[PageKey, WeightedStatsAggregator] = {}
         for estimator in estimators:
             for page in estimator["pages"]:
                 key = page_key(estimator["name"], page)
-                if key in sums:
+                if key in aggregators:
                     raise ValueError(f"Estimator {key[0]} has more than one page numbered {key[1]}")
-                sums[key] = np.asarray(page["data"]["values"], dtype=VALUES_DTYPE)
+                aggregators[key] = WeightedStatsAggregator()
+                aggregators[key].update(np.asarray(page["data"]["values"], dtype=VALUES_DTYPE))
 
         self._estimators = estimators
-        self._sums = sums
+        self._aggregators = aggregators
         self._count = 1
-        logging.debug("Accumulating %d estimators, %d pages in total", len(estimators), len(sums))
+        logging.debug("Accumulating %d estimators, %d pages in total", len(estimators), len(aggregators))
