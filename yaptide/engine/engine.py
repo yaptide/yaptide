@@ -156,7 +156,8 @@ class Engine:
             if simulation_id in self.running:
                 self.save_task_updates(simulation_id, updates)
 
-    def save_task_updates(self, simulation_id: int, updates: list[dict]) -> None:
+    @staticmethod
+    def save_task_updates(simulation_id: int, updates: list[dict]) -> None:
         """Saves task updates and moves the simulation's state when a task's state changed"""
         bulk_update_task_states(simulation_id, updates)
         if any("task_state" in update["update_dict"] for update in updates):

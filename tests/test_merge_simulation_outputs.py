@@ -1,12 +1,10 @@
 """Merging of direct simulation results straight from the simulator's output files"""
 
 import json
-import os
 import shutil
 from pathlib import Path
 
 import numpy as np
-import pytest
 from pymchelper.run import main as convertmc
 
 from yaptide.utils.sim_utils import merge_simulation_outputs

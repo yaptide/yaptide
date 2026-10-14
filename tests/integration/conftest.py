@@ -207,7 +207,8 @@ def direct_engine(app):
     stop.set()
     thread.join()
     ray.shutdown()
-    assert not errors, f"engine tick failed: {errors[0]!r}"
+    if errors:
+        pytest.fail(f"engine tick failed: {errors[0]!r}")
 
 
 @pytest.fixture(scope="function")
