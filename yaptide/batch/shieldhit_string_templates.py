@@ -21,6 +21,8 @@ SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRI
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
+# every job id goes next to the jobs as well, so a cancel finds them even if the submit was interrupted
+echo "$JOB_ID" > $ROOT_DIR/array_job_id
 
 if [ -n "$JOB_ID" ] ; then
     # the aggregator batches the progress updates of all tasks into single requests to the backend
@@ -42,6 +44,7 @@ if [ -n "$JOB_ID" ] ; then
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
+    echo "$COLLECT_ID" > $ROOT_DIR/collect_job_id
     # a collect job that SLURM stops (time limit, memory, node failure, scancel) cannot report it ended, so a small
     # job does it then; it is removed by SLURM when the collect succeeds (--kill-on-invalid-dep)
     if [ -n "$COLLECT_ID" ] ; then

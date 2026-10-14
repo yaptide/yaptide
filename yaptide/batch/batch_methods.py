@@ -1,6 +1,8 @@
 import io
 import logging
 import os
+import re
+import shlex
 import tempfile
 from datetime import datetime
 from pathlib import Path
@@ -8,7 +10,7 @@ from zipfile import ZipFile
 
 import pymchelper
 from fabric import Connection, Result
-from paramiko import RSAKey
+from paramiko import AuthenticationException, RSAKey
 
 from yaptide.batch.shieldhit_string_templates import (
     AGGREGATOR_SHIELDHIT_BASH,
@@ -25,7 +27,13 @@ from yaptide.batch.utils.utils import (
 )
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import add_object_to_db, update_simulation_state
-from yaptide.persistence.models import BatchSimulationModel, ClusterModel, KeycloakUserModel, LogfilesModel
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    ClusterModel,
+    KeycloakUserModel,
+    LogfilesModel,
+    SimulationModel,
+)
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import write_simulation_input_files
@@ -61,11 +69,17 @@ def claim_job_dir(simulation_id: int, job_dir: str) -> bool:
     """Records the job directory before anything is submitted; False when another submit already did
 
     A crash after this point leaves a directory that can be found (and the simulation is failed on the engine's
-    restart), and a second submit of the same simulation never starts.
+    restart), a second submit of the same simulation never starts, and neither does one cancelled meanwhile.
     """
+    simulations, batch_simulations = SimulationModel.__table__, BatchSimulationModel.__table__
+    still_pending = (
+        db.select(simulations.c.id)
+        .where(simulations.c.id == simulation_id, simulations.c.job_state == EntityState.PENDING.value)
+        .exists()
+    )
     claimed = db.session.execute(
-        BatchSimulationModel.__table__.update()
-        .where(BatchSimulationModel.__table__.c.id == simulation_id, BatchSimulationModel.__table__.c.job_dir.is_(None))
+        batch_simulations.update()
+        .where(batch_simulations.c.id == simulation_id, batch_simulations.c.job_dir.is_(None), still_pending)
         .values(job_dir=job_dir)
     ).rowcount
     db.session.commit()
@@ -81,6 +95,9 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
     cluster = db.session.get(ClusterModel, simulation.cluster_id)
     if user is None or user.cert is None or user.private_key is None:
         fail_submit(simulation, {"error": "The user has no certificate for the cluster, log in again"})
+        return
+    if not os.environ.get("BACKEND_EXTERNAL_URL"):
+        fail_submit(simulation, {"error": "BACKEND_EXTERNAL_URL is not set, the cluster's jobs could not report"})
         return
     if not os.environ.get("YAPTIDE_TOKEN_SECRET"):
         # the update key would be signed with a secret only this process knows, the backend would reject the reports
@@ -146,32 +163,57 @@ def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
         con.put(Path(__file__).parent.resolve() / script, job_dir)
 
 
-def cancel_simulation(simulation_id: int) -> None:
-    """Cancels the SLURM jobs of a cancelled simulation and removes its directory on the cluster
+# a job directory as submit_simulation creates it: $SCRATCH/yaptide_runs/<simulation id>_<microseconds>
+JOB_DIR_PATTERN = re.compile(r"/[\w./-]+/yaptide_runs/(\d+)_\d+")
+# the jobs of a simulation, in the order they are cancelled: collect first - cancelling the array first lets SLURM
+# start the collect, which then reports FAILED; the submit script writes their ids into the job directory
+SIMULATION_JOBS = ("collect", "array", "aggregator", "reporter")
 
-    Possible only while the user's certificate is valid; otherwise the jobs run to their end and what they report
-    is ignored, as the simulation is final.
+
+def forget_job_dir(simulation_id: int) -> None:
+    """Nothing of the simulation is left on the cluster to cancel"""
+    db.session.execute(
+        BatchSimulationModel.__table__.update()
+        .where(BatchSimulationModel.__table__.c.id == simulation_id)
+        .values(job_dir=None)
+    )
+    db.session.commit()
+
+
+def cancel_simulation(simulation_id: int) -> None:
+    """Cancels the SLURM jobs of a simulation and removes its directory on the cluster, then forgets the directory
+
+    The jobs are found by the ids the submit wrote into the job directory, so a submit interrupted before its ids
+    reached the database is cleaned up too. A directory left in the database means the cancel is still to be done
+    (the engine's sweep repeats it). With the user's certificate expired, the jobs run to their end and what they
+    report is ignored, as the simulation is final.
     """
     simulation = db.session.get(BatchSimulationModel, simulation_id)
-    if simulation is None or simulation.array_id is None:
+    if simulation is None or not simulation.job_dir:
         return
+    match = JOB_DIR_PATTERN.fullmatch(simulation.job_dir)
+    if not match or int(match.group(1)) != simulation.id:
+        # only a directory this backend created goes into a command on the cluster
+        logging.error("Simulation %d has an unexpected job directory, nothing is cancelled", simulation.id)
+        forget_job_dir(simulation.id)
+        return
+    job_dir = shlex.quote(simulation.job_dir)
     user = db.session.get(KeycloakUserModel, simulation.user_id)
     cluster = db.session.get(ClusterModel, simulation.cluster_id)
-    job_dir = simulation.job_dir
     try:
         with get_connection(user=user, cluster=cluster) as con:
-            # collect first - cancelling the array first lets SLURM start the collect, which then reports FAILED;
             # a job already gone from SLURM makes scancel fail, the rest must still be cancelled (warn)
-            con.run(f"scancel {simulation.collect_id}", warn=True)
-            con.run(f"scancel {simulation.array_id}", warn=True)
-            # by id, not by name - several yaptide deployments may share one cluster account
-            for helper_job in ("aggregator", "reporter"):
-                con.run(
-                    f"test -s {job_dir}/{helper_job}_job_id && scancel `cat {job_dir}/{helper_job}_job_id`", warn=True
-                )
+            for job in SIMULATION_JOBS:
+                con.run(f"test -s {job_dir}/{job}_job_id && scancel `cat {job_dir}/{job}_job_id`", warn=True)
             con.run(f"rm -rf {job_dir}", warn=True)
+    except AuthenticationException:
+        logging.warning("Certificate of simulation %d expired, its jobs run to their end", simulation.id)
     except Exception as e:  # skipcq: PYL-W0703
-        logging.error("Cancelling the jobs of simulation %d on the cluster failed: %s", simulation_id, e)
+        logging.error(
+            "Cancelling the jobs of simulation %d on the cluster failed, to be repeated: %s", simulation_id, e
+        )
+        return
+    forget_job_dir(simulation.id)
 
 
 def prepare_script_files(

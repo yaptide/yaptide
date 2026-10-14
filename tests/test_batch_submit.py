@@ -16,7 +16,7 @@ from yaptide.persistence.models import (
     LogfilesModel,
     SimulationModel,
 )
-from yaptide.routes.utils.tokens import encode_auth_token
+from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.routes.utils.utils import update_state_from_tasks
 from yaptide.utils.enums import EntityState
 
@@ -27,6 +27,7 @@ SUBMIT_OUTPUT = "Job id: 101\nAggregator id: 102\nCollect id: 103\nReporter id: 
 def client(monkeypatch):
     """Test client of a logged in Keycloak user with a certificate, and one cluster"""
     monkeypatch.setenv("YAPTIDE_TOKEN_SECRET", "shared with the backend")
+    monkeypatch.setenv("BACKEND_EXTERNAL_URL", "https://yaptide.test")
     app = create_app()
     with app.app_context():
         db.create_all()
@@ -167,9 +168,11 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
 
     batch_methods.cancel_simulation(simulation.id)
     sent = commands(cluster_connection)
-    assert sent[:2] == ["scancel 103", "scancel 101"]
-    assert any("reporter_job_id" in command for command in sent)
+    # every job by the id the submit wrote next to it, collect first; then the directory goes
+    assert [command.split("/")[-1].split("_job_id")[0] for command in sent[:4]] == list(batch_methods.SIMULATION_JOBS)
+    assert all("scancel" in command for command in sent[:4])
     assert sent[-1].startswith("rm -rf /scratch/plgtest/yaptide_runs/")
+    assert stored(simulation.id).job_dir is None  # nothing left to cancel
 
 
 def test_cancel_during_submit_cancels_the_jobs_right_after(client, cluster_connection):
@@ -191,7 +194,9 @@ def test_cancel_during_submit_cancels_the_jobs_right_after(client, cluster_conne
     cluster_connection.run.side_effect = cancel_meanwhile
     batch_methods.submit_simulation(simulation.id)
 
-    assert "scancel 103" in commands(cluster_connection)
+    assert sum(command.startswith("test -s") for command in commands(cluster_connection)) == len(
+        batch_methods.SIMULATION_JOBS
+    )
     assert stored(simulation.id).job_state == EntityState.CANCELED.value
 
 
@@ -228,3 +233,71 @@ def test_hpc_state_follows_task_reports(client, task_states, before, expected):
     update_state_from_tasks(simulation)
 
     assert stored(simulation.id).job_state == expected
+
+
+def test_job_dir_from_a_job_never_reaches_a_command(client, cluster_connection):
+    """A job may only say it merges or failed; a job directory or a cancel from it is refused"""
+    simulation = submit(client)
+    batch_methods.submit_simulation(simulation.id)
+    key = encode_simulation_auth_token(simulation.id)
+
+    for update in ({"job_dir": "~; touch /tmp/pwned"}, {"job_state": "CANCELED"}, {"array_id": 1}):
+        response = client.post("/jobs", json={"sim_id": simulation.id, "update_key": key, **update})
+        assert response.status_code == 400
+    assert stored(simulation.id).job_dir.startswith("/scratch/plgtest/yaptide_runs/")
+    assert (
+        client.post(
+            "/jobs", json={"sim_id": simulation.id, "update_key": key, "job_state": "MERGING_RUNNING"}
+        ).status_code
+        == 202
+    )
+
+
+def test_unexpected_job_dir_is_never_used_in_a_command(client, cluster_connection):
+    """Even a job directory that got into the database some other way is not put into a command"""
+    simulation = submit(client)
+    batch_methods.submit_simulation(simulation.id)
+    db.session.execute(
+        BatchSimulationModel.__table__.update()
+        .where(BatchSimulationModel.__table__.c.id == simulation.id)
+        .values(job_dir="/scratch/x; rm -rf ~")
+    )
+    db.session.commit()
+    cluster_connection.run.reset_mock()
+
+    batch_methods.cancel_simulation(simulation.id)
+
+    cluster_connection.run.assert_not_called()
+
+
+def test_cancel_before_the_claim_submits_nothing(client, cluster_connection):
+    """A simulation cancelled while the submit connects is not submitted"""
+    simulation = submit(client)
+    run = cluster_connection.run.side_effect
+
+    def cancel_while_connecting(command: str, **kwargs) -> Result:
+        """The user cancels while the submit asks for $SCRATCH"""
+        if command == "echo $SCRATCH":
+            with db.engine.begin() as other:
+                other.execute(
+                    SimulationModel.__table__.update()
+                    .where(SimulationModel.__table__.c.id == simulation.id)
+                    .values(job_state=EntityState.CANCELED.value)
+                )
+        return run(command, **kwargs)
+
+    cluster_connection.run.side_effect = cancel_while_connecting
+    batch_methods.submit_simulation(simulation.id)
+
+    assert not any(command.startswith("sh ") for command in commands(cluster_connection))
+
+
+def test_delete_waits_for_the_cancel_on_the_cluster(client, cluster_connection):
+    """Deleting a cancelled simulation before its jobs are cancelled would leave them running"""
+    simulation = submit(client)
+    batch_methods.submit_simulation(simulation.id)
+    client.delete("/jobs/batch", query_string={"job_id": simulation.job_id})
+
+    assert client.delete("/user/simulations", query_string={"job_id": simulation.job_id}).status_code == 409
+    batch_methods.cancel_simulation(simulation.id)
+    assert client.delete("/user/simulations", query_string={"job_id": simulation.job_id}).status_code == 200

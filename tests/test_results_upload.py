@@ -26,6 +26,7 @@ from yaptide.persistence.models import (
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
+MD5 = base64.b64encode(hashlib.md5(b"page").digest()).decode()
 RESULTS = json.loads((Path(__file__).parent / "res" / "json_with_results.json").read_text())["estimators"]
 
 
@@ -90,7 +91,7 @@ def store_all(storage: dict) -> None:
 
 def test_links_for_every_page(client, storage):
     """One signed link per page, under the simulation's own keys"""
-    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": "bWQ1"}]
+    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": MD5}]
 
     response = client.post("/results/uploads", json=body(pages=pages))
 
@@ -107,14 +108,14 @@ def test_links_for_every_page(client, storage):
 @pytest.mark.parametrize("estimator", ["..", ".", "a/b", ""])
 def test_estimator_names_cannot_leave_the_simulation(client, storage, estimator):
     """The name becomes a part of the object key, so it must be a plain name"""
-    pages = [{"estimator": estimator, "page_number": 0, "size": 10, "md5": "bWQ1"}]
+    pages = [{"estimator": estimator, "page_number": 0, "size": 10, "md5": MD5}]
 
     assert client.post("/results/uploads", json=body(pages=pages)).status_code == 400
 
 
 def test_wrong_key_and_final_simulation_are_refused(client, storage):
     """Only the simulation's own jobs, and only while it is not finished"""
-    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": "bWQ1"}]
+    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": MD5}]
     wrong = {**body(pages=pages), "update_key": encode_simulation_auth_token(simulation_id() + 1)}
     assert client.post("/results/uploads", json=wrong).status_code == 400
 
@@ -126,7 +127,7 @@ def test_wrong_key_and_final_simulation_are_refused(client, storage):
 def test_no_storage_tells_the_job_to_send_the_old_way(client, storage, monkeypatch):
     """501: the uploader then sends the results in one request to POST /results"""
     monkeypatch.delenv("RESULTS_S3_BUCKET")
-    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": "bWQ1"}]
+    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": MD5}]
 
     assert client.post("/results/uploads", json=body(pages=pages)).status_code == 501
 
@@ -162,6 +163,8 @@ class FakeServer(BaseHTTPRequestHandler):
 
     storage: dict = {}
     lost_once: set = set()
+    dropped_once: set = set()
+    expired_once: set = set()
     calls: list = []
     has_storage = True
 
@@ -190,6 +193,14 @@ class FakeServer(BaseHTTPRequestHandler):
         """The storage: refuses a body whose MD5 differs from the signed one; the first upload of a page may get lost"""
         data = self.rfile.read(int(self.headers["Content-Length"]))
         key = self.path.removeprefix("/store/")
+        if key in FakeServer.dropped_once:
+            # the connection breaks without an answer, e.g. nginx restarting
+            FakeServer.dropped_once.discard(key)
+            self.close_connection = True
+            return None
+        if key in FakeServer.expired_once:
+            FakeServer.expired_once.discard(key)
+            return self.answer(403, {})
         if base64.b64encode(hashlib.md5(data).digest()).decode() != self.headers["Content-MD5"]:
             return self.answer(400, {})
         if key in FakeServer.lost_once:
@@ -213,6 +224,7 @@ class FakeServer(BaseHTTPRequestHandler):
 def fake_server(tmp_path, monkeypatch):
     """The fake backend and storage, and the collect job's output directory with convertmc's files"""
     FakeServer.storage, FakeServer.lost_once, FakeServer.calls, FakeServer.has_storage = {}, set(), [], True
+    FakeServer.dropped_once, FakeServer.expired_once = set(), set()
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeServer)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     for estimator in RESULTS:
@@ -253,3 +265,26 @@ def test_uploader_sends_the_old_way_without_storage(fake_server):
     assert results_uploader.main(fake_server) == 0
 
     assert FakeServer.calls == ["/results/uploads", "/results"]
+
+
+def first_page_key() -> str:
+    """The fake storage's key of the first page"""
+    return f"{RESULTS[0]['name']}/{RESULTS[0]['pages'][0]['metadata']['page_number']}"
+
+
+def test_uploader_survives_a_dropped_connection(fake_server):
+    """A connection broken during an upload is retried, not the end of the simulation"""
+    FakeServer.dropped_once = {first_page_key()}
+
+    assert results_uploader.main(fake_server) == 0
+
+    assert len(FakeServer.storage) == sum(len(estimator["pages"]) for estimator in RESULTS)
+
+
+def test_uploader_gets_new_links_when_one_expires(fake_server):
+    """A refused (expired) link makes the uploader ask for new links for what is left"""
+    FakeServer.expired_once = {first_page_key()}
+
+    assert results_uploader.main(fake_server) == 0
+
+    assert FakeServer.calls == ["/results/uploads", "/results/uploads", "/results/done"]

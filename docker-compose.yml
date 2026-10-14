@@ -91,6 +91,9 @@ services:
     env_file: .env
     environment:
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      # HPC jobs report to the backend's public address with update keys the engine signs - with Flask's secret
+      - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
+      - YAPTIDE_TOKEN_SECRET=${YAPTIDE_TOKEN_SECRET:-}
       # the engine reads and writes simulations in the same database as Flask
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
       # simulation tasks run at once; empty means one per core of the machine

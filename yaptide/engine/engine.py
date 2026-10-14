@@ -146,8 +146,9 @@ class Engine:
         """Engine with nothing running yet"""
         self.inbox = ProgressInbox.remote()
         self.cluster = ClusterGateway.remote()
-        # HPC simulations being submitted: simulation id -> the submit's ref
+        # HPC simulations being submitted (simulation id -> the submit's ref) and cancelled on their cluster
         self.submitting: dict[int, ray.ObjectRef] = {}
+        self.cancelling: set[int] = set()
         self.running: dict[int, Running] = {}
         # (event, simulation id, platform): PENDING, CANCELED, DELETED from Postgres, FINISHED and SUBMITTED
         # from Ray, SWEEP
@@ -198,6 +199,9 @@ class Engine:
             self.sweep()
         elif event == "SUBMITTED":
             self.submitted(simulation_id)
+        elif event == "CANCELLED_ON_CLUSTER":
+            # done, or to be repeated by a sweep: the job directory stays in the database until it is done
+            self.cancelling.discard(simulation_id)
         elif event == EntityState.PENDING.value:
             simulation = db.session.get(CelerySimulationModel, simulation_id)
             if simulation and simulation.job_state == EntityState.PENDING.value and simulation_id not in self.running:
@@ -214,7 +218,13 @@ class Engine:
         if event == EntityState.PENDING.value:
             self.submit(simulation_id)
         elif event == EntityState.CANCELED.value:
-            self.cluster.cancel.remote(simulation_id)
+            self.cancel(simulation_id)
+
+    def cancel(self, simulation_id: int) -> None:
+        """Hands a cancelled HPC simulation to the cluster gateway, once at a time"""
+        if simulation_id not in self.cancelling:
+            self.cancelling.add(simulation_id)
+            self.watch(self.cluster.cancel.remote(simulation_id), simulation_id, "CANCELLED_ON_CLUSTER")
 
     def submit(self, simulation_id: int) -> None:
         """Hands a stored HPC simulation to the cluster gateway, once"""
@@ -223,14 +233,21 @@ class Engine:
             self.watch(self.submitting[simulation_id], simulation_id, "SUBMITTED")
 
     def submitted(self, simulation_id: int) -> None:
-        """A submit ended; it reports its own failures, a crashed one fails the simulation here"""
+        """A submit ended; it reports its own failures. One that crashed (the gateway died) is repeated if it had
+        not started yet; otherwise the simulation fails and whatever reached the cluster is cancelled.
+        """
         ref = self.submitting.pop(simulation_id, None)
         try:
             ray.get(ref)
         except Exception as error:  # skipcq: PYL-W0703
             simulation = db.session.get(BatchSimulationModel, simulation_id)
-            if simulation:
-                fail_submit(simulation, {"error": f"Submitting crashed: {error}"})
+            if simulation is None or simulation.job_state != EntityState.PENDING.value:
+                return
+            if simulation.job_dir is None:
+                self.submit(simulation_id)
+                return
+            fail_submit(simulation, {"error": f"Submitting crashed: {error}"})
+            self.cancel(simulation_id)
 
     def watch(self, ref, simulation_id: int, event: str = "FINISHED") -> None:
         """Ray puts an event into the queue when the task, merge or submit finishes"""
@@ -253,7 +270,8 @@ class Engine:
             .all()
         )
         for simulation in interrupted:
-            fail_submit(simulation, {"error": f"Submitting was interrupted, check {simulation.job_dir} on the cluster"})
+            fail_submit(simulation, {"error": "Submitting was interrupted, its jobs are cancelled"})
+            self.cancel(simulation.id)
 
     def sweep(self) -> None:
         """Brings the engine in line with the database: stops what was cancelled, starts what waits, takes results"""
@@ -279,6 +297,12 @@ class Engine:
         )
         for (simulation_id,) in waiting:
             self.submit(simulation_id)
+        # cancels whose event was lost, or that could not reach the cluster: the job directory is still recorded
+        to_cancel = db.session.query(BatchSimulationModel.id).filter(
+            BatchSimulationModel.job_state == EntityState.CANCELED.value, BatchSimulationModel.job_dir.isnot(None)
+        )
+        for (simulation_id,) in to_cancel:
+            self.cancel(simulation_id)
 
     def start_guarded(self, simulation: CelerySimulationModel) -> None:
         """Starts a simulation; one that cannot start fails alone, without stopping the engine"""

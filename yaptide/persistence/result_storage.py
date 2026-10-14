@@ -17,8 +17,9 @@ from botocore.exceptions import ClientError
 PAGE_FORMAT = "page-json-gzip-v1"
 # the UI fetches a page right after asking for it
 URL_SECONDS = 15 * 60
-# a cluster job uploads its pages right after asking for the links
-UPLOAD_URL_SECONDS = 60 * 60
+# a cluster job uploads its pages right after asking for the links, and asks again when they expire; short, so a
+# link cannot replace a page long after the results were stored
+UPLOAD_URL_SECONDS = 15 * 60
 
 
 def configured() -> bool:

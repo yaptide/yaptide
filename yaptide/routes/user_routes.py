@@ -8,7 +8,14 @@ from marshmallow import Schema, fields, ValidationError
 from sqlalchemy import asc, desc
 
 from yaptide.persistence import result_storage
-from yaptide.persistence.models import EstimatorModel, PageModel, PageObjectModel, SimulationModel, UserModel
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    EstimatorModel,
+    PageModel,
+    PageObjectModel,
+    SimulationModel,
+    UserModel,
+)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
 from yaptide.persistence.database import db
@@ -139,6 +146,11 @@ class UserSimulations(Resource):
                   Please cancel simulation or wait for it to finish""",
                 code=403,
             )
+
+        # the engine still has to cancel its jobs on the cluster; deleting now would leave them running there
+        if isinstance(simulation, BatchSimulationModel) and simulation.job_state == EntityState.CANCELED.value:
+            if simulation.job_dir:
+                return yaptide_response(message="Its jobs are being cancelled on the cluster, try again soon", code=409)
 
         # objects first: if the storage fails, the simulation stays and the delete can be repeated
         stored = (

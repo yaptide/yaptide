@@ -5,6 +5,9 @@ reports what it uploaded (POST /results/done). The backend checks every page is 
 results and marks the simulation completed; a page missing is listed in the answer, for the job to upload again.
 """
 
+import base64
+import binascii
+
 from flask import request
 from flask_restful import Resource
 
@@ -35,17 +38,34 @@ def authorized_simulation(payload: dict):
     return simulation, None
 
 
+# pages of one simulation in one request; far more than any result so far, few enough to answer in seconds
+MAX_PAGES = 10_000
+
+
+def valid_name(name) -> bool:
+    """A plain estimator name: it becomes a part of the object key"""
+    return isinstance(name, str) and is_plain_filename(name) and name != "."
+
+
+def valid_md5(md5) -> bool:
+    """The base64 MD5 of a page, as the Content-MD5 header carries it"""
+    try:
+        return isinstance(md5, str) and len(base64.b64decode(md5, validate=True)) == 16
+    except (binascii.Error, ValueError):
+        return False
+
+
 def valid_page(page: dict) -> bool:
-    """A page entry: a plain estimator name (it becomes a part of the object key), its number, size and MD5"""
+    """A page entry: its estimator's name, its number, size and MD5"""
     return (
         isinstance(page, dict)
-        and isinstance(page.get("estimator"), str)
-        and is_plain_filename(page["estimator"])
-        and page["estimator"] != "."
-        and isinstance(page.get("page_number"), int)
-        and isinstance(page.get("size"), int)
+        and valid_name(page.get("estimator"))
+        # bool is an int too, and would become a key like .../True.json
+        and type(page.get("page_number")) is int
+        and page["page_number"] >= 0
+        and type(page.get("size")) is int
         and page["size"] > 0
-        and isinstance(page.get("md5"), str)
+        and valid_md5(page.get("md5"))
     )
 
 
@@ -60,7 +80,7 @@ class ResultsUploadsResource(Resource):
         if error:
             return error
         pages = payload.get("pages")
-        if not isinstance(pages, list) or not pages or not all(valid_page(page) for page in pages):
+        if not isinstance(pages, list) or not 0 < len(pages) <= MAX_PAGES or not all(valid_page(p) for p in pages):
             return yaptide_response(message="pages: estimator, page_number, size and md5 of each", code=400)
         uploads = [
             {
@@ -90,13 +110,21 @@ class ResultsDoneResource(Resource):
         if error:
             return error
         estimators = payload.get("estimators")
-        if not isinstance(estimators, list) or not estimators:
-            return yaptide_response(message="estimators are required", code=400)
+        if (
+            not isinstance(estimators, list)
+            or not estimators
+            or not all(
+                isinstance(e, dict) and valid_name(e.get("name")) and isinstance(e.get("pages"), list)
+                for e in estimators
+            )
+            or sum(len(estimator["pages"]) for estimator in estimators) > MAX_PAGES
+        ):
+            return yaptide_response(message="estimators: name and pages of each", code=400)
         missing, results = [], []
-        for estimator in sorted(estimators, key=lambda estimator: estimator.get("name", "")):
+        for estimator in sorted(estimators, key=lambda estimator: estimator["name"]):
             pages = []
-            for page in estimator.get("pages", []):
-                entry = {**page, "estimator": estimator.get("name")}
+            for page in estimator["pages"]:
+                entry = {**page, "estimator": estimator["name"]} if isinstance(page, dict) else None
                 if not valid_page(entry):
                     return yaptide_response(message="Invalid page entry", code=400)
                 key = result_storage.page_key(simulation.id, entry["estimator"], entry["page_number"])

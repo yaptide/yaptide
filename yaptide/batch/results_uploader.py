@@ -10,12 +10,14 @@ import argparse
 import base64
 import gzip
 import hashlib
+import io
 import json
 import logging
 import ssl
 import sys
 import time
 from pathlib import Path
+from http.client import HTTPException
 from urllib import error, request
 
 ATTEMPTS = 3
@@ -29,7 +31,11 @@ CONTEXT.verify_mode = ssl.CERT_NONE
 
 def page_body(page: dict) -> bytes:
     """The page as the UI reads it from storage: gzipped JSON, the same bytes every time (no timestamp)"""
-    return gzip.compress(json.dumps(page).encode(), mtime=0)
+    # GzipFile, not gzip.compress(mtime=...): the Python on a cluster can be older than 3.8
+    buffer = io.BytesIO()
+    with gzip.GzipFile(fileobj=buffer, mode="wb", mtime=0) as gzipped:
+        gzipped.write(json.dumps(page).encode())
+    return buffer.getvalue()
 
 
 def read_estimators(output_dir: Path) -> list[dict]:
@@ -75,35 +81,43 @@ def post(url: str, payload: dict) -> tuple[int, dict]:
             if http_error.code < 500 or http_error.code == 501:
                 return http_error.code, json.loads(http_error.read() or b"{}")
             logging.warning("%s answered %d", url, http_error.code)
-        except (error.URLError, TimeoutError) as connection_error:
+        except (OSError, HTTPException) as connection_error:
+            # unreachable, or the connection dropped (e.g. a restart of the backend)
             logging.warning("%s unreachable: %s", url, connection_error)
         if attempt < ATTEMPTS - 1:
             time.sleep(RETRY_SECONDS * (attempt + 1))
     return 0, {}
 
 
-def put(url: str, body: bytes, md5: str) -> bool:
+# what put() can end with
+STORED, LINK_EXPIRED, REFUSED = "stored", "link expired", "refused"
+
+
+def put(url: str, body: bytes, md5: str) -> str:
     """Uploads one page to its signed link, retrying when the storage cannot be reached"""
     headers = {"Content-MD5": md5, "Content-Type": "application/json", "Content-Encoding": "gzip"}
     for attempt in range(ATTEMPTS):
         req = request.Request(url, body, headers, method="PUT")
         try:
             with request.urlopen(req, context=CONTEXT, timeout=300) as response:  # skipcq: BAN-B310
-                return response.status == 200
+                return STORED if response.status == 200 else REFUSED
         except error.HTTPError as http_error:
+            if http_error.code == 403:
+                # links last minutes; a long upload gets new ones
+                return LINK_EXPIRED
             if http_error.code < 500:
                 logging.error("Upload refused: %d %s", http_error.code, http_error.read()[:500])
-                return False
+                return REFUSED
             logging.warning("Upload answered %d", http_error.code)
-        except (error.URLError, TimeoutError) as connection_error:
+        except (OSError, HTTPException) as connection_error:
             logging.warning("Upload failed: %s", connection_error)
         if attempt < ATTEMPTS - 1:
             time.sleep(RETRY_SECONDS * (attempt + 1))
-    return False
+    return REFUSED
 
 
 # what upload() can end with
-UPLOADED, NO_STORAGE, FAILED = "uploaded", "no storage", "failed"
+UPLOADED, NO_STORAGE, FAILED, AGAIN = "uploaded", "no storage", "failed", "again"
 
 
 def upload(estimators: list[dict], listed: list[dict], wanted: set, args) -> str:
@@ -128,8 +142,14 @@ def upload(estimators: list[dict], listed: list[dict], wanted: set, args) -> str
     for estimator in estimators:
         for page in estimator["pages"]:
             page_id = (estimator["name"], int(page["metadata"]["page_number"]))
-            if page_id in wanted and not put(links[page_id], page_body(page), md5s[page_id]):
+            if page_id not in wanted:
+                continue
+            stored = put(links[page_id], page_body(page), md5s[page_id])
+            if stored == LINK_EXPIRED:
+                return AGAIN
+            if stored == REFUSED:
                 return FAILED
+            wanted.discard(page_id)
     return UPLOADED
 
 
@@ -152,6 +172,14 @@ def main(args) -> int:
     wanted = {(estimator["name"], page["page_number"]) for estimator in listed for page in estimator["pages"]}
     for _ in range(ATTEMPTS):
         uploaded = upload(estimators, listed, wanted, args)
+        for _ in range(ATTEMPTS):
+            if uploaded != AGAIN:
+                break
+            # what is left of wanted, with new links
+            uploaded = upload(estimators, listed, wanted, args)
+        if uploaded == AGAIN:
+            # every new link refused too (e.g. a clock far off on this node)
+            return 1
         if uploaded == NO_STORAGE:
             return 0 if send_old_way(estimators, args) else 1
         if uploaded == FAILED:
