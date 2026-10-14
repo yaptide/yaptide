@@ -5,7 +5,8 @@ import gzip
 import json
 from datetime import datetime
 
-from sqlalchemy import Column, UniqueConstraint
+import flask_migrate
+from sqlalchemy import Column, UniqueConstraint, inspect
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -413,6 +414,15 @@ class LogfilesModel(db.Model):
             self.compressed_data = compress(value)
 
 
-def create_all():
-    """Creates all tables, to be used with Flask app context."""
-    db.create_all()
+def prepare_database():
+    """Brings the database to the current models, to be used with Flask app context
+
+    A database under migrations gets the ones it lacks. A new one, or one whose tables were only ever created from
+    the models, gets the missing tables and is marked as up to date, so that later migrations apply to it.
+    Creating tables before migrating would make a migration that creates a table fail, so the two never mix.
+    """
+    if inspect(db.engine).has_table("alembic_version"):
+        flask_migrate.upgrade()
+    else:
+        db.create_all()
+        flask_migrate.stamp()

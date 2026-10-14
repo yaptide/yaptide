@@ -294,3 +294,4 @@ yaptide_tester/output/
 server.crt
 server.key
 download/
+.DS_Store
