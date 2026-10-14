@@ -96,3 +96,36 @@ def test_data_migrations_carry_old_data_over(app):
 
     flask_migrate.downgrade(revision=BEFORE_DATA_MIGRATIONS)
     assert query('SELECT name FROM "Estimator"') == [("z_profile_",)]
+
+
+def test_downgrade_keeps_pages_in_object_storage(app):
+    """Going back before object storage would lose the only record of pages kept there, so it stops"""
+    flask_migrate.upgrade()
+    with engine().begin() as connection:
+        connection.execute(text("""INSERT INTO "User" (id, username, auth_provider) VALUES (1, 'u', 'YaptideUser')"""))
+        connection.execute(
+            text(
+                """INSERT INTO "Simulation" (id, job_id, user_id, start_time, title, platform, input_type, sim_type,
+                job_state) VALUES (1, 'j', 1, now(), 't', 'DIRECT', 'FILES', 'shieldhit', 'COMPLETED')"""
+            )
+        )
+        connection.execute(
+            text("""INSERT INTO "Estimator" (id, simulation_id, name, file_name) VALUES (1, 1, 'z', 'z')""")
+        )
+        connection.execute(
+            text(
+                """INSERT INTO "Page" (id, estimator_id, page_number, page_name, page_dimension)
+                VALUES (1, 1, 0, 'dose', 1)"""
+            )
+        )
+        connection.execute(
+            text("""INSERT INTO "PageObject" (page_id, key, size, format) VALUES (1, 'k', 1, 'page-json-gzip-v1')""")
+        )
+
+    # Flask-Migrate reports the migration's error and exits
+    with pytest.raises(SystemExit):
+        flask_migrate.downgrade(revision="5003b9acb1f4")
+
+    assert "PageObject" in tables()
+    with engine().begin() as connection:
+        connection.execute(text('DELETE FROM "PageObject"'))
