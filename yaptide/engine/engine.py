@@ -23,12 +23,12 @@ from yaptide.persistence.models import CelerySimulationModel, LogfilesModel, Sim
 from yaptide.routes.utils.utils import FINAL_STATES, update_direct_state_from_tasks
 from yaptide.utils.enums import EntityState
 
-# how often the engine looks for new and cancelled simulations and saves progress
-TICK_SECONDS = 2
+# how often the engine looks for new and cancelled simulations and saves progress (a few small queries)
+TICK_SECONDS = 0.5
 # a task running longer is stopped, as the Celery workers did
 TASK_SECONDS_LIMIT = 10 * 3600
 # the engine gives up and restarts with its container after failing this many ticks in a row (about a minute)
-FAILED_TICKS_LIMIT = 30
+FAILED_TICKS_LIMIT = 120
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
 
 
