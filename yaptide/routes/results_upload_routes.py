@@ -6,7 +6,6 @@ results and marks the simulation completed; a page missing is listed in the answ
 """
 
 import base64
-import binascii
 
 from flask import request
 from flask_restful import Resource
@@ -51,7 +50,7 @@ def valid_md5(md5) -> bool:
     """The base64 MD5 of a page, as the Content-MD5 header carries it"""
     try:
         return isinstance(md5, str) and len(base64.b64decode(md5, validate=True)) == 16
-    except (binascii.Error, ValueError):
+    except ValueError:  # binascii.Error is one
         return False
 
 
@@ -97,6 +96,42 @@ class ResultsUploadsResource(Resource):
         return yaptide_response(message="Upload links", code=200, content={"uploads": uploads})
 
 
+def valid_estimators(estimators) -> bool:
+    """A list of estimators, each with a plain name and a list of pages, not too many pages in all"""
+    return (
+        isinstance(estimators, list)
+        and bool(estimators)
+        and all(
+            isinstance(e, dict) and valid_name(e.get("name")) and isinstance(e.get("pages"), list) for e in estimators
+        )
+        and sum(len(estimator["pages"]) for estimator in estimators) <= MAX_PAGES
+    )
+
+
+def check_pages(simulation_id: int, estimator: dict) -> tuple[list[dict], list[dict]]:
+    """The estimator's pages found in storage, as store_results takes them, and the ones missing there
+
+    Raises ValueError for an invalid page entry.
+    """
+    stored, missing = [], []
+    for page in estimator["pages"]:
+        entry = {**page, "estimator": estimator["name"]} if isinstance(page, dict) else None
+        if not valid_page(entry):
+            raise ValueError("Invalid page entry")
+        key = result_storage.page_key(simulation_id, entry["estimator"], entry["page_number"])
+        if not result_storage.stored_matches(key, entry["size"], entry["md5"]):
+            missing.append({"estimator": entry["estimator"], "page_number": entry["page_number"]})
+            continue
+        stored.append(
+            {
+                "metadata": {"page_number": entry["page_number"], "name": page.get("name", "")},
+                "dimensions": page.get("dimensions", 0),
+                "stored": {"key": key, "size": entry["size"]},
+            }
+        )
+    return stored, missing
+
+
 class ResultsDoneResource(Resource):
     """The cluster job uploaded the results: checked, stored and the simulation completed"""
 
@@ -110,34 +145,15 @@ class ResultsDoneResource(Resource):
         if error:
             return error
         estimators = payload.get("estimators")
-        if (
-            not isinstance(estimators, list)
-            or not estimators
-            or not all(
-                isinstance(e, dict) and valid_name(e.get("name")) and isinstance(e.get("pages"), list)
-                for e in estimators
-            )
-            or sum(len(estimator["pages"]) for estimator in estimators) > MAX_PAGES
-        ):
+        if not valid_estimators(estimators):
             return yaptide_response(message="estimators: name and pages of each", code=400)
         missing, results = [], []
         for estimator in sorted(estimators, key=lambda estimator: estimator["name"]):
-            pages = []
-            for page in estimator["pages"]:
-                entry = {**page, "estimator": estimator["name"]} if isinstance(page, dict) else None
-                if not valid_page(entry):
-                    return yaptide_response(message="Invalid page entry", code=400)
-                key = result_storage.page_key(simulation.id, entry["estimator"], entry["page_number"])
-                if not result_storage.stored_matches(key, entry["size"], entry["md5"]):
-                    missing.append({"estimator": entry["estimator"], "page_number": entry["page_number"]})
-                    continue
-                pages.append(
-                    {
-                        "metadata": {"page_number": entry["page_number"], "name": page.get("name", "")},
-                        "dimensions": page.get("dimensions", 0),
-                        "stored": {"key": key, "size": entry["size"]},
-                    }
-                )
+            try:
+                pages, missing_pages = check_pages(simulation.id, estimator)
+            except ValueError as invalid:
+                return yaptide_response(message=str(invalid), code=400)
+            missing.extend(missing_pages)
             results.append({"name": estimator["name"], "metadata": estimator.get("metadata", {}), "pages": pages})
         if missing:
             return yaptide_response(message="Pages missing in storage", code=409, content={"missing": missing})

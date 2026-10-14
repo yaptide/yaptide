@@ -30,7 +30,10 @@ if [ -n "$JOB_ID" ] ; then
     # a collect job that SLURM stops (time limit, memory, node failure, scancel) cannot report it ended, so a small
     # job does it then; it is removed by SLURM when the collect succeeds (--kill-on-invalid-dep)
     if [ -n "$COLLECT_ID" ] ; then
-        REPORTER_CMD="sbatch --dependency=afternotok:$COLLECT_ID --kill-on-invalid-dep=yes {reporter_options} --parsable --wrap=\\"python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} --simulation_state=FAILED\\" > $OUT"
+        REPORTER_OPTS="--dependency=afternotok:$COLLECT_ID --kill-on-invalid-dep=yes {reporter_options} --parsable"
+        REPORTER_SEND="python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key}"
+        REPORTER_SEND="$REPORTER_SEND --backend_url={backend_url} --simulation_state=FAILED"
+        REPORTER_CMD="sbatch $REPORTER_OPTS --wrap=\\"$REPORTER_SEND\\" > $OUT"
         eval $REPORTER_CMD
         REPORTER_ID=`cat $OUT | cut -d ";" -f 1`
         echo "Reporter id: $REPORTER_ID"
