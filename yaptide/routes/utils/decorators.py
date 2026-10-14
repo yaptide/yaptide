@@ -6,6 +6,7 @@ from werkzeug.exceptions import Forbidden, Unauthorized
 
 from yaptide.persistence.db_methods import fetch_user_by_id
 from yaptide.routes.utils.tokens import decode_auth_token
+from yaptide.routes.utils.utils import is_disabled_local_user
 
 
 def requires_auth(is_refresh: bool = False):
@@ -23,6 +24,8 @@ def requires_auth(is_refresh: bool = False):
             if isinstance(resp, int):
                 user = fetch_user_by_id(user_id=resp)
                 if user:
+                    if is_disabled_local_user(user):
+                        raise Forbidden(description="Local users are disabled on this instance")
                     return f(user, *args, **kwargs)
                 raise Forbidden(description="User not found")
             if is_refresh:

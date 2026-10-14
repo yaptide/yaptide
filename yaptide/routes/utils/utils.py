@@ -1,10 +1,31 @@
 from typing import Optional
 import logging
 
+from environs import env, EnvValidationError
+
 from yaptide.persistence.db_methods import fetch_simulation_by_job_id
-from yaptide.persistence.models import UserModel
+from yaptide.persistence.models import UserModel, YaptideUserModel
 from yaptide.utils.enums import InputType
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
+
+
+def local_users_enabled() -> bool:
+    """Whether local (username/password) users can register, log in and use the service.
+
+    Local users are enabled only when the ENABLE_LOCAL_USERS environment variable is set to
+    a truthy value (true/1/yes/on). When it is unset, the instance accepts Keycloak users only.
+    An invalid value is logged and treated as disabled.
+    """
+    try:
+        return env.bool("ENABLE_LOCAL_USERS", False)
+    except EnvValidationError as e:
+        logging.error("Local users disabled due to invalid ENABLE_LOCAL_USERS: %s", e)
+        return False
+
+
+def is_disabled_local_user(user: UserModel) -> bool:
+    """Whether the user is a local user while local users are disabled on this instance"""
+    return isinstance(user, YaptideUserModel) and not local_users_enabled()
 
 
 def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool, str, int]:
