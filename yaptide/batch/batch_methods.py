@@ -5,11 +5,13 @@ import os
 import re
 import shlex
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
 
 import pymchelper
+from cryptography.hazmat.primitives.serialization import SSHCertificate, load_ssh_public_identity
 from fabric import Connection, Result
 from paramiko import AuthenticationException, RSAKey
 
@@ -46,8 +48,20 @@ COMMAND_SECONDS = 60
 SUBMIT_SECONDS = 300
 
 
+def certificate_expired(cert: str) -> bool:
+    """Whether an SSH certificate is past its end; one that cannot be read is left for the login to judge"""
+    try:
+        certificate = load_ssh_public_identity(cert.encode())
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return isinstance(certificate, SSHCertificate) and certificate.valid_before < time.time()
+
+
 def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
     """Returns connection object to cluster"""
+    # a login with an expired certificate fails anyway, and failed logins count against the account on the cluster
+    if certificate_expired(user.cert):
+        raise AuthenticationException("The certificate for the cluster expired, log in again")
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
 

@@ -1,10 +1,20 @@
 """HPC simulations: Flask only stores and flags them, the engine submits and cancels them over SSH"""
 
 import subprocess
+import time
 from unittest import mock
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    NoEncryption,
+    PrivateFormat,
+    SSHCertificateBuilder,
+    SSHCertificateType,
+)
 from fabric import Result
+from paramiko import AuthenticationException
 
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
@@ -362,3 +372,34 @@ def test_failed_submit_cancels_what_reached_the_cluster(client, cluster_connecti
     assert stored(simulation_id).job_state == EntityState.FAILED.value
     assert any("scancel" in command for command in commands(cluster_connection))
     assert stored(simulation_id).job_dir is None
+
+
+def ssh_certificate(valid_before: int) -> tuple[str, str]:
+    """A private key and an SSH certificate for it, signed by a throwaway CA"""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    ca = ed25519.Ed25519PrivateKey.generate()
+    certificate = (
+        SSHCertificateBuilder()
+        .public_key(key.public_key())
+        .type(SSHCertificateType.USER)
+        .valid_principals([b"plgtest"])
+        .valid_after(0)
+        .valid_before(valid_before)
+        .sign(ca)
+    )
+    pem = key.private_bytes(Encoding.PEM, PrivateFormat.TraditionalOpenSSL, NoEncryption()).decode()
+    return pem, certificate.public_bytes().decode()
+
+
+def test_no_login_with_an_expired_certificate():
+    """A login bound to fail is not tried: failed logins count against the account on the cluster"""
+    cluster = ClusterModel(cluster_name="ares")
+    pem, expired = ssh_certificate(int(time.time()) - 60)
+    with pytest.raises(AuthenticationException, match="expired"):
+        batch_methods.get_connection(KeycloakUserModel(username="plgtest", cert=expired, private_key=pem), cluster)
+
+    pem, valid = ssh_certificate(int(time.time()) + 3600)
+    connection = batch_methods.get_connection(
+        KeycloakUserModel(username="plgtest", cert=valid, private_key=pem), cluster
+    )
+    assert connection.user == "plgtest" and not connection.is_connected  # nothing connects before a command
