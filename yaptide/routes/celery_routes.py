@@ -1,5 +1,4 @@
 import logging
-from collections import Counter
 from datetime import datetime
 
 from flask import request
@@ -34,6 +33,7 @@ from yaptide.routes.utils.utils import (
     determine_input_type,
     make_input_dict,
     get_clamped_ntasks_value,
+    job_status_content,
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
@@ -112,6 +112,8 @@ class JobsDirect(Resource):
         """Class specifies API parameters for GET and DELETE request"""
 
         job_id = fields.String()
+        # the UI needs only the totals; the list of tasks stays the default for older clients
+        tasks = fields.Boolean(load_default=True)
 
     @staticmethod
     @requires_auth()
@@ -130,38 +132,10 @@ class JobsDirect(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
 
-        # find appropriate simulation in the database
         simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
-
-        tasks = fetch_celery_tasks_by_sim_id(sim_id=simulation.id)
-
-        job_tasks_status = [task.get_status_dict() for task in tasks]
-
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
-            return yaptide_response(
-                message=f"Job state: {simulation.job_state}",
-                code=200,
-                content={
-                    "job_state": simulation.job_state,
-                    "job_tasks_status": job_tasks_status,
-                },
-            )
-
-        job_info = {"job_state": simulation.job_state}
-        status_counter = Counter([task["task_state"] for task in job_tasks_status])
-        if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.PENDING.value
-        elif status_counter[EntityState.FAILED.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.FAILED.value
-        elif status_counter[EntityState.RUNNING.value] > 0:
-            job_info["job_state"] = EntityState.RUNNING.value
-
-        # if simulation is not found, return error
-        update_simulation_state(simulation=simulation, update_dict=job_info)
-
-        job_info["job_tasks_status"] = job_tasks_status
-
-        return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
+        # a read only: the state follows the tasks when they report, not when someone looks
+        content = job_status_content(simulation, with_tasks=param_dict["tasks"])
+        return yaptide_response(message=f"Job state: {simulation.job_state}", code=200, content=content)
 
     @staticmethod
     @requires_auth()

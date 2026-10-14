@@ -81,7 +81,7 @@ def test_run_simulation_with_flask_crashing(
 
         # lets ensure that the keys contain only message, job_state and job_tasks_status
         # and that there is no results, logfiles and input files here
-        assert set(jobs_data.keys()) == {"message", "job_state", "job_tasks_status"}
+        assert set(jobs_data.keys()) == {"message", "job_state", "job_tasks_status", "job_tasks_summary"}
         assert len(jobs_data["job_tasks_status"]) == payload_dict_with_broken_input["ntasks"]
         logging.debug("Job state: %s", jobs_data["job_state"])
         for i, task_status in enumerate(jobs_data["job_tasks_status"]):

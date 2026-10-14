@@ -9,7 +9,13 @@ import requests
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
 from yaptide.persistence.database import db
-from yaptide.persistence.models import BatchSimulationModel, ClusterModel, KeycloakUserModel, SimulationModel
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    BatchTaskModel,
+    ClusterModel,
+    KeycloakUserModel,
+    SimulationModel,
+)
 from yaptide.routes import batch_routes
 from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
@@ -226,3 +232,19 @@ def test_cancel_does_not_undo_results_stored_meanwhile(client, batch_simulation,
     monkeypatch.setattr(batch_routes, "delete_job", results_arrive_during_the_cancel)
     assert job_state(client, "delete")[0] == 200
     assert db.session.get(BatchSimulationModel, batch_simulation.id).job_state == "COMPLETED"
+
+
+@pytest.mark.parametrize("job_state", ["COMPLETED", "MERGING_QUEUED"])
+def test_batch_status_without_the_task_list(client, batch_simulation, monkeypatch, job_state):
+    """The UI asks for totals only, for finished and running batch simulations alike"""
+    batch_simulation.job_state = job_state
+    db.session.add(BatchTaskModel(simulation_id=batch_simulation.id, task_id=1, requested_primaries=500))
+    db.session.commit()
+    monkeypatch.setattr(batch_routes, "slurm_status_due", lambda sim_id: False)
+
+    content = client.get("/jobs/batch?job_id=batchjob&tasks=false").get_json()
+
+    assert content["job_state"] == job_state
+    assert content["job_tasks_summary"]["ntasks"] == 1
+    assert content["job_tasks_summary"]["requested_primaries"] == 500
+    assert "job_tasks_status" not in content

@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Union
 
-from sqlalchemy import and_
+from sqlalchemy import and_, func
 from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
 from sqlalchemy.orm import with_polymorphic
 
@@ -113,6 +113,27 @@ def fetch_task_by_sim_id_and_task_id(sim_id: int, task_id: int) -> Union[BatchTa
 
 # errors of the database or the connection, not of the data - retrying later can succeed
 DATABASE_FAILURES = (OperationalError, InterfaceError, InternalError)
+
+
+def fetch_task_summary(sim_id: int) -> dict:
+    """Number of tasks in each state and the primaries of all tasks of a simulation, counted by the database"""
+    rows = (
+        db.session.query(
+            TaskModel.task_state,
+            func.count(TaskModel.id),
+            func.sum(TaskModel.requested_primaries),
+            func.sum(TaskModel.simulated_primaries),
+        )
+        .filter(TaskModel.simulation_id == sim_id)
+        .group_by(TaskModel.task_state)
+        .all()
+    )
+    return {
+        "ntasks": sum(count for _, count, _, _ in rows),
+        "task_states": {state: count for state, count, _, _ in rows},
+        "requested_primaries": int(sum(requested or 0 for _, _, requested, _ in rows)),
+        "simulated_primaries": int(sum(simulated or 0 for _, _, _, simulated in rows)),
+    }
 
 
 def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
