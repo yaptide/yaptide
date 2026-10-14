@@ -1,38 +1,60 @@
 """Long-lived engine running direct simulations on the Ray cluster it is started on.
 
-Flask only stores simulations in the database. The engine picks up the pending ones, runs their tasks on Ray,
+Flask only stores simulations in the database. The engine starts the pending ones, runs their tasks on Ray,
 writes their progress and results to the database itself and stops the ones cancelled there.
+
+It acts on events, handled one at a time from one queue: Postgres sends one when a direct simulation is stored,
+cancelled or deleted (the trigger in yaptide/persistence/models.py), Ray when a task or merge finishes.
+A sweep through the database catches what came while the engine was not listening: at start, after it lost
+the connection to the database and after a failed event.
 """
 
+import json
 import logging
 import os
+import queue
 import shutil
+import threading
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
+import psycopg
 import ray
+from sqlalchemy import make_url
 
 from yaptide.engine.pymc import get_tmp_dir
 from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app, merge_and_store, run_simulation
 from yaptide.persistence.database import db
-from yaptide.persistence.db_methods import add_object_to_db, bulk_update_task_states, update_simulation_state
-from yaptide.persistence.models import CelerySimulationModel, LogfilesModel, SimulationModel, TaskModel
+from yaptide.persistence.db_methods import (
+    DATABASE_FAILURES,
+    add_object_to_db,
+    bulk_update_task_states,
+    update_simulation_state,
+)
+from yaptide.persistence.models import (
+    ENGINE_CHANNEL,
+    CelerySimulationModel,
+    LogfilesModel,
+    SimulationModel,
+    TaskModel,
+)
 from yaptide.routes.utils.utils import FINAL_STATES, update_direct_state_from_tasks
 from yaptide.utils.enums import EntityState
 
-# how often the engine looks for new and cancelled simulations and saves progress (a few small queries)
-TICK_SECONDS = 0.5
-# a task running longer is stopped, as the Celery workers did
+# progress is saved in batches, not for every line the simulators log
+PROGRESS_SECONDS = 1
+# a task running longer is stopped, as the Celery workers did; checked once a minute
 TASK_SECONDS_LIMIT = 10 * 3600
-# the engine gives up and restarts with its container after failing this many ticks in a row (about a minute)
-FAILED_TICKS_LIMIT = 120
+OVERDUE_CHECK_SECONDS = 60
+# the engine gives up and restarts with its container after failing for this long
+GIVE_UP_SECONDS = 60
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
 
 
-# restarted when it dies: only progress since the last tick is lost, final states come with the task results
+# restarted when it dies: only progress not saved yet is lost, final states come with the task results
 @ray.remote(num_cpus=0, max_restarts=-1, max_task_retries=-1)
 class ProgressInbox:
     """Keeps the latest progress of every task until the engine saves it"""
@@ -91,12 +113,70 @@ def now() -> str:
 
 
 class Engine:
-    """Runs the direct simulations stored in the database, one tick at a time"""
+    """Runs the direct simulations stored in the database, one event at a time"""
 
     def __init__(self):
         """Engine with nothing running yet"""
         self.inbox = ProgressInbox.remote()
         self.running: dict[int, Running] = {}
+        # (event, simulation id): PENDING, CANCELED, DELETED from Postgres, FINISHED from Ray, SWEEP
+        self.events: queue.Queue = queue.Queue()
+
+    def run(self, listener: Optional[threading.Thread] = None) -> None:
+        """Handles events as they come, saves progress every second, until failing for a minute
+
+        A listener thread that died would leave the engine without events, so the engine stops with it.
+        """
+        self.recover()
+        self.events.put(("SWEEP", None))
+        last_progress = last_overdue_check = time.monotonic()
+        failing_since = None
+        while True:
+            try:
+                event = self.events.get(timeout=PROGRESS_SECONDS)
+            except queue.Empty:
+                event = None
+            try:
+                if event:
+                    self.handle(*event)
+                if time.monotonic() - last_progress >= PROGRESS_SECONDS:
+                    last_progress = time.monotonic()
+                    if listener and not listener.is_alive():
+                        raise SystemExit("the thread listening for database events died")
+                    self.save_progress()
+                if time.monotonic() - last_overdue_check >= OVERDUE_CHECK_SECONDS:
+                    last_overdue_check = time.monotonic()
+                    self.stop_overdue()
+                failing_since = None
+            except Exception:  # skipcq: PYL-W0703
+                logging.exception("Handling %s failed", event)
+                failing_since = failing_since or time.monotonic()
+                if time.monotonic() - failing_since > GIVE_UP_SECONDS:
+                    raise
+                # what the failed step missed, e.g. while the database is down, is caught by a sweep
+                time.sleep(1)
+                self.events.put(("SWEEP", None))
+            finally:
+                db.session.remove()
+
+    def handle(self, event: str, simulation_id: Optional[int]) -> None:
+        """Acts on one event"""
+        if event == "SWEEP":
+            self.sweep()
+        elif event == EntityState.PENDING.value:
+            simulation = db.session.get(CelerySimulationModel, simulation_id)
+            if simulation and simulation.job_state == EntityState.PENDING.value and simulation_id not in self.running:
+                self.start_guarded(simulation)
+        elif event in (EntityState.CANCELED.value, "DELETED"):
+            self.stop(simulation_id)
+        elif event == "FINISHED" and simulation_id in self.running:
+            running = self.running[simulation_id]
+            ready, _ = ray.wait(running.refs(), num_returns=len(running.refs()), timeout=0)
+            self.collect_guarded(simulation_id, running, set(ready))
+
+    def watch(self, ref, simulation_id: int) -> None:
+        """Ray puts an event into the queue when the task or merge finishes"""
+        ref.future().add_done_callback(lambda _: self.events.put(("FINISHED", simulation_id)))
 
     def recover(self) -> None:
         """Simulations running when the engine stopped lost their tasks with it; pending ones are started again"""
@@ -105,16 +185,11 @@ class Engine:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
             self.fail(simulation.id)
 
-    def tick(self) -> None:
-        """Starts new simulations, saves progress, handles finished tasks and stops cancelled or overdue ones"""
-        try:
-            self.stop_cancelled()
-            self.start_pending()
-            self.save_progress()
-            self.collect_finished()
-            self.stop_overdue()
-        finally:
-            db.session.remove()
+    def sweep(self) -> None:
+        """Brings the engine in line with the database: stops what was cancelled, starts what waits, takes results"""
+        self.stop_cancelled()
+        self.start_pending()
+        self.collect_finished()
 
     def start_pending(self) -> None:
         """Submits the tasks of every simulation waiting to start"""
@@ -128,12 +203,18 @@ class Engine:
             .all()
         )
         for simulation in pending:
-            try:
-                self.start(simulation)
-            except Exception:  # skipcq: PYL-W0703
-                # one broken simulation must not keep the engine from the others
-                logging.exception("Starting simulation %d failed", simulation.id)
-                self.fail(simulation.id)
+            self.start_guarded(simulation)
+
+    def start_guarded(self, simulation: CelerySimulationModel) -> None:
+        """Starts a simulation; one that cannot start fails alone, without stopping the engine"""
+        try:
+            self.start(simulation)
+        except DATABASE_FAILURES:
+            # the database, not the simulation: the event fails and a sweep repeats it
+            raise
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Starting simulation %d failed", simulation.id)
+            self.fail(simulation.id)
 
     def start(self, simulation: CelerySimulationModel) -> None:
         """Submits the tasks of a simulation"""
@@ -145,10 +226,12 @@ class Engine:
             for task_id, work_dir in work_dirs.items()
         }
         self.running[simulation.id] = Running(tasks=tasks, work_dirs=work_dirs)
+        for ref in tasks:
+            self.watch(ref, simulation.id)
         logging.info("Started simulation %d with %d tasks", simulation.id, len(tasks))
 
     def save_progress(self) -> None:
-        """Saves the progress the tasks reported since the last tick"""
+        """Saves the progress the tasks reported since the last save"""
         by_simulation: dict[int, list[dict]] = {}
         for (simulation_id, task_id), update_dict in ray.get(self.inbox.drain.remote()).items():
             by_simulation.setdefault(simulation_id, []).append({"task_id": task_id, "update_dict": update_dict})
@@ -173,12 +256,18 @@ class Engine:
         ready, _ = ray.wait(refs, num_returns=len(refs), timeout=0)
         ready = set(ready)
         for simulation_id, running in list(self.running.items()):
-            try:
-                self.collect(simulation_id, running, ready)
-            except Exception:  # skipcq: PYL-W0703
-                # one broken simulation must not keep the engine from the others
-                logging.exception("Handling simulation %d failed", simulation_id)
-                self.fail(simulation_id)
+            self.collect_guarded(simulation_id, running, ready)
+
+    def collect_guarded(self, simulation_id: int, running: Running, ready: set) -> None:
+        """Takes what finished of a simulation; one that cannot be handled fails alone, without stopping the engine"""
+        try:
+            self.collect(simulation_id, running, ready)
+        except DATABASE_FAILURES:
+            # the database, not the simulation: the event fails and a sweep repeats it
+            raise
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Handling simulation %d failed", simulation_id)
+            self.fail(simulation_id)
 
     def collect(self, simulation_id: int, running: Running, ready: set) -> None:
         """Takes the finished tasks of one simulation, then its merge"""
@@ -187,7 +276,7 @@ class Engine:
             return
         results = {ref: self.task_result(simulation_id, running, ref) for ref in running.tasks if ref in ready}
         if results:
-            # saved before they are forgotten, so a failing save is repeated on the next tick
+            # saved before they are forgotten, so a failing save is repeated by the next sweep
             updates = [{"task_id": running.tasks[ref], "update_dict": r["final_update"]} for ref, r in results.items()]
             self.save_task_updates(simulation_id, updates)
             for ref, result in results.items():
@@ -224,6 +313,7 @@ class Engine:
             return
         update_simulation_state(simulation, {"job_state": EntityState.MERGING_QUEUED.value})
         running.merge = merge_task.remote(simulation_id, running.output_dirs)
+        self.watch(running.merge, simulation_id)
 
     def finish_merge(self, simulation_id: int, running: Running) -> None:
         """A merge with nothing stored, or one that crashed, fails the simulation"""
@@ -278,8 +368,10 @@ class Engine:
             shutil.rmtree(work_dir, ignore_errors=True)
 
     def fail(self, simulation_id: int) -> None:
-        """Marks a simulation and its unfinished tasks failed, unless it reached a final state meanwhile"""
-        self.stop(simulation_id)
+        """Marks a simulation and its unfinished tasks failed, unless it reached a final state meanwhile, then stops it
+
+        Written first: if the database fails, the simulation stays with the engine and a sweep tries again.
+        """
         db.session.query(TaskModel).filter(
             TaskModel.simulation_id == simulation_id, TaskModel.task_state.notin_(FINAL_STATES)
         ).update({TaskModel.task_state: EntityState.FAILED.value}, synchronize_session=False)
@@ -287,26 +379,48 @@ class Engine:
         simulation = db.session.get(SimulationModel, simulation_id)
         if simulation:
             update_simulation_state(simulation, {"job_state": EntityState.FAILED.value, "end_time": now()})
+        self.stop(simulation_id)
+
+
+def listen(database_uri: str, events: queue.Queue) -> None:
+    """Puts the database's events for the engine into the queue, connecting again whenever the connection is lost
+
+    Every (re)connection is followed by a sweep, which catches what was committed while nobody listened.
+    """
+    if make_url(database_uri).get_backend_name() != "postgresql":
+        # SQLite has no notifications (local development only)
+        while True:
+            events.put(("SWEEP", None))
+            time.sleep(2)
+    conninfo = make_url(database_uri).set(drivername="postgresql").render_as_string(hide_password=False)
+    while True:
+        try:
+            # keepalives notice a connection that died silently, so the engine does not wait on it forever
+            with psycopg.connect(
+                conninfo, autocommit=True, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3
+            ) as connection:
+                connection.execute(f"LISTEN {ENGINE_CHANNEL}")
+                events.put(("SWEEP", None))
+                for notify in connection.notifies():
+                    payload = json.loads(notify.payload)
+                    events.put((payload["event"], payload["simulation"]))
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Listening for engine events failed, connecting again")
+            time.sleep(1)
 
 
 def main() -> None:
     """Runs the engine on the Ray cluster started next to it, until it fails for about a minute"""
     logging.basicConfig(level=os.environ.get("LOG_LEVEL_ROOT", "INFO"))
     ray.init(address="auto")
-    with backend_app().app_context():
+    app = backend_app()
+    with app.app_context():
         engine = Engine()
-        engine.recover()
-        failed_ticks = 0
-        while True:
-            try:
-                engine.tick()
-                failed_ticks = 0
-            except Exception:  # skipcq: PYL-W0703
-                failed_ticks += 1
-                logging.exception("Engine tick failed (%d in a row)", failed_ticks)
-                if failed_ticks >= FAILED_TICKS_LIMIT:
-                    raise
-            time.sleep(TICK_SECONDS)
+        listener = threading.Thread(
+            target=listen, args=(app.config["SQLALCHEMY_DATABASE_URI"], engine.events), daemon=True
+        )
+        listener.start()
+        engine.run(listener)
 
 
 if __name__ == "__main__":
