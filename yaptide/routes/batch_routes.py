@@ -1,23 +1,15 @@
-import os
-import time
 import uuid
 from datetime import datetime
 
-import redis
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
-from sqlalchemy.exc import InvalidRequestError
 
-from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import (
-    add_object_to_db,
     fetch_all_clusters,
     fetch_batch_simulation_by_job_id,
     fetch_batch_tasks_by_sim_id,
-    fetch_cluster_by_id,
-    make_commit_to_db,
     update_simulation_state,
     update_task_state,
 )
@@ -28,9 +20,8 @@ from yaptide.persistence.models import (  # skipcq: FLK-E101
     InputModel,
     KeycloakUserModel,
 )
-from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.routes.utils.decorators import requires_auth
-from yaptide.routes.utils.response_templates import error_validation_response, error_internal_response, yaptide_response
+from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
 from yaptide.routes.utils.utils import (
     check_if_job_is_owned_and_exist,
     determine_input_type,
@@ -40,40 +31,9 @@ from yaptide.routes.utils.utils import (
 )
 from yaptide.utils.enums import EntityState, PlatformType
 
-# an open simulations page polls job status every 1.5 s and every SLURM query is a new SSH login to the cluster
-SLURM_STATUS_INTERVAL = 30  # seconds
-_broker_url = os.environ.get("CELERY_BROKER_URL", "")
-# Redis runs next to the server - a short timeout, as every status request waits for it while holding a worker
-_redis = (
-    redis.Redis.from_url(_broker_url, socket_timeout=0.2, socket_connect_timeout=0.2)
-    if _broker_url.startswith(("redis://", "rediss://"))
-    else None
-)
-_redis_down_until = 0.0
-_last_local_check: dict[int, float] = {}
-
-
-def slurm_status_due(sim_id: int) -> bool:
-    """True for at most one caller per SLURM_STATUS_INTERVAL and simulation, shared by all server processes.
-
-    Without Redis it is one caller per server process; after a Redis error Redis is not asked again for an interval,
-    so a hanging Redis does not slow down every request.
-    """
-    global _redis_down_until  # skipcq: PYL-W0603
-    now = time.monotonic()
-    if _redis is not None and now >= _redis_down_until:
-        try:
-            return bool(_redis.set(f"slurm_status:{sim_id}", 1, nx=True, ex=SLURM_STATUS_INTERVAL))
-        except redis.RedisError:
-            _redis_down_until = now + SLURM_STATUS_INTERVAL
-    if now - _last_local_check.get(sim_id, -SLURM_STATUS_INTERVAL) < SLURM_STATUS_INTERVAL:
-        return False
-    _last_local_check[sim_id] = now
-    return True
-
 
 class JobsBatch(Resource):
-    """Class responsible for jobs via direct slurm connection"""
+    """HPC simulations: stored here, submitted and cancelled on the cluster by the engine (yaptide/engine)"""
 
     @staticmethod
     @requires_auth()
@@ -110,8 +70,12 @@ class JobsBatch(Resource):
             filtered_clusters = [cluster for cluster in clusters if cluster.cluster_name == cluster_name]
         cluster = filtered_clusters[0] if len(filtered_clusters) > 0 else clusters[0]
 
-        # create a new simulation in the database, not waiting for the job to finish
+        # the simulation, its tasks and input in one commit: the engine submits what it finds PENDING
         job_id = datetime.now().strftime("%Y%m%d-%H%M%S-") + str(uuid.uuid4()) + PlatformType.BATCH.value
+        input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+        # what the engine needs to write the sbatch scripts
+        input_dict["batch_options"] = payload_dict.get("batch_options") or {}
+        requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
         # skipcq: PYL-E1123
         simulation = BatchSimulationModel(
             user_id=user.id,
@@ -120,35 +84,18 @@ class JobsBatch(Resource):
             sim_type=payload_dict["sim_type"],
             input_type=input_type,
             title=payload_dict.get("title", ""),
+            job_state=EntityState.PENDING.value,
         )
-        add_object_to_db(simulation)
-        update_key = encode_simulation_auth_token(simulation.id)
-
-        input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
-
-        submit_job.delay(
-            payload_dict=payload_dict,
-            files_dict=input_dict["input_files"],
-            userId=user.id,
-            clusterId=cluster.id,
-            sim_id=simulation.id,
-            update_key=update_key,
-        )
-
-        requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
-        for i in range(payload_dict["ntasks"]):
-            task = BatchTaskModel(
-                simulation_id=simulation.id,
-                task_id=str(i + 1),
-                requested_primaries=requested_primaries,
-            )
-            add_object_to_db(task, False)
-
-        input_model = InputModel(simulation_id=simulation.id)
+        # the relationships do not cascade saving, so the children are added themselves
+        simulation.tasks = [
+            BatchTaskModel(task_id=task_id, requested_primaries=requested_primaries)
+            for task_id in range(1, payload_dict["ntasks"] + 1)
+        ]
+        input_model = InputModel()
         input_model.data = input_dict
-        add_object_to_db(input_model)
-        if simulation.update_state({"job_state": EntityState.PENDING.value}):
-            make_commit_to_db()
+        simulation.inputs = [input_model]
+        db.session.add_all([simulation, input_model, *simulation.tasks])
+        db.session.commit()
 
         return yaptide_response(message="Job waiting for submission", code=202, content={"job_id": simulation.job_id})
 
@@ -179,27 +126,11 @@ class JobsBatch(Resource):
             return yaptide_response(message=error_message, code=res_code)
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
-            return yaptide_response(
-                message=f"Job state: {simulation.job_state}",
-                code=200,
-                content=job_status_content(simulation, with_tasks=params_dict["tasks"]),
-            )
-
-        # the job ids arrive from the helper worker a few seconds after submitting, until then SLURM has nothing to say
-        if simulation.array_id is not None and slurm_status_due(simulation.id):
-            cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
-            job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
-            # the SLURM query takes seconds - meanwhile the results upload or a cancel may have ended the simulation,
-            # which update_state must see to keep the final state
-            try:
-                db.session.refresh(simulation)
-            except InvalidRequestError:  # the user deleted the simulation meanwhile
-                return yaptide_response(message="Simulation no longer exists", code=404)
-            update_simulation_state(simulation=simulation, update_dict=job_info)
-
+        # a read only: the states come from what the cluster's jobs report
         return yaptide_response(
-            message="", code=200, content=job_status_content(simulation, with_tasks=params_dict["tasks"])
+            message=f"Job state: {simulation.job_state}",
+            code=200,
+            content=job_status_content(simulation, with_tasks=params_dict["tasks"]),
         )
 
     @staticmethod
@@ -237,28 +168,19 @@ class JobsBatch(Resource):
                 },
             )
 
-        if simulation.array_id is None:
-            return yaptide_response(message="Job is still being submitted, try again in a moment", code=409)
-
-        cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
-
-        result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
-        if status_code != 200:
-            return error_internal_response(content=result)
-
-        # cancelling takes several SSH calls - a final state stored meanwhile (results upload) must be kept
-        try:
-            db.session.refresh(simulation)
-        except InvalidRequestError:  # the user deleted the simulation meanwhile
-            return yaptide_response(message="Simulation no longer exists", code=404)
+        # the engine sees the state and cancels the jobs on the cluster
         update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
-
-        tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
-
-        for task in tasks:
-            update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
-
-        return yaptide_response(message="", code=status_code, content=result)
+        if simulation.job_state != EntityState.CANCELED.value:
+            # finished meanwhile
+            return yaptide_response(
+                message=f"Cannot cancel job which is in {simulation.job_state} state",
+                code=200,
+                content={"job_state": simulation.job_state},
+            )
+        for task in fetch_batch_tasks_by_sim_id(sim_id=simulation.id):
+            if task.task_state in [EntityState.PENDING.value, EntityState.RUNNING.value]:
+                update_task_state(task=task, update_dict={"task_state": EntityState.CANCELED.value})
+        return yaptide_response(message="Job canceled", code=200)
 
 
 class Clusters(Resource):

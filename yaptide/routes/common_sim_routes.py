@@ -4,6 +4,7 @@ from typing import List
 
 from flask import request, current_app as app
 from flask_restful import Resource
+from sqlalchemy import text
 from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (
@@ -35,7 +36,7 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, job_status_content
+from yaptide.routes.utils.utils import FINAL_STATES, check_if_job_is_owned_and_exist, job_status_content
 from yaptide.routes.utils.tokens import decode_auth_token
 from yaptide.utils.enums import EntityState, InputType
 
@@ -92,13 +93,25 @@ class JobsResource(Resource):
         if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
-        update_simulation_state(simulation, payload_dict)
+        # a job only says it merges or failed: the rest (the job directory, job ids, a cancel) is the engine's,
+        # and a job directory taken from here would end up in a command run on the cluster
+        job_state = payload_dict.get("job_state")
+        if job_state not in JOB_REPORTED_STATES:
+            return yaptide_response(message=f"Jobs report only {', '.join(JOB_REPORTED_STATES)}", code=400)
+        update_dict = {"job_state": job_state}
+        if job_state == EntityState.FAILED.value:
+            update_dict["end_time"] = datetime.utcnow().isoformat(sep=" ")
+        update_simulation_state(simulation, update_dict)
         if payload_dict.get("log"):
             logfiles = LogfilesModel(simulation_id=simulation.id)
             logfiles.data = payload_dict["log"]
             add_object_to_db(logfiles)
 
         return yaptide_response(message="Task updated", code=202)
+
+
+# the states a simulation's own jobs may report (POST /jobs)
+JOB_REPORTED_STATES = (EntityState.MERGING_RUNNING.value, EntityState.FAILED.value)
 
 
 def page_content(page: PageModel) -> dict:
@@ -180,18 +193,25 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
                 page_name=str(page_dict["metadata"]["name"]),
             )
         # we always update the data
-        if use_storage:
-            key = result_storage.page_key(sim_id, estimator.file_name, page.page_number)
-            try:
-                size = result_storage.put_page(key, page_dict)
-                page.compressed_data = None
-                page.stored_object = PageObjectModel(key=key, size=size, format=result_storage.PAGE_FORMAT)
-            except Exception:  # skipcq: PYL-W0703
-                logging.exception("Storing results of simulation %d failed, the rest goes to the database", sim_id)
-                use_storage = False
-        if not use_storage:
-            page.data = page_dict
-            page.stored_object = None
+        if "stored" in page_dict:
+            # uploaded straight to storage by a cluster job and checked there (yaptide/routes/results_upload_routes.py)
+            page.compressed_data = None
+            page.stored_object = PageObjectModel(
+                key=page_dict["stored"]["key"], size=page_dict["stored"]["size"], format=result_storage.PAGE_FORMAT
+            )
+        else:
+            if use_storage:
+                key = result_storage.page_key(sim_id, estimator.file_name, page.page_number)
+                try:
+                    size = result_storage.put_page(key, page_dict)
+                    page.compressed_data = None
+                    page.stored_object = PageObjectModel(key=key, size=size, format=result_storage.PAGE_FORMAT)
+                except Exception:  # skipcq: PYL-W0703
+                    logging.exception("Storing results of simulation %d failed, the rest goes to the database", sim_id)
+                    use_storage = False
+            if not use_storage:
+                page.data = page_dict
+                page.stored_object = None
         if not page_existed:
             # if page was created, we add it to the session
             add_object_to_db(page, make_commit=False)
@@ -199,10 +219,13 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
 
 
 def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
-    """Stores the merged results of a simulation and marks it completed, unless it was cancelled meanwhile"""
+    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile"""
+    if db.engine.dialect.name == "postgresql":
+        # results stored twice at once (a repeated request) would both create the estimators and pages; one waits
+        db.session.execute(text("SELECT pg_advisory_xact_lock(:simulation_id)"), {"simulation_id": simulation.id})
     db.session.refresh(simulation)
-    if simulation.job_state == EntityState.CANCELED.value:
-        logging.info("Simulation %d was cancelled, its results are not stored", simulation.id)
+    if simulation.job_state in FINAL_STATES:
+        logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
         return
     if simulation.input_type == InputType.EDITOR.value:
         outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]

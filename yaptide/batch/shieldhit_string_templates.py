@@ -21,6 +21,8 @@ SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRI
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
+# every job id goes next to the jobs as well, so a cancel finds them even if the submit was interrupted
+echo "$JOB_ID" > $ROOT_DIR/array_job_id
 
 if [ -n "$JOB_ID" ] ; then
     # the aggregator batches the progress updates of all tasks into single requests to the backend
@@ -42,6 +44,21 @@ if [ -n "$JOB_ID" ] ; then
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
+    echo "$COLLECT_ID" > $ROOT_DIR/collect_job_id
+    # a collect job that SLURM stops (time limit, memory, node failure, scancel) cannot report it ended, so a small
+    # job does it then; it is removed by SLURM when the collect succeeds (--kill-on-invalid-dep)
+    if [ -n "$COLLECT_ID" ] ; then
+        REPORTER_OPTS="--dependency=afternotok:$COLLECT_ID --kill-on-invalid-dep=yes {reporter_options} --parsable"
+        REPORTER_SEND="python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key}"
+        REPORTER_SEND="$REPORTER_SEND --backend_url={backend_url} --simulation_state=FAILED"
+        REPORTER_CMD="sbatch $REPORTER_OPTS --wrap=\\"$REPORTER_SEND\\" > $OUT"
+        eval $REPORTER_CMD
+        REPORTER_ID=`cat $OUT | cut -d ";" -f 1`
+        echo "Reporter id: $REPORTER_ID"
+        if [ -n "$REPORTER_ID" ] ; then
+            echo "$REPORTER_ID" > $ROOT_DIR/reporter_job_id
+        fi
+    fi
 fi
 """  # skipcq: FLK-E501
 
@@ -77,8 +94,9 @@ if $CLEAR_BDOS; then
     rm $INPUT_WILDCARD
 fi
 
-python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
-    --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
+# the pages go straight to the storage of the backend; a failed upload fails the job, the reporter job reports it
+python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY \\
+    --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} || exit 1
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash

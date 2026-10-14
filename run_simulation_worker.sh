@@ -50,4 +50,5 @@ fi
 # with everything that ran on it
 ray start --head --port=6379 --num-cpus="$NUM_CPUS" --object-store-memory=$((768 * 1024 * 1024)) \
     --include-dashboard=false --disable-usage-stats
-exec python -m yaptide.engine.engine
+# imported, not run as __main__: Ray would then send the engine's actors by value, with the database object in them
+exec python -c "from yaptide.engine.engine import main; main()"

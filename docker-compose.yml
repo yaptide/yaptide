@@ -1,13 +1,6 @@
 # this docker compose should be compatible also with older (<=v24) version of docker engine
 
 services:
-  redis:
-    image: redis:8-alpine
-    container_name: yaptide_redis
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-
   # result pages; started only with COMPOSE_PROFILES=storage and the keys below set in .env
   # (RESULTS_S3_ACCESS_KEY "GK" + 32 hex, RESULTS_S3_SECRET_KEY and GARAGE_RPC_SECRET 64 hex); the key pair is fixed
   # after the first start - a new secret for the same key id stops Garage from starting
@@ -54,8 +47,6 @@ services:
     # longer than gunicorn's 30 s graceful timeout, so a redeploy lets requests up to 30 s long finish
     stop_grace_period: 40s
     environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
       - CERT_AUTH_URL=${CERT_AUTH_URL:-}
       - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
@@ -76,8 +67,6 @@ services:
       - RESULTS_S3_ACCESS_KEY=${RESULTS_S3_ACCESS_KEY:-}
       - RESULTS_S3_SECRET_KEY=${RESULTS_S3_SECRET_KEY:-}
     depends_on:
-      redis:
-        condition: service_healthy
       postgresql:
         condition: service_healthy
 
@@ -102,6 +91,9 @@ services:
     env_file: .env
     environment:
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      # HPC jobs report to the backend's public address with update keys the engine signs - with Flask's secret
+      - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
+      - YAPTIDE_TOKEN_SECRET=${YAPTIDE_TOKEN_SECRET:-}
       # the engine reads and writes simulations in the same database as Flask
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
       # simulation tasks run at once; empty means one per core of the machine
@@ -121,32 +113,6 @@ services:
       yaptide_flask:
         condition: service_healthy
 
-  yaptide_helper_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile-helper-worker
-    image: yaptide_helper_worker
-    container_name: yaptide_helper_worker
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          cpus: '1.0'
-    env_file: .env
-    environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
-      - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
-      - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
-      - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
-    healthcheck:
-      test: ["CMD-SHELL", "celery --app yaptide.utils.helper_worker inspect ping"]
-    depends_on:
-      redis:
-        condition: service_healthy
-      yaptide_flask:
-        condition: service_healthy
-
   nginx:
     image: yaptide_nginx
     container_name: yaptide_nginx
@@ -161,8 +127,6 @@ services:
       yaptide_flask:
         condition: service_healthy
       yaptide_simulation_worker:
-        condition: service_healthy
-      yaptide_helper_worker:
         condition: service_healthy
 
 

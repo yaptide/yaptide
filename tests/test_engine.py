@@ -5,6 +5,7 @@ import platform
 import queue
 import time
 from pathlib import Path
+from unittest import mock
 
 import pytest
 import ray
@@ -15,6 +16,8 @@ from yaptide.engine.engine import Engine
 from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
+    BatchSimulationModel,
+    ClusterModel,
     CelerySimulationModel,
     CeleryTaskModel,
     LogfilesModel,
@@ -324,3 +327,56 @@ def test_database_failure_while_collecting_is_retried(client, engine, monkeypatc
     run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value and not engine.running)
 
     assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
+
+
+@ray.remote
+def crashing_submit(simulation_id: int) -> None:
+    """A submit whose worker died"""
+    raise RuntimeError(f"worker of submit {simulation_id} died")
+
+
+def test_hpc_events_submit_once_and_a_crashed_submit_fails(client, engine):
+    """The engine hands a stored HPC simulation to the cluster gateway once; a crash before the claim is
+    repeated, one after it fails the simulation and cancels what reached the cluster
+    """
+    user = db.session.query(YaptideUserModel).one()
+    cluster = ClusterModel(cluster_name="ares")
+    db.session.add(cluster)
+    db.session.commit()
+    simulation = BatchSimulationModel(
+        job_id="hpc",
+        user_id=user.id,
+        cluster_id=cluster.id,
+        title="hpc",
+        input_type=InputType.FILES.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        job_state=EntityState.PENDING.value,
+    )
+    db.session.add(simulation)
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    submits = []
+
+    def submit_crashing(simulation_id: int):
+        """The first submit dies before claiming the job directory, the second right after claiming it"""
+        submits.append(simulation_id)
+        if len(submits) == 2:
+            db.session.execute(
+                BatchSimulationModel.__table__.update()
+                .where(BatchSimulationModel.__table__.c.id == simulation_id)
+                .values(job_dir=f"/scratch/yaptide_runs/{simulation_id}_1")
+            )
+            db.session.commit()
+        return crashing_submit.remote(simulation_id)
+
+    engine.cluster.submit.remote.side_effect = submit_crashing
+    engine.cluster.cancel.remote.side_effect = lambda simulation_id: ray.put(None)
+
+    engine.handle(EntityState.PENDING.value, simulation.id, "BATCH")
+    engine.handle(EntityState.PENDING.value, simulation.id, "BATCH")
+    assert engine.cluster.submit.remote.call_count == 1
+    run_events_until(engine, lambda: state(simulation.id) == EntityState.FAILED.value)
+
+    assert engine.cluster.submit.remote.call_count == 2
+    assert not engine.submitting
+    engine.cluster.cancel.remote.assert_called_once_with(simulation.id)

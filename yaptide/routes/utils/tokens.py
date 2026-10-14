@@ -11,7 +11,9 @@ SECRET_KEY_TOKEN_REFRESH = os.environ.get("YAPTIDE_REFRESH_TOKEN_SECRET") or tok
 _Refresh_Token_Expiration_Time = 120  # minutes
 _Access_Token_Expiration_Time = 10  # minutes
 _Keycloak_Token_Expiration_Time = 30  # minutes
-_Simulation_Token_Expiration_time = 10080  # minutes
+# HPC jobs report with it until they end - a week in the queue plus days of running must not outlive it;
+# once the simulation is final, its reports are refused anyway
+_Simulation_Token_Expiration_time = 30 * 24 * 60  # minutes
 
 
 def encode_auth_token(

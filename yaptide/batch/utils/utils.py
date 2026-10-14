@@ -49,11 +49,13 @@ def extract_aggregator_header(array_header: str) -> str:
     return "\n".join(f"#SBATCH {option}" for option in options)
 
 
-def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str) -> str:
-    """Function building sbatch options for the aggregator job
+def convert_dict_to_aggregator_sbatch_options(
+    payload_dict: dict, sim_id: int, job_dir: str, role: str = "aggregator"
+) -> str:
+    """Function building sbatch options for a small helper job: the aggregator, or the reporter of a failed collect
 
     It keeps whatever the array job needs to be accepted by the queue (account, partition, qos, reservation, time)
-    and asks for a single cheap cpu, because the aggregator only forwards updates.
+    and asks for a single cheap cpu, because the helper only forwards updates.
     """
     options_dict = {"time": "00:59:59"}
     array_options = payload_dict.get("batch_options", {}).get("array_options", {})
@@ -63,8 +65,8 @@ def convert_dict_to_aggregator_sbatch_options(payload_dict: dict, sim_id: int, j
             "ntasks": "1",
             "cpus-per-task": "1",
             "mem": "1G",
-            "job-name": f"yaptide_aggregator_{sim_id}",
-            "output": f"{job_dir}/aggregator.log",
+            "job-name": f"yaptide_{role}_{sim_id}",
+            "output": f"{job_dir}/{role}.log",
         }
     )
     opt_list = []

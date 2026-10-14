@@ -4,7 +4,8 @@ import logging
 import signal
 import ssl
 from pathlib import Path
-from urllib import request
+import time
+from urllib import error, request
 
 
 def send_simulation_results(output_Path: Path, simulation_id: int, update_key: str, backend_url: str):
@@ -42,21 +43,37 @@ def send_simulation_results(output_Path: Path, simulation_id: int, update_key: s
         logging.error("Sending update to %s failed: %s", results_url, str(e))
 
 
+# a state report (e.g. FAILED from the reporter job) is the only one the simulation gets, so it is retried for
+# a few minutes - long enough to outlast a restart of the backend
+STATE_ATTEMPTS = 6
+STATE_RETRY_SECONDS = 30
+
+
 def send_simulation_state_update(simulation_id: int, update_key: str, backend_url: str, simulation_state: str):
     """Sends simulation state to backend"""
     dict_to_send = {"sim_id": simulation_id, "job_state": simulation_state, "update_key": update_key}
     jobs_url = f"{backend_url}/jobs"
     context = ssl.SSLContext()
 
-    req = request.Request(
-        jobs_url, json.dumps(dict_to_send).encode(), {"Content-Type": "application/json"}, method="POST"
-    )
-    try:
-        with request.urlopen(req, context=context) as res:  # skipcq: BAN-B310
-            if res.getcode() != 202:
-                logging.warning("Sending update to %s failed", jobs_url)
-    except Exception as e:  # skipcq: PYL-W0703
-        logging.error("Sending update to %s failed: %s", jobs_url, str(e))
+    for attempt in range(STATE_ATTEMPTS):
+        req = request.Request(
+            jobs_url, json.dumps(dict_to_send).encode(), {"Content-Type": "application/json"}, method="POST"
+        )
+        try:
+            with request.urlopen(req, context=context, timeout=60) as res:  # skipcq: BAN-B310
+                if res.getcode() == 202:
+                    return
+                logging.warning("Sending update to %s answered %d", jobs_url, res.getcode())
+        except error.HTTPError as http_error:
+            if http_error.code < 500:
+                # refused for good (e.g. the simulation is already final)
+                logging.warning("Sending update to %s refused: %d", jobs_url, http_error.code)
+                return
+            logging.warning("Sending update to %s answered %d", jobs_url, http_error.code)
+        except Exception as e:  # skipcq: PYL-W0703
+            logging.error("Sending update to %s failed: %s", jobs_url, str(e))
+        if attempt < STATE_ATTEMPTS - 1:
+            time.sleep(STATE_RETRY_SECONDS)
 
 
 if __name__ == "__main__":
@@ -78,7 +95,6 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     logging.info("sim_id %s", args.sim_id)
-    logging.info("update_key %s", args.update_key)
     logging.info("backend_url %s", args.backend_url)
 
     if args.output_dir:

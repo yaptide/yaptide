@@ -11,7 +11,7 @@ from yaptide.persistence.db_methods import (
     fetch_tasks_by_sim_id,
 )
 from yaptide.persistence.models import SimulationModel, UserModel, YaptideUserModel
-from yaptide.utils.enums import EntityState, InputType
+from yaptide.utils.enums import EntityState, InputType, PlatformType
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
 
 
@@ -46,6 +46,15 @@ def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool,
 
 
 FINAL_STATES = (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value)
+# the order states follow; FAILED can come at any point before the end
+PROGRESSION = [
+    EntityState.UNKNOWN.value,
+    EntityState.PENDING.value,
+    EntityState.RUNNING.value,
+    EntityState.MERGING_QUEUED.value,
+    EntityState.MERGING_RUNNING.value,
+    EntityState.FAILED.value,
+]
 
 
 def job_status_content(simulation: SimulationModel, with_tasks: bool) -> dict:
@@ -56,27 +65,32 @@ def job_status_content(simulation: SimulationModel, with_tasks: bool) -> dict:
     return content
 
 
-def update_direct_state_from_tasks(simulation: SimulationModel) -> None:
-    """A direct simulation is PENDING, RUNNING or FAILED as its tasks are; its other states come from its worker"""
+def update_state_from_tasks(simulation: SimulationModel) -> None:
+    """Moves a simulation forward as its tasks report: RUNNING once a task runs, FAILED when all failed and, for
+    HPC simulations, MERGING_QUEUED once all ended (the collect job reports the rest); the engine merges direct
+    simulations itself. A state never moves back, and a final one is kept.
+    """
     summary = fetch_task_summary(simulation.id)
     states, ntasks = summary["task_states"], summary["ntasks"]
-    if states.get(EntityState.PENDING.value) == ntasks:
-        job_state = EntityState.PENDING.value
-    elif states.get(EntityState.FAILED.value) == ntasks:
-        job_state = EntityState.FAILED.value
-    elif states.get(EntityState.RUNNING.value):
-        job_state = EntityState.RUNNING.value
+    ended = sum(states.get(state, 0) for state in FINAL_STATES)
+    if states.get(EntityState.FAILED.value) == ntasks:
+        job_state, before = EntityState.FAILED.value, EntityState.FAILED.value
+    elif ended == ntasks and simulation.platform == PlatformType.BATCH.value:
+        job_state, before = EntityState.MERGING_QUEUED.value, EntityState.MERGING_QUEUED.value
+    elif states.get(EntityState.RUNNING.value) or ended:
+        job_state, before = EntityState.RUNNING.value, EntityState.RUNNING.value
     else:
         return
-    if simulation.job_state == job_state:
+    # the states it may move from: only earlier ones, and never a final one
+    earlier = [state for state in PROGRESSION[: PROGRESSION.index(before)] if state not in FINAL_STATES]
+    if simulation.job_state not in earlier:
         return
     update = {SimulationModel.job_state: job_state}
     if job_state == EntityState.FAILED.value:
-        # the merge reports FAILED with its end time too, but a final state cannot be updated any more
         update[SimulationModel.end_time] = datetime.utcnow()
     # one conditional statement: a cancel or result stored meanwhile by another request is not overwritten
     db.session.query(SimulationModel).filter(
-        SimulationModel.id == simulation.id, SimulationModel.job_state.notin_(FINAL_STATES)
+        SimulationModel.id == simulation.id, SimulationModel.job_state.in_(earlier)
     ).update(update, synchronize_session=False)
     db.session.commit()
 
