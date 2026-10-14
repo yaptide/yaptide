@@ -34,13 +34,14 @@ def _client(endpoint: str):
         config=Config(
             s3={"addressing_style": "path"},
             signature_version="s3v4",
-            # boto3 >= 1.36 adds streaming checksums by default, which Garage rejects next to Content-Encoding: gzip
+            # over https boto3 >= 1.36 sends streaming checksums (aws-chunked), which clash with Content-Encoding: gzip
             request_checksum_calculation="when_required",
             response_checksum_validation="when_required",
             # the results upload waits for the storage within a web request: fail fast instead of ~9 s per page
             connect_timeout=2,
             read_timeout=10,
-            retries={"max_attempts": 2},
+            # two attempts in total ("max_attempts" would count retries only, three attempts)
+            retries={"total_max_attempts": 2},
         ),
     )
 

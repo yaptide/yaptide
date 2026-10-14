@@ -98,6 +98,11 @@ def run_migrations_online():
     connectable = get_engine()
 
     with connectable.connect() as connection:
+        if connection.dialect.name == "sqlite":
+            # batch migrations recreate tables on SQLite, cascading foreign keys would empty their children
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            # ends the transaction the statement began, alembic commits only the ones it begins itself
+            connection.commit()
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),
