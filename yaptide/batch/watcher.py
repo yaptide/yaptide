@@ -7,9 +7,6 @@ simulator. The signed links come in storage_links.json, written at submit; when 
 the watcher asks the backend for new ones.
 """
 
-# the cluster's Python may be older than the backend's: annotations are not evaluated
-from __future__ import annotations
-
 import argparse
 import json
 import logging
@@ -19,11 +16,10 @@ import signal
 import ssl
 import time
 import uuid
-from collections.abc import Iterator
 from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Iterator, Optional, Tuple
 from urllib import error, request
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -38,9 +34,14 @@ FLUKA_END = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?)
 CONTEXT = ssl.create_default_context()
 CONTEXT.check_hostname = False
 CONTEXT.verify_mode = ssl.CERT_NONE  # skipcq: PTC-W6001 # see above
-# how often a cancel is looked for, and how long the simulator gets to stop before it is killed
-CANCEL_CHECK_SECONDS = 15
+# how long the simulator gets to stop before it is killed
 STOP_SECONDS = 10
+# new links are asked for a day before they expire, and not more often than this
+RENEW_BEFORE_SECONDS = 24 * 3600
+RENEW_INTERVAL_SECONDS = 600
+# the final state is retried for about two minutes, longer than a restart of the storage
+FINAL_ATTEMPTS = 6
+FINAL_RETRY_SECONDS = 20
 
 
 def log_generator(
@@ -135,7 +136,7 @@ class FlukaParser:
         return {"simulated_primaries": done}
 
 
-def multipart(fields: dict, body: bytes) -> tuple[bytes, str]:
+def multipart(fields: dict, body: bytes) -> Tuple[bytes, str]:
     """A multipart/form-data body (an S3 POST upload: the policy fields, then the file) and its content type"""
     boundary = uuid.uuid4().hex
     parts = [
@@ -155,55 +156,86 @@ def multipart(fields: dict, body: bytes) -> tuple[bytes, str]:
 class Reporter:
     """Puts the task's state into storage and looks there for a cancel"""
 
-    def __init__(self, links_path: Path, task_id: int, report_seconds: float, backend: dict):
-        """backend: sim_id, update_key and backend_url, for new links when the old ones expire"""
+    def __init__(self, links_path: Path, task_id: int, interval_seconds: float, backend: dict):
+        """interval_seconds: how often progress is reported and a cancel looked for; backend: sim_id, update_key
+        and backend_url, for new links before the old ones expire
+        """
         self.links_path = links_path
         self.links = json.loads(links_path.read_text())
         self.task_id = task_id
-        self.report_seconds = report_seconds
+        self.interval_seconds = interval_seconds
         self.backend = backend
         self.state: dict = {}
         self.unsent = False
         self.last_report = 0.0
         self.last_cancel_check = 0.0
+        self.last_renewal = 0.0
 
     def update(self, changes: dict) -> None:
-        """Takes a change of the task's state; a new state is reported at once, progress at most every few
-        seconds
-        """
+        """Takes a change of the task's state; a new state is reported at once, progress at most every interval"""
         self.state.update(changes)
         self.unsent = True
-        if "task_state" in changes or time.monotonic() - self.last_report >= self.report_seconds:
+        if "task_state" in changes:
+            self.report()
+        else:
+            self.report_due()
+
+    def report_due(self) -> None:
+        """Reports what changed, if the last report (or attempt) was an interval ago"""
+        if time.monotonic() - self.last_report >= self.interval_seconds:
             self.report()
 
-    def report(self) -> None:
-        """Puts the task's state into its object, if anything changed"""
+    def report(self) -> bool:
+        """Puts the task's state into its object, if anything changed; whether it is there"""
         if not self.unsent:
-            return
+            return True
+        self.renew_links_if_expiring()
+        # an attempt counts as a report for the interval, so a failing storage is not hammered every second
+        self.last_report = time.monotonic()
         body = json.dumps({"task_id": self.task_id, "update": self.state}).encode()
         key = f"{self.links['progress']['prefix']}task_{self.task_id:04d}.json"
-        data, content_type = multipart({**self.links["progress"]["fields"], "key": key}, body)
+        data, content_type = multipart(dict(self.links["progress"]["fields"], key=key), body)
         status = self.send(self.links["progress"]["url"], "POST", data, {"Content-Type": content_type})
-        if status == 403 and self.renew_links():
-            return self.report()
+        # 400 or 403: an expired or otherwise refused link - new links, then one more try
+        if status in (400, 403) and self.renew_links():
+            data, content_type = multipart(dict(self.links["progress"]["fields"], key=key), body)
+            status = self.send(self.links["progress"]["url"], "POST", data, {"Content-Type": content_type})
         if status in (200, 201, 204):
             self.unsent = False
-            self.last_report = time.monotonic()
-        return None
+        return not self.unsent
+
+    def report_final(self) -> None:
+        """The task's last state, retried for a while: without it the task would stay running"""
+        for attempt in range(FINAL_ATTEMPTS):
+            if self.report():
+                return
+            if attempt < FINAL_ATTEMPTS - 1:
+                time.sleep(FINAL_RETRY_SECONDS)
+        logging.error("The final state of task %d could not be stored", self.task_id)
 
     def cancelled(self) -> bool:
-        """Whether the simulation was cancelled; looked up at most every CANCEL_CHECK_SECONDS"""
-        if time.monotonic() - self.last_cancel_check < CANCEL_CHECK_SECONDS:
+        """Whether the simulation was cancelled; looked up at most every interval"""
+        if time.monotonic() - self.last_cancel_check < self.interval_seconds:
             return False
         self.last_cancel_check = time.monotonic()
+        self.renew_links_if_expiring()
         status = self.send(self.links["cancel"], "HEAD")
-        if status == 403 and self.renew_links():
-            self.last_cancel_check = 0.0
-            return self.cancelled()
+        if status in (400, 403) and self.renew_links():
+            status = self.send(self.links["cancel"], "HEAD")
         return status == 200
 
+    def renew_links_if_expiring(self) -> None:
+        """New links a day before these expire"""
+        if time.time() > self.links.get("expires", float("inf")) - RENEW_BEFORE_SECONDS:
+            self.renew_links()
+
     def renew_links(self) -> bool:
-        """New signed links from the backend, once the old ones expired; shared with the other tasks"""
+        """New signed links from the backend, at most every RENEW_INTERVAL_SECONDS (a refused link may be a
+        configuration error, which new links would not fix); the file gets them for tasks that start later
+        """
+        if time.monotonic() - self.last_renewal < RENEW_INTERVAL_SECONDS and self.last_renewal:
+            return False
+        self.last_renewal = time.monotonic()
         payload = json.dumps({"simulation_id": self.backend["sim_id"], "update_key": self.backend["update_key"]})
         req = request.Request(
             f"{self.backend['backend_url']}/tasks/links",
@@ -308,7 +340,7 @@ def watch(  # skipcq: PY-R1000
                             return
                 reporter.update({"task_state": "FAILED", "end_time": now()})
                 return
-            reporter.report()
+            reporter.report_due()
             time.sleep(poll_seconds)
 
 
@@ -322,8 +354,9 @@ def main(args) -> None:
     reporter = Reporter(
         Path(args.links),
         args.task_id,
-        # one report per task at most every 10 s, less often with many tasks: about 10 a second in all
-        max(10.0, args.ntasks / 10),
+        # one report and one cancel check per task at most every 15 s, less often with many tasks: about 10 a
+        # second of each in all
+        max(15.0, args.ntasks / 10),
         {"sim_id": args.sim_id, "update_key": args.update_key, "backend_url": args.backend_url},
     )
     if args.simulator == "fluka":
@@ -331,7 +364,7 @@ def main(args) -> None:
     else:
         log_path = Path(args.filepath)
         watch(lambda: log_path if log_path.exists() else None, shieldhit_update, args.pid, reporter)
-    reporter.report()
+    reporter.report_final()
 
 
 if __name__ == "__main__":

@@ -126,7 +126,8 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
             job_dir = f"{scratch}/yaptide_runs/{simulation.id}_{int(datetime.utcnow().timestamp() * 1e6)}"
             if not claim_job_dir(simulation.id, job_dir):
                 return
-            con.run(f"mkdir -p {job_dir}")
+            # readable by the user only: the signed links and the update key are in there
+            con.run(f"mkdir -p -m 700 {job_dir}")
             upload_inputs(con, job_dir, input_dict["input_files"])
             # signed links the jobs report progress and look for a cancel with
             links = json.dumps(result_storage.job_links(simulation.id)).encode()
@@ -179,7 +180,8 @@ JOB_DIR_PATTERN = re.compile(r"/[\w./-]+/yaptide_runs/(\d+)_\d+")
 # the jobs of a simulation, in the order they are cancelled: the reporter first - a cancelled collect would start
 # it (it reports a collect that did not succeed); then the collect - cancelling the array first lets SLURM start
 # the collect, which then reports FAILED. The submit script writes their ids into the job directory.
-SIMULATION_JOBS = ("reporter", "collect", "array")
+# "aggregator": jobs submitted before progress went through storage still have one (test -s skips it otherwise)
+SIMULATION_JOBS = ("reporter", "collect", "array", "aggregator")
 
 
 def forget_job_dir(simulation_id: int) -> None:
@@ -197,8 +199,8 @@ def cancel_simulation(simulation_id: int) -> None:
 
     The jobs are found by the ids the submit wrote into the job directory, so a submit interrupted before its ids
     reached the database is cleaned up too. A directory left in the database means the cancel is still to be done
-    (the engine's sweep repeats it). With the user's certificate expired, the jobs run to their end and what they
-    report is ignored, as the simulation is final.
+    (the engine's sweep repeats it). With the user's certificate expired, the jobs still stop by themselves, as they
+    find the cancel the engine put into storage (yaptide/batch/watcher.py); the directory stays on the cluster.
     """
     simulation = db.session.get(BatchSimulationModel, simulation_id)
     if simulation is None or not simulation.job_dir:
@@ -221,7 +223,7 @@ def cancel_simulation(simulation_id: int) -> None:
             )
             con.run(f"{cancels}; rm -rf {job_dir}", warn=True)
     except AuthenticationException:
-        logging.warning("Certificate of simulation %d expired, its jobs run to their end", simulation.id)
+        logging.warning("Certificate of simulation %d expired, its jobs stop through storage", simulation.id)
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(
             "Cancelling the jobs of simulation %d on the cluster failed, to be repeated: %s", simulation_id, e

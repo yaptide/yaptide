@@ -5,6 +5,7 @@ import json
 import subprocess
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -26,7 +27,10 @@ class FakeStorage(BaseHTTPRequestHandler):
 
     objects: dict = {}
     cancelled = False
+    # Garage answers an expired link with 400; a link signed with a wrong secret gets 403 every time
     expired_once = False
+    always_refused = False
+    down_for = 0
     renewals = 0
 
     def do_POST(self):
@@ -35,9 +39,14 @@ class FakeStorage(BaseHTTPRequestHandler):
         if self.path == "/tasks/links":
             FakeStorage.renewals += 1
             return self.answer(200, {"links": links(self.server.server_address[1])})
+        if FakeStorage.down_for > 0:
+            FakeStorage.down_for -= 1
+            return self.answer(503, {})
+        if FakeStorage.always_refused:
+            return self.answer(403, {})
         if FakeStorage.expired_once:
             FakeStorage.expired_once = False
-            return self.answer(403, {})
+            return self.answer(400, {})
         message = email.message_from_bytes(f"Content-Type: {self.headers['Content-Type']}\r\n\r\n".encode() + data)
         fields = {
             part.get_param("name", header="content-disposition"): part.get_payload(decode=True)
@@ -81,12 +90,13 @@ def links(port: int) -> dict:
 def storage(tmp_path, monkeypatch):
     """The fake storage running, the links file written, and the watcher's waits shortened"""
     FakeStorage.objects, FakeStorage.cancelled, FakeStorage.expired_once, FakeStorage.renewals = {}, False, False, 0
+    FakeStorage.always_refused, FakeStorage.down_for = False, 0
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeStorage)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     port = server.server_address[1]
     (tmp_path / "storage_links.json").write_text(json.dumps(links(port)))
-    monkeypatch.setattr(watcher, "CANCEL_CHECK_SECONDS", 0)
     monkeypatch.setattr(watcher, "STOP_SECONDS", 1)
+    monkeypatch.setattr(watcher, "FINAL_RETRY_SECONDS", 0)
     yield tmp_path, f"http://127.0.0.1:{port}"
     server.shutdown()
 
@@ -155,7 +165,9 @@ def test_simulator_ending_without_completing_fails_the_task(storage):
 
 
 def test_expired_links_are_renewed_by_the_backend(storage):
-    """After a week the signed links expire; new ones come from the backend and are shared through the file"""
+    """After a week the signed links expire (Garage answers 400); new ones come from the backend, also for tasks
+    that start later
+    """
     tmp_path, backend_url = storage
     FakeStorage.expired_once = True
     task = reporter(tmp_path, backend_url)
@@ -204,3 +216,38 @@ def test_watcher_runs_with_the_standard_library_only(tmp_path):
         timeout=60,
     )
     assert result.returncode == 0, result.stderr
+
+
+def test_links_are_renewed_a_day_before_they_expire(storage):
+    """No report is lost to an expiry: new links are asked for in advance"""
+    tmp_path, backend_url = storage
+    links_file = tmp_path / "storage_links.json"
+    links_file.write_text(json.dumps({**json.loads(links_file.read_text()), "expires": int(time.time()) + 3600}))
+
+    reporter(tmp_path, backend_url).update({"task_state": "RUNNING"})
+
+    assert FakeStorage.renewals == 1
+
+
+def test_refused_links_are_not_renewed_in_a_loop(storage):
+    """A link refused for another reason (e.g. a wrong key) gets one renewal, not one per attempt"""
+    tmp_path, backend_url = storage
+    FakeStorage.always_refused = True
+    task = reporter(tmp_path, backend_url)
+
+    task.update({"task_state": "RUNNING"})
+    task.update({"task_state": "RUNNING", "simulated_primaries": 5})
+
+    assert FakeStorage.renewals == 1
+
+
+def test_final_state_waits_for_the_storage(storage):
+    """A restart of the storage when the task ends does not leave it running forever"""
+    tmp_path, backend_url = storage
+    task = reporter(tmp_path, backend_url)
+    FakeStorage.down_for = 3
+
+    task.update({"task_state": "COMPLETED"})
+    task.report_final()
+
+    assert report()["task_state"] == "COMPLETED"

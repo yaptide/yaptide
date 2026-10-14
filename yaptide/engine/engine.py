@@ -52,15 +52,42 @@ from yaptide.utils.enums import EntityState, PlatformType
 CLUSTER_CONNECTIONS = 4
 # how often the progress HPC tasks put into storage is read
 HPC_PROGRESS_SECONDS = 10
-# what a task's progress report may set
-REPORTED_FIELDS = {
-    "task_state",
-    "simulated_primaries",
-    "requested_primaries",
-    "start_time",
-    "end_time",
-    "estimated_time",
+# a task's progress object, and what its report may set
+REPORT_KEY = re.compile(r".*/task_(\d{1,6})\.json")
+REPORTED_STATES = {
+    EntityState.RUNNING.value,
+    EntityState.COMPLETED.value,
+    EntityState.FAILED.value,
+    EntityState.CANCELED.value,
 }
+REPORTED_NUMBERS = ("simulated_primaries", "requested_primaries", "estimated_time")
+REPORTED_TIMES = ("start_time", "end_time")
+MAX_REPORTED_NUMBER = 2**31 - 1
+
+
+def clean_report(update: dict) -> dict:
+    """The fields of a task's report that may go into the database, as written by the jobs (yaptide/batch/watcher.py)
+
+    Reports come from the cluster, so states, numbers and times are checked; anything else is left out.
+    """
+    clean = {}
+    if update.get("task_state") in REPORTED_STATES:
+        clean["task_state"] = update["task_state"]
+    for name in REPORTED_NUMBERS:
+        value = update.get(name)
+        if type(value) is int and 0 <= value <= MAX_REPORTED_NUMBER:
+            clean[name] = value
+    for name in REPORTED_TIMES:
+        value = update.get(name)
+        if isinstance(value, str):
+            try:
+                datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                continue
+            clean[name] = value
+    return clean
+
+
 HPC_ACTIVE_STATES = (
     EntityState.PENDING.value,
     EntityState.RUNNING.value,
@@ -261,7 +288,8 @@ class Engine:
     def read_hpc_progress(self) -> None:
         """Saves what the tasks of running HPC simulations put into storage since the last look
 
-        Storage out of reach skips a round; it is not a reason to stop the engine.
+        A report that cannot be used is skipped (and not read again until it changes); storage out of reach ends
+        the round - it is not a reason to stop the engine, and the next round tries again.
         """
         if not result_storage.configured():
             return
@@ -280,29 +308,32 @@ class Engine:
                     if update
                 ]
             except Exception:  # skipcq: PYL-W0703
-                logging.exception("Reading the progress of simulation %d failed", simulation_id)
-                continue
-            if updates:
-                self.save_task_updates(simulation_id, updates)
+                logging.exception("Reading HPC progress failed, trying again in %d s", HPC_PROGRESS_SECONDS)
+                return
+            try:
+                if updates:
+                    self.save_task_updates(simulation_id, updates)
+            except DATABASE_FAILURES:
+                raise
+            except Exception:  # skipcq: PYL-W0703
+                logging.exception("Progress of simulation %d refused", simulation_id)
             seen.update(reports)
         # finished simulations are forgotten
         self.report_etags = seen
 
     @staticmethod
     def read_report(key: str) -> Optional[dict]:
-        """A task's report as a task update: the task comes from the object's name, only known fields count"""
-        match = re.fullmatch(r".*/task_(\d+)\.json", key)
+        """A task's report as a task update: the task comes from the object's name, only valid fields count"""
+        match = REPORT_KEY.fullmatch(key)
+        if not match:
+            return None
         try:
-            update = result_storage.read_report(key)["update"]
+            report = result_storage.read_report(key)
+            update = clean_report(report["update"])
         except (KeyError, TypeError, ValueError):
             logging.warning("Unreadable progress report %s", key)
             return None
-        if not match or not isinstance(update, dict):
-            return None
-        return {
-            "task_id": int(match.group(1)),
-            "update_dict": {k: v for k, v in update.items() if k in REPORTED_FIELDS},
-        }
+        return {"task_id": int(match.group(1)), "update_dict": update} if update else None
 
     def submit(self, simulation_id: int) -> None:
         """Hands a stored HPC simulation to the cluster gateway, once"""

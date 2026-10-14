@@ -7,6 +7,7 @@ import base64
 import gzip
 import json
 import os
+import time
 from functools import lru_cache
 
 import boto3
@@ -82,10 +83,15 @@ def page_url(key: str) -> str:
 
 
 def delete_simulation(sim_id: int) -> None:
-    """Removes every stored page of a simulation"""
+    """Removes every stored object of a simulation: its pages, and what its HPC jobs reported"""
     bucket = os.environ["RESULTS_S3_BUCKET"]
     client = _internal()
-    for listing in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=f"simulations/{sim_id}/"):
+    listings = [
+        listing
+        for prefix in (f"simulations/{sim_id}/", f"hpc/{sim_id}/")
+        for listing in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix)
+    ]
+    for listing in listings:
         keys = [{"Key": item["Key"]} for item in listing.get("Contents", [])]
         if keys:
             errors = client.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True}).get("Errors")
@@ -135,12 +141,13 @@ MAX_PROGRESS_BYTES = 64 * 1024
 
 def progress_prefix(sim_id: int) -> str:
     """Where the tasks of an HPC simulation put their progress, one object per task"""
-    return f"simulations/{sim_id}/progress/"
+    # apart from the result pages (simulations/...), which an estimator called "progress" would otherwise mix with
+    return f"hpc/{sim_id}/progress/"
 
 
 def cancel_key(sim_id: int) -> str:
     """The object whose presence tells an HPC simulation's tasks to stop"""
-    return f"simulations/{sim_id}/cancel"
+    return f"hpc/{sim_id}/cancel"
 
 
 def job_links(sim_id: int) -> dict:
@@ -159,7 +166,13 @@ def job_links(sim_id: int) -> dict:
     cancel = client.generate_presigned_url(
         "head_object", Params={"Bucket": bucket, "Key": cancel_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
     )
-    return {"progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix}, "cancel": cancel}
+    # the jobs ask for new links a day before these expire (Garage answers an expired link with 400, like a bad one)
+    expires = int(time.time()) + JOB_LINK_SECONDS
+    return {
+        "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
+        "cancel": cancel,
+        "expires": expires,
+    }
 
 
 def progress_reports(sim_id: int) -> dict[str, str]:

@@ -178,7 +178,7 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
     (sent,) = commands(cluster_connection)  # one round trip
     # every job by the id the submit wrote next to it, the reporter first; then the directory goes
     cancelled = [part.split("/")[-1].split("_job_id")[0] for part in sent.split("; ")[:-1]]
-    assert cancelled == ["reporter", "collect", "array"]
+    assert cancelled == ["reporter", "collect", "array", "aggregator"]  # the aggregator of jobs submitted before
     assert sent.split("; ")[-1].startswith("rm -rf /scratch/plgtest/yaptide_runs/")
     assert stored(simulation.id).job_dir is None  # nothing left to cancel
 

@@ -465,3 +465,36 @@ def test_hpc_cancel_goes_into_storage(client, engine, monkeypatch):
 
     assert cancels == [simulation_id]
     engine.cluster.cancel.remote.assert_called_once_with(simulation_id)
+
+
+def test_bad_reports_are_left_out_and_others_still_saved(client, engine, monkeypatch):
+    """A report with a huge task number or nonsense values does not stop the reports of other simulations"""
+    simulation_id = hpc_simulation()
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    reports = {
+        "hpc/1/progress/task_99999999999999999999.json": ("e1", {"task_state": "RUNNING"}),
+        "hpc/1/progress/task_0001.json": (
+            "e2",
+            {"task_state": "HACKED", "simulated_primaries": -5, "requested_primaries": 10**30, "start_time": "x"},
+        ),
+        "hpc/1/progress/task_0002.json": ("e3", {"task_state": "RUNNING", "simulated_primaries": 700}),
+    }
+    reads = []
+    monkeypatch.setattr(
+        engine_module.result_storage, "progress_reports", lambda sim_id: {k: v[0] for k, v in reports.items()}
+    )
+    monkeypatch.setattr(
+        engine_module.result_storage, "read_report", lambda key: reads.append(key) or {"update": reports[key][1]}
+    )
+
+    engine.read_hpc_progress()
+
+    assert "hpc/1/progress/task_99999999999999999999.json" not in reads  # left out by its name, never fetched
+    db.session.remove()
+    tasks = {task.task_id: task for task in db.session.query(TaskModel).filter_by(simulation_id=simulation_id)}
+    assert (tasks[1].task_state, tasks[1].simulated_primaries) == (EntityState.PENDING.value, 0)
+    assert (tasks[2].task_state, tasks[2].simulated_primaries) == (EntityState.RUNNING.value, 700)
+
+    reads.clear()
+    engine.read_hpc_progress()
+    assert not reads  # unchanged reports, also the unusable ones, are not read again
