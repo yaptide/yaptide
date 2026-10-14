@@ -52,12 +52,11 @@ def upgrade():
             try:
                 outputs = unpack(input_row.compressed_data)["input_json"]["scoringManager"]["outputs"]
             except (AttributeError, KeyError, TypeError, ValueError):
-                logging.warning("Simulation %d has no editor outputs, estimator names stay", simulation.id)
+                logging.warning("Simulation %d has no editor outputs, estimators keep their file names", simulation.id)
         for i, row in enumerate(rows):
-            if outputs is not None and i < len(outputs):
-                name = outputs[i]["name"]
-            else:
-                name = row.name.rstrip("_")
+            output = outputs[i] if outputs is not None and i < len(outputs) else {}
+            name = output.get("name") if isinstance(output, dict) else None
+            name = name or row.name.rstrip("_")
             bind.execute(estimators.update().where(estimators.c.id == row.id).values(name=name, file_name=row.name))
 
 
