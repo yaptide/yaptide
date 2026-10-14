@@ -24,7 +24,14 @@ from yaptide.persistence.db_methods import (
     update_simulation_state,
 )
 from yaptide.persistence import result_storage
-from yaptide.persistence.models import EstimatorModel, LogfilesModel, PageModel, PageObjectModel, UserModel
+from yaptide.persistence.models import (
+    EstimatorModel,
+    LogfilesModel,
+    PageModel,
+    PageObjectModel,
+    SimulationModel,
+    UserModel,
+)
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, job_status_content
@@ -190,6 +197,35 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
     return use_storage
 
 
+def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
+    """Stores the merged results of a simulation and marks it completed, unless it was cancelled meanwhile"""
+    if simulation.input_type == InputType.EDITOR.value:
+        outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
+        sorted_estimator_names = sorted([output["name"] for output in outputs])
+        for output in outputs:
+            name = output["name"]
+            # estimators are sorted alphabeticaly by names, thats why we can match indexes from sorted_estimator_names
+            estimator_dict = estimators[sorted_estimator_names.index(name)]
+            prepare_create_or_update_estimator_in_db(sim_id=simulation.id, name=name, estimator_dict=estimator_dict)
+    elif simulation.input_type == InputType.FILES.value:
+        for estimator_dict in estimators:
+            prepare_create_or_update_estimator_in_db(
+                sim_id=simulation.id, name=estimator_dict["name"], estimator_dict=estimator_dict
+            )
+
+    use_storage = result_storage.configured()
+    for estimator_dict in estimators:
+        use_storage = prepare_create_or_update_pages_in_db(
+            sim_id=simulation.id, estimator_dict=estimator_dict, use_storage=use_storage
+        )
+
+    # estimators and pages together, so a failure in between does not leave estimators without pages
+    make_commit_to_db()
+
+    update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+    update_simulation_state(simulation=simulation, update_dict=update_dict)
+
+
 def parse_page_numbers(param: str) -> List[int]:
     """Parses string of page ranges (e.g., '1-3,5') and returns a sorted list of page numbers"""
     pages = set()
@@ -231,37 +267,7 @@ class ResultsResource(Resource):
         if decoded_token != sim_id:
             return yaptide_response(message="Invalid update key", code=400)
 
-        if simulation.input_type == InputType.EDITOR.value:
-            outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
-            sorted_estimator_names = sorted([output["name"] for output in outputs])
-            for output in outputs:
-                name = output["name"]
-                # estimator_dict is sorted alphabeticaly by names,
-                # thats why we can match indexes from sorted_estimator_names
-                estimator_dict_index = sorted_estimator_names.index(name)
-                estimator_dict = payload_dict["estimators"][estimator_dict_index]
-                prepare_create_or_update_estimator_in_db(sim_id=simulation.id, name=name, estimator_dict=estimator_dict)
-        elif simulation.input_type == InputType.FILES.value:
-            for estimator_dict in payload_dict["estimators"]:
-                prepare_create_or_update_estimator_in_db(
-                    sim_id=simulation.id, name=estimator_dict["name"], estimator_dict=estimator_dict
-                )
-
-        use_storage = result_storage.configured()
-        for estimator_dict in payload_dict["estimators"]:
-            use_storage = prepare_create_or_update_pages_in_db(
-                sim_id=simulation.id, estimator_dict=estimator_dict, use_storage=use_storage
-            )
-
-        # estimators and pages together, so a failure in between does not leave estimators without pages
-        make_commit_to_db()
-
-        logging.debug("Marking simulation as completed")
-        update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        update_simulation_state(simulation=simulation, update_dict=update_dict)
-
-        logging.debug("Marking simulation tasks as completed")
-
+        store_results(simulation, payload_dict["estimators"])
         return yaptide_response(message="Results saved", code=202)
 
     class APIParametersSchema(Schema):
