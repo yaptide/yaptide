@@ -90,7 +90,7 @@ services:
           cpus: ${MAX_CORES-1.0}
     env_file: .env
     environment:
-      - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-INFO}
       # HPC jobs report to the backend's public address with update keys the engine signs - with Flask's secret
       - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
       - YAPTIDE_TOKEN_SECRET=${YAPTIDE_TOKEN_SECRET:-}

@@ -343,3 +343,22 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
             ["bash", "-n"], input=put[script].getvalue().decode(), capture_output=True, text=True, check=False
         )
         assert checked.returncode == 0, checked.stderr
+
+
+def test_failed_submit_cancels_what_reached_the_cluster(client, cluster_connection):
+    """sbatch failing half way may leave the array queued: it is cancelled and the directory removed"""
+    simulation_id = submit(client).id
+    run = cluster_connection.run.side_effect
+    cluster_connection.run.side_effect = lambda command, **kwargs: (
+        Result(
+            stdout="Job id: 101\n", stderr="sbatch: error: collect refused", command=command, exited=1, connection=None
+        )
+        if command.startswith("sh ")
+        else run(command, **kwargs)
+    )
+
+    batch_methods.submit_simulation(simulation_id)
+
+    assert stored(simulation_id).job_state == EntityState.FAILED.value
+    assert any("scancel" in command for command in commands(cluster_connection))
+    assert stored(simulation_id).job_dir is None
