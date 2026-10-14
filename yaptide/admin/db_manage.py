@@ -32,11 +32,11 @@ class TableTypes(Enum):
 def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
     """Connects to the db"""
     db_uri = os.environ.get("FLASK_SQLALCHEMY_DATABASE_URI")
-    if verbose > 1:
-        click.echo(f"Connecting to URI: {db_uri}")
     if not db_uri:
         click.echo(f"Database URI: {db_uri} not set - aborting", err=True)
         raise click.Abort()
+    if verbose > 1:
+        click.echo(f"Connecting to URI: {db.make_url(db_uri).render_as_string(hide_password=True)}")
     echo: bool = verbose > 1
     engine = db.create_engine(db_uri, echo=echo)
     try:
@@ -44,7 +44,7 @@ def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engi
         metadata = db.MetaData()
         metadata.reflect(bind=engine)
     except db.exc.OperationalError:
-        click.echo(f"Connection to db {db_uri} failed", err=True)
+        click.echo(f"Connection to db {db.make_url(db_uri).render_as_string(hide_password=True)} failed", err=True)
         raise click.Abort()
     return con, metadata, engine
 

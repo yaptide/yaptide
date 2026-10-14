@@ -1,11 +1,16 @@
+import os
+import time
 import uuid
 from datetime import datetime
 
+import redis
 from flask import request
 from flask_restful import Resource
 from marshmallow import Schema, fields
+from sqlalchemy.exc import InvalidRequestError
 
 from yaptide.batch.batch_methods import delete_job, get_job_status, submit_job
+from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_all_clusters,
@@ -33,6 +38,37 @@ from yaptide.routes.utils.utils import (
     get_clamped_ntasks_value,
 )
 from yaptide.utils.enums import EntityState, PlatformType
+
+# an open simulations page polls job status every 1.5 s and every SLURM query is a new SSH login to the cluster
+SLURM_STATUS_INTERVAL = 30  # seconds
+_broker_url = os.environ.get("CELERY_BROKER_URL", "")
+# Redis runs next to the server - a short timeout, as every status request waits for it while holding a worker
+_redis = (
+    redis.Redis.from_url(_broker_url, socket_timeout=0.2, socket_connect_timeout=0.2)
+    if _broker_url.startswith(("redis://", "rediss://"))
+    else None
+)
+_redis_down_until = 0.0
+_last_local_check: dict[int, float] = {}
+
+
+def slurm_status_due(sim_id: int) -> bool:
+    """True for at most one caller per SLURM_STATUS_INTERVAL and simulation, shared by all server processes.
+
+    Without Redis it is one caller per server process; after a Redis error Redis is not asked again for an interval,
+    so a hanging Redis does not slow down every request.
+    """
+    global _redis_down_until  # skipcq: PYL-W0603
+    now = time.monotonic()
+    if _redis is not None and now >= _redis_down_until:
+        try:
+            return bool(_redis.set(f"slurm_status:{sim_id}", 1, nx=True, ex=SLURM_STATUS_INTERVAL))
+        except redis.RedisError:
+            _redis_down_until = now + SLURM_STATUS_INTERVAL
+    if now - _last_local_check.get(sim_id, -SLURM_STATUS_INTERVAL) < SLURM_STATUS_INTERVAL:
+        return False
+    _last_local_check[sim_id] = now
+    return True
 
 
 class JobsBatch(Resource):
@@ -144,7 +180,7 @@ class JobsBatch(Resource):
 
         job_tasks_status = [task.get_status_dict() for task in tasks]
 
-        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value):
+        if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return yaptide_response(
                 message=f"Job state: {simulation.job_state}",
                 code=200,
@@ -154,13 +190,18 @@ class JobsBatch(Resource):
                 },
             )
 
-        cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
-
-        job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
-        update_simulation_state(simulation=simulation, update_dict=job_info)
-
-        job_info.pop("end_time", None)
-        job_info["job_tasks_status"] = job_tasks_status
+        # the job ids arrive from the helper worker a few seconds after submitting, until then SLURM has nothing to say
+        if simulation.array_id is not None and slurm_status_due(simulation.id):
+            cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
+            job_info = get_job_status(simulation=simulation, user=user, cluster=cluster)
+            # the SLURM query takes seconds - meanwhile the results upload or a cancel may have ended the simulation,
+            # which update_state must see to keep the final state
+            try:
+                db.session.refresh(simulation)
+            except InvalidRequestError:  # the user deleted the simulation meanwhile
+                return yaptide_response(message="Simulation no longer exists", code=404)
+            update_simulation_state(simulation=simulation, update_dict=job_info)
+        job_info = {"job_state": simulation.job_state, "job_tasks_status": job_tasks_status}
 
         return yaptide_response(message="", code=200, content=job_info)
 
@@ -199,12 +240,20 @@ class JobsBatch(Resource):
                 },
             )
 
+        if simulation.array_id is None:
+            return yaptide_response(message="Job is still being submitted, try again in a moment", code=409)
+
         cluster = fetch_cluster_by_id(cluster_id=simulation.cluster_id)
 
         result, status_code = delete_job(simulation=simulation, user=user, cluster=cluster)
         if status_code != 200:
             return error_internal_response(content=result)
 
+        # cancelling takes several SSH calls - a final state stored meanwhile (results upload) must be kept
+        try:
+            db.session.refresh(simulation)
+        except InvalidRequestError:  # the user deleted the simulation meanwhile
+            return yaptide_response(message="Simulation no longer exists", code=404)
         update_simulation_state(simulation=simulation, update_dict={"job_state": EntityState.CANCELED.value})
 
         tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)

@@ -6,9 +6,10 @@ from yaptide.routes.celery_routes import JobsDirect
 from yaptide.routes.common_sim_routes import JobsResource, InputsResource, LogfilesResource, ResultsResource
 from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
-from yaptide.routes.task_routes import TasksResource
+from yaptide.routes.task_routes import TasksBulkResource, TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
+from yaptide.routes.utils.utils import local_users_enabled
 
 
 class HelloWorld(Resource):
@@ -16,8 +17,12 @@ class HelloWorld(Resource):
 
     @staticmethod
     def get():
-        """Root route get method"""
-        return yaptide_response(message="Hello World!", code=200)
+        """Root route get method, also advertising which login methods are available to the UI"""
+        return yaptide_response(
+            message="Hello World!",
+            code=200,
+            content={"local_users_enabled": local_users_enabled()},
+        )
 
 
 def initialize_routes(api: Api):
@@ -30,6 +35,7 @@ def initialize_routes(api: Api):
     api.add_resource(JobsResource, "/jobs")
 
     api.add_resource(TasksResource, "/tasks")
+    api.add_resource(TasksBulkResource, "/tasks/bulk")
 
     api.add_resource(ResultsResource, "/results")
     api.add_resource(InputsResource, "/inputs")
