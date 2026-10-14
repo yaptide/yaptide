@@ -1,0 +1,18 @@
+# Garage object storage for result pages, one node without replication (docker-compose.yml, service garage).
+# The RPC secret, the access key and the bucket come from the environment, see docker-compose.yml.
+metadata_dir = "/var/lib/garage/meta"
+data_dir = "/var/lib/garage/data"
+db_engine = "sqlite"
+# writes are rare (one per result page), so syncing them costs little and survives a crash of the host
+metadata_fsync = true
+data_fsync = true
+# a daily copy of the metadata database, so a corrupted one can be restored
+metadata_auto_snapshot_interval = "24h"
+replication_factor = 1
+rpc_bind_addr = "[::]:3901"
+rpc_public_addr = "127.0.0.1:3901"
+
+[s3_api]
+s3_region = "garage"
+api_bind_addr = "[::]:3900"
+root_domain = ".s3.garage.localhost"
