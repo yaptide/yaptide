@@ -9,6 +9,7 @@ from unittest import mock
 
 import pytest
 import ray
+from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import OperationalError
 
 from yaptide.engine import engine as engine_module
@@ -383,14 +384,14 @@ def test_hpc_events_submit_once_and_a_crashed_submit_fails(client, engine):
     engine.cluster.cancel.remote.assert_called_once_with(simulation.id)
 
 
-def hpc_simulation(state: str = EntityState.PENDING.value) -> int:
+def hpc_simulation(state: str = EntityState.PENDING.value, job_id: str = "hpc") -> int:
     """A submitted HPC simulation with two tasks"""
     user = db.session.query(YaptideUserModel).one()
     cluster = ClusterModel(cluster_name="ares")
     db.session.add(cluster)
     db.session.commit()
     simulation = BatchSimulationModel(
-        job_id="hpc",
+        job_id=job_id,
         user_id=user.id,
         cluster_id=cluster.id,
         title="hpc",
@@ -406,11 +407,37 @@ def hpc_simulation(state: str = EntityState.PENDING.value) -> int:
     return simulation.id
 
 
+def test_last_reports_are_read_after_the_simulation_completed(client, engine, monkeypatch):
+    """The collect job may complete a simulation before the engine read its tasks' last reports"""
+    simulation_id = hpc_simulation(EntityState.COMPLETED.value)
+    db.session.get(BatchSimulationModel, simulation_id).end_time = datetime.now(timezone.utc)
+    old_id = hpc_simulation(EntityState.COMPLETED.value, "old")
+    db.session.get(BatchSimulationModel, old_id).end_time = datetime.now(timezone.utc) - timedelta(hours=1)
+    db.session.commit()
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    listed = []
+    monkeypatch.setattr(
+        engine_module.result_storage,
+        "progress_reports",
+        lambda sim_id: listed.append(sim_id) or {f"hpc/{sim_id}/progress/task_0001.json": "e1"},
+    )
+    monkeypatch.setattr(
+        engine_module.result_storage, "read_report", lambda key: {"update": {"task_state": "COMPLETED"}}
+    )
+
+    engine.read_hpc_progress()
+
+    assert listed == [simulation_id]
+    db.session.remove()
+    task = db.session.query(TaskModel).filter_by(simulation_id=simulation_id, task_id=1).one()
+    assert task.task_state == EntityState.COMPLETED.value
+
+
 def test_hpc_progress_is_read_from_storage(client, engine, monkeypatch):
     """The tasks' reports in storage move their tasks and the simulation; an unchanged report is not read again"""
     simulation_id = hpc_simulation()
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
-    prefix = f"simulations/{simulation_id}/progress/"
+    prefix = f"hpc/{simulation_id}/progress/"
     reports = {
         prefix + "task_0001.json": ("e1", {"task_state": "RUNNING", "simulated_primaries": 300, "job_dir": "x"}),
         prefix + "task_0002.json": ("e2", {"task_state": "RUNNING"}),

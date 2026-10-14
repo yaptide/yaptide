@@ -18,13 +18,13 @@ import shutil
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
 import psycopg
 import ray
-from sqlalchemy import make_url
+from sqlalchemy import make_url, or_
 
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
@@ -293,8 +293,11 @@ class Engine:
         """
         if not result_storage.configured():
             return
+        # one completed since the last look still has the last reports of its tasks to read
+        recently = datetime.now(timezone.utc) - timedelta(seconds=3 * HPC_PROGRESS_SECONDS)
         active = db.session.query(BatchSimulationModel.id).filter(
-            BatchSimulationModel.array_id.isnot(None), BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES)
+            BatchSimulationModel.array_id.isnot(None),
+            or_(BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES), BatchSimulationModel.end_time >= recently),
         )
         seen: dict[str, str] = {}
         for (simulation_id,) in active.all():
