@@ -57,6 +57,8 @@ def create_app():
 
     database_uri = make_url(app.config["SQLALCHEMY_DATABASE_URI"]).render_as_string(hide_password=True)
     app.logger.info(f"Initializing Flask to use SQLAlchemy ORM @ {database_uri}")
+    # connections kept in the pool die with a database restart; checked before use instead of failing a request
+    app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {"pool_pre_ping": True})
     db.init_app(app)
 
     # the schema is prepared once per deployment, before the workers start (run_flask.sh)

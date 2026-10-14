@@ -1,20 +1,20 @@
 import logging
 import os
 import re
+import signal
 import subprocess
 import tempfile
 import threading
 import math
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Callable, Optional, Protocol
 
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
 
 from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator
-from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
-from yaptide.celery.utils.requests import send_task_update
+from yaptide.engine.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.utils.enums import EntityState
 
 
@@ -94,36 +94,49 @@ def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
 
 
 def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
-    """Function to execute simulation subprocess."""
-    process_exit_success: bool = True
-    command_stdout: str = ""
-    command_stderr: str = ""
+    """Runs the simulator and returns whether it succeeded, with its output
+
+    A cancel of the task interrupts the wait (Ray raises KeyboardInterrupt in it), and the simulator is then killed
+    with every process it started. Ray's force cancel would kill the whole worker process instead, which can also
+    take down a task of another simulation just handed to that worker.
+    """
     try:
-        completed_process = subprocess.run(
-            command_as_list, check=True, cwd=str(dir_path), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
-        )
-        logging.info("simulation subprocess with return code %d finished", completed_process.returncode)
-
-        # Capture stdout and stderr
-        command_stdout = completed_process.stdout
-        command_stderr = completed_process.stderr
-
-        process_exit_success = True
-
-        # Log stdout and stderr using logging
-        logging.info("Command Output:\n%s", command_stdout)
-        logging.info("Command Error Output:\n%s", command_stderr)
-    except subprocess.CalledProcessError as e:
-        process_exit_success = False
-        # If the command exits with a non-zero status
-        logging.error(
-            "Command Error: %sSTD OUT: %s\nExecuted Command: %s", e.stderr, e.stdout, " ".join(command_as_list)
+        # its own process group, so the processes it starts (e.g. rfluka's) die with it
+        process = subprocess.Popen(
+            command_as_list,
+            cwd=str(dir_path),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
         )
     except Exception as e:  # skipcq: PYL-W0703
-        process_exit_success = False
         logging.error("Exception while running simulation: %s", e)
+        return False, "", ""
+    try:
+        while True:
+            try:
+                command_stdout, command_stderr = process.communicate(timeout=1)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+    finally:
+        if process.poll() is None:
+            os.killpg(process.pid, signal.SIGKILL)
+            process.wait()
 
-    return process_exit_success, command_stdout, command_stderr
+    if process.returncode != 0:
+        logging.error(
+            "Command Error: %sSTD OUT: %s\nExecuted Command: %s",
+            command_stderr,
+            command_stdout,
+            " ".join(command_as_list),
+        )
+        return False, command_stdout, command_stderr
+    logging.info("simulation subprocess with return code %d finished", process.returncode)
+    logging.debug("Command Output:\n%s", command_stdout)
+    logging.debug("Command Error Output:\n%s", command_stderr)
+    return True, command_stdout, command_stderr
 
 
 # skipcq:  PY-R1000
@@ -132,7 +145,7 @@ def read_shieldhit_file(
     filepath: Path,
     simulation_id: int,
     task_id: int,
-    update_key: str,
+    report: Callable[[dict], None],
     max_wait_for_file_seconds: float = 20,
     max_idle_seconds: float = 5 * 60,
     update_interval_seconds: float = 2,
@@ -149,7 +162,7 @@ def read_shieldhit_file(
         filepath: Path to the log file to monitor.
         simulation_id: Simulation ID.
         task_id: Task ID.
-        update_key: Simulation auth token for backend updates.
+        report: Called with every task state update, e.g. the engine collecting them.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
@@ -181,7 +194,7 @@ def read_shieldhit_file(
         if logfile is None:
             logging.error("Log file for task %d not found", task_id)
             up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            report(up_dict)
             return
         logging.debug("Log file for task %d found", task_id)
 
@@ -223,7 +236,7 @@ def read_shieldhit_file(
                     logging.error("Cannot parse estimated time in line: %s", line.rstrip())
                 up_dict = {"simulated_primaries": simulated_primaries, "estimated_time": estimated_seconds}
                 logging.debug("Sending update for task %d, simulated primaries %d", task_id, simulated_primaries)
-                send_task_update(simulation_id, task_id, update_key, up_dict)
+                report(up_dict)
 
             elif re.search(REQUESTED_MATCH, line):
                 logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
@@ -237,7 +250,7 @@ def read_shieldhit_file(
                     "task_state": EntityState.RUNNING.value,
                 }
                 logging.debug("Sending update for task %d", task_id)
-                send_task_update(simulation_id, task_id, update_key, up_dict)
+                report(up_dict)
             elif re.search(COMPLETE_MATCH, line):
                 logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
                 logging.info("Parsing log file for task %d finished", task_id)
@@ -247,7 +260,7 @@ def read_shieldhit_file(
                     "task_state": EntityState.COMPLETED.value,
                 }
                 logging.info("Sending final update for task %d, simulated primaries %d", task_id, simulated_primaries)
-                send_task_update(simulation_id, task_id, update_key, up_dict)
+                report(up_dict)
                 return
 
         if not event.is_set():
@@ -258,11 +271,11 @@ def read_shieldhit_file(
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     except Exception as err:  # skipcq: PYL-W0703
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     finally:
         if logfile is not None:
             logfile.close()
@@ -273,7 +286,7 @@ def read_fluka_file(
     dirpath: Path,
     simulation_id: int,
     task_id: int,
-    update_key: str,
+    report: Callable[[dict], None],
     max_wait_for_file_seconds: float = 20,
     max_idle_seconds: float = 5 * 60,
     update_interval_seconds: float = 2,
@@ -290,7 +303,7 @@ def read_fluka_file(
         dirpath: Path to the directory containing the log file to monitor.
         simulation_id: Simulation ID.
         task_id: Task ID.
-        update_key: Simulation auth token for backend updates.
+        report: Called with every task state update, e.g. the engine collecting them.
         max_wait_for_file_seconds: Maximum time to wait for the log file to be created
             before marking the task as FAILED.
         max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
@@ -331,7 +344,7 @@ def read_fluka_file(
         if logfile is None:
             logging.error("Log file for task %d not found", task_id)
             up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-            send_task_update(simulation_id, task_id, update_key, up_dict)
+            report(up_dict)
             return
         logging.debug("Log file for task %d found", task_id)
 
@@ -345,17 +358,17 @@ def read_fluka_file(
             event,
             loglines,
             update_interval_seconds=update_interval_seconds,
-            details=TaskDetails(simulation_id, task_id, update_key),
+            details=TaskDetails(simulation_id, task_id, report),
             verbose=logging_level <= logging.INFO,
         )
     except TimeoutError as err:
         logging.error("Simulation watcher %d timed out: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     except Exception as err:  # skipcq: PYL-W0703
         logging.error("Error while monitoring log file for task %d: %s", task_id, err)
         up_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
-        send_task_update(simulation_id, task_id, update_key, up_dict)
+        report(up_dict)
     finally:
         if logfile is not None:
             logfile.close()

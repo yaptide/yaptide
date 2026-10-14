@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Stand-in for SHIELD-HIT12A in tests, behaviour chosen by the content of beam.dat in the working directory:
+FAKE_SLEEP runs until killed (writes its pid to fake.pid), FAKE_FAIL exits with an error and no results,
+anything else copies the results of a real run (tests/res/bdo) into the working directory.
+"""
+
+import os
+import shutil
+import sys
+import time
+from pathlib import Path
+
+work_dir = Path(sys.argv[-1])
+seed = int(sys.argv[sys.argv.index("-N") + 1])
+beam = (work_dir / "beam.dat").read_text()
+log = work_dir / f"shieldhit_{seed:04d}.log"
+log.write_text("  Requested number of primaries NSTAT      : 100\n")
+if "FAKE_SLEEP" in beam:
+    (work_dir / "fake.pid").write_text(str(os.getpid()))
+    time.sleep(600)
+elif "FAKE_FAIL" in beam:
+    # where the logs of a failed run are collected from
+    (work_dir / "run_1").mkdir()
+    (work_dir / "run_1" / f"shieldhit_{seed:04d}.log").write_text("fake simulator crashed\n")
+    sys.exit("fake simulator crashed")
+else:
+    # a real simulation takes a while, the monitor polls the log once a second
+    time.sleep(3)
+    source = Path(__file__).resolve().parent.parent / "bdo" / f"task_{seed % 2 + 1}"
+    for result_file in source.glob("*.bdo"):
+        shutil.copy(result_file, work_dir / result_file.name)
+    with log.open("a") as log_file:
+        log_file.write("     Primary particle no.         100      ETR:   0 hours  0 minutes  0 seconds\n")
+        log_file.write("   Run time:   0 hours  0 minutes  1 seconds     prim/sec:        100\n")

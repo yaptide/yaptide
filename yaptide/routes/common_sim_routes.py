@@ -24,6 +24,7 @@ from yaptide.persistence.db_methods import (
     update_simulation_state,
 )
 from yaptide.persistence import result_storage
+from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     EstimatorModel,
     LogfilesModel,
@@ -199,6 +200,10 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
 
 def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
     """Stores the merged results of a simulation and marks it completed, unless it was cancelled meanwhile"""
+    db.session.refresh(simulation)
+    if simulation.job_state == EntityState.CANCELED.value:
+        logging.info("Simulation %d was cancelled, its results are not stored", simulation.id)
+        return
     if simulation.input_type == InputType.EDITOR.value:
         outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
         sorted_estimator_names = sorted([output["name"] for output in outputs])

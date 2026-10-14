@@ -5,20 +5,14 @@ from pathlib import Path
 import os
 import platform
 import subprocess
+import threading
 from typing import Generator
 import pytest
+import ray
 
-# skipcq: FLK-E501, PY-W2000
-from celery.contrib.pytest import (
-    celery_app,
-    celery_worker,
-    celery_enable_logging,
-    celery_config,
-    celery_parameters,
-    use_celery_app_trap,
-)
 from yaptide.admin.simulator_storage import download_shieldhit_from_s3_or_from_website
 from yaptide.application import create_app
+from yaptide.engine.engine import Engine
 
 
 @pytest.fixture(scope="session")
@@ -130,22 +124,6 @@ def add_simulator_mocks_to_path_variable(yaptide_fake_dir: Path):
 
 
 @pytest.fixture(scope="function")
-def celery_worker_parameters() -> Generator[dict, None, None]:
-    """Here we could as well configure other fixture simulation-worker parameters, like app, pool, loglevel, etc."""
-    logging.info("Creating celery simulation-worker parameters for testing")
-
-    # get current logging level
-    log_level = logging.getLogger().getEffectiveLevel()
-
-    yield {
-        "concurrency": 2,
-        "loglevel": log_level,  # set celery simulation-worker log level to the same as the one used by pytest
-        "queues": "simulations",
-        "perform_ping_check": False,  # it's crucial for tests to pass. There is bug in celery related to using queues.
-    }
-
-
-@pytest.fixture(scope="function")
 def modify_tmpdir(tmpdir_factory):
     """
     In yaptide some of the modules (pymchelper?) uses temporary directories to store files.
@@ -192,17 +170,50 @@ def modify_tmpdir(tmpdir_factory):
         os.environ["TMP"] = original_tmp
 
 
-@pytest.fixture(autouse=True)
-def clear_celery_queue(celery_app):
-    """Clears task queue from celery tasks after each test"""
+@pytest.fixture(scope="function")
+def direct_engine(app):
+    """The engine running direct simulations on a local Ray cluster, against the test's database
+
+    Request it after the fixtures setting PATH and TMPDIR: the Ray workers get the environment of this moment.
+    """
+    env_vars = {
+        "PATH": os.environ["PATH"],
+        "FLASK_SQLALCHEMY_DATABASE_URI": os.environ["FLASK_SQLALCHEMY_DATABASE_URI"],
+        "PYTHONPATH": str(Path(__file__).resolve().parent.parent.parent),
+    }
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        if name in os.environ:
+            env_vars[name] = os.environ[name]
+    ray.init(num_cpus=2, runtime_env={"env_vars": env_vars}, include_dashboard=False)
+    stop = threading.Event()
+    errors = []
+
+    def run():
+        """Ticks the engine until the test ends; a failing tick ends the test with its error"""
+        with app.app_context():
+            engine = Engine()
+            try:
+                while not stop.is_set():
+                    engine.tick()
+                    stop.wait(0.5)
+            except Exception as error:  # skipcq: PYL-W0703
+                errors.append(error)
+            for simulation_id in list(engine.running):
+                engine.stop(simulation_id)
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
     yield
-    celery_app.control.purge()
+    stop.set()
+    thread.join()
+    ray.shutdown()
+    assert not errors, f"engine tick failed: {errors[0]!r}"
 
 
 @pytest.fixture(scope="function")
 def app(tmp_path):
     """Create Flask app for testing"""
-    # for some unknown reasons Flask live server and celery won't work with the default in-memory database
+    # the engine and the merges in the Ray workers need the same database as the test, so it is a file
     # so we need to create a temporary database file
     # for each new test a new temporary directory is created
     sqlite_db_path = Path(tmp_path) / "main.db"
