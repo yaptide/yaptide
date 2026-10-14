@@ -7,9 +7,11 @@ from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError
 from sqlalchemy import asc, desc
 
-from yaptide.persistence.models import SimulationModel, UserModel
+from yaptide.persistence import result_storage
+from yaptide.persistence.models import EstimatorModel, PageModel, PageObjectModel, SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
+from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import delete_object_from_db, fetch_simulation_by_job_id
 from yaptide.utils.enums import EntityState
 
@@ -132,6 +134,20 @@ class UserSimulations(Resource):
                 code=403,
             )
 
+        # objects first: if the storage fails, the simulation stays and the delete can be repeated
+        stored = (
+            db.session.query(PageObjectModel.page_id)
+            .join(PageModel)
+            .join(EstimatorModel)
+            .filter(EstimatorModel.simulation_id == simulation.id)
+            .first()
+        )
+        if stored:
+            try:
+                result_storage.delete_simulation(simulation.id)
+            except Exception:  # skipcq: PYL-W0703
+                logging.exception("Removing the stored results of simulation %d failed", simulation.id)
+                return yaptide_response(message="Results storage is unavailable, try again later", code=503)
         delete_object_from_db(simulation)
         return yaptide_response(message=f"Simulation with job_id={job_id} successfully deleted from database", code=200)
 

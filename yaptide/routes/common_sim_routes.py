@@ -23,7 +23,8 @@ from yaptide.persistence.db_methods import (
     make_commit_to_db,
     update_simulation_state,
 )
-from yaptide.persistence.models import EstimatorModel, LogfilesModel, PageModel, UserModel
+from yaptide.persistence import result_storage
+from yaptide.persistence.models import EstimatorModel, LogfilesModel, PageModel, PageObjectModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, job_status_content
@@ -92,6 +93,17 @@ class JobsResource(Resource):
         return yaptide_response(message="Task updated", code=202)
 
 
+def page_content(page: PageModel) -> dict:
+    """A page as the UI gets it: the page itself, or a signed link to it in object storage"""
+    if page.stored_object:
+        return {
+            "page_number": page.page_number,
+            "url": result_storage.page_url(page.stored_object.key),
+            "format": page.stored_object.format,
+        }
+    return page.data
+
+
 def get_single_estimator(sim_id: int, estimator_name: str):
     """Retrieve a single estimator by simulation ID and estimator name"""
     estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
@@ -100,7 +112,11 @@ def get_single_estimator(sim_id: int, estimator_name: str):
         return yaptide_response(message="Estimator not found", code=404)
 
     pages = fetch_pages_by_estimator_id(est_id=estimator.id)
-    estimator_dict = {"metadata": estimator.data, "name": estimator.name, "pages": [page.data for page in pages]}
+    estimator_dict = {
+        "metadata": estimator.data,
+        "name": estimator.name,
+        "pages": [page_content(page) for page in pages],
+    }
     return yaptide_response(
         message=f"Estimator '{estimator_name}' for simulation: {sim_id}", code=200, content=estimator_dict
     )
@@ -118,7 +134,7 @@ def get_all_estimators(sim_id: int):
         estimator_dict = {
             "metadata": estimator.data,
             "name": estimator.name,
-            "pages": [page.data for page in estimator.pages],
+            "pages": [page_content(page) for page in estimator.pages],
         }
         result_estimators.append(estimator_dict)
     return yaptide_response(
@@ -136,8 +152,12 @@ def prepare_create_or_update_estimator_in_db(sim_id: int, name: str, estimator_d
     return estimator
 
 
-def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
-    """Prepares page objects for insertion or update without committing to the database"""
+def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storage: bool) -> bool:
+    """Prepares page objects for insertion or update without committing to the database.
+
+    Pages go to object storage while it accepts them and to the database otherwise, so an outage of the storage
+    does not lose the results; returns whether the storage is still used for the next pages.
+    """
     estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
     for page_dict in estimator_dict["pages"]:
         page = fetch_page_by_est_id_and_page_number(
@@ -152,10 +172,22 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict):
                 page_name=str(page_dict["metadata"]["name"]),
             )
         # we always update the data
-        page.data = page_dict
+        if use_storage:
+            key = result_storage.page_key(sim_id, estimator.file_name, page.page_number)
+            try:
+                size = result_storage.put_page(key, page_dict)
+                page.compressed_data = None
+                page.stored_object = PageObjectModel(key=key, size=size, format=result_storage.PAGE_FORMAT)
+            except Exception:  # skipcq: PYL-W0703
+                logging.exception("Storing results of simulation %d failed, the rest goes to the database", sim_id)
+                use_storage = False
+        if not use_storage:
+            page.data = page_dict
+            page.stored_object = None
         if not page_existed:
             # if page was created, we add it to the session
             add_object_to_db(page, make_commit=False)
+    return use_storage
 
 
 def parse_page_numbers(param: str) -> List[int]:
@@ -215,13 +247,13 @@ class ResultsResource(Resource):
                     sim_id=simulation.id, name=estimator_dict["name"], estimator_dict=estimator_dict
                 )
 
-        # commit estimators
-        make_commit_to_db()
-
+        use_storage = result_storage.configured()
         for estimator_dict in payload_dict["estimators"]:
-            prepare_create_or_update_pages_in_db(sim_id=simulation.id, estimator_dict=estimator_dict)
+            use_storage = prepare_create_or_update_pages_in_db(
+                sim_id=simulation.id, estimator_dict=estimator_dict, use_storage=use_storage
+            )
 
-        # commit pages
+        # estimators and pages together, so a failure in between does not leave estimators without pages
         make_commit_to_db()
 
         logging.debug("Marking simulation as completed")
@@ -278,13 +310,13 @@ class ResultsResource(Resource):
         estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
         if page_number is not None:
             page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=page_number)
-            result = {"page": page.data}
+            result = {"page": page_content(page)}
             return yaptide_response(message="Page retrieved successfully", code=200, content=result)
 
         if page_numbers is not None:
             parsed_page_numbers = parse_page_numbers(page_numbers)
             pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator_id, page_numbers=parsed_page_numbers)
-            result = {"pages": [page.data for page in pages]}
+            result = {"pages": [page_content(page) for page in pages]}
             return yaptide_response(message="Pages retrieved successfully", code=200, content=result)
         return yaptide_response(message="Wrong parameters", code=400, content=errors)
 

@@ -266,6 +266,7 @@ def fetch_pages_by_est_id_and_page_numbers(est_id: int, page_numbers: list) -> P
     pages = (
         db.session.query(PageModel)
         .filter(and_(PageModel.estimator_id == est_id, PageModel.page_number.in_(page_numbers)))
+        .order_by(PageModel.page_number)
         .all()
     )
     return pages
