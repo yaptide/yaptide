@@ -1,12 +1,13 @@
 import os
 import re
+from pathlib import Path
 
 from flask import Flask
 from flask_restful import Api
 from flask_migrate import Migrate
 from sqlalchemy.engine import make_url
-from yaptide.persistence.models import create_all
 from yaptide.persistence.database import db
+from yaptide.persistence.models import prepare_database
 from yaptide.routes.main_routes import initialize_routes
 
 
@@ -56,15 +57,14 @@ def create_app():
 
     database_uri = make_url(app.config["SQLALCHEMY_DATABASE_URI"]).render_as_string(hide_password=True)
     app.logger.info(f"Initializing Flask to use SQLAlchemy ORM @ {database_uri}")
+    # connections kept in the pool die with a database restart; checked before use instead of failing a request
+    app.config.setdefault("SQLALCHEMY_ENGINE_OPTIONS", {"pool_pre_ping": True})
     db.init_app(app)
 
-    # Find a better solution (maybe with Flask-Migrate) to handle migration of data from past versions
-    with app.app_context():
-        app.logger.debug("Creating models")
-        create_all()
-        app.logger.debug(f"Created {len(db.metadata.tables)} tables")
-
-    Migrate(app, db)
+    # the schema is prepared once per deployment, before the workers start (run_flask.sh)
+    Migrate(app, db, directory=str(Path(__file__).resolve().parent.parent / "migrations"))
+    # the same step by hand, e.g. for local development: flask --app yaptide.application prepare-db
+    app.cli.command("prepare-db")(prepare_database)
     api = Api(app)
     initialize_routes(api)
 

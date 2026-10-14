@@ -10,8 +10,13 @@ YAPTIDE_TOKEN_SECRET="${YAPTIDE_TOKEN_SECRET:-$(python -c 'import secrets; print
 YAPTIDE_REFRESH_TOKEN_SECRET="${YAPTIDE_REFRESH_TOKEN_SECRET:-$(python -c 'import secrets; print(secrets.token_hex(256))')}"
 export YAPTIDE_TOKEN_SECRET YAPTIDE_REFRESH_TOKEN_SECRET
 
-# create the tables once, before the workers start and race each other doing it
-python -c "from yaptide.application import create_app; create_app()"
+# migrate or create the tables once, before the workers start and race each other doing it
+python -c "
+from yaptide.application import create_app
+from yaptide.persistence.models import prepare_database
+with create_app().app_context():
+    prepare_database()
+"
 
 # workers, timeout and logging come from gunicorn.conf.py (GUNICORN_WORKERS and GUNICORN_TIMEOUT override them)
 exec gunicorn "yaptide.application:create_app()"

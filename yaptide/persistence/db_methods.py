@@ -147,6 +147,10 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
     tasks = (
         db.session.query(TaskPoly)
         .filter(TaskModel.simulation_id == sim_id, TaskModel.task_id.in_(updates_by_task_id.keys()))
+        # locked and read again, in one order so two reports do not deadlock: a cancel committed meanwhile is kept
+        .order_by(TaskModel.task_id)
+        .with_for_update(of=TaskModel.__table__, key_share=True)
+        .populate_existing()
         .all()
     )
     found_task_ids = [task.task_id for task in tasks]
@@ -164,6 +168,8 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
         logging.error("Bulk update of simulation %d rejected by the database, retrying task by task: %s", sim_id, e)
         db.session.rollback()
         for task, task_id in zip(tasks, found_task_ids):
+            # the rollback released the locks
+            db.session.refresh(task, with_for_update={"key_share": True})
             _apply_task_update(task, updates_by_task_id[task_id], sim_id)
             try:
                 db.session.commit()
@@ -309,13 +315,18 @@ def fetch_logfiles_by_sim_id(sim_id: int) -> LogfilesModel:
 
 def update_task_state(task: Union[BatchTaskModel, CeleryTaskModel], update_dict: dict) -> None:
     """Updates task state and makes commit"""
+    # locked and read again: a cancel committed by another request after this one read the task is kept;
+    # key_share (FOR NO KEY UPDATE) does not wait for requests only adding rows that point to this one
+    db.session.refresh(task, with_for_update={"key_share": True})
     task.update_state(update_dict)
     db.session.commit()
 
 
 def update_simulation_state(simulation: Union[BatchSimulationModel, CelerySimulationModel], update_dict: dict) -> None:
     """Updates simulation state and makes commit"""
-    if simulation.update_state(update_dict):
-        db.session.commit()
-    else:
-        logging.warning("Simulation state not updated, skipping commit")
+    # locked and read again: a final state committed by another request after this one read the row is kept;
+    # key_share (FOR NO KEY UPDATE) does not wait for a results upload adding estimators of this simulation
+    db.session.refresh(simulation, with_for_update={"key_share": True})
+    if not simulation.update_state(update_dict):
+        logging.warning("Simulation state not updated")
+    db.session.commit()

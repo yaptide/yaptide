@@ -3,9 +3,8 @@ from datetime import datetime, timezone
 import logging
 import re
 import threading
-from typing import Iterator, Optional
+from typing import Callable, Iterator, Optional
 
-from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
 
 # templates for regex matching output from `<simulation>_<no>.out` file
@@ -45,7 +44,7 @@ class TaskDetails:
 
     simulation_id: int
     task_id: int
-    update_key: str
+    report: Callable[[dict], None]
 
 
 def time_now_utc() -> datetime:
@@ -95,7 +94,7 @@ def check_progress(
                 "start_time": utc_without_offset(progress_details.utc_now),
                 "task_state": EntityState.RUNNING.value,
             }
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            details.report(up_dict)
         else:
             if (
                 progress_details.utc_now.timestamp() - progress_details.last_update_timestamp_seconds
@@ -107,7 +106,7 @@ def check_progress(
             up_dict = {
                 "simulated_primaries": progress,
             }
-            send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+            details.report(up_dict)
         return True
     return False
 
@@ -170,7 +169,7 @@ def read_fluka_out_file(
                     details.task_id,
                     progress_details.requested_primaries,
                 )
-                send_task_update(details.simulation_id, details.task_id, details.update_key, up_dict)
+                details.report(up_dict)
                 return
     if not event.is_set():
         raise RuntimeError(

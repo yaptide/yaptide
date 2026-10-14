@@ -88,8 +88,12 @@ services:
     image: yaptide_simulation_worker
     container_name: yaptide_simulation_worker
     restart: unless-stopped
+    # the engine runs as the main process, an init reaps the Ray processes it does not wait for
+    init: true
     volumes:
       - simulators:/simulators:rw
+    # Ray's object store lives in /dev/shm; it carries only the simulation input, the results stay on disk
+    shm_size: 1gb
     deploy:
       resources:
         limits:
@@ -97,15 +101,23 @@ services:
           cpus: ${MAX_CORES-1.0}
     env_file: .env
     environment:
-      - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
-      - BACKEND_INTERNAL_URL=http://yaptide_flask:6000
       - LOG_LEVEL_ROOT=${LOG_LEVEL_ROOT:-WARNING}
+      # the engine reads and writes simulations in the same database as Flask
+      - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+      # simulation tasks run at once; empty means one per core of the machine
+      - RAY_NUM_CPUS=${RAY_NUM_CPUS:-}
+      # a RAY_AUTH_TOKEN in .env (env_file) is used when set; an empty one here would hide the generated token
+      - RAY_AUTH_MODE=token
+      - PYTHONPATH=/usr/local/app
+      # the same storage as yaptide_flask, for the engine writing results itself (keys come from .env)
+      - RESULTS_S3_BUCKET=${RESULTS_S3_ACCESS_KEY:+yaptide-results}
+      - RESULTS_S3_ENDPOINT=http://garage:3900
+    # no ports are published: nothing outside this container talks to Ray
     healthcheck:
-      test: ["CMD-SHELL", "celery --app yaptide.celery.simulation_worker inspect ping"]
+      # GCS answering is not enough: without the raylet no task can run, while the container keeps running
+      test: ["CMD-SHELL", "ray health-check --address localhost:6379 && grep -qx raylet /proc/[0-9]*/comm"]
     depends_on:
-      redis:
-        condition: service_healthy
+      # Flask prepares the database schema before it reports healthy
       yaptide_flask:
         condition: service_healthy
 

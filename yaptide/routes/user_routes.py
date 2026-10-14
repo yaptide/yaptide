@@ -127,7 +127,13 @@ class UserSimulations(Resource):
             )
 
         # Simulation has to be completed/cancelled before deleting it.
-        if simulation.job_state in (EntityState.UNKNOWN.value, EntityState.PENDING.value, EntityState.RUNNING.value):
+        if simulation.job_state in (
+            EntityState.UNKNOWN.value,
+            EntityState.PENDING.value,
+            EntityState.RUNNING.value,
+            EntityState.MERGING_QUEUED.value,
+            EntityState.MERGING_RUNNING.value,
+        ):
             return yaptide_response(
                 message=f"""Simulation with job_id={job_id} is currently running.
                   Please cancel simulation or wait for it to finish""",

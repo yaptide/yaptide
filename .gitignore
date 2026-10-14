@@ -282,6 +282,8 @@ pyrightconfig.json
 
 # shieldhit binary
 shieldhit
+# the stand-in the tests run instead
+!tests/res/fake_shieldhit/shieldhit
 bin/
 
 # database
@@ -294,3 +296,4 @@ yaptide_tester/output/
 server.crt
 server.key
 download/
+.DS_Store

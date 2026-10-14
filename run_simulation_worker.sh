@@ -29,4 +29,25 @@ else
     ./yaptide/admin/simulators.py download-fluka --dir /simulators
 fi
 
-celery --app yaptide.celery.simulation_worker worker --events --loglevel="$LOG_LEVEL_ROOT" --pool eventlet --hostname yaptide-simulation-worker --queues simulations
+# simulations running before a restart are lost (the engine marks them failed), so their directories can go
+rm -rf "${TMPDIR:-/tmp}"/yaptide_task_* /tmp/ray/session_*
+
+# nproc ignores the container's CPU limit (MAX_CORES), so the limit comes first
+NUM_CPUS="${RAY_NUM_CPUS:-$MAX_CORES}"
+NUM_CPUS="${NUM_CPUS%.*}"
+NUM_CPUS="${NUM_CPUS:-$(nproc)}"
+if [ "$NUM_CPUS" -lt 1 ]; then
+    NUM_CPUS=1
+fi
+
+# Ray's ports are open to every container of the project, so it always runs with a token (RAY_AUTH_MODE=token
+# from compose): the one from .env, or one generated into ~/.ray/auth_token, read also by the healthcheck
+if [ -z "$RAY_AUTH_TOKEN" ]; then
+    ray get-auth-token --generate > /dev/null
+fi
+
+# Ray runs in the background, the engine in the foreground: when the engine stops, the container restarts
+# with everything that ran on it
+ray start --head --port=6379 --num-cpus="$NUM_CPUS" --object-store-memory=$((768 * 1024 * 1024)) \
+    --include-dashboard=false --disable-usage-stats
+exec python -m yaptide.engine.engine
