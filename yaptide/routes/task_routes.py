@@ -62,7 +62,7 @@ class TasksBulkResource(Resource):
     """Class responsible for updating many tasks of one simulation at once"""
 
     @staticmethod
-    def post():
+    def post():  # skipcq: PY-R1000
         """
         Method updating state of many tasks in one request.
         Used by the aggregator running on the cluster, which batches updates
