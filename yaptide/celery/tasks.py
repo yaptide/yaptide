@@ -2,6 +2,7 @@ from dataclasses import dataclass
 import logging
 import shutil
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 import threading
@@ -32,6 +33,9 @@ from yaptide.utils.sim_utils import (
 
 # prefix of the task working directories, so the ones left behind can be found
 WORK_DIR_PREFIX = "yaptide_task_"
+# a cancel does not stop running tasks (eventlet ignores terminate), so they leave their directories behind;
+# a directory where nothing was written for this long is a leftover - a running simulation keeps writing its log
+STALE_WORK_DIR_SECONDS = 7 * 24 * 3600
 
 
 @celery_app.task
@@ -63,6 +67,7 @@ def run_single_simulation(
     # the directory outlives the task: merge_results reads the result files from it and removes it afterwards,
     # so both must run on the same filesystem (one simulation worker); the directories of a job cancelled
     # before its merge are removed when the worker starts again
+    remove_old_work_dirs()
     tmp_work_dir = tempfile.mkdtemp(prefix=WORK_DIR_PREFIX, dir=get_tmp_dir())
     logging.info("Working directory is: %s", tmp_work_dir)
     try:
@@ -116,6 +121,16 @@ def run_single_simulation(
         if not keep_tmp_files:
             shutil.rmtree(tmp_work_dir, ignore_errors=True)
         raise
+
+
+def remove_old_work_dirs() -> None:
+    """Removes working directories nobody wrote to for a week, e.g. left by tasks that ran on after a cancel"""
+    oldest = time.time() - STALE_WORK_DIR_SECONDS
+    for work_dir in get_tmp_dir().glob(f"{WORK_DIR_PREFIX}*"):
+        last_write = max(path.stat().st_mtime for path in (work_dir, *work_dir.iterdir()))
+        if last_write < oldest:
+            logging.warning("Removing old working directory %s", work_dir)
+            shutil.rmtree(work_dir, ignore_errors=True)
 
 
 @worker_ready.connect

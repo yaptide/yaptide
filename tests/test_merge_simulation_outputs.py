@@ -1,6 +1,7 @@
 """Merging of direct simulation results straight from the simulator's output files"""
 
 import json
+import os
 import shutil
 from pathlib import Path
 
@@ -26,7 +27,11 @@ def test_merge_matches_convertmc(tmp_path: Path):
     assert [estimator["name"] for estimator in merged] == ESTIMATOR_NAMES
     for estimator in merged:
         expected = json.loads((tmp_path / f"{estimator['name']}.json").read_text())
-        assert {key: value for key, value in estimator.items() if key != "name"} == expected
+        assert estimator["metadata"] == expected["metadata"]
+        for page, expected_page in zip(estimator["pages"], expected["pages"], strict=True):
+            values, expected_values = page["data"].pop("values"), expected_page["data"].pop("values")
+            np.testing.assert_allclose(values, expected_values, rtol=1e-12)  # summation order differs from convertmc
+            assert page == expected_page
 
 
 def test_merge_weights_tasks_by_primaries():
@@ -160,3 +165,20 @@ def test_merge_results_fails_simulation_when_all_tasks_failed(backend_posts: lis
     tasks.merge_results(results)
 
     assert backend_posts == [("jobs", "MERGING_RUNNING"), ("logfiles", None), ("jobs", "FAILED")]
+
+
+def test_task_start_removes_only_work_dirs_nobody_wrote_to_for_a_week(tmp_path: Path, monkeypatch):
+    """A directory left after a cancel goes; one of a long simulation that still writes its log stays"""
+    monkeypatch.setattr(tasks, "get_tmp_dir", lambda: tmp_path)
+    week_ago = tasks.time.time() - tasks.STALE_WORK_DIR_SECONDS - 60
+    left, running = tmp_path / f"{tasks.WORK_DIR_PREFIX}left", tmp_path / f"{tasks.WORK_DIR_PREFIX}running"
+    for work_dir in (left, running):
+        work_dir.mkdir()
+        (work_dir / "shieldhit.log").write_text("progress")
+    for path in (left, left / "shieldhit.log", running):
+        os.utime(path, (week_ago, week_ago))
+
+    tasks.remove_old_work_dirs()
+
+    assert not left.exists()
+    assert running.exists()

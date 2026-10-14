@@ -6,8 +6,9 @@ import tempfile
 from pathlib import Path
 from typing import Optional
 
+import numpy as np
 from pymchelper.estimator import Estimator
-from pymchelper.input_output import frompattern
+from pymchelper.input_output import AggregationType, fromfile, group_input_files
 from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
 from converter.api import get_parser_from_str, run_parser
@@ -39,11 +40,44 @@ def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
     return result_estimators
 
 
+def merge_estimator_files(files: list[str]) -> Optional[Estimator]:
+    """Merge one estimator's task files: each page aggregated by its normalisation, averages weighted by primaries.
+
+    Mean only - pymchelper's WeightedStatsAggregator also accumulates a variance, which the JSON for the UI drops.
+    """
+    result = fromfile(files[0])
+    if not result:
+        return None
+    kinds = [getattr(page, "page_normalized", AggregationType.AveragingCumulative) for page in result.pages]
+    averaged = [
+        kind not in (AggregationType.NoAggregation, AggregationType.Sum, AggregationType.Concatenation)
+        for kind in kinds
+    ]
+    for page, avg in zip(result.pages, averaged):
+        if avg:
+            page.data_raw = page.data_raw * result.number_of_primaries
+    for file in files[1:]:
+        estimator = fromfile(file)
+        for page, other, kind, avg in zip(result.pages, estimator.pages, kinds, averaged):
+            if avg:
+                page.data_raw += other.data_raw * estimator.number_of_primaries
+            elif kind == AggregationType.Sum:
+                page.data_raw += other.data_raw
+            elif kind == AggregationType.Concatenation:
+                page.data_raw = np.concatenate((page.data_raw, other.data_raw))
+        result.number_of_primaries += estimator.number_of_primaries
+    for page, avg in zip(result.pages, averaged):
+        if avg:
+            page.data_raw /= result.number_of_primaries
+    result.file_counter = len(files)
+    return result
+
+
 def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
     """Merge the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*) of all tasks into estimators ready for the UI
 
-    nan=False makes pymchelper choose the aggregation of each page from its normalisation and weight the tasks
-    by their primaries, as convertmc does for batch simulations. JSON is produced once, from the merged result.
+    Each page is aggregated by its normalisation and averages are weighted by primaries, as convertmc does for
+    batch simulations. JSON is produced once, from the merged result.
     The list is sorted by name, as POST /results matches estimators to editor outputs by sorted name.
     """
     files = [
@@ -51,7 +85,12 @@ def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
     ]
     if not files:
         return []
-    estimators = {estimator.file_corename: estimator for estimator in frompattern(files, nan=False) if estimator}
+    estimators = {}
+    for corename, group in group_input_files(files).items():
+        estimator = merge_estimator_files(group)
+        if estimator:
+            estimator.file_corename = corename
+            estimators[corename] = estimator
     if not estimators:
         return []
     with tempfile.TemporaryDirectory() as json_dir:
