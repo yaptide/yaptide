@@ -3,6 +3,7 @@
 Without RESULTS_S3_BUCKET set, pages stay in the database as before (tests, local runs, older deployments).
 """
 
+import base64
 import gzip
 import json
 import os
@@ -10,11 +11,14 @@ from functools import lru_cache
 
 import boto3
 from botocore.config import Config
+from botocore.exceptions import ClientError
 
 # the page JSON the UI reads, gzipped; a format kept per page lets other formats (binary, chunked) live alongside
 PAGE_FORMAT = "page-json-gzip-v1"
 # the UI fetches a page right after asking for it
 URL_SECONDS = 15 * 60
+# a cluster job uploads its pages right after asking for the links
+UPLOAD_URL_SECONDS = 60 * 60
 
 
 def configured() -> bool:
@@ -71,8 +75,7 @@ def put_page(key: str, page: dict) -> int:
 
 def page_url(key: str) -> str:
     """Signed link the browser fetches the page from, through nginx at the backend's public address"""
-    endpoint = os.environ.get("RESULTS_S3_PUBLIC_ENDPOINT") or os.environ["BACKEND_EXTERNAL_URL"]
-    return _client(endpoint).generate_presigned_url(
+    return public_client().generate_presigned_url(
         "get_object", Params={"Bucket": os.environ["RESULTS_S3_BUCKET"], "Key": key}, ExpiresIn=URL_SECONDS
     )
 
@@ -87,3 +90,36 @@ def delete_simulation(sim_id: int) -> None:
             errors = client.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True}).get("Errors")
             if errors:
                 raise RuntimeError(f"storage kept {len(errors)} objects of simulation {sim_id}: {errors[0]}")
+
+
+def public_client():
+    """Client signing links for the browser and the clusters, at the backend's public address"""
+    return _client(os.environ.get("RESULTS_S3_PUBLIC_ENDPOINT") or os.environ["BACKEND_EXTERNAL_URL"])
+
+
+def upload_url(key: str, size: int, md5: str) -> str:
+    """Signed link a cluster job uploads one gzipped page with; the storage rejects any other size or content
+
+    md5 is the base64 MD5 of the body, as the Content-MD5 header carries it.
+    """
+    params = {
+        "Bucket": os.environ["RESULTS_S3_BUCKET"],
+        "Key": key,
+        "ContentLength": size,
+        "ContentMD5": md5,
+        "ContentType": "application/json",
+        "ContentEncoding": "gzip",
+    }
+    return public_client().generate_presigned_url("put_object", Params=params, ExpiresIn=UPLOAD_URL_SECONDS)
+
+
+def stored_matches(key: str, size: int, md5: str) -> bool:
+    """Whether the object is in storage with this size and MD5 (base64), i.e. its upload completed"""
+    try:
+        head = _internal().head_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)
+    except ClientError as error:
+        if error.response.get("Error", {}).get("Code") in ("404", "NoSuchKey", "NotFound"):
+            return False
+        raise
+    # the ETag of an object uploaded in one piece is its MD5, in hex
+    return head["ContentLength"] == size and head["ETag"].strip('"') == base64.b64decode(md5).hex()

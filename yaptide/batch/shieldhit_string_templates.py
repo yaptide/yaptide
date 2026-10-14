@@ -88,8 +88,9 @@ if $CLEAR_BDOS; then
     rm $INPUT_WILDCARD
 fi
 
-python3 $ROOT_DIR/simulation_data_sender.py --output_dir=$OUTPUT_DIRECTORY \\
-    --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
+# the pages go straight to the storage of the backend; a failed upload fails the job, the reporter job reports it
+python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY \\
+    --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} || exit 1
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash

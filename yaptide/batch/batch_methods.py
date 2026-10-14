@@ -142,7 +142,7 @@ def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
                 if file.name != "input.zip":
                     archive.write(file, arcname=file.name)
         con.put(zip_path, job_dir)
-    for script in ("watcher.py", "simulation_data_sender.py", "aggregator.py"):
+    for script in ("watcher.py", "simulation_data_sender.py", "aggregator.py", "results_uploader.py"):
         con.put(Path(__file__).parent.resolve() / script, job_dir)
 
 

@@ -180,18 +180,25 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
                 page_name=str(page_dict["metadata"]["name"]),
             )
         # we always update the data
-        if use_storage:
-            key = result_storage.page_key(sim_id, estimator.file_name, page.page_number)
-            try:
-                size = result_storage.put_page(key, page_dict)
-                page.compressed_data = None
-                page.stored_object = PageObjectModel(key=key, size=size, format=result_storage.PAGE_FORMAT)
-            except Exception:  # skipcq: PYL-W0703
-                logging.exception("Storing results of simulation %d failed, the rest goes to the database", sim_id)
-                use_storage = False
-        if not use_storage:
-            page.data = page_dict
-            page.stored_object = None
+        if "stored" in page_dict:
+            # uploaded straight to storage by a cluster job and checked there (yaptide/routes/results_upload_routes.py)
+            page.compressed_data = None
+            page.stored_object = PageObjectModel(
+                key=page_dict["stored"]["key"], size=page_dict["stored"]["size"], format=result_storage.PAGE_FORMAT
+            )
+        else:
+            if use_storage:
+                key = result_storage.page_key(sim_id, estimator.file_name, page.page_number)
+                try:
+                    size = result_storage.put_page(key, page_dict)
+                    page.compressed_data = None
+                    page.stored_object = PageObjectModel(key=key, size=size, format=result_storage.PAGE_FORMAT)
+                except Exception:  # skipcq: PYL-W0703
+                    logging.exception("Storing results of simulation %d failed, the rest goes to the database", sim_id)
+                    use_storage = False
+            if not use_storage:
+                page.data = page_dict
+                page.stored_object = None
         if not page_existed:
             # if page was created, we add it to the session
             add_object_to_db(page, make_commit=False)
