@@ -1,20 +1,20 @@
-import contextlib
 from dataclasses import dataclass
 import logging
+import shutil
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 import threading
 from typing import Optional
 
+from celery.signals import worker_ready
+
 from yaptide.batch.batch_methods import post_update
 from yaptide.celery.utils.pymc import (
-    average_estimators,
     command_to_run_fluka,
     command_to_run_shieldhit,
     execute_simulation_subprocess,
-    get_fluka_estimators,
-    get_shieldhit_estimators,
     get_tmp_dir,
     read_shieldhit_file,
     read_file_offline,
@@ -25,10 +25,17 @@ from yaptide.celery.simulation_worker import celery_app
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import (
     check_and_convert_payload_to_files_dict,
-    estimators_to_list,
+    merge_simulation_outputs,
     simulation_logfiles,
     write_simulation_input_files,
 )
+
+
+# prefix of the task working directories, so the ones left behind can be found
+WORK_DIR_PREFIX = "yaptide_task_"
+# a cancel does not stop running tasks (eventlet ignores terminate), so they leave their directories behind;
+# a directory where nothing was written for this long is a leftover - a running simulation keeps writing its log
+STALE_WORK_DIR_SECONDS = 7 * 24 * 3600
 
 
 @celery_app.task
@@ -57,17 +64,13 @@ def run_single_simulation(
     logging.info("Sending initial update for task %d, setting celery id %s", task_id, self.request.id)
     send_task_update(simulation_id, task_id, update_key, {"celery_id": self.request.id})
 
-    # we would like to have some control on the temporary directory used by the function
-    tmp_dir = get_tmp_dir()
-    logging.info("Temporary directory is: %s", tmp_dir)
-
-    # with tempfile.TemporaryDirectory(dir=tmp_dir) as tmp_dir_path:
-    # use the selected temporary directory to create a temporary directory
-    with (
-        contextlib.nullcontext(tempfile.mkdtemp(dir=tmp_dir))
-        if keep_tmp_files
-        else tempfile.TemporaryDirectory(dir=tmp_dir)
-    ) as tmp_work_dir:
+    # the directory outlives the task: merge_results reads the result files from it and removes it afterwards,
+    # so both must run on the same filesystem (one simulation worker); the directories of a job cancelled
+    # before its merge are removed when the worker starts again
+    remove_old_work_dirs()
+    tmp_work_dir = tempfile.mkdtemp(prefix=WORK_DIR_PREFIX, dir=get_tmp_dir())
+    logging.info("Working directory is: %s", tmp_work_dir)
+    try:
         write_simulation_input_files(files_dict=files_dict, output_dir=Path(tmp_work_dir))
         logging.debug("Generated input files: %s", files_dict.keys())
 
@@ -77,35 +80,17 @@ def run_single_simulation(
             simulation_result = run_single_simulation_for_fluka(tmp_work_dir, task_id, update_key, simulation_id)
 
         # there is no simulation output
-        if not simulation_result.estimators_dict:
+        if not simulation_result.output_files:
             # first we notify the backend that the task with simulation has failed
             logging.info("Simulation failed for task %d, sending update that it has failed", task_id)
             update_dict = {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
             send_task_update(simulation_id, task_id, update_key, update_dict)
 
-            # then we send the logfiles to the backend, if available
+            # the logfiles are returned to merge_results, which sends them to the backend
             logfiles = simulation_logfiles(path=Path(tmp_work_dir))
             logging.info("Simulation failed, logfiles: %s", logfiles.keys())
-            # the method below is in particular broken,
-            # as there may be several logfiles, for some of the tasks
-            # lets imagine following sequence of actions:
-            # task 1 fails, with some usefule message in the logfile,
-            # i.e. after 100 primaries the SHIELD-HIT12A binary crashed
-            # then the useful logfiles are being sent to the backend
-            # task 2 fails later, but here the SHIELD-HIT12A binary crashes
-            # at the beginning of the simulation, without producing of the logfiles
-            # then again the logfiles are being sent to the backend, but this time they are empty
-            # so the useful logfiles are overwritten by the empty ones
-            # we temporarily disable sending logfiles to the backend
-            # if logfiles:
-            #     pass
-            # sending_logfiles_status = send_simulation_logfiles(simulation_id=simulation_id,
-            #                                                 update_key=update_key,
-            #                                                 logfiles=logfiles)
-            # if not sending_logfiles_status:
-            #     logging.error("Sending logfiles failed for task %s", task_id)
-
-            # finally we return from the celery task, returning the logfiles and stdout/stderr as result
+            if not keep_tmp_files:
+                shutil.rmtree(tmp_work_dir, ignore_errors=True)
             return {
                 "logfiles": logfiles,
                 "stdout": simulation_result.command_stdout,
@@ -114,24 +99,46 @@ def run_single_simulation(
                 "update_key": update_key,
             }
 
-        # otherwise we have simulation output
-        logging.debug("Converting simulation results to JSON")
-        estimators = estimators_to_list(estimators_dict=simulation_result.estimators_dict, dir_path=Path(tmp_work_dir))
+        # We do not have any information if monitoring process sent the last update
+        # so we send it here to make sure that we have the end_time and COMPLETED state
+        end_time = datetime.utcnow().isoformat(sep=" ")
+        update_dict = {
+            "task_state": EntityState.COMPLETED.value,
+            "end_time": end_time,
+            "simulated_primaries": simulation_result.requested_primaries,
+            "requested_primaries": simulation_result.requested_primaries,
+        }
+        send_task_update(simulation_id, task_id, update_key, update_dict)
 
-    # We do not have any information if monitoring process sent the last update
-    # so we send it here to make sure that we have the end_time and COMPLETED state
-    end_time = datetime.utcnow().isoformat(sep=" ")
-    update_dict = {
-        "task_state": EntityState.COMPLETED.value,
-        "end_time": end_time,
-        "simulated_primaries": simulation_result.requested_primaries,
-        "requested_primaries": simulation_result.requested_primaries,
-    }
-    send_task_update(simulation_id, task_id, update_key, update_dict)
+        # the result files stay on disk, merge_results reads them directly - no JSON on the way
+        return {
+            "output_dir": tmp_work_dir,
+            "keep_output_dir": keep_tmp_files,
+            "simulation_id": simulation_id,
+            "update_key": update_key,
+        }
+    except BaseException:
+        if not keep_tmp_files:
+            shutil.rmtree(tmp_work_dir, ignore_errors=True)
+        raise
 
-    # finally return from the celery task, returning the estimators and stdout/stderr as result
-    # the estimators will be merged by subsequent celery task
-    return {"estimators": estimators, "simulation_id": simulation_id, "update_key": update_key}
+
+def remove_old_work_dirs() -> None:
+    """Removes working directories nobody wrote to for a week, e.g. left by tasks that ran on after a cancel"""
+    oldest = time.time() - STALE_WORK_DIR_SECONDS
+    for work_dir in get_tmp_dir().glob(f"{WORK_DIR_PREFIX}*"):
+        last_write = max(path.stat().st_mtime for path in (work_dir, *work_dir.iterdir()))
+        if last_write < oldest:
+            logging.warning("Removing old working directory %s", work_dir)
+            shutil.rmtree(work_dir, ignore_errors=True)
+
+
+@worker_ready.connect
+def remove_stale_work_dirs(**_) -> None:
+    """Removes working directories left by tasks whose merge never ran - no task is running when a worker starts"""
+    for work_dir in get_tmp_dir().glob(f"{WORK_DIR_PREFIX}*"):
+        logging.warning("Removing stale working directory %s", work_dir)
+        shutil.rmtree(work_dir, ignore_errors=True)
 
 
 @dataclass
@@ -143,7 +150,7 @@ class SimulationTaskResult:
     command_stderr: str
     simulated_primaries: int
     requested_primaries: int
-    estimators_dict: dict
+    output_files: list[Path]
 
 
 def run_single_simulation_for_shieldhit(
@@ -177,8 +184,10 @@ def run_single_simulation_for_shieldhit(
     if task_monitor:
         simulated_primaries, requested_primaries = read_file_offline(task_monitor.path_to_monitor)
 
-    # both simulation execution and monitoring process are finished now, we can read the estimators
-    estimators_dict = get_shieldhit_estimators(dir_path=Path(tmp_work_dir))
+    # both simulation execution and monitoring process are finished now, the result files are complete
+    output_files = sorted(Path(tmp_work_dir).glob("*.bdo"))
+    if not output_files:
+        logging.error("No *.bdo files found in %s", tmp_work_dir)
 
     return SimulationTaskResult(
         process_exit_success=process_exit_success,
@@ -186,7 +195,7 @@ def run_single_simulation_for_shieldhit(
         command_stderr=command_stderr,
         simulated_primaries=simulated_primaries,
         requested_primaries=requested_primaries,
-        estimators_dict=estimators_dict,
+        output_files=output_files,
     )
 
 
@@ -222,8 +231,10 @@ def run_single_simulation_for_fluka(
     # reading of the log file for fluka after simulation was finished
     # fluka copies the file back to main directory from temporary directory
 
-    # both simulation execution and monitoring process are finished now, we can read the estimators
-    estimators_dict = get_fluka_estimators(dir_path=Path(tmp_work_dir))
+    # both simulation execution and monitoring process are finished now, the result files are complete
+    output_files = sorted(Path(tmp_work_dir).glob("*_fort.*"))
+    if not output_files:
+        logging.error("No *_fort.* files found in %s", tmp_work_dir)
 
     return SimulationTaskResult(
         process_exit_success=process_exit_success,
@@ -231,7 +242,7 @@ def run_single_simulation_for_fluka(
         command_stderr=command_stderr,
         simulated_primaries=simulated_primaries,
         requested_primaries=requested_primaries,
-        estimators_dict=estimators_dict,
+        output_files=output_files,
     )
 
 
@@ -252,36 +263,39 @@ def set_merging_queued_state(results: list[dict]) -> list[dict]:
 
 
 @celery_app.task
-def merge_results(results: list[dict]) -> dict:
+def merge_results(results: list[dict]) -> dict:  # skipcq: PY-R1000
     """Merge results from multiple simulation's tasks"""
     logging.debug("Merging results from %d tasks", len(results))
+    simulation_id, update_key = None, None
+    for result in results:
+        simulation_id = simulation_id or result.get("simulation_id")
+        update_key = update_key or result.get("update_key")
+    output_dirs = [Path(result["output_dir"]) for result in results if "output_dir" in result]
+    try:
+        if simulation_id and update_key:
+            dict_to_send = {
+                "sim_id": simulation_id,
+                "job_state": EntityState.MERGING_RUNNING.value,
+                "update_key": update_key,
+            }
+            post_update(dict_to_send)
+
+        # a directory is missing after a worker restart, a result without files or logfiles comes from older code
+        missing = [str(path) for path in output_dirs if not path.is_dir()]
+        missing += [
+            f"result with keys {sorted(result)}" for result in results if not {"output_dir", "logfiles"} & set(result)
+        ]
+        for item in missing:
+            logging.error("Results of a task are missing: %s", item)
+        merged_estimators = [] if missing else merge_simulation_outputs(output_dirs)
+    finally:
+        for result in results:
+            if "output_dir" in result and not result.get("keep_output_dir"):
+                shutil.rmtree(result["output_dir"], ignore_errors=True)
+
     logfiles = {}
-
-    averaged_estimators = None
-    simulation_id = results[0].pop("simulation_id", None)
-    update_key = results[0].pop("update_key", None)
-    if simulation_id and update_key:
-        dict_to_send = {
-            "sim_id": simulation_id,
-            "job_state": EntityState.MERGING_RUNNING.value,
-            "update_key": update_key,
-        }
-        post_update(dict_to_send)
-    for i, result in enumerate(results):
-        if simulation_id is None:
-            simulation_id = result.pop("simulation_id", None)
-        if update_key is None:
-            update_key = result.pop("update_key", None)
-        if "logfiles" in result:
-            logfiles.update(result["logfiles"])
-            continue
-
-        if averaged_estimators is None:
-            averaged_estimators: list[dict] = result.get("estimators", [])
-            # There is nothing to average yet
-            continue
-
-        averaged_estimators = average_estimators(averaged_estimators, result.get("estimators", []), i)
+    for result in results:
+        logfiles.update(result.get("logfiles", {}))
 
     final_result = {"end_time": datetime.utcnow().isoformat(sep=" ")}
 
@@ -290,13 +304,23 @@ def merge_results(results: list[dict]) -> dict:
     ):
         final_result["logfiles"] = logfiles
 
-    if averaged_estimators:
+    if merged_estimators:
         # send results to the backend and mark whole simulation as completed
         sending_results_ok = send_simulation_results(
-            simulation_id=simulation_id, update_key=update_key, estimators=averaged_estimators
+            simulation_id=simulation_id, update_key=update_key, estimators=merged_estimators
         )
         if not sending_results_ok:
-            final_result["estimators"] = averaged_estimators
+            final_result["estimators"] = merged_estimators
+    elif simulation_id and update_key:
+        # nothing to show - mark the simulation failed instead of leaving it merging forever
+        post_update(
+            {
+                "sim_id": simulation_id,
+                "job_state": EntityState.FAILED.value,
+                "end_time": final_result["end_time"],
+                "update_key": update_key,
+            }
+        )
 
     return final_result
 
