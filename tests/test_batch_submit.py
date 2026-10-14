@@ -1,5 +1,6 @@
 """HPC simulations: Flask only stores and flags them, the engine submits and cancels them over SSH"""
 
+import subprocess
 from unittest import mock
 
 import pytest
@@ -28,6 +29,13 @@ def client(monkeypatch):
     """Test client of a logged in Keycloak user with a certificate, and one cluster"""
     monkeypatch.setenv("YAPTIDE_TOKEN_SECRET", "shared with the backend")
     monkeypatch.setenv("BACKEND_EXTERNAL_URL", "https://yaptide.test")
+    # the jobs report through the results storage, links to it are signed at submit
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setattr(
+        batch_methods.result_storage,
+        "job_links",
+        lambda sim_id: {"progress": {"url": "https://s3.test", "fields": {}, "prefix": f"{sim_id}/"}, "cancel": "x"},
+    )
     app = create_app()
     with app.app_context():
         db.create_all()
@@ -170,7 +178,7 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
     (sent,) = commands(cluster_connection)  # one round trip
     # every job by the id the submit wrote next to it, the reporter first; then the directory goes
     cancelled = [part.split("/")[-1].split("_job_id")[0] for part in sent.split("; ")[:-1]]
-    assert cancelled == ["reporter", "collect", "array", "aggregator"]
+    assert cancelled == ["reporter", "collect", "array"]
     assert sent.split("; ")[-1].startswith("rm -rf /scratch/plgtest/yaptide_runs/")
     assert stored(simulation.id).job_dir is None  # nothing left to cancel
 
@@ -300,3 +308,36 @@ def test_delete_waits_for_the_cancel_on_the_cluster(client, cluster_connection):
     assert client.delete("/user/simulations", query_string={"job_id": simulation.job_id}).status_code == 409
     batch_methods.cancel_simulation(simulation.id)
     assert client.delete("/user/simulations", query_string={"job_id": simulation.job_id}).status_code == 200
+
+
+def test_jobs_get_new_links_while_running(client, cluster_connection, monkeypatch):
+    """A job running past the links' week gets new ones with its update key; not once the simulation is final"""
+    simulation = submit(client)
+    key = encode_simulation_auth_token(simulation.id)
+
+    response = client.post("/tasks/links", json={"simulation_id": simulation.id, "update_key": key})
+    assert response.status_code == 200
+    assert response.get_json()["links"]["cancel"] == "x"
+    wrong = encode_simulation_auth_token(simulation.id + 1)
+    assert client.post("/tasks/links", json={"simulation_id": simulation.id, "update_key": wrong}).status_code == 400
+
+    client.delete("/jobs/batch", query_string={"job_id": simulation.job_id})
+    assert client.post("/tasks/links", json={"simulation_id": simulation.id, "update_key": key}).status_code == 409
+
+
+def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_connection):
+    """storage_links.json and the scripts are put as files; the array script hands the simulator's pid to the
+    watcher, and there is no aggregator any more
+    """
+    simulation = submit(client)
+    batch_methods.submit_simulation(simulation.id)
+
+    put = {call.args[1].rsplit("/", 1)[-1]: call.args[0] for call in cluster_connection.put.call_args_list}
+    assert {"storage_links.json", "array_script.sh", "collect_script.sh", "yaptide_submitter.sh"} <= set(put)
+    array_script = put["array_script.sh"].getvalue().decode()
+    assert "SIMULATOR_PID=$!" in array_script and "--pid=$SIMULATOR_PID" in array_script
+    submit_script = put["yaptide_submitter.sh"].getvalue().decode()
+    assert "aggregator" not in submit_script and "pyzmq" not in submit_script
+    for script in ("array_script.sh", "collect_script.sh", "yaptide_submitter.sh"):
+        checked = subprocess.run(["bash", "-n"], input=put[script].getvalue().decode(), capture_output=True, text=True)
+        assert checked.returncode == 0, checked.stderr

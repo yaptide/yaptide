@@ -124,3 +124,59 @@ def stored_matches(key: str, size: int, md5: str) -> bool:
         raise
     # the ETag of an object uploaded in one piece is its MD5, in hex
     return head["ContentLength"] == size and head["ETag"].strip('"') == base64.b64decode(md5).hex()
+
+
+# HPC jobs report progress and learn about a cancel through storage, with links signed at submit; a signature
+# lasts at most 7 days, a job running longer asks the backend for new ones
+JOB_LINK_SECONDS = 7 * 24 * 3600
+# a task's progress report: a few numbers
+MAX_PROGRESS_BYTES = 64 * 1024
+
+
+def progress_prefix(sim_id: int) -> str:
+    """Where the tasks of an HPC simulation put their progress, one object per task"""
+    return f"simulations/{sim_id}/progress/"
+
+
+def cancel_key(sim_id: int) -> str:
+    """The object whose presence tells an HPC simulation's tasks to stop"""
+    return f"simulations/{sim_id}/cancel"
+
+
+def job_links(sim_id: int) -> dict:
+    """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
+    progress prefix only (each at most MAX_PROGRESS_BYTES), and a HEAD of its cancel object
+    """
+    bucket = os.environ["RESULTS_S3_BUCKET"]
+    prefix = progress_prefix(sim_id)
+    client = public_client()
+    post = client.generate_presigned_post(
+        bucket,
+        prefix + "${filename}",
+        Conditions=[["starts-with", "$key", prefix], ["content-length-range", 1, MAX_PROGRESS_BYTES]],
+        ExpiresIn=JOB_LINK_SECONDS,
+    )
+    cancel = client.generate_presigned_url(
+        "head_object", Params={"Bucket": bucket, "Key": cancel_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
+    )
+    return {"progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix}, "cancel": cancel}
+
+
+def progress_reports(sim_id: int) -> dict[str, str]:
+    """The progress objects of an HPC simulation: key -> ETag, which changes with every new report"""
+    bucket = os.environ["RESULTS_S3_BUCKET"]
+    reports = {}
+    for listing in _internal().get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=progress_prefix(sim_id)):
+        for item in listing.get("Contents", []):
+            reports[item["Key"]] = item["ETag"]
+    return reports
+
+
+def read_report(key: str) -> dict:
+    """A task's progress report"""
+    return json.loads(_internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"].read())
+
+
+def put_cancel(sim_id: int) -> None:
+    """Tells the tasks of an HPC simulation to stop; they check for this object"""
+    _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")

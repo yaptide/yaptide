@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import queue
+import re
 import shutil
 import threading
 import time
@@ -28,6 +29,7 @@ from sqlalchemy import make_url
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
 from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app, merge_and_store, run_simulation
+from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import (
     DATABASE_FAILURES,
@@ -48,6 +50,23 @@ from yaptide.utils.enums import EntityState, PlatformType
 
 # SSH connections to the clusters at once; they ban accounts that log in often
 CLUSTER_CONNECTIONS = 4
+# how often the progress HPC tasks put into storage is read
+HPC_PROGRESS_SECONDS = 10
+# what a task's progress report may set
+REPORTED_FIELDS = {
+    "task_state",
+    "simulated_primaries",
+    "requested_primaries",
+    "start_time",
+    "end_time",
+    "estimated_time",
+}
+HPC_ACTIVE_STATES = (
+    EntityState.PENDING.value,
+    EntityState.RUNNING.value,
+    EntityState.MERGING_QUEUED.value,
+    EntityState.MERGING_RUNNING.value,
+)
 # progress is saved in batches, not for every line the simulators log
 PROGRESS_SECONDS = 1
 # a task running longer is stopped, as the Celery workers did; checked once a minute
@@ -146,6 +165,8 @@ class Engine:
         """Engine with nothing running yet"""
         self.inbox = ProgressInbox.remote()
         self.cluster = ClusterGateway.remote()
+        # ETags of the progress reports HPC tasks put into storage, as last read
+        self.report_etags: dict[str, str] = {}
         # HPC simulations being submitted (simulation id -> the submit's ref) and cancelled on their cluster
         self.submitting: dict[int, ray.ObjectRef] = {}
         self.cancelling: set[int] = set()
@@ -161,7 +182,7 @@ class Engine:
         """
         self.recover()
         self.events.put(("SWEEP", None))
-        last_progress = last_overdue_check = time.monotonic()
+        last_progress = last_overdue_check = last_hpc_progress = time.monotonic()
         failing_since = None
         while True:
             try:
@@ -176,6 +197,9 @@ class Engine:
                     if listener and not listener.is_alive():
                         raise SystemExit("the thread listening for database events died")
                     self.save_progress()
+                if time.monotonic() - last_hpc_progress >= HPC_PROGRESS_SECONDS:
+                    last_hpc_progress = time.monotonic()
+                    self.read_hpc_progress()
                 if time.monotonic() - last_overdue_check >= OVERDUE_CHECK_SECONDS:
                     last_overdue_check = time.monotonic()
                     self.stop_overdue()
@@ -221,10 +245,64 @@ class Engine:
             self.cancel(simulation_id)
 
     def cancel(self, simulation_id: int) -> None:
-        """Hands a cancelled HPC simulation to the cluster gateway, once at a time"""
+        """Cancels an HPC simulation: its tasks find the cancel in storage, and while the user's certificate lasts
+        the cluster gateway also cancels the jobs at once (and removes the job directory)
+        """
+        try:
+            if result_storage.configured():
+                result_storage.put_cancel(simulation_id)
+        except Exception:  # skipcq: PYL-W0703
+            # put again by the cancel a sweep repeats, as long as the job directory is recorded
+            logging.exception("Putting the cancel of simulation %d into storage failed", simulation_id)
         if simulation_id not in self.cancelling:
             self.cancelling.add(simulation_id)
             self.watch(self.cluster.cancel.remote(simulation_id), simulation_id, "CANCELLED_ON_CLUSTER")
+
+    def read_hpc_progress(self) -> None:
+        """Saves what the tasks of running HPC simulations put into storage since the last look
+
+        Storage out of reach skips a round; it is not a reason to stop the engine.
+        """
+        if not result_storage.configured():
+            return
+        active = db.session.query(BatchSimulationModel.id).filter(
+            BatchSimulationModel.array_id.isnot(None), BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES)
+        )
+        seen: dict[str, str] = {}
+        for (simulation_id,) in active.all():
+            try:
+                reports = result_storage.progress_reports(simulation_id)
+                updates = [
+                    update
+                    for key, etag in reports.items()
+                    if self.report_etags.get(key) != etag
+                    for update in [self.read_report(key)]
+                    if update
+                ]
+            except Exception:  # skipcq: PYL-W0703
+                logging.exception("Reading the progress of simulation %d failed", simulation_id)
+                continue
+            if updates:
+                self.save_task_updates(simulation_id, updates)
+            seen.update(reports)
+        # finished simulations are forgotten
+        self.report_etags = seen
+
+    @staticmethod
+    def read_report(key: str) -> Optional[dict]:
+        """A task's report as a task update: the task comes from the object's name, only known fields count"""
+        match = re.fullmatch(r".*/task_(\d+)\.json", key)
+        try:
+            update = result_storage.read_report(key)["update"]
+        except (KeyError, TypeError, ValueError):
+            logging.warning("Unreadable progress report %s", key)
+            return None
+        if not match or not isinstance(update, dict):
+            return None
+        return {
+            "task_id": int(match.group(1)),
+            "update_dict": {k: v for k, v in update.items() if k in REPORTED_FIELDS},
+        }
 
     def submit(self, simulation_id: int) -> None:
         """Hands a stored HPC simulation to the cluster gateway, once"""

@@ -1,6 +1,7 @@
 from flask import request
 from flask_restful import Resource
 
+from yaptide.persistence import result_storage
 from yaptide.persistence.db_methods import (
     bulk_update_task_states,
     fetch_simulation_by_sim_id,
@@ -9,7 +10,7 @@ from yaptide.persistence.db_methods import (
 )
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.tokens import decode_auth_token
-from yaptide.routes.utils.utils import update_state_from_tasks
+from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
 
 
 class TasksResource(Resource):
@@ -64,8 +65,7 @@ class TasksBulkResource(Resource):
     def post():  # skipcq: PY-R1000
         """
         Method updating state of many tasks in one request.
-        Used by the aggregator running on the cluster, which batches updates
-        coming from the individual simulation tasks.
+        Kept for jobs submitted before tasks reported through object storage (yaptide/batch/watcher.py).
         Structure required by this method to work properly:
         {
             "simulation_id": <int>,
@@ -113,3 +113,22 @@ class TasksBulkResource(Resource):
             update_state_from_tasks(simulation)
 
         return yaptide_response(message=f"Updated {updated_count} tasks", code=202)
+
+
+class TaskLinksResource(Resource):
+    """New signed storage links for the jobs of an HPC simulation running longer than the links last (a week)"""
+
+    @staticmethod
+    def post():
+        """Body: simulation_id and update_key"""
+        payload = request.get_json(force=True)
+        if not isinstance(payload, dict) or not {"simulation_id", "update_key"} <= set(payload):
+            return yaptide_response(message="simulation_id and update_key are required", code=400)
+        simulation = fetch_simulation_by_sim_id(sim_id=payload["simulation_id"])
+        if simulation is None:
+            return yaptide_response(message="Simulation does not exist", code=400)
+        if decode_auth_token(payload["update_key"], payload_key_to_return="simulation_id") != simulation.id:
+            return yaptide_response(message="Invalid update key", code=400)
+        if simulation.job_state in FINAL_STATES or not result_storage.configured():
+            return yaptide_response(message=f"No links for a simulation in {simulation.job_state}", code=409)
+        return yaptide_response(message="Links", code=200, content={"links": result_storage.job_links(simulation.id)})

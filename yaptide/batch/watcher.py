@@ -1,41 +1,57 @@
+"""Follows one simulation task on the cluster: its progress goes into object storage, a cancel stops it.
+
+Runs next to the simulator on the compute node, with the standard library only. The task's state goes into one
+small object of its own, at most every few seconds and at once when the state changes; the backend's engine reads
+these objects. A cancel is an object the backend puts into storage: the watcher checks for it and kills the
+simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
+the watcher asks the backend for new ones.
+"""
+
+# the cluster's Python may be older than the backend's: annotations are not evaluated
+from __future__ import annotations
+
 import argparse
-from collections.abc import Iterator
 import json
 import logging
-import random
+import os
 import re
 import signal
 import ssl
-import threading
 import time
+import uuid
+from collections.abc import Iterator
 from datetime import datetime
 from io import TextIOWrapper
 from pathlib import Path
-from typing import Optional
-from urllib import request
-import math
+from typing import Callable, Optional
+from urllib import error, request
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
+# FLUKA's output: progress lines (six numbers) follow NEXT SEEDS, the run ends with an "End of FLUKA" banner
+FLUKA_IN_PROGRESS = " NEXT SEEDS:"
+FLUKA_COLLECTED = " All cases handled by Feeder"
+FLUKA_END = re.compile(r"^ \* ======(?:( )*?)End of FLUKA [\w\-.]* run (?:( )*?) ====== \*")
+
+# the TLS certificate chain of the backend is not always complete for the cluster's OpenSSL, as in the other scripts
+CONTEXT = ssl.create_default_context()
+CONTEXT.check_hostname = False
+CONTEXT.verify_mode = ssl.CERT_NONE  # skipcq: PTC-W6001 # see above
+# how often a cancel is looked for, and how long the simulator gets to stop before it is killed
+CANCEL_CHECK_SECONDS = 15
+STOP_SECONDS = 10
 
 
 def log_generator(
     thefile: TextIOWrapper,
-    event: threading.Event = None,
+    event=None,
     max_idle_seconds: float = 3600,
     polling_interval_seconds: float = 1,
 ) -> Iterator[str]:
-    """
-    Generator equivalent to `tail -f` Linux command.
-    Yields new lines appended to the end of the file.
-    Main purpose is monitoring of the log files.
+    """`tail -f` of a log file: yields the lines appended to it, waits for new ones (used by the direct engine too)
 
-    Args:
-        thefile: File object to read from.
-        event: Threading event to signal when to stop the generator.
-        max_idle_seconds: Maximum time to wait for new data before raising TimeoutError.
-        polling_interval_seconds: Interval between successive file polls while no new data is available.
+    Raises TimeoutError when nothing new comes for max_idle_seconds.
     """
     if thefile is None:
         raise ValueError("File object cannot be None.")
@@ -58,351 +74,278 @@ def log_generator(
         yield line
 
 
-def send_task_update(  # skipcq: PY-R1000
-    sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str
-) -> bool:
-    """Sends task update to the aggregator, or directly to flask when no aggregator is reachable"""
-    global AGGREGATOR_SENDER  # skipcq: PYL-W0603
-    REPORTED_STATE.update(update_dict)
-    if AGGREGATOR_SENDER is None:
-        # the aggregator runs in its own job, it may still have been queued when this task started
-        AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, update_key)
-    aggregator_lost = False
-    if AGGREGATOR_SENDER is not None and not AGGREGATOR_SENDER.send(task_id=task_id, update_dict=update_dict):
-        # the aggregator is gone (time limit, crash) - drop the sender, a later update checks .zmq_auth again,
-        # which an aggregator that shut down normally has removed
-        aggregator_lost = AGGREGATOR_SENDER.delivered
-        if not aggregator_lost:
-            # never reached it - an address left behind by a killed aggregator, or one this node cannot reach;
-            # trying it on every update would add a connection attempt per update, so wait before the next try
-            UNREACHABLE_AGGREGATOR["retry_after"] = time.monotonic() + UNREACHABLE_AGGREGATOR_RETRY_SECONDS
-        AGGREGATOR_SENDER.close(linger=0)
-        AGGREGATOR_SENDER = None
-    elif AGGREGATOR_SENDER is not None:
-        if update_dict.get("task_state") in TERMINAL_TASK_STATES:
-            # a successful send only means the update is queued, it is not delivered yet - a task that never
-            # reaches the backend as finished stays RUNNING forever, so the terminal state also goes to flask
-            # directly; it is one request per task and flask ignores updates of an already finished task.
-            # It carries everything reported so far - it can overtake the aggregator's batch with start_time,
-            # which flask would then ignore for the finished task
-            post_task_update(
-                sim_id=sim_id,
-                task_id=task_id,
-                update_key=update_key,
-                update_dict=dict(REPORTED_STATE),
-                backend_url=backend_url,
-            )
-        return True
-    # without the aggregator hundreds of tasks talk to flask directly - the load that made it unresponsive,
-    # so state changes always go through, progress alone is throttled (only where an aggregator is expected);
-    # the interval is randomized per update, so tasks started together do not report in lock-step
-    now = time.monotonic()
-    if AGGREGATOR_AUTH_PATH is not None and "task_state" not in update_dict and not aggregator_lost:
-        if now < REST_FALLBACK["next_progress_seconds"]:
-            logging.debug("No aggregator, skipping progress update for task %d", task_id)
-            return True
-        REST_FALLBACK["next_progress_seconds"] = now + REST_FALLBACK_PROGRESS_INTERVAL_SECONDS * random.uniform(
-            0.8, 1.2
-        )
-    if AGGREGATOR_AUTH_PATH is not None and REST_FALLBACK["startup_delay_pending"]:
-        # tasks of one array start within the same second - a random delay before the first request spreads them;
-        # timestamps already in update_dict are not shifted, lines read after the delay can be up to it late
-        REST_FALLBACK["startup_delay_pending"] = False
-        time.sleep(random.uniform(0, STARTUP_JITTER_SECONDS))
-    if update_dict.get("task_state") in TERMINAL_TASK_STATES or aggregator_lost:
-        # carry everything reported so far - the updates sent just before the aggregator went away may be lost,
-        # e.g. RUNNING with start_time
-        update_dict = dict(REPORTED_STATE)
-    # a final state that never arrives leaves the task RUNNING forever - worth a few retries (e.g. during a deploy)
-    attempts = TERMINAL_STATE_ATTEMPTS if update_dict.get("task_state") in TERMINAL_TASK_STATES else 1
-    return post_task_update_with_retries(sim_id, task_id, update_key, update_dict, backend_url, attempts)
+def now() -> str:
+    """Current time as the backend stores task times"""
+    return datetime.utcnow().isoformat(sep=" ", timespec="microseconds")
 
 
-def post_task_update_with_retries(  # skipcq: PYL-R0913
-    sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str, attempts: int
-) -> bool:
-    """Sends the update to flask, trying up to `attempts` times"""
-    for attempt in range(attempts):
-        if post_task_update(
-            sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=update_dict, backend_url=backend_url
-        ):
-            return True
-        if attempt < attempts - 1:
-            time.sleep(TERMINAL_STATE_RETRY_SECONDS)
-    return False
+def shieldhit_update(line: str) -> Optional[dict]:
+    """What a line of SHIELD-HIT12A's log says about the task, if anything"""
+    if re.search(RUN_MATCH, line):
+        parts = line.split()
+        return {
+            "simulated_primaries": int(parts[3]),
+            "estimated_time": int(parts[9]) + int(parts[7]) * 60 + int(parts[5]) * 3600,
+        }
+    if re.search(REQUESTED_MATCH, line):
+        return {
+            "simulated_primaries": 0,
+            "requested_primaries": int(line.split(": ")[1]),
+            "start_time": now(),
+            "task_state": "RUNNING",
+        }
+    if re.search(COMPLETE_MATCH, line):
+        return {"end_time": now(), "task_state": "COMPLETED"}
+    return None
 
 
-def post_task_update(sim_id: int, task_id: int, update_key: str, update_dict: dict, backend_url: str) -> bool:
-    """Sends task update to flask to update database"""
-    if not backend_url:
-        logging.error("Backend url not specified")
-        return False
+class FlukaParser:
+    """What lines of FLUKA's output say about the task; progress lines count only after NEXT SEEDS"""
 
-    dict_to_send = {"simulation_id": sim_id, "task_id": task_id, "update_key": update_key, "update_dict": update_dict}
-    tasks_url = f"{backend_url}/tasks"
-    logging.debug("Sending update %s to the backend %s", dict_to_send, tasks_url)
-    context = ssl.SSLContext()
+    def __init__(self):
+        """Before the run"""
+        self.in_progress = False
+        self.requested = 0
 
-    req = request.Request(
-        tasks_url, json.dumps(dict_to_send).encode(), {"Content-Type": "application/json"}, method="POST"
+    def __call__(self, line: str) -> Optional[dict]:
+        """The update a line carries, if any"""
+        if FLUKA_END.match(line):
+            return {"end_time": now(), "task_state": "COMPLETED", "simulated_primaries": self.requested}
+        if line.startswith(FLUKA_IN_PROGRESS):
+            self.in_progress = True
+            return None
+        if line.startswith(FLUKA_COLLECTED):
+            self.in_progress = False
+            return None
+        parts = line.split()
+        if not self.in_progress or len(parts) != 6:
+            return None
+        try:
+            done, remaining = int(float(parts[0])), int(float(parts[1]))
+        except ValueError:
+            return None
+        if not self.requested:
+            self.requested = done + remaining
+            return {
+                "simulated_primaries": done,
+                "requested_primaries": self.requested,
+                "start_time": now(),
+                "task_state": "RUNNING",
+            }
+        return {"simulated_primaries": done}
+
+
+def multipart(fields: dict, body: bytes) -> tuple[bytes, str]:
+    """A multipart/form-data body (an S3 POST upload: the policy fields, then the file) and its content type"""
+    boundary = uuid.uuid4().hex
+    parts = [
+        f'--{boundary}\r\nContent-Disposition: form-data; name="{name}"\r\n\r\n{value}\r\n'.encode()
+        for name, value in fields.items()
+    ]
+    parts.append(
+        f'--{boundary}\r\nContent-Disposition: form-data; name="file"; filename="report.json"\r\n'
+        f"Content-Type: application/json\r\n\r\n".encode()
+        + body
+        + b"\r\n"
     )
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
 
+
+class Reporter:
+    """Puts the task's state into storage and looks there for a cancel"""
+
+    def __init__(self, links_path: Path, task_id: int, report_seconds: float, backend: dict):
+        """backend: sim_id, update_key and backend_url, for new links when the old ones expire"""
+        self.links_path = links_path
+        self.links = json.loads(links_path.read_text())
+        self.task_id = task_id
+        self.report_seconds = report_seconds
+        self.backend = backend
+        self.state: dict = {}
+        self.unsent = False
+        self.last_report = 0.0
+        self.last_cancel_check = 0.0
+
+    def update(self, changes: dict) -> None:
+        """Takes a change of the task's state; a new state is reported at once, progress at most every few
+        seconds
+        """
+        self.state.update(changes)
+        self.unsent = True
+        if "task_state" in changes or time.monotonic() - self.last_report >= self.report_seconds:
+            self.report()
+
+    def report(self) -> None:
+        """Puts the task's state into its object, if anything changed"""
+        if not self.unsent:
+            return
+        body = json.dumps({"task_id": self.task_id, "update": self.state}).encode()
+        key = f"{self.links['progress']['prefix']}task_{self.task_id:04d}.json"
+        data, content_type = multipart({**self.links["progress"]["fields"], "key": key}, body)
+        status = self.send(self.links["progress"]["url"], "POST", data, {"Content-Type": content_type})
+        if status == 403 and self.renew_links():
+            return self.report()
+        if status in (200, 201, 204):
+            self.unsent = False
+            self.last_report = time.monotonic()
+        return None
+
+    def cancelled(self) -> bool:
+        """Whether the simulation was cancelled; looked up at most every CANCEL_CHECK_SECONDS"""
+        if time.monotonic() - self.last_cancel_check < CANCEL_CHECK_SECONDS:
+            return False
+        self.last_cancel_check = time.monotonic()
+        status = self.send(self.links["cancel"], "HEAD")
+        if status == 403 and self.renew_links():
+            self.last_cancel_check = 0.0
+            return self.cancelled()
+        return status == 200
+
+    def renew_links(self) -> bool:
+        """New signed links from the backend, once the old ones expired; shared with the other tasks"""
+        payload = json.dumps({"simulation_id": self.backend["sim_id"], "update_key": self.backend["update_key"]})
+        req = request.Request(
+            f"{self.backend['backend_url']}/tasks/links",
+            payload.encode(),
+            {"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with request.urlopen(req, context=CONTEXT, timeout=60) as response:  # skipcq: BAN-B310
+                links = json.loads(response.read())["links"]
+        except Exception as err:  # skipcq: PYL-W0703
+            logging.warning("New links refused: %s", err)
+            return False
+        self.links = links
+        temporary = self.links_path.with_suffix(f".{self.task_id}.tmp")
+        temporary.write_text(json.dumps(links))
+        temporary.replace(self.links_path)
+        return True
+
+    @staticmethod
+    def send(url: str, method: str, data: Optional[bytes] = None, headers: Optional[dict] = None) -> int:
+        """One request to storage; the status, or 0 when it could not be reached"""
+        req = request.Request(url, data=data, method=method, headers=headers or {})
+        try:
+            with request.urlopen(req, context=CONTEXT, timeout=60) as response:  # skipcq: BAN-B310
+                return response.status
+        except error.HTTPError as http_error:
+            return http_error.code
+        except Exception as err:  # skipcq: PYL-W0703
+            logging.warning("%s %s failed: %s", method, url.split("?")[0], err)
+            return 0
+
+
+def running(pid: int) -> bool:
+    """Whether the simulator still runs"""
     try:
-        with request.urlopen(req, context=context, timeout=30) as res:  # skipcq: BAN-B310
-            if res.getcode() != 202:
-                logging.warning("Sending update to %s failed", tasks_url)
-                return False
-    except Exception as e:  # skipcq: PYL-W0703
-        print(e)
-        logging.debug("Sending update to %s failed", tasks_url)
+        os.kill(pid, 0)
+    except ProcessLookupError:
         return False
+    except PermissionError:
+        return True
     return True
 
 
-class AggregatorSender:
-    """Pushes task updates to the aggregator of the simulation over a persistent ZeroMQ socket"""
-
-    def __init__(self, auth_path: Path, update_key: str):
-        # imported here, so a cluster without pyzmq still gets its updates through the REST fallback
-        import zmq  # skipcq: PYL-C0415
-
-        self.zmq = zmq
-        self.delivered = False
-        auth = json.loads(auth_path.read_text())
-        self.update_key = update_key
-        self.context = zmq.Context()
-        self.socket = self.context.socket(zmq.PUSH)
-        # a dead aggregator must fail the send instead of silently queueing - the REST fallback then takes over,
-        # so messages are queued only to a live connection
-        self.socket.setsockopt(zmq.IMMEDIATE, 1)
-        self.socket.setsockopt(zmq.SNDHWM, 100)
-        self.socket.setsockopt(zmq.LINGER, 1000)
-        # without heartbeats a frozen aggregator or a dead node keeps the connection "alive" and swallows updates
-        self.socket.setsockopt(zmq.HEARTBEAT_IVL, 2000)
-        self.socket.setsockopt(zmq.HEARTBEAT_TIMEOUT, 6000)
-        self.socket.connect(f"tcp://{auth['host']}:{auth['port']}")
-        # with IMMEDIATE a send fails until the TCP handshake is done - wait for it once instead of losing
-        # the first update to the fallback
-        reachable = self.socket.poll(500, zmq.POLLOUT)
-        logging.debug(
-            "Aggregator at %s:%s %s", auth["host"], auth["port"], "connected" if reachable else "not reachable yet"
-        )
-
-    def send(self, task_id: int, update_dict: dict) -> bool:
-        """Returns False when the update could not be handed over to the aggregator"""
-        message = {"update_key": self.update_key, "task_id": task_id, "update_dict": update_dict}
-        try:
-            self.socket.send(json.dumps(message).encode(), flags=self.zmq.NOBLOCK)
-        except self.zmq.ZMQError as e:
-            logging.warning("Sending update to the aggregator failed: %s", e)
-            return False
-        self.delivered = True
-        return True
-
-    def close(self, linger: Optional[int] = None) -> None:
-        """Waits up to the linger period for queued updates to leave - pyzmq skips that at interpreter exit"""
-        self.socket.close(linger=linger)
-        self.context.term()
-
-
-def connect_to_aggregator(auth_path: Optional[Path], update_key: str) -> Optional[AggregatorSender]:
-    """Builds the sender, returns None when no aggregator is available and REST should be used instead"""
-    if auth_path is None or not auth_path.exists() or time.monotonic() < UNREACHABLE_AGGREGATOR["retry_after"]:
-        return None
+def stop(pid: int) -> None:
+    """Stops the simulator: politely first, then for good"""
     try:
-        return AggregatorSender(auth_path=auth_path, update_key=update_key)
-    except Exception as e:  # skipcq: PYL-W0703
-        logging.warning("Could not connect to the aggregator described by %s: %s", auth_path, e)
-        return None
-
-
-AGGREGATOR_AUTH_PATH: Optional[Path] = None
-AGGREGATOR_SENDER: Optional[AggregatorSender] = None
-TERMINAL_TASK_STATES = {"COMPLETED", "FAILED", "CANCELED"}
-REST_FALLBACK_PROGRESS_INTERVAL_SECONDS = 30
-REST_FALLBACK = {"next_progress_seconds": 0.0, "startup_delay_pending": True}
-STARTUP_JITTER_SECONDS = 15
-# everything this task reported so far, merged - the direct terminal update carries it along
-REPORTED_STATE: dict = {}
-UNREACHABLE_AGGREGATOR_RETRY_SECONDS = 60
-UNREACHABLE_AGGREGATOR = {"retry_after": 0.0}
-TERMINAL_STATE_ATTEMPTS = 3
-TERMINAL_STATE_RETRY_SECONDS = 20
-
-
-def read_shieldhit_file(
-    filepath: Path,
-    sim_id: int,
-    task_id: int,
-    update_key: str,
-    backend_url: str,
-    max_wait_for_file_seconds: float = 30,
-    max_idle_seconds: float = 3600,
-    update_interval_seconds: float = 2,
-    polling_interval_seconds: float = 1,
-):  # skipcq: PYL-W0613
-    """
-    Monitors log file of a shieldhit task and sends updates to the backend.
-    The purpose of the updates is the progress bar update and state updates
-    (like simulation failed or completed). All possible exceptions are caught and logged,
-    and in case of any exception the task is marked as FAILED.
-
-    Args:
-        filepath: Path to the log file to monitor.
-        sim_id: Simulation ID.
-        task_id: Task ID.
-        update_key: Simulation auth token for backend updates.
-        backend_url: URL of the backend server to send updates to.
-        max_wait_for_file_seconds: Maximum time to wait for the log file to be created
-            before marking the task as FAILED.
-        max_idle_seconds: Maximum time to wait for new data before marking the task as FAILED.
-        update_interval_seconds: Minimum interval between successive updates to the backend.
-        polling_interval_seconds: Interval between successive file polls while no new
-            data is available or while waiting for the file to be created.
-    """
-    try:
-        logging.debug("Started monitoring, simulation id: %d, task id: %s", sim_id, task_id)
-        logfile = None
-        last_update_timestamp_seconds = 0
-
-        open_file_attempts = math.ceil(max_wait_for_file_seconds / polling_interval_seconds)
-        for _ in range(open_file_attempts):
-            try:
-                logfile = open(filepath)  # skipcq: PTC-W6004
-                break
-            except FileNotFoundError:
-                time.sleep(polling_interval_seconds)
-
-        if logfile is None:
-            logging.debug("Log file for task %s not found", task_id)
-            up_dict = {  # skipcq: PYL-W0612
-                "task_state": "FAILED",
-                "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
-            }
-            send_task_update(
-                sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
-            )
-            logging.debug("Update for task: %d - FAILED", task_id)
-            return
-
-        loglines = log_generator(
-            logfile,
-            threading.Event(),
-            max_idle_seconds=max_idle_seconds,
-            polling_interval_seconds=polling_interval_seconds,
-        )
-
-        for line in loglines:
-            utc_now = datetime.utcnow()
-            if re.search(RUN_MATCH, line):
-                logging.debug("Found RUN_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-                if utc_now.timestamp() - last_update_timestamp_seconds < update_interval_seconds:
-                    logging.debug("Skipping update, too often")
-                    continue
-                last_update_timestamp_seconds = utc_now.timestamp()
-                splitted = line.split()
-                up_dict = {  # skipcq: PYL-W0612
-                    "simulated_primaries": int(splitted[3]),
-                    "estimated_time": int(splitted[9]) + int(splitted[7]) * 60 + int(splitted[5]) * 3600,
-                }
-                send_task_update(
-                    sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
-                )
-                logging.debug("Update for task: %d - simulated primaries: %s", task_id, splitted[3])
-
-            elif re.search(REQUESTED_MATCH, line):
-                logging.debug("Found REQUESTED_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-                splitted = line.split(": ")
-                up_dict = {  # skipcq: PYL-W0612
-                    "simulated_primaries": 0,
-                    "requested_primaries": int(splitted[1]),
-                    "start_time": utc_now.isoformat(sep=" ", timespec="microseconds"),
-                    "task_state": "RUNNING",
-                }
-                send_task_update(
-                    sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
-                )
-                logging.debug("Update for task: %d - RUNNING", task_id)
-
-            elif re.search(COMPLETE_MATCH, line):
-                logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %s ", line, filepath, task_id)
-                up_dict = {  # skipcq: PYL-W0612
-                    "end_time": utc_now.isoformat(sep=" ", timespec="microseconds"),
-                    "task_state": "COMPLETED",
-                }
-                send_task_update(
-                    sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
-                )
-                logging.debug("Update for task: %d - COMPLETED", task_id)
+        os.kill(pid, signal.SIGTERM)
+        for _ in range(STOP_SECONDS):
+            if not running(pid):
                 return
-            else:
-                logging.debug("No match found in line: %s for file: %s and task: %s ", line, filepath, task_id)
+            time.sleep(1)
+        os.kill(pid, signal.SIGKILL)
+    except ProcessLookupError:
+        return
 
-        raise RuntimeError(
-            f"Log stream ended without completion markers in SHIELDHIT monitor for task {task_id}. "
-            f"This should never happen."
-        )
-    except TimeoutError as err:
-        logging.warning("Log monitoring timed out for file %s and task %s: %s", filepath, task_id, err)
-        up_dict = {  # skipcq: PYL-W0612
-            "task_state": "FAILED",
-            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
-        }
-        send_task_update(
-            sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
-        )
-        logging.debug("Update for task: %d - TIMEOUT", task_id)
-    except Exception as err:
-        logging.error("Error while monitoring log file %s for task %s: %s", filepath, task_id, err)
-        up_dict = {  # skipcq: PYL-W0612
-            "task_state": "FAILED",
-            "end_time": datetime.utcnow().isoformat(sep=" ", timespec="microseconds"),
-        }
-        send_task_update(
-            sim_id=sim_id, task_id=task_id, update_key=update_key, update_dict=up_dict, backend_url=backend_url
-        )
-        logging.debug("Update for task: %d - ERROR", task_id)
-    finally:
-        if logfile is not None:
-            logfile.close()
+
+def find_log(find: Callable[[], Optional[Path]], pid: int, poll_seconds: float) -> Optional[Path]:
+    """The simulator's log, once it exists; None if the simulator ended without one"""
+    while True:
+        path = find()
+        if path is not None:
+            return path
+        if not running(pid):
+            return find()
+        time.sleep(poll_seconds)
+
+
+def watch(  # skipcq: PY-R1000
+    find: Callable[[], Optional[Path]],
+    parse: Callable[[str], Optional[dict]],
+    pid: int,
+    reporter: Reporter,
+    poll_seconds: float = 1,
+) -> None:
+    """Follows the simulator's log until it ends or the simulation is cancelled, reporting the task's state"""
+    path = find_log(find, pid, poll_seconds)
+    if path is None:
+        reporter.update({"task_state": "FAILED", "end_time": now()})
+        return
+    with open(path) as log:  # skipcq: PTC-W6004
+        while True:
+            line = log.readline()
+            if line:
+                update = parse(line)
+                if update:
+                    reporter.update(update)
+                    if update.get("task_state") == "COMPLETED":
+                        return
+                continue
+            if reporter.cancelled():
+                stop(pid)
+                reporter.update({"task_state": "CANCELED", "end_time": now()})
+                return
+            if not running(pid):
+                # the simulator ended: what it wrote last decides, a run that never completed failed
+                for last_line in log:
+                    update = parse(last_line)
+                    if update:
+                        reporter.update(update)
+                        if update.get("task_state") == "COMPLETED":
+                            return
+                reporter.update({"task_state": "FAILED", "end_time": now()})
+                return
+            reporter.report()
+            time.sleep(poll_seconds)
+
+
+def fluka_log(work_dir: Path) -> Callable[[], Optional[Path]]:
+    """FLUKA writes its output into a directory named after its process"""
+    return lambda: next(work_dir.glob("fluka_*/*001.out"), None)
+
+
+def main(args) -> None:
+    """Watches one task"""
+    reporter = Reporter(
+        Path(args.links),
+        args.task_id,
+        # one report per task at most every 10 s, less often with many tasks: about 10 a second in all
+        max(10.0, args.ntasks / 10),
+        {"sim_id": args.sim_id, "update_key": args.update_key, "backend_url": args.backend_url},
+    )
+    if args.simulator == "fluka":
+        watch(fluka_log(Path(args.work_dir)), FlukaParser(), args.pid, reporter)
+    else:
+        log_path = Path(args.filepath)
+        watch(lambda: log_path if log_path.exists() else None, shieldhit_update, args.pid, reporter)
+    reporter.report()
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGUSR1, signal.SIG_IGN)
-
     parser = argparse.ArgumentParser()
-    parser.add_argument("--filepath", type=str)
-    parser.add_argument("--sim_id", type=int)
-    parser.add_argument("--task_id", type=int)
-    parser.add_argument("--update_key", type=str)
-    parser.add_argument("--backend_url", type=str)
-    parser.add_argument("--zmq_auth", type=str, default=None, help="path to the .zmq_auth file of the aggregator")
-    parser.add_argument("--verbose", action="store_true")
-    args = parser.parse_args()
-
-    log_level = logging.INFO
-    if args.verbose:
-        log_level = logging.DEBUG
-    logging.basicConfig(
-        level=log_level, format="%(asctime)s %(levelname)s %(message)s", handlers=[logging.StreamHandler()]
-    )
-
-    logging.info("log file %s", args.filepath)
-    logging.info("sim_id %s", args.sim_id)
-    logging.info("task_id %s", args.task_id)
-    logging.info("update_key %s", args.update_key)
-    logging.info("backend_url %s", args.backend_url)
-    AGGREGATOR_AUTH_PATH = Path(args.zmq_auth) if args.zmq_auth else None
-    AGGREGATOR_SENDER = connect_to_aggregator(AGGREGATOR_AUTH_PATH, args.update_key)
-    try:
-        read_shieldhit_file(
-            filepath=Path(args.filepath),
-            sim_id=args.sim_id,
-            task_id=args.task_id,
-            update_key=args.update_key,
-            backend_url=args.backend_url,
-        )
-    finally:
-        # the sender may have been created lazily inside read_shieldhit_file
-        if AGGREGATOR_SENDER is not None:
-            AGGREGATOR_SENDER.close()
+    parser.add_argument("--simulator", choices=("shieldhit", "fluka"), default="shieldhit")
+    parser.add_argument("--filepath", help="SHIELD-HIT12A's log")
+    parser.add_argument("--work_dir", help="the task's directory, where FLUKA runs")
+    parser.add_argument("--pid", type=int, required=True, help="the simulator's process")
+    parser.add_argument("--links", required=True, help="storage_links.json of the simulation")
+    parser.add_argument("--ntasks", type=int, default=1)
+    parser.add_argument("--sim_id", type=int, required=True)
+    parser.add_argument("--task_id", type=int, required=True)
+    parser.add_argument("--update_key", required=True)
+    parser.add_argument("--backend_url", required=True)
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    main(parser.parse_args())

@@ -17,6 +17,7 @@ from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
+    BatchTaskModel,
     ClusterModel,
     CelerySimulationModel,
     CeleryTaskModel,
@@ -380,3 +381,87 @@ def test_hpc_events_submit_once_and_a_crashed_submit_fails(client, engine):
     assert engine.cluster.submit.remote.call_count == 2
     assert not engine.submitting
     engine.cluster.cancel.remote.assert_called_once_with(simulation.id)
+
+
+def hpc_simulation(state: str = EntityState.PENDING.value) -> int:
+    """A submitted HPC simulation with two tasks"""
+    user = db.session.query(YaptideUserModel).one()
+    cluster = ClusterModel(cluster_name="ares")
+    db.session.add(cluster)
+    db.session.commit()
+    simulation = BatchSimulationModel(
+        job_id="hpc",
+        user_id=user.id,
+        cluster_id=cluster.id,
+        title="hpc",
+        input_type=InputType.FILES.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        job_state=state,
+        array_id=1,
+        collect_id=2,
+    )
+    simulation.tasks = [BatchTaskModel(task_id=task_id, requested_primaries=1000) for task_id in (1, 2)]
+    db.session.add_all([simulation, *simulation.tasks])
+    db.session.commit()
+    return simulation.id
+
+
+def test_hpc_progress_is_read_from_storage(client, engine, monkeypatch):
+    """The tasks' reports in storage move their tasks and the simulation; an unchanged report is not read again"""
+    simulation_id = hpc_simulation()
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    prefix = f"simulations/{simulation_id}/progress/"
+    reports = {
+        prefix + "task_0001.json": ("e1", {"task_state": "RUNNING", "simulated_primaries": 300, "job_dir": "x"}),
+        prefix + "task_0002.json": ("e2", {"task_state": "RUNNING"}),
+    }
+    reads = []
+    monkeypatch.setattr(
+        engine_module.result_storage, "progress_reports", lambda sim_id: {k: v[0] for k, v in reports.items()}
+    )
+    monkeypatch.setattr(
+        engine_module.result_storage,
+        "read_report",
+        lambda key: reads.append(key) or {"task_id": 99, "update": reports[key][1]},
+    )
+
+    engine.read_hpc_progress()
+    assert state(simulation_id) == EntityState.RUNNING.value
+    db.session.remove()
+    first = db.session.query(TaskModel).filter_by(simulation_id=simulation_id, task_id=1).one()
+    assert first.simulated_primaries == 300  # the task from the object's name, unknown fields ignored
+
+    reports[prefix + "task_0001.json"] = ("e3", {"task_state": "COMPLETED"})
+    reports[prefix + "task_0002.json"] = ("e2", {"task_state": "RUNNING"})
+    reads.clear()
+    engine.read_hpc_progress()
+    assert reads == [prefix + "task_0001.json"]
+
+
+def test_unreachable_storage_skips_a_round(client, engine, monkeypatch):
+    """Progress that cannot be read now is read next time; the engine keeps going"""
+    hpc_simulation()
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+
+    def unreachable(sim_id: int) -> dict:
+        """Storage restarting"""
+        raise ConnectionError(f"storage unreachable for {sim_id}")
+
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", unreachable)
+
+    engine.read_hpc_progress()
+
+
+def test_hpc_cancel_goes_into_storage(client, engine, monkeypatch):
+    """The tasks learn about a cancel from storage, also after the user's certificate expired"""
+    simulation_id = hpc_simulation(EntityState.CANCELED.value)
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    cancels = []
+    monkeypatch.setattr(engine_module.result_storage, "put_cancel", cancels.append)
+    engine.cluster = mock.Mock()
+    engine.cluster.cancel.remote.side_effect = lambda sim_id: ray.put(None)
+
+    engine.handle(EntityState.CANCELED.value, simulation_id, "BATCH")
+
+    assert cancels == [simulation_id]
+    engine.cluster.cancel.remote.assert_called_once_with(simulation_id)
