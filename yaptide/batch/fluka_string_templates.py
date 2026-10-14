@@ -24,8 +24,19 @@ if [ -n "$JOB_ID" ] ; then
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
+    # a collect job that SLURM stops (time limit, memory, node failure, scancel) cannot report it ended, so a small
+    # job does it then; it is removed by SLURM when the collect succeeds (--kill-on-invalid-dep)
+    if [ -n "$COLLECT_ID" ] ; then
+        REPORTER_CMD="sbatch --dependency=afternotok:$COLLECT_ID --kill-on-invalid-dep=yes {reporter_options} --parsable --wrap=\\"python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} --simulation_state=FAILED\\" > $OUT"
+        eval $REPORTER_CMD
+        REPORTER_ID=`cat $OUT | cut -d ";" -f 1`
+        echo "Reporter id: $REPORTER_ID"
+        if [ -n "$REPORTER_ID" ] ; then
+            echo "$REPORTER_ID" > $ROOT_DIR/reporter_job_id
+        fi
+    fi
 fi
-"""
+"""  # skipcq: FLK-E501
 
 COLLECT_FLUKA_BASH: str = """#!/bin/bash
 {collect_header}

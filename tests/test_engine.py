@@ -5,6 +5,7 @@ import platform
 import queue
 import time
 from pathlib import Path
+from unittest import mock
 
 import pytest
 import ray
@@ -15,6 +16,8 @@ from yaptide.engine.engine import Engine
 from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
+    BatchSimulationModel,
+    ClusterModel,
     CelerySimulationModel,
     CeleryTaskModel,
     LogfilesModel,
@@ -324,3 +327,39 @@ def test_database_failure_while_collecting_is_retried(client, engine, monkeypatc
     run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value and not engine.running)
 
     assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
+
+
+@ray.remote
+def crashing_submit(simulation_id: int) -> None:
+    """A submit whose worker died"""
+    raise RuntimeError(f"worker of submit {simulation_id} died")
+
+
+def test_hpc_events_submit_once_and_a_crashed_submit_fails(client, engine):
+    """The engine hands a stored HPC simulation to the cluster gateway once; a crash of it ends FAILED"""
+    user = db.session.query(YaptideUserModel).one()
+    cluster = ClusterModel(cluster_name="ares")
+    db.session.add(cluster)
+    db.session.commit()
+    simulation = BatchSimulationModel(
+        job_id="hpc",
+        user_id=user.id,
+        cluster_id=cluster.id,
+        title="hpc",
+        input_type=InputType.FILES.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        job_state=EntityState.PENDING.value,
+    )
+    db.session.add(simulation)
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    engine.cluster.submit.remote.side_effect = crashing_submit.remote
+
+    engine.handle(EntityState.PENDING.value, simulation.id, "BATCH")
+    engine.handle(EntityState.PENDING.value, simulation.id, "BATCH")
+    assert engine.cluster.submit.remote.call_count == 1
+    run_events_until(engine, lambda: state(simulation.id) == EntityState.FAILED.value)
+
+    assert not engine.submitting
+    engine.handle(EntityState.CANCELED.value, simulation.id, "BATCH")
+    engine.cluster.cancel.remote.assert_called_once_with(simulation.id)

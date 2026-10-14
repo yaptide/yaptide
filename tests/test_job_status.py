@@ -13,7 +13,7 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes import task_routes
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
-from yaptide.routes.utils.utils import update_direct_state_from_tasks
+from yaptide.routes.utils.utils import update_state_from_tasks
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
 
@@ -160,7 +160,7 @@ def test_bulk_task_reports_set_the_direct_state(client, simulation):
 def test_progress_reports_skip_the_state_check(client, simulation, monkeypatch):
     """Most reports carry only progress; they do not pay for counting the task states"""
     counted = []
-    monkeypatch.setattr(task_routes, "update_direct_state_from_tasks", counted.append)
+    monkeypatch.setattr(task_routes, "update_state_from_tasks", counted.append)
 
     post_task_update(client, simulation.id, 1, {"simulated_primaries": 500})
     post_task_update(client, simulation.id, 1, {"task_state": "COMPLETED"})
@@ -190,6 +190,6 @@ def test_derived_state_does_not_overwrite_a_cancel_stored_meanwhile(client, simu
     db.session.query(SimulationModel).filter_by(id=sim_id).update({"job_state": "CANCELED"})
     db.session.commit()
 
-    update_direct_state_from_tasks(stale)
+    update_state_from_tasks(stale)
 
     assert stored_state(sim_id) == "CANCELED"

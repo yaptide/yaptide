@@ -130,22 +130,28 @@ class SimulationModel(db.Model):
         return db_commit_required
 
 
-# Postgres tells the engine (yaptide/engine) about the direct simulations it has to start or stop: every change,
-# from any route, script or psql, sends the event when its transaction commits. The same function and trigger
-# are created by the migration 9e1d2f3a4b5c for databases created before.
+# Postgres tells the engine (yaptide/engine) about the simulations it has to start or stop - direct ones it runs,
+# HPC ones it submits and cancels: every change, from any route, script or psql, sends the event when its
+# transaction commits. The migrations 9e1d2f3a4b5c and 4b8e2c6d1a7f create the same for databases created before.
 ENGINE_CHANNEL = "yaptide_engine"
 NOTIFY_ENGINE_FUNCTION = DDL(
     """
 CREATE OR REPLACE FUNCTION notify_engine() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
-        IF OLD.platform = 'DIRECT' THEN
-            PERFORM pg_notify('yaptide_engine', json_build_object('simulation', OLD.id, 'event', 'DELETED')::text);
+        IF OLD.platform IN ('DIRECT', 'BATCH') THEN
+            PERFORM pg_notify(
+                'yaptide_engine',
+                json_build_object('simulation', OLD.id, 'platform', OLD.platform, 'event', 'DELETED')::text
+            );
         END IF;
         RETURN OLD;
     END IF;
-    IF NEW.platform = 'DIRECT' AND NEW.job_state IN ('PENDING', 'CANCELED') THEN
-        PERFORM pg_notify('yaptide_engine', json_build_object('simulation', NEW.id, 'event', NEW.job_state)::text);
+    IF NEW.platform IN ('DIRECT', 'BATCH') AND NEW.job_state IN ('PENDING', 'CANCELED') THEN
+        PERFORM pg_notify(
+            'yaptide_engine',
+            json_build_object('simulation', NEW.id, 'platform', NEW.platform, 'event', NEW.job_state)::text
+        );
     END IF;
     RETURN NEW;
 END

@@ -175,6 +175,7 @@ def test_aggregator_depends_on_the_first_array_task_and_collect_stops_it():
         update_key="key",
         backend_url="http://backend",
         aggregator_options="",
+        reporter_options="",
     )
     collect_script = COLLECT_SHIELDHIT_BASH.format(
         collect_header="",

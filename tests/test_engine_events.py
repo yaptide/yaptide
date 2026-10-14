@@ -95,8 +95,8 @@ def test_states_the_engine_writes_itself_send_nothing(listener):
     assert events(listener) == []
 
 
-def test_batch_simulations_send_nothing(listener):
-    """HPC simulations are not the engine's"""
+def test_batch_simulations_send_events_with_their_platform(listener):
+    """The engine submits stored HPC simulations too, so it has to know which ones they are"""
     user = YaptideUserModel(username="batch")
     user.set_password("x")
     cluster = ClusterModel(cluster_name="ares")
@@ -115,7 +115,10 @@ def test_batch_simulations_send_nothing(listener):
     )
     db.session.commit()
 
-    assert events(listener) == []
+    simulation_id = db.session.query(BatchSimulationModel.id).scalar()
+    assert [json.loads(notify.payload) for notify in listener.notifies(timeout=0.5)] == [
+        {"simulation": simulation_id, "platform": "BATCH", "event": EntityState.PENDING.value}
+    ]
 
 
 def test_database_with_tables_from_the_models_only_gets_the_trigger(listener):
