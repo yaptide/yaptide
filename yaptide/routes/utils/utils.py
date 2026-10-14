@@ -1,11 +1,17 @@
+from datetime import datetime
 from typing import Optional
 import logging
 
 from environs import env, EnvValidationError
 
-from yaptide.persistence.db_methods import fetch_simulation_by_job_id
-from yaptide.persistence.models import UserModel, YaptideUserModel
-from yaptide.utils.enums import InputType
+from yaptide.persistence.database import db
+from yaptide.persistence.db_methods import (
+    fetch_simulation_by_job_id,
+    fetch_task_summary,
+    fetch_tasks_by_sim_id,
+)
+from yaptide.persistence.models import SimulationModel, UserModel, YaptideUserModel
+from yaptide.utils.enums import EntityState, InputType
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
 
 
@@ -37,6 +43,42 @@ def check_if_job_is_owned_and_exist(job_id: str, user: UserModel) -> tuple[bool,
     if simulation.user_id == user.id:
         return True, "", 200
     return False, "Job with provided ID does not belong to the user", 403
+
+
+FINAL_STATES = (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value)
+
+
+def job_status_content(simulation: SimulationModel, with_tasks: bool) -> dict:
+    """Simulation status as the UI polls it: totals over the tasks always, the list of tasks only when asked for"""
+    content = {"job_state": simulation.job_state, "job_tasks_summary": fetch_task_summary(simulation.id)}
+    if with_tasks:
+        content["job_tasks_status"] = [task.get_status_dict() for task in fetch_tasks_by_sim_id(sim_id=simulation.id)]
+    return content
+
+
+def update_direct_state_from_tasks(simulation: SimulationModel) -> None:
+    """A direct simulation is PENDING, RUNNING or FAILED as its tasks are; its other states come from its worker"""
+    summary = fetch_task_summary(simulation.id)
+    states, ntasks = summary["task_states"], summary["ntasks"]
+    if states.get(EntityState.PENDING.value) == ntasks:
+        job_state = EntityState.PENDING.value
+    elif states.get(EntityState.FAILED.value) == ntasks:
+        job_state = EntityState.FAILED.value
+    elif states.get(EntityState.RUNNING.value):
+        job_state = EntityState.RUNNING.value
+    else:
+        return
+    if simulation.job_state == job_state:
+        return
+    update = {SimulationModel.job_state: job_state}
+    if job_state == EntityState.FAILED.value:
+        # the merge reports FAILED with its end time too, but a final state cannot be updated any more
+        update[SimulationModel.end_time] = datetime.utcnow()
+    # one conditional statement: a cancel or result stored meanwhile by another request is not overwritten
+    db.session.query(SimulationModel).filter(
+        SimulationModel.id == simulation.id, SimulationModel.job_state.notin_(FINAL_STATES)
+    ).update(update, synchronize_session=False)
+    db.session.commit()
 
 
 def determine_input_type(payload_dict: dict) -> Optional[str]:

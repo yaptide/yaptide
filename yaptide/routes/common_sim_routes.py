@@ -1,5 +1,4 @@
 import logging
-from collections import Counter
 from datetime import datetime
 from typing import List
 
@@ -21,14 +20,13 @@ from yaptide.persistence.db_methods import (
     fetch_simulation_by_job_id,
     fetch_simulation_by_sim_id,
     fetch_simulation_id_by_job_id,
-    fetch_tasks_by_sim_id,
     make_commit_to_db,
     update_simulation_state,
 )
 from yaptide.persistence.models import EstimatorModel, LogfilesModel, PageModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
-from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist
+from yaptide.routes.utils.utils import check_if_job_is_owned_and_exist, job_status_content
 from yaptide.routes.utils.tokens import decode_auth_token
 from yaptide.utils.enums import EntityState, InputType
 
@@ -40,6 +38,8 @@ class JobsResource(Resource):
         """Class specifies API parameters for GET and DELETE request"""
 
         job_id = fields.String()
+        # the UI needs only the totals; the list of tasks stays the default for older clients
+        tasks = fields.Boolean(load_default=True)
 
     @staticmethod
     @requires_auth()
@@ -63,42 +63,9 @@ class JobsResource(Resource):
                 message="Job state is unknown", code=200, content={"job_state": simulation.job_state}
             )
 
-        tasks = fetch_tasks_by_sim_id(sim_id=simulation.id)
-
-        job_tasks_status = [task.get_status_dict() for task in tasks]
-        job_tasks_status = sorted(job_tasks_status, key=lambda x: x["task_id"])
-
-        if simulation.job_state in (
-            EntityState.COMPLETED.value,
-            EntityState.FAILED.value,
-            EntityState.MERGING_QUEUED.value,
-            EntityState.MERGING_RUNNING.value,
-        ):
-            return yaptide_response(
-                message=f"Job state: {simulation.job_state}",
-                code=200,
-                content={
-                    "job_state": simulation.job_state,
-                    "job_tasks_status": job_tasks_status,
-                },
-            )
-
-        job_info = {"job_state": simulation.job_state}
-        status_counter = Counter([task["task_state"] for task in job_tasks_status])
-        if status_counter[EntityState.PENDING.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.PENDING.value
-        elif status_counter[EntityState.FAILED.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.FAILED.value
-        elif status_counter[EntityState.RUNNING.value] > 0:
-            job_info["job_state"] = EntityState.RUNNING.value
-        elif job_id.endswith("BATCH") and status_counter[EntityState.COMPLETED.value] == len(job_tasks_status):
-            job_info["job_state"] = EntityState.MERGING_QUEUED.value
-
-        update_simulation_state(simulation=simulation, update_dict=job_info)
-
-        job_info["job_tasks_status"] = job_tasks_status
-
-        return yaptide_response(message=f"Job state: {job_info['job_state']}", code=200, content=job_info)
+        # a read only: the state follows the tasks when they report, not when someone looks
+        content = job_status_content(simulation, with_tasks=param_dict["tasks"])
+        return yaptide_response(message=f"Job state: {simulation.job_state}", code=200, content=content)
 
     @staticmethod
     def post():

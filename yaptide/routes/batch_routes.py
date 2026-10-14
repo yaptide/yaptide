@@ -36,6 +36,7 @@ from yaptide.routes.utils.utils import (
     determine_input_type,
     make_input_dict,
     get_clamped_ntasks_value,
+    job_status_content,
 )
 from yaptide.utils.enums import EntityState, PlatformType
 
@@ -155,6 +156,8 @@ class JobsBatch(Resource):
         """Class specifies API parameters"""
 
         job_id = fields.String()
+        # the UI needs only the totals; the list of tasks stays the default for older clients
+        tasks = fields.Boolean(load_default=True)
 
     @staticmethod
     @requires_auth()
@@ -176,18 +179,11 @@ class JobsBatch(Resource):
             return yaptide_response(message=error_message, code=res_code)
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
 
-        tasks = fetch_batch_tasks_by_sim_id(sim_id=simulation.id)
-
-        job_tasks_status = [task.get_status_dict() for task in tasks]
-
         if simulation.job_state in (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value):
             return yaptide_response(
                 message=f"Job state: {simulation.job_state}",
                 code=200,
-                content={
-                    "job_state": simulation.job_state,
-                    "job_tasks_status": job_tasks_status,
-                },
+                content=job_status_content(simulation, with_tasks=params_dict["tasks"]),
             )
 
         # the job ids arrive from the helper worker a few seconds after submitting, until then SLURM has nothing to say
@@ -201,9 +197,10 @@ class JobsBatch(Resource):
             except InvalidRequestError:  # the user deleted the simulation meanwhile
                 return yaptide_response(message="Simulation no longer exists", code=404)
             update_simulation_state(simulation=simulation, update_dict=job_info)
-        job_info = {"job_state": simulation.job_state, "job_tasks_status": job_tasks_status}
 
-        return yaptide_response(message="", code=200, content=job_info)
+        return yaptide_response(
+            message="", code=200, content=job_status_content(simulation, with_tasks=params_dict["tasks"])
+        )
 
     @staticmethod
     @requires_auth()
