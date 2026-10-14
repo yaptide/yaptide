@@ -2,11 +2,13 @@
 
 import os
 import platform
+import queue
 import time
 from pathlib import Path
 
 import pytest
 import ray
+from sqlalchemy.exc import OperationalError
 
 from yaptide.engine import engine as engine_module
 from yaptide.engine.engine import Engine
@@ -97,10 +99,11 @@ def submit(client, beam: str, ntasks: int = 2) -> int:
 
 
 def run_until(engine: Engine, condition, timeout: float = 60) -> None:
-    """Ticks the engine until the condition holds"""
+    """Sweeps until the condition holds, as the engine does when it cannot listen"""
     deadline = time.time() + timeout
     while time.time() < deadline:
-        engine.tick()
+        engine.sweep()
+        engine.save_progress()
         if condition():
             return
         time.sleep(0.2)
@@ -179,6 +182,7 @@ def test_overdue_task_is_stopped_and_fails(client, engine, monkeypatch):
     simulation_id = submit(client, "FAKE_SLEEP", ntasks=1)
     run_until(engine, lambda: task_states(simulation_id) == [EntityState.RUNNING.value])
     monkeypatch.setattr(engine_module, "TASK_SECONDS_LIMIT", 0)
+    engine.stop_overdue()
 
     run_until(engine, lambda: state(simulation_id) == EntityState.FAILED.value and not engine.running)
 
@@ -244,12 +248,79 @@ def test_simulation_deleted_after_its_tasks_does_not_break_the_engine(client, en
     """A simulation gone before its merge starts is dropped, the others keep running"""
     deleted = submit(client, "regular run", ntasks=1)
     other = submit(client, "FAKE_SLEEP", ntasks=1)
-    engine.tick()
+    engine.sweep()
     ray.wait(list(engine.running[deleted].tasks), timeout=60)
     db.session.delete(db.session.get(SimulationModel, deleted))
     db.session.commit()
 
-    engine.tick()
+    engine.sweep()
 
     assert deleted not in engine.running
     assert other in engine.running
+
+
+def run_events_until(engine: Engine, condition, timeout: float = 60) -> None:
+    """Handles only the events in the queue, as the engine does while listening, until the condition holds"""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            engine.handle(*engine.events.get(timeout=0.2))
+        except queue.Empty:
+            pass
+        engine.save_progress()
+        if condition():
+            return
+    raise AssertionError("condition not reached")
+
+
+def test_events_alone_run_a_simulation(client, engine):
+    """The event Postgres sends on submit starts it, Ray's events of finished tasks and merge complete it"""
+    simulation_id = submit(client, "regular run")
+    engine.handle(EntityState.PENDING.value, simulation_id)
+
+    run_events_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value and not engine.running)
+
+    assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
+
+
+def test_cancel_event_stops_the_simulation(client, engine, cluster):
+    """The event Postgres sends on cancel stops the tasks at once"""
+    simulation_id = submit(client, "FAKE_SLEEP")
+    engine.handle(EntityState.PENDING.value, simulation_id)
+    run_events_until(engine, lambda: task_states(simulation_id) == [EntityState.RUNNING.value] * 2)
+
+    engine.handle(EntityState.CANCELED.value, simulation_id)
+
+    assert not engine.running
+    assert not work_dirs(cluster)
+
+
+def test_database_failure_while_collecting_is_retried(client, engine, monkeypatch):
+    """A task finishing while the database is down is taken again by the sweep, not failed and forgotten"""
+    original = Engine.save_task_updates
+    failures = []
+
+    def database_down_once(simulation_id: int, updates: list[dict]) -> None:
+        """The first save of finished tasks meets a database that is restarting"""
+        if not failures and any("end_time" in update["update_dict"] for update in updates):
+            failures.append(simulation_id)
+            raise OperationalError("UPDATE", {}, Exception("the database system is shutting down"))
+        original(simulation_id, updates)
+
+    monkeypatch.setattr(Engine, "save_task_updates", staticmethod(database_down_once))
+    simulation_id = submit(client, "regular run")
+    engine.handle(EntityState.PENDING.value, simulation_id)
+    deadline = time.time() + 60
+    while not failures and time.time() < deadline:
+        try:
+            engine.handle(*engine.events.get(timeout=0.2))
+        except OperationalError:
+            db.session.rollback()
+        except queue.Empty:
+            pass
+    assert failures, "the failure was not reached"
+    assert simulation_id in engine.running
+
+    run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value and not engine.running)
+
+    assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2

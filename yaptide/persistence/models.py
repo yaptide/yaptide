@@ -6,7 +6,7 @@ import json
 from datetime import datetime
 
 import flask_migrate
-from sqlalchemy import Column, UniqueConstraint, inspect
+from sqlalchemy import DDL, Column, UniqueConstraint, event, inspect
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -128,6 +128,38 @@ class SimulationModel(db.Model):
             self.end_time = datetime.strptime(update_dict["end_time"], "%Y-%m-%d %H:%M:%S.%f")
             db_commit_required = True
         return db_commit_required
+
+
+# Postgres tells the engine (yaptide/engine) about the direct simulations it has to start or stop: every change,
+# from any route, script or psql, sends the event when its transaction commits. The same function and trigger
+# are created by the migration 9e1d2f3a4b5c for databases created before.
+ENGINE_CHANNEL = "yaptide_engine"
+NOTIFY_ENGINE_FUNCTION = DDL(
+    """
+CREATE OR REPLACE FUNCTION notify_engine() RETURNS trigger AS $$
+BEGIN
+    IF TG_OP = 'DELETE' THEN
+        IF OLD.platform = 'DIRECT' THEN
+            PERFORM pg_notify('yaptide_engine', json_build_object('simulation', OLD.id, 'event', 'DELETED')::text);
+        END IF;
+        RETURN OLD;
+    END IF;
+    IF NEW.platform = 'DIRECT' AND NEW.job_state IN ('PENDING', 'CANCELED') THEN
+        PERFORM pg_notify('yaptide_engine', json_build_object('simulation', NEW.id, 'event', NEW.job_state)::text);
+    END IF;
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql
+"""
+)
+NOTIFY_ENGINE_TRIGGER = DDL(
+    """
+CREATE OR REPLACE TRIGGER simulation_engine_events AFTER INSERT OR UPDATE OF job_state OR DELETE ON "Simulation"
+FOR EACH ROW EXECUTE FUNCTION notify_engine()
+"""
+)
+for statement in (NOTIFY_ENGINE_FUNCTION, NOTIFY_ENGINE_TRIGGER):
+    event.listen(SimulationModel.__table__, "after_create", statement.execute_if(dialect="postgresql"))
 
 
 class CelerySimulationModel(SimulationModel):
@@ -426,4 +458,10 @@ def prepare_database():
         flask_migrate.upgrade()
     else:
         db.create_all()
+        if db.engine.dialect.name == "postgresql":
+            # create_all skips existing tables, and with them their after_create trigger; the stamp below skips
+            # its migration, so a database whose tables were only ever created from the models gets it here
+            with db.engine.begin() as connection:
+                connection.execute(NOTIFY_ENGINE_FUNCTION)
+                connection.execute(NOTIFY_ENGINE_TRIGGER)
         flask_migrate.stamp()

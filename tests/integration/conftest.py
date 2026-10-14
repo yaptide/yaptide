@@ -189,12 +189,13 @@ def direct_engine(app):
     errors = []
 
     def run():
-        """Ticks the engine until the test ends; a failing tick ends the test with its error"""
+        """Sweeps until the test ends (SQLite sends no events); a failing sweep ends the test with its error"""
         with app.app_context():
             engine = Engine()
             try:
                 while not stop.is_set():
-                    engine.tick()
+                    engine.sweep()
+                    engine.save_progress()
                     stop.wait(0.5)
             except Exception as error:  # skipcq: PYL-W0703
                 errors.append(error)
@@ -208,7 +209,7 @@ def direct_engine(app):
     thread.join()
     ray.shutdown()
     if errors:
-        pytest.fail(f"engine tick failed: {errors[0]!r}")
+        pytest.fail(f"engine sweep failed: {errors[0]!r}")
 
 
 @pytest.fixture(scope="function")
