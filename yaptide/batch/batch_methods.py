@@ -33,6 +33,7 @@ from yaptide.persistence.models import (
     KeycloakUserModel,
     LogfilesModel,
     SimulationModel,
+    TaskModel,
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, SimulationType
@@ -60,6 +61,9 @@ def fail_submit(simulation: BatchSimulationModel, log: dict) -> None:
     logfiles = LogfilesModel(simulation_id=simulation.id)
     logfiles.data = log
     add_object_to_db(logfiles)
+    db.session.query(TaskModel).filter(TaskModel.simulation_id == simulation.id).update(
+        {TaskModel.task_state: EntityState.FAILED.value}, synchronize_session=False
+    )
     update_simulation_state(
         simulation, {"job_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     )
@@ -165,9 +169,10 @@ def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
 
 # a job directory as submit_simulation creates it: $SCRATCH/yaptide_runs/<simulation id>_<microseconds>
 JOB_DIR_PATTERN = re.compile(r"/[\w./-]+/yaptide_runs/(\d+)_\d+")
-# the jobs of a simulation, in the order they are cancelled: collect first - cancelling the array first lets SLURM
-# start the collect, which then reports FAILED; the submit script writes their ids into the job directory
-SIMULATION_JOBS = ("collect", "array", "aggregator", "reporter")
+# the jobs of a simulation, in the order they are cancelled: the reporter first - a cancelled collect would start
+# it (it reports a collect that did not succeed); then the collect - cancelling the array first lets SLURM start
+# the collect, which then reports FAILED. The submit script writes their ids into the job directory.
+SIMULATION_JOBS = ("reporter", "collect", "array", "aggregator")
 
 
 def forget_job_dir(simulation_id: int) -> None:
@@ -202,10 +207,12 @@ def cancel_simulation(simulation_id: int) -> None:
     cluster = db.session.get(ClusterModel, simulation.cluster_id)
     try:
         with get_connection(user=user, cluster=cluster) as con:
-            # a job already gone from SLURM makes scancel fail, the rest must still be cancelled (warn)
-            for job in SIMULATION_JOBS:
-                con.run(f"test -s {job_dir}/{job}_job_id && scancel `cat {job_dir}/{job}_job_id`", warn=True)
-            con.run(f"rm -rf {job_dir}", warn=True)
+            # one command, as every command is a round trip; a job already gone from SLURM makes its scancel fail,
+            # the rest are still cancelled
+            cancels = "; ".join(
+                f"test -s {job_dir}/{job}_job_id && scancel `cat {job_dir}/{job}_job_id`" for job in SIMULATION_JOBS
+            )
+            con.run(f"{cancels}; rm -rf {job_dir}", warn=True)
     except AuthenticationException:
         logging.warning("Certificate of simulation %d expired, its jobs run to their end", simulation.id)
     except Exception as e:  # skipcq: PYL-W0703

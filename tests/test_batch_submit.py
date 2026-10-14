@@ -167,11 +167,11 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
     assert stored(simulation.id).job_state == EntityState.CANCELED.value
 
     batch_methods.cancel_simulation(simulation.id)
-    sent = commands(cluster_connection)
-    # every job by the id the submit wrote next to it, collect first; then the directory goes
-    assert [command.split("/")[-1].split("_job_id")[0] for command in sent[:4]] == list(batch_methods.SIMULATION_JOBS)
-    assert all("scancel" in command for command in sent[:4])
-    assert sent[-1].startswith("rm -rf /scratch/plgtest/yaptide_runs/")
+    (sent,) = commands(cluster_connection)  # one round trip
+    # every job by the id the submit wrote next to it, the reporter first; then the directory goes
+    cancelled = [part.split("/")[-1].split("_job_id")[0] for part in sent.split("; ")[:-1]]
+    assert cancelled == ["reporter", "collect", "array", "aggregator"]
+    assert sent.split("; ")[-1].startswith("rm -rf /scratch/plgtest/yaptide_runs/")
     assert stored(simulation.id).job_dir is None  # nothing left to cancel
 
 
@@ -194,9 +194,8 @@ def test_cancel_during_submit_cancels_the_jobs_right_after(client, cluster_conne
     cluster_connection.run.side_effect = cancel_meanwhile
     batch_methods.submit_simulation(simulation.id)
 
-    assert sum(command.startswith("test -s") for command in commands(cluster_connection)) == len(
-        batch_methods.SIMULATION_JOBS
-    )
+    cancels = [command for command in commands(cluster_connection) if command.startswith("test -s")]
+    assert len(cancels) == 1 and cancels[0].count("scancel") == len(batch_methods.SIMULATION_JOBS)
     assert stored(simulation.id).job_state == EntityState.CANCELED.value
 
 
