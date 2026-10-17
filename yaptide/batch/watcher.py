@@ -245,7 +245,7 @@ class Reporter:
         )
         try:
             with request.urlopen(req, context=CONTEXT, timeout=60) as response:  # skipcq: BAN-B310
-                links = json.loads(response.read())["links"]
+                links = json.load(response)["links"]
         except Exception as err:  # skipcq: PYL-W0703
             logging.warning("New links refused: %s", err)
             return False

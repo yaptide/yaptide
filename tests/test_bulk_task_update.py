@@ -1,5 +1,3 @@
-import json
-
 import pytest
 from sqlalchemy.exc import DataError, OperationalError
 from yaptide.application import create_app

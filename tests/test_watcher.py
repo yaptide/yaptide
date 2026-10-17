@@ -213,6 +213,7 @@ def test_watcher_runs_with_the_standard_library_only(tmp_path):
         [sys.executable, "-I", "-S", "-c", f"import runpy; runpy.run_path({str(Path(watcher.__file__))!r})"],
         capture_output=True,
         text=True,
+        check=False,
         timeout=60,
     )
     assert result.returncode == 0, result.stderr

@@ -339,5 +339,7 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
     submit_script = put["yaptide_submitter.sh"].getvalue().decode()
     assert "aggregator" not in submit_script and "pyzmq" not in submit_script
     for script in ("array_script.sh", "collect_script.sh", "yaptide_submitter.sh"):
-        checked = subprocess.run(["bash", "-n"], input=put[script].getvalue().decode(), capture_output=True, text=True)
+        checked = subprocess.run(
+            ["bash", "-n"], input=put[script].getvalue().decode(), capture_output=True, text=True, check=False
+        )
         assert checked.returncode == 0, checked.stderr

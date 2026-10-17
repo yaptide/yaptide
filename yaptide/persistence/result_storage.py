@@ -187,7 +187,7 @@ def progress_reports(sim_id: int) -> dict[str, str]:
 
 def read_report(key: str) -> dict:
     """A task's progress report"""
-    return json.loads(_internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"].read())
+    return json.load(_internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"])
 
 
 def put_cancel(sim_id: int) -> None:

@@ -263,8 +263,11 @@ def prepare_script_files(
             collect_header=collect_header, remove_output_from_workspace="true", **common
         ),
     }
-    paths = {"submit": f"{job_dir}/yaptide_submitter.sh", "array": f"{job_dir}/array_script.sh"}
-    paths["collect"] = f"{job_dir}/collect_script.sh"
+    paths = {
+        "submit": f"{job_dir}/yaptide_submitter.sh",
+        "array": f"{job_dir}/array_script.sh",
+        "collect": f"{job_dir}/collect_script.sh",
+    }
     # put as files: one round trip each and no quoting of the scripts through a shell command
     for name, script in sh_files.items():
         con.put(io.BytesIO(script.encode()), paths[name])
