@@ -2,7 +2,7 @@
 """Stand-in for SHIELD-HIT12A in tests, behaviour chosen by the content of beam.dat in the working directory:
 FAKE_SLEEP runs until killed (writes its pid to fake.pid), FAKE_FAIL exits with an error and no results,
 anything else copies the results of a real run (tests/res/bdo) into the working directory; FAKE_SAVES also logs
-a save of them half way and waits a while before it ends.
+a save of them half way and ends only once a file named "release" appears in the working directory.
 """
 
 import os
@@ -34,7 +34,10 @@ else:
         with log.open("a") as log_file:
             log_file.write("     Primary particle no.          50      ETR:   0 hours  0 minutes  1 seconds\n")
             log_file.write("     Saved all 4 estimator(s)\n")
-        time.sleep(5)
+        # the test releases the tasks once it saw the saves of both merged; a lost test does not leave them behind
+        deadline = time.time() + 120
+        while not (work_dir / "release").exists() and time.time() < deadline:
+            time.sleep(0.1)
     with log.open("a") as log_file:
         log_file.write("     Primary particle no.         100      ETR:   0 hours  0 minutes  0 seconds\n")
         log_file.write("   Run time:   0 hours  0 minutes  1 seconds     prim/sec:        100\n")
