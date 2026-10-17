@@ -128,9 +128,9 @@ class ProgressInbox:
         """Merges a task's update into the one waiting to be saved"""
         self.updates.setdefault((simulation_id, task_id), {}).update(update_dict)
 
-    def saved(self, simulation_id: int, task_id: int, snapshot_dir: str, primaries: int) -> None:
+    def saved(self, simulation_id: int, task_id: int, key: str, primaries: int) -> None:
         """Replaces a task's save waiting to be taken"""
-        self.saves[(simulation_id, task_id)] = (snapshot_dir, primaries)
+        self.saves[(simulation_id, task_id)] = (key, primaries)
 
     def drain(self) -> tuple[dict[tuple[int, int], dict], dict[tuple[int, int], tuple[str, int]]]:
         """Hands over the waiting updates and saves"""
@@ -146,9 +146,9 @@ def run_task(inbox, files_dict: dict, sim_type: str, simulation_id: int, task_id
         """Hands a progress update to the inbox"""
         inbox.report.remote(simulation_id, task_id, update_dict)
 
-    def saved(snapshot_dir: str, primaries: int) -> None:
+    def saved(key: str, primaries: int) -> None:
         """Hands a save of the results to the inbox"""
-        inbox.saved.remote(simulation_id, task_id, snapshot_dir, primaries)
+        inbox.saved.remote(simulation_id, task_id, key, primaries)
 
     return run_simulation(files_dict, task_id, sim_type, Path(work_dir), simulation_id, report, saved)
 
@@ -156,16 +156,23 @@ def run_task(inbox, files_dict: dict, sim_type: str, simulation_id: int, task_id
 # a merge killed for memory must not be retried forever, which Ray does unless retries are off;
 # it takes no CPU slot, so a finished simulation does not wait behind the tasks of others (merges are short and rare)
 @ray.remote(num_cpus=0, max_retries=0)
-def merge_task(simulation_id: int, output_dirs: list[str]) -> bool:
+def merge_task(simulation_id: int, keys: list[str]) -> bool:
     """Merges and stores the results of a simulation"""
-    return merge_and_store(simulation_id, output_dirs)
+    return merge_and_store(simulation_id, keys)
 
 
 # like the merge; one that fails is skipped, the next saves bring the next partial results
 @ray.remote(num_cpus=0, max_retries=0)
-def partial_merge_task(simulation_id: int, snapshot_dirs: list[str], primaries: int) -> bool:
+def partial_merge_task(simulation_id: int, keys: list[str], primaries: int) -> bool:
     """Merges the latest saves of the tasks of a running simulation and stores them as its partial results"""
-    return merge_and_store_partial(simulation_id, snapshot_dirs, primaries)
+    return merge_and_store_partial(simulation_id, keys, primaries)
+
+
+# a task cancelled meanwhile may still store its save, and removes it itself
+@ray.remote(num_cpus=0)
+def delete_task_results(simulation_id: int) -> None:
+    """Removes what the tasks of a simulation stored for the merges"""
+    result_storage.delete_objects(result_storage.work_prefix(simulation_id))
 
 
 @ray.remote(num_cpus=0, max_concurrency=CLUSTER_CONNECTIONS, max_restarts=-1)
@@ -198,10 +205,10 @@ class Running:
     tasks: dict  # task ref -> task id
     work_dirs: dict[int, Path]
     requested_primaries: int = 0
-    output_dirs: list[str] = field(default_factory=list)
+    result_keys: list[str] = field(default_factory=list)
     logfiles: dict = field(default_factory=dict)
     merge: Optional[ray.ObjectRef] = None
-    # the latest results of every task, saved while running or final: task id -> (directory, primaries)
+    # the latest results of every task, saved while running or final: task id -> (key in storage, primaries)
     saves: dict[int, tuple[str, int]] = field(default_factory=dict)
     partial: Optional[ray.ObjectRef] = None
     # primaries of the stored partial results, and of the ones being merged
@@ -410,6 +417,11 @@ class Engine:
 
     def recover(self) -> None:
         """Simulations running when the engine stopped lost their tasks with it; pending ones are started again"""
+        # before any task starts: what the lost tasks stored is of no use
+        try:
+            result_storage.delete_objects(result_storage.WORK_PREFIX)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Removing the results stored by lost tasks failed")
         lost = db.session.query(CelerySimulationModel).filter(CelerySimulationModel.job_state.in_(RUNNING_STATES)).all()
         for simulation in lost:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
@@ -515,8 +527,8 @@ class Engine:
         # with every task finished the final merge is next
         if not running.tasks or sum(1 for other in self.running.values() if other.partial) >= MAX_PARTIAL_MERGES:
             return
-        snapshot_dirs = [snapshot_dir for snapshot_dir, _ in running.saves.values()]
-        running.partial = partial_merge_task.remote(simulation_id, snapshot_dirs, primaries)
+        keys = [key for key, _ in running.saves.values()]
+        running.partial = partial_merge_task.remote(simulation_id, keys, primaries)
         running.merging_primaries = primaries
         self.watch(running.partial, simulation_id, "PARTIAL")
 
@@ -575,11 +587,11 @@ class Engine:
             self.save_task_updates(simulation_id, updates)
             for ref, result in results.items():
                 task_id = running.tasks.pop(ref)
-                # a failed task's directory is gone, its saves with it
+                # a failed task's saves are left out
                 running.saves.pop(task_id, None)
-                if "output_dir" in result:
-                    running.output_dirs.append(result["output_dir"])
-                    running.saves[task_id] = (result["output_dir"], result["final_update"]["simulated_primaries"])
+                if "result_key" in result:
+                    running.result_keys.append(result["result_key"])
+                    running.saves[task_id] = (result["result_key"], result["final_update"]["simulated_primaries"])
                 running.logfiles.update(result.get("logfiles", {}))
         if not running.tasks and running.merge is None:
             self.start_merge(simulation_id, running)
@@ -605,11 +617,11 @@ class Engine:
             logfiles = LogfilesModel(simulation_id=simulation_id)
             logfiles.data = running.logfiles
             add_object_to_db(logfiles)
-        if not running.output_dirs:
+        if not running.result_keys:
             self.fail(simulation_id)
             return
         update_simulation_state(simulation, {"job_state": EntityState.MERGING_QUEUED.value})
-        running.merge = merge_task.remote(simulation_id, running.output_dirs)
+        running.merge = merge_task.remote(simulation_id, running.result_keys)
         self.watch(running.merge, simulation_id)
 
     def finish_merge(self, simulation_id: int, running: Running) -> None:
@@ -623,6 +635,7 @@ class Engine:
             self.fail(simulation_id)
         else:
             del self.running[simulation_id]
+            delete_task_results.remote(simulation_id)
             logging.info("Simulation %d finished", simulation_id)
 
     def stop_cancelled(self) -> None:
@@ -653,7 +666,7 @@ class Engine:
                     ray.cancel(ref)
 
     def stop(self, simulation_id: int) -> None:
-        """Kills what still runs for a simulation and removes its directories"""
+        """Kills what still runs for a simulation and removes its directories and what its tasks stored"""
         running = self.running.pop(simulation_id, None)
         if running is None:
             return
@@ -663,6 +676,7 @@ class Engine:
             ray.cancel(ref)
         for work_dir in running.work_dirs.values():
             shutil.rmtree(work_dir, ignore_errors=True)
+        delete_task_results.remote(simulation_id)
 
     def fail(self, simulation_id: int) -> None:
         """Marks a simulation and its unfinished tasks failed, unless it reached a final state meanwhile, then stops it

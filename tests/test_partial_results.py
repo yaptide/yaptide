@@ -2,6 +2,8 @@
 
 import copy
 import json
+import shutil
+import tarfile
 import threading
 from pathlib import Path
 
@@ -10,6 +12,7 @@ from flask import current_app
 
 from yaptide.application import create_app
 from yaptide.engine import simulation as simulation_module
+from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import CelerySimulationModel, PageModel, SimulationModel, YaptideUserModel
 from yaptide.routes import events_routes
@@ -211,31 +214,58 @@ def test_files_from_windows_get_a_step_of_saving():
     assert files["beam.dat"].startswith("NSTAT 1000    100\r\n")
 
 
-def test_merge_of_missing_task_outputs_fails(tmp_path):
+def test_merge_of_missing_task_outputs_fails(tmp_path, monkeypatch):
     """A merge without some tasks' outputs would be stored as the whole result"""
     with pytest.raises(FileNotFoundError):
         merge_simulation_outputs([BDO_DIR / "task_1", tmp_path / "gone"])
 
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    with pytest.raises(FileNotFoundError):
+        simulation_module.merge_stored([result_storage.work_key(1, 1)])
 
-def test_snapshot_rewritten_while_copied_is_dropped(tmp_path, monkeypatch):
-    """The simulator's next save may start while the last one is copied; a torn copy is not merged"""
-    (tmp_path / "dose.bdo").write_bytes(b"save 1")
-    copy_file = simulation_module.shutil.copy
 
-    def copy_during_next_save(source, target):
-        """Copies, while the simulator writes its next save"""
-        copy_file(source, target)
-        Path(source).write_bytes(b"save 2, longer")
+def test_results_passed_through_storage_merge_as_from_the_task_directories(tmp_path, monkeypatch):
+    """The archive a task stores keeps its result files as they were"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    keys = []
+    for task in ("task_1", "task_2"):
+        work_dir = shutil.copytree(BDO_DIR / task, tmp_path / task)
+        keys.append(result_storage.work_key(1, int(task[-1])))
+        result_storage.put_file(keys[-1], simulation_module.pack_results(work_dir))
+        assert not (work_dir / "results.tar.gz").exists()
 
-    monkeypatch.setattr(simulation_module.shutil, "copy", copy_during_next_save)
+    assert simulation_module.merge_stored(keys) == merge_simulation_outputs([BDO_DIR / "task_1", BDO_DIR / "task_2"])
+
+    result_storage.delete_objects(result_storage.work_prefix(1))
+    assert not list(tmp_path.rglob("*.tar.gz"))
+
+
+def test_save_rewritten_while_packed_is_not_stored(tmp_path, monkeypatch):
+    """The simulator's next save may start while the last one is packed; a torn archive is not merged"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    work_dir = tmp_path / "task"
+    work_dir.mkdir()
+    (work_dir / "dose.bdo").write_bytes(b"save 1")
+    add = tarfile.TarFile.add
+
+    def add_during_next_save(self, name, *args, **kwargs):
+        """Packs a file, while the simulator writes its next save"""
+        add(self, name, *args, **kwargs)
+        Path(name).write_bytes(b"save 2, longer")
+
+    key = result_storage.work_key(1, 1)
     saved = []
-    simulation_module.take_snapshot(tmp_path, 100, lambda path, primaries: saved.append(path))
+    monkeypatch.setattr(tarfile.TarFile, "add", add_during_next_save)
+    simulation_module.store_save(work_dir, key, 100, lambda key, primaries: saved.append((key, primaries)))
     assert not saved
-    assert not list(tmp_path.glob("snapshot_*"))
+    assert not list(tmp_path.rglob("*.tar.gz"))
 
-    monkeypatch.setattr(simulation_module.shutil, "copy", copy_file)
-    simulation_module.take_snapshot(tmp_path, 200, lambda path, primaries: saved.append(path))
-    assert saved == [str(tmp_path / "snapshot_000000000200")]
+    monkeypatch.setattr(tarfile.TarFile, "add", add)
+    simulation_module.store_save(work_dir, key, 200, lambda key, primaries: saved.append((key, primaries)))
+    assert saved == [(key, 200)]
+    result_storage.get_file(key, tmp_path / "save.tar.gz")
+    with tarfile.open(tmp_path / "save.tar.gz") as tar:
+        assert tar.extractfile("dose.bdo").read() == b"save 2, longer"
 
 
 def test_one_user_cannot_take_every_stream(monkeypatch):
