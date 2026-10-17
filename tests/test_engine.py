@@ -542,3 +542,31 @@ def test_bad_reports_are_left_out_and_others_still_saved(client, engine, monkeyp
     reads.clear()
     engine.read_hpc_progress()
     assert not reads  # unchanged reports, also the unusable ones, are not read again
+
+
+def test_partial_merges_are_limited_and_a_failed_one_is_repeated(engine, monkeypatch):
+    """Partial merges hold every task's results in memory next to the simulators: a few at once; one that fails
+    does not count as stored, so the next round tries again
+    """
+    started = []
+    monkeypatch.setattr(
+        engine_module, "partial_merge_task", mock.Mock(remote=lambda *args: started.append(args[0]) or ray.put(False))
+    )
+    monkeypatch.setattr(engine, "watch", lambda *args: None)
+    for simulation_id in (1, 2, 3):
+        engine.running[simulation_id] = engine_module.Running(
+            tasks={f"ref{simulation_id}": 1}, work_dirs={}, requested_primaries=1000, saves={1: ("dir", 100)}
+        )
+        engine.merge_partial(simulation_id, engine.running[simulation_id])
+    assert started == [1, 2]
+
+    # the merge of 1 stored nothing: the slot goes to 3, and 1 is due again from the same primaries
+    engine.partial_merged(1, engine.running[1])
+    assert engine.running[1].partial is None and engine.running[1].partial_primaries == 0
+    engine.merge_partial(3, engine.running[3])
+    engine.merge_partial(1, engine.running[1])
+    assert started == [1, 2, 3]
+    engine.partial_merged(2, engine.running[2])
+    engine.merge_partial(1, engine.running[1])
+    assert started == [1, 2, 3, 1]
+    engine.running.clear()
