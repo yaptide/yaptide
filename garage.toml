@@ -3,7 +3,8 @@
 metadata_dir = "/var/lib/garage/meta"
 data_dir = "/var/lib/garage/data"
 db_engine = "sqlite"
-# writes are rare (one per result page), so syncing them costs little and survives a crash of the host
+# writes are few (one per result page, and per direct simulation task one object replaced at each save and at the
+# end, about 11 per run), so syncing them costs little and survives a crash of the host
 metadata_fsync = true
 data_fsync = true
 # a daily copy of the metadata database, so a corrupted one can be restored

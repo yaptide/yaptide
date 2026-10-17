@@ -8,6 +8,7 @@ import threading
 from pathlib import Path
 
 import pytest
+from botocore.exceptions import ClientError
 from flask import current_app
 
 from yaptide.application import create_app
@@ -220,8 +221,9 @@ def test_merge_of_missing_task_outputs_fails(tmp_path, monkeypatch):
         merge_simulation_outputs([BDO_DIR / "task_1", tmp_path / "gone"])
 
     monkeypatch.setenv("TMPDIR", str(tmp_path))
-    with pytest.raises(FileNotFoundError):
-        simulation_module.merge_stored([result_storage.work_key(1, 1)])
+    # nor in a bucket, if one is configured: simulation ids start at 1
+    with pytest.raises((FileNotFoundError, ClientError)):
+        simulation_module.merge_stored([result_storage.work_key(0, 1)])
 
 
 def test_results_passed_through_storage_merge_as_from_the_task_directories(tmp_path, monkeypatch):

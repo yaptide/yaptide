@@ -136,9 +136,15 @@ def work_dirs(work_root: Path) -> list[Path]:
     return list(work_root.glob(f"{WORK_DIR_PREFIX}*"))
 
 
-def stored_results(work_root: Path) -> list[Path]:
-    """Result files the tasks left for the merges, in the directory standing in for storage"""
-    return list(work_root.glob("yaptide_objects/**/*.tar.gz"))
+def stored_results(work_root: Path) -> list[str]:
+    """Result files the tasks left for the merges: in the bucket when one is configured, otherwise in the directory
+    standing in for it
+    """
+    if result_storage.configured():
+        client = result_storage._internal()  # skipcq: PYL-W0212
+        listing = client.list_objects_v2(Bucket=os.environ["RESULTS_S3_BUCKET"], Prefix=result_storage.WORK_PREFIX)
+        return [item["Key"] for item in listing.get("Contents", [])]
+    return [str(path) for path in work_root.glob("yaptide_objects/**/*.tar.gz")]
 
 
 def test_simulation_runs_and_its_results_are_stored(client, engine, cluster):
@@ -231,9 +237,10 @@ def test_recovery_fails_lost_simulations_and_starts_pending_ones(client, engine,
     db.session.query(SimulationModel).filter_by(id=lost).update({"job_state": EntityState.RUNNING.value})
     db.session.query(TaskModel).filter_by(simulation_id=lost).update({"task_state": EntityState.RUNNING.value})
     db.session.commit()
-    saved = cluster / "yaptide_objects" / result_storage.work_key(lost, 0)
-    saved.parent.mkdir(parents=True)
+    saved = cluster / "save.tar.gz"
     saved.write_bytes(b"a save of a lost task")
+    result_storage.put_file(result_storage.work_key(lost, 0), saved)
+    assert stored_results(cluster)
     waiting = submit(client, "regular run")
 
     engine.recover()
