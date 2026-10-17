@@ -51,7 +51,8 @@ from yaptide.persistence.models import (
     TaskModel,
 )
 from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
-from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.enums import EntityState, PlatformType, SimulationType
+from yaptide.utils.sim_utils import set_shieldhit_save_step
 
 # SSH connections to the clusters at once; they ban accounts that log in often
 CLUSTER_CONNECTIONS = 4
@@ -459,7 +460,11 @@ class Engine:
 
     def start(self, simulation: CelerySimulationModel) -> None:
         """Submits the tasks of a simulation"""
-        files_ref = ray.put(simulation.inputs[0].data["input_files"])
+        files = dict(simulation.inputs[0].data["input_files"])
+        if simulation.sim_type == SimulationType.SHIELDHIT.value:
+            # saves along the way for partial results, in the tasks' copy only: the stored input stays the user's
+            set_shieldhit_save_step(files, max(task.requested_primaries or 0 for task in simulation.tasks))
+        files_ref = ray.put(files)
         task_ids = sorted(task.task_id for task in simulation.tasks)
         work_dirs = {task_id: get_tmp_dir() / f"{WORK_DIR_PREFIX}{simulation.id}_{task_id}" for task_id in task_ids}
         tasks = {

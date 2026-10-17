@@ -9,6 +9,7 @@ from unittest import mock
 
 import pytest
 import ray
+import re
 from datetime import datetime, timedelta, timezone
 from sqlalchemy.exc import OperationalError
 
@@ -17,6 +18,7 @@ from yaptide.engine.engine import Engine
 from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
+    InputModel,
     BatchSimulationModel,
     BatchTaskModel,
     ClusterModel,
@@ -156,6 +158,9 @@ def test_saves_of_running_tasks_become_partial_results(client, engine):
     assert db.session.get(SimulationModel, simulation_id).partial_primaries == 100
     assert db.session.query(PageModel).count() > 0
     run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value)
+    # the step of saving goes to the tasks only, the stored input is as the user sent it
+    stored = db.session.query(InputModel).filter_by(simulation_id=simulation_id).one().data
+    assert re.search(r"^NSTAT\s+\d+\s+0$", stored["input_files"]["beam.dat"], re.MULTILINE)
 
 
 def test_failing_tasks_fail_the_simulation_with_their_logs(client, engine):
