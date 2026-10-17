@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Optional
 
 import ray
+from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy import or_
 
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
@@ -58,8 +59,7 @@ from yaptide.utils.sim_utils import set_shieldhit_save_step
 CLUSTER_CONNECTIONS = 4
 # how often the progress HPC tasks put into storage is read
 HPC_PROGRESS_SECONDS = 10
-# a task's progress object, and what its report may set
-REPORT_KEY = re.compile(r".*/task_(\d{1,6})\.json")
+# what a task's report may set
 REPORTED_STATES = {
     EntityState.RUNNING.value,
     EntityState.COMPLETED.value,
@@ -342,7 +342,7 @@ class Engine:
                     update
                     for key, etag in reports.items()
                     if self.report_etags.get(key) != etag
-                    for update in [self.read_report(key)]
+                    for update in [self.read_report(simulation_id, key)]
                     if update
                 ]
             except Exception:  # skipcq: PYL-W0703
@@ -360,15 +360,23 @@ class Engine:
         self.report_etags = seen
 
     @staticmethod
-    def read_report(key: str) -> Optional[dict]:
-        """A task's report as a task update: the task comes from the object's name, only valid fields count"""
-        match = REPORT_KEY.fullmatch(key)
+    def read_report(simulation_id: int, key: str) -> Optional[dict]:
+        """A task's report as a task update: the task comes from the object's name, only valid fields count
+
+        A report that cannot be used gives None; storage out of reach is raised and ends the round.
+        """
+        match = re.fullmatch(result_storage.progress_prefix(simulation_id) + r"task_(\d{1,6})\.json", key)
         if not match:
             return None
         try:
             report = result_storage.read_report(key)
+            if not isinstance(report, dict) or not isinstance(report.get("update"), dict):
+                raise ValueError("not a report")
             update = clean_report(report["update"])
-        except (KeyError, TypeError, ValueError):
+        except (BotoCoreError, ClientError, OSError):
+            raise
+        # anything the job wrote, also JSON too deep to parse (RecursionError)
+        except Exception:  # skipcq: PYL-W0703
             logging.warning("Unreadable progress report %s", key)
             return None
         return {"task_id": int(match.group(1)), "update_dict": update} if update else None
