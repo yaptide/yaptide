@@ -311,7 +311,9 @@ class Engine:
             finally:
                 db.session.remove()
 
-    def handle(self, event: str, simulation_id: Optional[int], platform: Optional[str] = None) -> None:
+    def handle(  # skipcq: PY-R1000
+        self, event: str, simulation_id: Optional[int], platform: Optional[str] = None
+    ) -> None:
         """Acts on one event"""
         if platform == PlatformType.BATCH.value:
             self.handle_batch(event, simulation_id)
@@ -381,7 +383,7 @@ class Engine:
         for simulation_id in sorted(to_cancel):
             self.cancel(simulation_id)
 
-    def read_hpc_progress(self) -> None:
+    def read_hpc_progress(self) -> None:  # skipcq: PY-R1000
         """Saves what the tasks of running HPC simulations put into storage since the last look
 
         A report that cannot be used is skipped (and not read again until it changes); storage out of reach ends

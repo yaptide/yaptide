@@ -354,7 +354,7 @@ class Saver:
         url = self.reporter.links.get("saves", {}).get("urls", {}).get(str(self.reporter.task_id))
         if not url:
             return 0
-        with open(str(archive), "rb") as body:
+        with open(str(archive), "rb") as body:  # skipcq: PTC-W6004 # the archive this watcher made
             headers = {"Content-Length": str(size), "Content-Type": "application/gzip"}
             return self.reporter.send(url, "PUT", body, headers)
 
