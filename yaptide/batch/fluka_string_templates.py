@@ -118,7 +118,7 @@ SIMULATOR_PID=$!
 # reports the progress into storage and stops the simulator when the simulation is cancelled
 python3 $ROOT_DIR/watcher.py --simulator=fluka --work_dir=$WORK_DIR --pid=$SIMULATOR_PID \\
     --links=$ROOT_DIR/storage_links.json --ntasks={n_tasks} --sim_id={sim_id} --task_id=$SLURM_ARRAY_TASK_ID \\
-    --update_key={update_key} --backend_url={backend_url} \\
+    --backend_url={backend_url} \\
     1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 wait

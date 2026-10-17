@@ -1,5 +1,6 @@
 """HPC simulations: Flask only stores and flags them, the engine submits and cancels them over SSH"""
 
+import json
 import subprocess
 import time
 from unittest import mock
@@ -18,6 +19,7 @@ from paramiko import AuthenticationException
 
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
+from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
@@ -346,6 +348,9 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
     assert {"storage_links.json", "array_script.sh", "collect_script.sh", "yaptide_submitter.sh"} <= set(put)
     array_script = put["array_script.sh"].getvalue().decode()
     assert "SIMULATOR_PID=$!" in array_script and "--pid=$SIMULATOR_PID" in array_script
+    # the watcher runs as long as the simulation, its command line is visible to others on the node
+    update_key = json.loads(put["storage_links.json"].getvalue())["update_key"]
+    assert update_key and update_key not in array_script and "--update_key" not in ARRAY_FLUKA_BASH
     submit_script = put["yaptide_submitter.sh"].getvalue().decode()
     assert "aggregator" not in submit_script and "pyzmq" not in submit_script
     for script in ("array_script.sh", "collect_script.sh", "yaptide_submitter.sh"):

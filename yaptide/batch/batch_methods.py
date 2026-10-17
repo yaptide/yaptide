@@ -149,8 +149,8 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
             # readable by the user only: the signed links and the update key are in there
             con.run(f"mkdir -p -m 700 {job_dir}", timeout=COMMAND_SECONDS)
             upload_inputs(con, job_dir, input_dict["input_files"])
-            # signed links the jobs report progress and look for a cancel with
-            links = json.dumps(result_storage.job_links(simulation.id)).encode()
+            # signed links the jobs report progress and look for a cancel with, and the key to ask for new ones
+            links = json.dumps(dict(result_storage.job_links(simulation.id), update_key=update_key)).encode()
             con.put(io.BytesIO(links), f"{job_dir}/storage_links.json")
             submit_file, sh_files = prepare_script_files(
                 payload_dict=payload_dict, job_dir=job_dir, sim_id=simulation.id, update_key=update_key, con=con
