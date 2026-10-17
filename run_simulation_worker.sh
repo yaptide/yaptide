@@ -31,8 +31,8 @@ fi
 
 # simulations running before a restart are lost (the engine marks them failed), so their directories can go
 rm -rf "${TMPDIR:-/tmp}"/yaptide_task_*
-# Ray's logs of the run before (e.g. the crash that restarted the container) stay, older ones go
-ls -dt /tmp/ray/session_2* 2>/dev/null | tail -n +2 | xargs rm -rf
+# Ray's logs of the run before (e.g. the crash that restarted the container) stay, older ones go (named by time)
+find /tmp/ray -maxdepth 1 -type d -name 'session_2*' 2>/dev/null | sort | head -n -1 | xargs -r rm -rf
 
 # nproc ignores the container's CPU limit (MAX_CORES), so the limit comes first
 NUM_CPUS="${RAY_NUM_CPUS:-$MAX_CORES}"
