@@ -57,9 +57,11 @@ PROGRESSION = [
 ]
 
 
-def job_status_content(simulation: SimulationModel, with_tasks: bool) -> dict:
-    """Simulation status as the UI polls it: totals over the tasks always, the list of tasks only when asked for"""
-    content = {"job_state": simulation.job_state, "job_tasks_summary": fetch_task_summary(simulation.id)}
+def job_status_content(simulation: SimulationModel, with_tasks: bool, summary: Optional[dict] = None) -> dict:
+    """Simulation status as the UI polls it: totals over the tasks always (counted here unless given), the list of
+    tasks only when asked for
+    """
+    content = {"job_state": simulation.job_state, "job_tasks_summary": summary or fetch_task_summary(simulation.id)}
     if simulation.partial_primaries is not None:
         # the stored results cover only these primaries: the simulation has not finished
         content["partial_results"] = {
@@ -72,11 +74,30 @@ def job_status_content(simulation: SimulationModel, with_tasks: bool) -> dict:
     return content
 
 
-def update_state_from_tasks(simulation: SimulationModel) -> None:
-    """Moves a simulation forward as its tasks report: RUNNING once a task runs, FAILED when all failed and, for
+def update_state_from_tasks(simulation: SimulationModel, states_changed: bool = True) -> None:
+    """Tells that the tasks of a simulation saved their progress: counts the save in progress_revision and, when a
+    task's state changed, moves the simulation forward - RUNNING once a task runs, FAILED when all failed and, for
     HPC simulations, MERGING_QUEUED once all ended (the collect job reports the rest); the engine merges direct
-    simulations itself. A state never moves back, and a final one is kept.
+    simulations itself. A state never moves back, and a final one is kept. One transaction, so the streams of the
+    simulation get one event for the save.
     """
+    if states_changed:
+        state_update = state_update_from_tasks(simulation)
+        if state_update:
+            update, earlier = state_update
+            # one conditional statement: a cancel or result stored meanwhile by another request is not overwritten
+            db.session.query(SimulationModel).filter(
+                SimulationModel.id == simulation.id, SimulationModel.job_state.in_(earlier)
+            ).update(update, synchronize_session=False)
+    # the streams follow a simulation only until it ends
+    db.session.query(SimulationModel).filter(
+        SimulationModel.id == simulation.id, SimulationModel.job_state.notin_(FINAL_STATES)
+    ).update({SimulationModel.progress_revision: SimulationModel.progress_revision + 1}, synchronize_session=False)
+    db.session.commit()
+
+
+def state_update_from_tasks(simulation: SimulationModel) -> Optional[tuple[dict, list[str]]]:
+    """The state the tasks move the simulation to, with the states it may move from; None when they move nothing"""
     summary = fetch_task_summary(simulation.id)
     states, ntasks = summary["task_states"], summary["ntasks"]
     ended = sum(states.get(state, 0) for state in FINAL_STATES)
@@ -87,19 +108,15 @@ def update_state_from_tasks(simulation: SimulationModel) -> None:
     elif states.get(EntityState.RUNNING.value) or ended:
         job_state, before = EntityState.RUNNING.value, EntityState.RUNNING.value
     else:
-        return
+        return None
     # the states it may move from: only earlier ones, and never a final one
     earlier = [state for state in PROGRESSION[: PROGRESSION.index(before)] if state not in FINAL_STATES]
     if simulation.job_state not in earlier:
-        return
+        return None
     update = {SimulationModel.job_state: job_state}
     if job_state == EntityState.FAILED.value:
         update[SimulationModel.end_time] = datetime.utcnow()
-    # one conditional statement: a cancel or result stored meanwhile by another request is not overwritten
-    db.session.query(SimulationModel).filter(
-        SimulationModel.id == simulation.id, SimulationModel.job_state.in_(earlier)
-    ).update(update, synchronize_session=False)
-    db.session.commit()
+    return update, earlier
 
 
 def determine_input_type(payload_dict: dict) -> Optional[str]:

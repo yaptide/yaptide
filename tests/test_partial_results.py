@@ -11,7 +11,7 @@ from flask import current_app
 from yaptide.application import create_app
 from yaptide.engine import simulation as simulation_module
 from yaptide.persistence.database import db
-from yaptide.persistence.models import CelerySimulationModel, PageModel, YaptideUserModel
+from yaptide.persistence.models import CelerySimulationModel, PageModel, SimulationModel, YaptideUserModel
 from yaptide.routes import events_routes
 from yaptide.routes.common_sim_routes import store_partial_results, store_results
 from yaptide.routes.utils.tokens import encode_auth_token
@@ -53,7 +53,7 @@ def client(tmp_path, monkeypatch):
 def simulation() -> CelerySimulationModel:
     """The simulation as stored"""
     db.session.remove()
-    return db.session.query(CelerySimulationModel).one()
+    return db.session.query(CelerySimulationModel).filter_by(job_id="partialjob").one()
 
 
 def first_page_data(client) -> list:
@@ -125,16 +125,38 @@ def read_event(lines) -> dict:
     raise AssertionError("stream ended")
 
 
-def test_stream_sends_the_status_when_it_changes_and_ends_with_the_simulation(client, monkeypatch):
-    """Woken by the database (here every 2 s, SQLite has no notifications); a finished simulation ends the stream"""
+def running_simulation(user_id: int, job_id: str) -> None:
+    """Another simulation of a user, as submitted"""
+    db.session.add(
+        CelerySimulationModel(
+            job_id=job_id,
+            user_id=user_id,
+            input_type=InputType.FILES.value,
+            sim_type=SimulationType.SHIELDHIT.value,
+            title=job_id,
+            job_state=EntityState.PENDING.value,
+        )
+    )
+    db.session.commit()
+
+
+def test_stream_sends_the_status_of_the_users_simulations_when_they_change(client, monkeypatch):
+    """Woken by the database (here every 2 s, SQLite has no notifications); a final state is sent once, simulations
+    submitted while the stream is open join it
+    """
     monkeypatch.setattr(events_routes, "subscribers", events_routes.Subscribers())
-    response = client.get("/events/simulation", query_string={"job_id": "partialjob"}, buffered=False)
+    user_id = simulation().user_id
+    running_simulation(user_id, "finishedjob")
+    db.session.query(SimulationModel).filter_by(job_id="finishedjob").update({"job_state": "COMPLETED"})
+    db.session.commit()
+    response = client.get("/events/simulations", buffered=False)
     assert response.status_code == 200
     assert response.mimetype == "text/event-stream"
     lines = response.iter_encoded()
     lines = (line for chunk in lines for line in chunk.splitlines())
 
-    assert read_event(lines)["job_state"] == EntityState.RUNNING.value
+    first = read_event(lines)
+    assert (first["job_id"], first["job_state"]) == ("partialjob", EntityState.RUNNING.value)
     store_partial_results(simulation(), RESULTS, 300)
     assert read_event(lines)["partial_results"]["simulated_primaries"] == 300
 
@@ -148,19 +170,30 @@ def test_stream_sends_the_status_when_it_changes_and_ends_with_the_simulation(cl
     finished = threading.Timer(0.5, finish)
     finished.start()
     assert read_event(lines)["job_state"] == EntityState.COMPLETED.value
-    assert [line for line in lines if line] == []
     finished.join()
 
+    running_simulation(user_id, "nextjob")
+    assert read_event(lines)["job_id"] == "nextjob"
+    response.close()
 
-def test_stream_of_someone_elses_simulation_is_refused(client):
-    """Only the owner follows a simulation"""
+
+def test_stream_has_only_the_users_simulations(client):
+    """Others' simulations are not on it, nor the user's finished before it opened"""
     other = YaptideUserModel(username="Saruman")
     other.set_password("x")
     db.session.add(other)
     db.session.commit()
-    client.set_cookie("access_token", encode_auth_token(other.id)[0], domain="127.0.0.1")
+    running_simulation(other.id, "otherjob")
+    user_id = simulation().user_id
+    running_simulation(user_id, "finishedjob")
+    db.session.query(SimulationModel).filter_by(job_id="finishedjob").update({"job_state": "COMPLETED"})
+    db.session.commit()
 
-    assert client.get("/events/simulation", query_string={"job_id": "partialjob"}).status_code == 403
+    sent = events_routes.statuses(user_id, None, [])
+
+    assert [content["job_id"] for _, content in sent] == ["partialjob"]
+    client.delete_cookie("access_token", domain="127.0.0.1")
+    assert client.get("/events/simulations").status_code == 401
 
 
 def test_final_results_are_no_longer_partial(client):

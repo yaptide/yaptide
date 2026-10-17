@@ -11,7 +11,7 @@ from yaptide.persistence.models import (
     TaskModel,
     YaptideUserModel,
 )
-from yaptide.routes import task_routes
+from yaptide.routes.utils import utils
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.routes.utils.utils import update_state_from_tasks
 from yaptide.utils.enums import EntityState, InputType, SimulationType
@@ -158,14 +158,18 @@ def test_bulk_task_reports_set_the_direct_state(client, simulation):
 
 
 def test_progress_reports_skip_the_state_check(client, simulation, monkeypatch):
-    """Most reports carry only progress; they do not pay for counting the task states"""
+    """Most reports carry only progress; they do not pay for counting the task states, but wake the streams"""
     counted = []
-    monkeypatch.setattr(task_routes, "update_state_from_tasks", counted.append)
+    monkeypatch.setattr(utils, "state_update_from_tasks", counted.append)
+    sim_id = simulation.id
+    revision = simulation.progress_revision
 
-    post_task_update(client, simulation.id, 1, {"simulated_primaries": 500})
-    post_task_update(client, simulation.id, 1, {"task_state": "COMPLETED"})
+    post_task_update(client, sim_id, 1, {"simulated_primaries": 500})
+    post_task_update(client, sim_id, 1, {"task_state": "COMPLETED"})
 
     assert len(counted) == 1
+    db.session.remove()
+    assert db.session.get(SimulationModel, sim_id).progress_revision == revision + 2
 
 
 def test_failed_from_task_reports_has_an_end_time(client, simulation):

@@ -117,23 +117,34 @@ DATABASE_FAILURES = (OperationalError, InterfaceError, InternalError)
 
 def fetch_task_summary(sim_id: int) -> dict:
     """Number of tasks in each state and the primaries of all tasks of a simulation, counted by the database"""
+    return fetch_task_summaries([sim_id])[sim_id]
+
+
+def fetch_task_summaries(sim_ids: list[int]) -> dict[int, dict]:
+    """fetch_task_summary of many simulations in one query"""
     rows = (
         db.session.query(
+            TaskModel.simulation_id,
             TaskModel.task_state,
             func.count(TaskModel.id),
             func.sum(TaskModel.requested_primaries),
             func.sum(TaskModel.simulated_primaries),
         )
-        .filter(TaskModel.simulation_id == sim_id)
-        .group_by(TaskModel.task_state)
+        .filter(TaskModel.simulation_id.in_(sim_ids))
+        .group_by(TaskModel.simulation_id, TaskModel.task_state)
         .all()
     )
-    return {
-        "ntasks": sum(count for _, count, _, _ in rows),
-        "task_states": {state: count for state, count, _, _ in rows},
-        "requested_primaries": int(sum(requested or 0 for _, _, requested, _ in rows)),
-        "simulated_primaries": int(sum(simulated or 0 for _, _, _, simulated in rows)),
+    summaries = {
+        sim_id: {"ntasks": 0, "task_states": {}, "requested_primaries": 0, "simulated_primaries": 0}
+        for sim_id in sim_ids
     }
+    for sim_id, state, count, requested, simulated in rows:
+        summary = summaries[sim_id]
+        summary["ntasks"] += count
+        summary["task_states"][state] = count
+        summary["requested_primaries"] += int(requested or 0)
+        summary["simulated_primaries"] += int(simulated or 0)
+    return summaries
 
 
 def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:

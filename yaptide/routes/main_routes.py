@@ -5,7 +5,7 @@ from yaptide.routes.batch_routes import Clusters, JobsBatch
 from yaptide.routes.direct_routes import JobsDirect
 from yaptide.routes.common_sim_routes import JobsResource, InputsResource, LogfilesResource, ResultsResource
 from yaptide.routes.estimator_routes import EstimatorResource
-from yaptide.routes.events_routes import SimulationEventsResource
+from yaptide.routes.events_routes import SimulationsEventsResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.results_upload_routes import ResultsDoneResource, ResultsUploadsResource
 from yaptide.routes.task_routes import TaskLinksResource, TasksBulkResource, TasksResource
@@ -46,7 +46,7 @@ def initialize_routes(api: Api):
     api.add_resource(InputsResource, "/inputs")
     api.add_resource(LogfilesResource, "/logfiles")
     # served by the yaptide_events server, nginx sends /events/ there
-    api.add_resource(SimulationEventsResource, "/events/simulation")
+    api.add_resource(SimulationsEventsResource, "/events/simulations")
 
     api.add_resource(UserSimulations, "/user/simulations")
     api.add_resource(UserUpdate, "/user/update")
