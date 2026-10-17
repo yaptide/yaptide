@@ -360,22 +360,45 @@ def results_storage():
     return result_storage
 
 
+# the backend stores no results of a simulation in these states (yaptide/routes/utils/utils.py), so the pages of
+# only these simulations are copied and cleared: a running one may replace its pages in storage at any time
+FINAL_STATES = ("COMPLETED", "FAILED", "CANCELED")
+
+
+def pages_in_postgres_query(metadata: db.MetaData, *columns) -> db.Select:
+    """The columns of the pages kept only in the database, of finished simulations"""
+    pages = metadata.tables[TableTypes.Page.name]
+    estimators = metadata.tables[TableTypes.Estimator.name]
+    simulations = metadata.tables[TableTypes.Simulation.name]
+    objects = metadata.tables[TableTypes.PageObject.name]
+    return (
+        db.select(*columns)
+        .select_from(pages)
+        .join(estimators, pages.c.estimator_id == estimators.c.id)
+        .join(simulations, estimators.c.simulation_id == simulations.c.id)
+        .outerjoin(objects, objects.c.page_id == pages.c.id)
+        .where(
+            pages.c.compressed_data.is_not(None),
+            objects.c.page_id.is_(None),
+            simulations.c.job_state.in_(FINAL_STATES),
+        )
+    )
+
+
 def pages_in_postgres(con, metadata: db.MetaData, after_id: int, batch_size: int) -> list:
     """The next pages kept only in the database, by id: id, the page's object key parts and its gzipped data"""
     pages = metadata.tables[TableTypes.Page.name]
     estimators = metadata.tables[TableTypes.Estimator.name]
-    objects = metadata.tables[TableTypes.PageObject.name]
     stmt = (
-        db.select(
+        pages_in_postgres_query(
+            metadata,
             pages.c.id,
             pages.c.page_number,
             pages.c.compressed_data,
             estimators.c.simulation_id,
             estimators.c.file_name,
         )
-        .join(estimators, pages.c.estimator_id == estimators.c.id)
-        .outerjoin(objects, objects.c.page_id == pages.c.id)
-        .where(pages.c.compressed_data.is_not(None), objects.c.page_id.is_(None), pages.c.id > after_id)
+        .where(pages.c.id > after_id)
         .order_by(pages.c.id)
         .limit(batch_size)
     )
@@ -383,14 +406,10 @@ def pages_in_postgres(con, metadata: db.MetaData, after_id: int, batch_size: int
 
 
 def count_pages_in_postgres(con, metadata: db.MetaData) -> tuple[int, int]:
-    """How many pages are kept only in the database, and their size in bytes"""
+    """How many pages of finished simulations are kept only in the database, and their size in bytes"""
     pages = metadata.tables[TableTypes.Page.name]
-    objects = metadata.tables[TableTypes.PageObject.name]
-    stmt = (
-        db.select(db.func.count(), db.func.coalesce(db.func.sum(db.func.length(pages.c.compressed_data)), 0))
-        .select_from(pages)
-        .outerjoin(objects, objects.c.page_id == pages.c.id)
-        .where(pages.c.compressed_data.is_not(None), objects.c.page_id.is_(None))
+    stmt = pages_in_postgres_query(
+        metadata, db.func.count(), db.func.coalesce(db.func.sum(db.func.length(pages.c.compressed_data)), 0)
     )
     return tuple(con.execute(stmt).one())
 
@@ -426,7 +445,7 @@ def copy_pages_to_storage(batch_size, dry_run, verbose):
     with con:
         objects = metadata.tables[TableTypes.PageObject.name]
         total, total_size = count_pages_in_postgres(con, metadata)
-        click.echo(f"{total} pages ({megabytes(total_size)}) kept only in the database")
+        click.echo(f"{total} pages ({megabytes(total_size)}) of finished simulations kept only in the database")
         done, uploaded, skipped, after_id = 0, 0, [], 0
         keys_seen = set()
         while batch := pages_in_postgres(con, metadata, after_id, batch_size):
@@ -487,7 +506,7 @@ def clear_pages_in_postgres(batch_size, dry_run, verbose):
         pages = metadata.tables[TableTypes.Page.name]
         objects = metadata.tables[TableTypes.PageObject.name]
         total, total_size = count_pages_in_postgres(con, metadata)
-        click.echo(f"{total} pages ({megabytes(total_size)}) kept only in the database")
+        click.echo(f"{total} pages ({megabytes(total_size)}) of finished simulations kept only in the database")
         cleared, changed, after_id = 0, [], 0
         while batch := pages_in_postgres(con, metadata, after_id, batch_size):
             con.rollback()
@@ -564,7 +583,7 @@ def move_pages_to_postgres(batch_size, dry_run, verbose):
         click.echo(f"{total} pages ({megabytes(total_size)}) kept in object storage")
         if dry_run:
             return
-        moved = 0
+        moved, changed, after_id = 0, [], 0
         stmt = (
             db.select(objects.c.page_id, objects.c.key, objects.c.size, objects.c.format, estimators.c.simulation_id)
             .join(pages, pages.c.id == objects.c.page_id)
@@ -572,8 +591,9 @@ def move_pages_to_postgres(batch_size, dry_run, verbose):
             .order_by(objects.c.page_id)
             .limit(batch_size)
         )
-        while batch := con.execute(stmt).all():
+        while batch := con.execute(stmt.where(objects.c.page_id > after_id)).all():
             con.rollback()
+            after_id = batch[-1].page_id
             bodies = {}
             for page in batch:
                 if page.format != result_storage.PAGE_FORMAT:
@@ -591,18 +611,21 @@ def move_pages_to_postgres(batch_size, dry_run, verbose):
             with con.begin():
                 lock_simulations(con, (page.simulation_id for page in batch))
                 for page in batch:
-                    # only if the backend did not store the page again since it was read
-                    removed = con.execute(
-                        db.delete(objects).where(objects.c.page_id == page.page_id, objects.c.key == page.key)
-                    ).rowcount
-                    if removed == 1:
-                        con.execute(
-                            db.update(pages)
-                            .where(pages.c.id == page.page_id)
-                            .values(compressed_data=bodies[page.page_id])
-                        )
-                        moved += 1
-            click.echo(f"up to page {batch[-1].page_id}: {moved}/{total} back in the database")
+                    body = bodies[page.page_id]
+                    # only if the backend did not store the page again since it was read: it replaces the object
+                    # (same key) only while holding the lock, so the object checked here is the one recorded
+                    unchanged = result_storage.stored_matches(page.key, len(body), result_storage.body_md5(body))
+                    removed = db.delete(objects).where(
+                        objects.c.page_id == page.page_id, objects.c.key == page.key, objects.c.size == page.size
+                    )
+                    if not unchanged or con.execute(removed).rowcount != 1:
+                        changed.append(page.page_id)
+                        continue
+                    con.execute(db.update(pages).where(pages.c.id == page.page_id).values(compressed_data=body))
+                    moved += 1
+            click.echo(f"up to page {after_id}: {moved}/{total} back in the database")
+        if changed:
+            click.echo(f"{len(changed)} pages changed meanwhile and stay in storage, run again: {changed}", err=True)
 
 
 if __name__ == "__main__":

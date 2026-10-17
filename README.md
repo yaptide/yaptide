@@ -26,7 +26,8 @@ Pages stored before stay in Postgres; to move them (commands run in the `yaptide
 1. Back up first: `scripts/backup.sh` (below), or at least a `pg_dump --format=custom`.
 2. Copy: `docker exec yaptide_flask python -m yaptide.admin.db_manage copy-pages-to-storage`. It only reads the
    database: each page is uploaded to the key new pages use and checked there (size and MD5). Safe to stop and
-   to repeat; a repeat uploads only what is missing.
+   to repeat; a repeat uploads only what is missing. Pages of unfinished simulations are left (the backend may
+   still replace them); repeat after they end.
 3. Verify: `clear-pages-in-postgres --dry-run` lists any page without a matching copy.
 4. Later, optionally: `clear-pages-in-postgres` removes the copied pages from Postgres, a batch per transaction,
    and only batches whose every page is verified in storage. From then on they are read from the bucket.

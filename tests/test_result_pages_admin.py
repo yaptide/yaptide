@@ -204,3 +204,76 @@ def test_copy_never_replaces_another_page(database, storage):
     assert result_storage.get_gzipped_page(taken) == only_copy
     run("clear-pages-in-postgres", ok=False)
     assert page_rows(database, "compressed_data IS NOT NULL") == 13
+
+
+def backend_stores(body: bytes) -> None:
+    """The backend storing new results of the first page, as store_partial_results does with a bucket"""
+    key = result_storage.page_key(1, "dose", 0)
+    result_storage.put_gzipped_page(key, body)
+    with create_engine(os.environ["FLASK_SQLALCHEMY_DATABASE_URI"], poolclass=NullPool).begin() as connection:
+        connection.exec_driver_sql('UPDATE "Page" SET compressed_data = NULL WHERE id = 1')
+        connection.exec_driver_sql('DELETE FROM "PageObject" WHERE page_id = 1')
+        connection.exec_driver_sql(
+            'INSERT INTO "PageObject" (page_id, key, size, format) VALUES (1, %s, %s, %s)'
+            if connection.dialect.name == "postgresql"
+            else 'INSERT INTO "PageObject" (page_id, key, size, format) VALUES (1, ?, ?, ?)',
+            (key, len(body), result_storage.PAGE_FORMAT),
+        )
+
+
+def set_state(job_state: str) -> None:
+    """Sets the state of the first simulation"""
+    with create_engine(os.environ["FLASK_SQLALCHEMY_DATABASE_URI"], poolclass=NullPool).begin() as connection:
+        connection.exec_driver_sql(f"UPDATE \"Simulation\" SET job_state = '{job_state}' WHERE id = 1")
+
+
+def test_unfinished_simulations_are_left_to_the_backend(database, storage, monkeypatch):
+    """The backend replacing a page of a running simulation during the copy keeps its new page: the copy and the
+    clear touch only finished simulations
+    """
+    set_state(EntityState.RUNNING.value)
+    new = gzip.compress(b'{"new": "results"}')
+    matches = result_storage.stored_matches
+
+    def backend_meanwhile(key, size, md5):
+        """The backend stores the first page of the running simulation again, after the copy read it"""
+        if not stored:
+            stored.append(key)
+            backend_stores(new)
+        return matches(key, size, md5)
+
+    stored = []
+    monkeypatch.setattr(result_storage, "stored_matches", backend_meanwhile)
+    run("copy-pages-to-storage")
+    assert result_storage.get_gzipped_page(result_storage.page_key(1, "dose", 0)) == new
+    monkeypatch.setattr(result_storage, "stored_matches", matches)
+    run("clear-pages-in-postgres")
+    # the other five pages of the running simulation
+    assert page_rows(database, "compressed_data IS NOT NULL") == 5
+
+
+def test_move_keeps_a_page_the_backend_stored_meanwhile(database, storage, monkeypatch):
+    """A page stored again by the backend after the move read it keeps the new results, moved by the next run"""
+    run("copy-pages-to-storage")
+    run("clear-pages-in-postgres")
+    set_state(EntityState.RUNNING.value)
+    new = gzip.compress(b'{"new": "results"}')
+    get = result_storage.get_gzipped_page
+
+    def backend_meanwhile(key):
+        """The backend stores the first page again, after the move read it"""
+        body = get(key)
+        if not read:
+            read.append(key)
+            backend_stores(new)
+        return body
+
+    read = []
+    monkeypatch.setattr(result_storage, "get_gzipped_page", backend_meanwhile)
+    assert "1 pages changed meanwhile and stay in storage" in run("move-pages-to-postgres", "--batch-size", "5").output
+    assert page_rows(database, "compressed_data IS NULL") == 1
+    run("move-pages-to-postgres")
+    assert page_rows(database, "compressed_data IS NULL") == 0
+    engine = create_engine(database, poolclass=NullPool)
+    with engine.connect() as connection:
+        assert connection.exec_driver_sql('SELECT compressed_data FROM "Page" WHERE id = 1').scalar() == new
