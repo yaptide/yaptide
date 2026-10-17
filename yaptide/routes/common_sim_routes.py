@@ -10,7 +10,6 @@ from marshmallow import Schema, fields
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_estimator_by_sim_id_and_est_name,
-    fetch_estimator_by_sim_id_and_file_name,
     fetch_estimator_id_by_sim_id_and_est_name,
     fetch_estimators_by_sim_id,
     fetch_input_by_sim_id,
@@ -38,7 +37,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import FINAL_STATES, check_if_job_is_owned_and_exist, job_status_content
 from yaptide.routes.utils.tokens import decode_auth_token
-from yaptide.utils.enums import EntityState, InputType
+from yaptide.utils.enums import EntityState, InputType, SimulationType
 
 
 class JobsResource(Resource):
@@ -144,12 +143,15 @@ def get_single_estimator(sim_id: int, estimator_name: str):
 
 
 def get_all_estimators(sim_id: int):
-    """Retrieve all estimators for a given simulation ID"""
+    """Retrieve all estimators for a given simulation ID, each of an editor simulation with the uuid of the editor
+    output it was scored by (none for an estimator no output writes)
+    """
     estimators = fetch_estimators_by_sim_id(sim_id=sim_id)
     if len(estimators) == 0:
         return yaptide_response(message="Results are unavailable", code=404)
 
     logging.debug("Returning results from database")
+    outputs = editor_outputs_by_file(fetch_simulation_by_sim_id(sim_id=sim_id))
     result_estimators = []
     for estimator in estimators:
         estimator_dict = {
@@ -157,29 +159,23 @@ def get_all_estimators(sim_id: int):
             "name": estimator.name,
             "pages": [page_content(page) for page in estimator.pages],
         }
+        output = outputs.get(estimator_key(estimator.file_name))
+        if output and output.get("uuid"):
+            estimator_dict["output_uuid"] = output["uuid"]
         result_estimators.append(estimator_dict)
     return yaptide_response(
         message=f"Results for simulation: {sim_id}", code=200, content={"estimators": result_estimators}
     )
 
 
-def prepare_create_or_update_estimator_in_db(sim_id: int, name: str, estimator_dict: dict):
-    """Prepares an estimator object for insertion or update without committing to the database"""
-    estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
-    if not estimator:
-        estimator = EstimatorModel(name=name, file_name=estimator_dict["name"], simulation_id=sim_id)
-        estimator.data = estimator_dict["metadata"]
-        add_object_to_db(estimator, make_commit=False)
-    return estimator
-
-
-def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storage: bool) -> bool:
+def prepare_create_or_update_pages_in_db(
+    sim_id: int, estimator: EstimatorModel, estimator_dict: dict, use_storage: bool
+) -> bool:
     """Prepares page objects for insertion or update without committing to the database.
 
     Pages go to object storage while it accepts them and to the database otherwise, so an outage of the storage
     does not lose the results; returns whether the storage is still used for the next pages.
     """
-    estimator = fetch_estimator_by_sim_id_and_file_name(sim_id=sim_id, file_name=estimator_dict["name"])
     for page_dict in estimator_dict["pages"]:
         page = fetch_page_by_est_id_and_page_number(
             est_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])
@@ -227,26 +223,71 @@ def lock_results(simulation: SimulationModel) -> None:
     db.session.refresh(simulation)
 
 
-def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[dict]) -> None:
-    """Prepares the estimators and their pages in place of the stored ones, without committing"""
-    if simulation.input_type == InputType.EDITOR.value:
-        outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
-        sorted_estimator_names = sorted([output["name"] for output in outputs])
-        for output in outputs:
-            name = output["name"]
-            # estimators are sorted alphabeticaly by names, thats why we can match indexes from sorted_estimator_names
-            estimator_dict = estimators[sorted_estimator_names.index(name)]
-            prepare_create_or_update_estimator_in_db(sim_id=simulation.id, name=name, estimator_dict=estimator_dict)
-    elif simulation.input_type == InputType.FILES.value:
-        for estimator_dict in estimators:
-            prepare_create_or_update_estimator_in_db(
-                sim_id=simulation.id, name=estimator_dict["name"], estimator_dict=estimator_dict
-            )
+def estimator_key(file_name: str) -> str:
+    """An estimator's result file without the trailing underscore the cluster's convertmc adds ("dose_" for dose)"""
+    return file_name.rstrip("_")
 
+
+def editor_outputs_by_file(simulation: SimulationModel) -> dict[str, dict]:
+    """The editor's scoring outputs by the estimator key of the result file the converter makes each write to:
+    SHIELD-HIT12A files are named after the output, FLUKA ones by the output unit, from 21 for each output the
+    converter scores (with a mesh or cylinder detector). Empty for a simulation not from the editor.
+    """
+    if simulation.input_type != InputType.EDITOR.value:
+        return {}
+    try:
+        input_json = simulation.inputs[0].data["input_json"]
+        outputs = input_json["scoringManager"]["outputs"]
+        if simulation.sim_type == SimulationType.FLUKA.value:
+            detectors = {detector["uuid"]: detector for detector in input_json["detectorManager"]["detectors"]}
+            # the detectors converter.fluka.helper_parsers.scoring_parser.parse_detector takes
+            scored = [
+                output
+                for output in outputs
+                if detectors.get(output.get("detectorUuid"), {}).get("geometryData", {}).get("geometryType")
+                in ("Mesh", "Cyl")
+            ]
+            return {str(unit): output for unit, output in enumerate(scored, start=21)}
+        return {estimator_key(output["name"]): output for output in outputs}
+    except (IndexError, KeyError, TypeError):
+        logging.warning("Simulation %d has no editor outputs, its estimators keep their file names", simulation.id)
+        return {}
+
+
+def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[dict]) -> None:
+    """Prepares the estimators and their pages in place of the stored ones, without committing.
+
+    An estimator is its result file: the editor output writing it gives the name, and the estimator stored for the
+    same file before (partial results, named with or without the trailing underscore) is updated.
+    """
+    outputs = editor_outputs_by_file(simulation)
+    order = {key: index for index, key in enumerate(outputs)}
+    stored = {estimator_key(estimator.file_name): estimator for estimator in fetch_estimators_by_sim_id(simulation.id)}
+    # created in the order of the editor outputs, which the results are listed in
+    estimators = sorted(estimators, key=lambda estimator: order.get(estimator_key(estimator["name"]), len(order)))
     use_storage = result_storage.configured()
     for estimator_dict in estimators:
+        key = estimator_key(estimator_dict["name"])
+        name = estimator_dict["name"]
+        if key in outputs:
+            name = outputs[key]["name"]
+        elif outputs:
+            logging.error(
+                "Estimator %s of simulation %d is written by none of the editor outputs, it keeps its file name",
+                estimator_dict["name"],
+                simulation.id,
+            )
+        estimator = stored.get(key)
+        if not estimator:
+            estimator = EstimatorModel(simulation_id=simulation.id)
+            add_object_to_db(estimator, make_commit=False)
+        estimator.name = name
+        estimator.file_name = estimator_dict["name"]
+        estimator.data = estimator_dict["metadata"]
+        # the id for the pages
+        db.session.flush()
         use_storage = prepare_create_or_update_pages_in_db(
-            sim_id=simulation.id, estimator_dict=estimator_dict, use_storage=use_storage
+            sim_id=simulation.id, estimator=estimator, estimator_dict=estimator_dict, use_storage=use_storage
         )
 
 
