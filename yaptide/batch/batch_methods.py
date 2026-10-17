@@ -148,6 +148,8 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
                 return
             # readable by the user only: the signed links and the update key are in there
             con.run(f"mkdir -p -m 700 {job_dir}", timeout=COMMAND_SECONDS)
+            # uploads to a hung login node are given up too
+            con.sftp().get_channel().settimeout(COMMAND_SECONDS)
             upload_inputs(con, job_dir, input_dict["input_files"])
             # signed links the jobs report progress and look for a cancel with, and the key to ask for new ones
             links = json.dumps(dict(result_storage.job_links(simulation.id), update_key=update_key)).encode()

@@ -360,6 +360,16 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
         assert checked.returncode == 0, checked.stderr
 
 
+def test_uploads_to_the_cluster_have_a_timeout(client, cluster_connection):
+    """A hung login node does not hold the engine's connection forever while files are put"""
+    simulation = submit(client)
+    batch_methods.submit_simulation(simulation.id)
+
+    calls = [str(call) for call in cluster_connection.mock_calls]
+    timeout = calls.index(f"call.sftp().get_channel().settimeout({batch_methods.COMMAND_SECONDS})")
+    assert timeout < min(index for index, call in enumerate(calls) if call.startswith("call.put("))
+
+
 def test_failed_submit_cancels_what_reached_the_cluster(client, cluster_connection):
     """sbatch failing half way may leave the array queued: it is cancelled and the directory removed"""
     simulation_id = submit(client).id
