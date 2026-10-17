@@ -1,5 +1,6 @@
 """Every migration goes up and back down on Postgres, and the data migrations carry old data over
-(set TEST_DATABASE_URI to an empty Postgres database; SQLite cannot run the migrations' foreign key changes)"""
+(set TEST_DATABASE_URI to an empty Postgres database; SQLite cannot run the migrations' foreign key changes)
+"""
 
 import gzip
 import json
