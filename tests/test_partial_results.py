@@ -9,14 +9,16 @@ import pytest
 from flask import current_app
 
 from yaptide.application import create_app
+from yaptide.engine import simulation as simulation_module
 from yaptide.persistence.database import db
 from yaptide.persistence.models import CelerySimulationModel, PageModel, YaptideUserModel
 from yaptide.routes import events_routes
 from yaptide.routes.common_sim_routes import store_partial_results, store_results
 from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
-from yaptide.utils.sim_utils import set_shieldhit_save_step
+from yaptide.utils.sim_utils import merge_simulation_outputs, set_shieldhit_save_step
 
+BDO_DIR = Path(__file__).parent / "res" / "bdo"
 RESULTS = json.loads((Path(__file__).parent / "res" / "json_with_results.json").read_text())["estimators"]
 
 
@@ -159,3 +161,56 @@ def test_stream_of_someone_elses_simulation_is_refused(client):
     client.set_cookie("access_token", encode_auth_token(other.id)[0], domain="127.0.0.1")
 
     assert client.get("/events/simulation", query_string={"job_id": "partialjob"}).status_code == 403
+
+
+def test_final_results_are_no_longer_partial(client):
+    """The status of a completed simulation does not describe partial results any more"""
+    assert store_partial_results(simulation(), scaled(2), 300)
+    store_results(simulation(), RESULTS)
+    status = client.get("/jobs", query_string={"job_id": "partialjob", "tasks": False}).get_json()
+    assert "partial_results" not in status
+
+
+def test_files_from_windows_get_a_step_of_saving():
+    """Line ends of beam.dat written on Windows"""
+    files = {"beam.dat": "NSTAT 1000 0\r\nTMAX0 10.0\r\n"}
+    set_shieldhit_save_step(files, 1000)
+    assert files["beam.dat"].startswith("NSTAT 1000    100\r\n")
+
+
+def test_merge_of_missing_task_outputs_fails(tmp_path):
+    """A merge without some tasks' outputs would be stored as the whole result"""
+    with pytest.raises(FileNotFoundError):
+        merge_simulation_outputs([BDO_DIR / "task_1", tmp_path / "gone"])
+
+
+def test_snapshot_rewritten_while_copied_is_dropped(tmp_path, monkeypatch):
+    """The simulator's next save may start while the last one is copied; a torn copy is not merged"""
+    (tmp_path / "dose.bdo").write_bytes(b"save 1")
+    copy_file = simulation_module.shutil.copy
+
+    def copy_during_next_save(source, target):
+        """Copies, while the simulator writes its next save"""
+        copy_file(source, target)
+        Path(source).write_bytes(b"save 2, longer")
+
+    monkeypatch.setattr(simulation_module.shutil, "copy", copy_during_next_save)
+    saved = []
+    simulation_module.take_snapshot(tmp_path, 100, lambda path, primaries: saved.append(path))
+    assert not saved
+    assert not list(tmp_path.glob("snapshot_*"))
+
+    monkeypatch.setattr(simulation_module.shutil, "copy", copy_file)
+    simulation_module.take_snapshot(tmp_path, 200, lambda path, primaries: saved.append(path))
+    assert saved == [str(tmp_path / "snapshot_000000000200")]
+
+
+def test_one_user_cannot_take_every_stream(monkeypatch):
+    """Each stream holds a thread of the events server"""
+    monkeypatch.setattr(events_routes, "subscribers", events_routes.Subscribers())
+    for _ in range(events_routes.MAX_STREAMS_PER_USER):
+        assert events_routes.subscribers.admit(7)
+    assert not events_routes.subscribers.admit(7)
+    assert events_routes.subscribers.admit(8)
+    events_routes.subscribers.release(7)
+    assert events_routes.subscribers.admit(7)
