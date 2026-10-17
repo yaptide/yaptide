@@ -17,7 +17,13 @@ from yaptide.batch import watcher
 from yaptide.engine import simulation as simulation_module
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
-from yaptide.persistence.models import CelerySimulationModel, PageModel, SimulationModel, YaptideUserModel
+from yaptide.persistence.models import (
+    CelerySimulationModel,
+    EstimatorModel,
+    PageModel,
+    SimulationModel,
+    YaptideUserModel,
+)
 from yaptide.routes import events_routes
 from yaptide.routes.common_sim_routes import store_partial_results, store_results
 from yaptide.routes.utils.tokens import encode_auth_token
@@ -208,6 +214,19 @@ def test_final_results_are_no_longer_partial(client):
     store_results(simulation(), RESULTS)
     status = client.get("/jobs", query_string={"job_id": "partialjob", "tasks": False}).get_json()
     assert "partial_results" not in status
+
+
+def test_final_results_replace_partial_ones_named_otherwise(client):
+    """The cluster's convertmc names the estimators of input files with a trailing underscore, the merge on the
+    server without: the final results leave none of the partial ones behind
+    """
+    partial = [{**estimator, "name": estimator["name"].rstrip("_")} for estimator in scaled(2)]
+    assert store_partial_results(simulation(), partial, 300)
+    store_results(simulation(), RESULTS)
+
+    names = {estimator.file_name for estimator in db.session.query(EstimatorModel)}
+    assert names == {estimator["name"] for estimator in RESULTS} and names != {e["name"] for e in partial}
+    assert db.session.query(PageModel).count() == sum(len(estimator["pages"]) for estimator in RESULTS)
 
 
 def test_files_from_windows_get_a_step_of_saving():
