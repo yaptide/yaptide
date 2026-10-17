@@ -82,8 +82,9 @@ touch $ROOT_DIR/collected
 
 CLEAR_FORTS={remove_output_from_workspace}
 
+# find, as thousands of task outputs pass the argument limit of rm
 if $CLEAR_FORTS; then
-    rm $INPUT_WILDCARD
+    find $ROOT_DIR/workspaces -name "*_fort.*" -delete || true
 fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\

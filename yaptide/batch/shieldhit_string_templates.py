@@ -81,8 +81,9 @@ touch $ROOT_DIR/collected
 
 CLEAR_BDOS={remove_output_from_workspace}
 
+# find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect
 if $CLEAR_BDOS; then
-    rm $INPUT_WILDCARD
+    find $ROOT_DIR/workspaces -name "*.bdo" -delete || true
 fi
 """  # skipcq: FLK-E501
 
