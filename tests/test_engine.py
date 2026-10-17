@@ -16,6 +16,7 @@ from sqlalchemy.exc import OperationalError
 from yaptide.engine import engine as engine_module
 from yaptide.engine.engine import Engine
 from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app
+from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     InputModel,
@@ -135,6 +136,17 @@ def work_dirs(work_root: Path) -> list[Path]:
     return list(work_root.glob(f"{WORK_DIR_PREFIX}*"))
 
 
+def stored_results(work_root: Path) -> list[str]:
+    """Result files the tasks left for the merges: in the bucket when one is configured, otherwise in the directory
+    standing in for it
+    """
+    if result_storage.configured():
+        client = result_storage._internal()  # skipcq: PYL-W0212
+        listing = client.list_objects_v2(Bucket=os.environ["RESULTS_S3_BUCKET"], Prefix=result_storage.WORK_PREFIX)
+        return [item["Key"] for item in listing.get("Contents", [])]
+    return [str(path) for path in work_root.glob("yaptide_objects/**/*.tar.gz")]
+
+
 def test_simulation_runs_and_its_results_are_stored(client, engine, cluster):
     """Tasks run, report and complete; the merge stores the results and removes the task directories"""
     simulation_id = submit(client, "regular run")
@@ -146,10 +158,13 @@ def test_simulation_runs_and_its_results_are_stored(client, engine, cluster):
     assert db.session.query(PageModel).count() > 0
     assert not engine.running
     assert not work_dirs(cluster)
+    run_until(engine, lambda: not stored_results(cluster), timeout=20)
 
 
-def test_saves_of_running_tasks_become_partial_results(client, engine):
-    """A save half way through the tasks is merged and stored while they run; the final results replace it"""
+def test_saves_of_running_tasks_become_partial_results(client, engine, cluster):
+    """A save half way through the tasks goes to storage, is merged and stored while they run; the final results
+    replace it
+    """
     simulation_id = submit(client, "FAKE_SAVES")
 
     run_until(engine, lambda: db.session.get(SimulationModel, simulation_id).partial_primaries is not None)
@@ -157,7 +172,9 @@ def test_saves_of_running_tasks_become_partial_results(client, engine):
     assert state(simulation_id) == EntityState.RUNNING.value
     assert db.session.get(SimulationModel, simulation_id).partial_primaries == 100
     assert db.session.query(PageModel).count() > 0
+    assert len(stored_results(cluster)) == 2
     run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value)
+    run_until(engine, lambda: not stored_results(cluster), timeout=20)
     # the step of saving goes to the tasks only, the stored input is as the user sent it
     stored = db.session.query(InputModel).filter_by(simulation_id=simulation_id).one().data
     assert re.search(r"^NSTAT\s+\d+\s+0$", stored["input_files"]["beam.dat"], re.MULTILINE)
@@ -188,6 +205,7 @@ def test_cancel_kills_the_simulator_and_cleans_up(client, engine, cluster):
     assert task_states(simulation_id) == [EntityState.CANCELED.value] * 2
     run_until(engine, lambda: not any(_alive(pid) for pid in pids), timeout=20)
     assert not work_dirs(cluster)
+    run_until(engine, lambda: not stored_results(cluster), timeout=20)
 
 
 def _alive(pid: int) -> bool:
@@ -211,17 +229,24 @@ def test_overdue_task_is_stopped_and_fails(client, engine, monkeypatch):
     assert task_states(simulation_id) == [EntityState.FAILED.value]
 
 
-def test_recovery_fails_lost_simulations_and_starts_pending_ones(client, engine):
-    """After a restart, what was running is lost and marked failed; what was waiting runs"""
+def test_recovery_fails_lost_simulations_and_starts_pending_ones(client, engine, cluster):
+    """After a restart, what was running is lost and marked failed, with what its tasks stored; what was waiting
+    runs
+    """
     lost = submit(client, "regular run")
     db.session.query(SimulationModel).filter_by(id=lost).update({"job_state": EntityState.RUNNING.value})
     db.session.query(TaskModel).filter_by(simulation_id=lost).update({"task_state": EntityState.RUNNING.value})
     db.session.commit()
+    saved = cluster / "save.tar.gz"
+    saved.write_bytes(b"a save of a lost task")
+    result_storage.put_file(result_storage.work_key(lost, 0), saved)
+    assert stored_results(cluster)
     waiting = submit(client, "regular run")
 
     engine.recover()
     assert state(lost) == EntityState.FAILED.value
     assert task_states(lost) == [EntityState.FAILED.value] * 2
+    assert not stored_results(cluster)
 
     run_until(engine, lambda: state(waiting) == EntityState.COMPLETED.value)
     assert lost not in engine.running
@@ -607,7 +632,7 @@ def test_partial_merges_are_limited_and_a_failed_one_is_repeated(engine, monkeyp
     monkeypatch.setattr(engine, "watch", lambda *args: None)
     for simulation_id in (1, 2, 3):
         engine.running[simulation_id] = engine_module.Running(
-            tasks={f"ref{simulation_id}": 1}, work_dirs={}, requested_primaries=1000, saves={1: ("dir", 100)}
+            tasks={f"ref{simulation_id}": 1}, work_dirs={}, requested_primaries=1000, saves={1: ("key", 100)}
         )
         engine.merge_partial(simulation_id, engine.running[simulation_id])
     assert started == [1, 2]

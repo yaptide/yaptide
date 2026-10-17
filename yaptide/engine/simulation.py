@@ -1,5 +1,7 @@
 import logging
 import shutil
+import tarfile
+import tempfile
 import threading
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,10 +14,12 @@ from yaptide.engine.pymc import (
     command_to_run_fluka,
     command_to_run_shieldhit,
     execute_simulation_subprocess,
+    get_tmp_dir,
     read_file_offline,
     read_fluka_file,
     read_shieldhit_file,
 )
+from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import fetch_simulation_by_sim_id, update_simulation_state
 from yaptide.routes.common_sim_routes import store_partial_results, store_results
@@ -24,8 +28,8 @@ from yaptide.utils.sim_utils import merge_simulation_outputs, simulation_logfile
 
 # prefix of the task working directories, so the ones left behind can be found
 WORK_DIR_PREFIX = "yaptide_task_"
-# a partial merge may still read the snapshot before the latest one
-SNAPSHOTS_KEPT = 2
+# the result files of the simulators
+RESULT_PATTERNS = ("*.bdo", "*_fort.*")
 
 
 @dataclass
@@ -51,12 +55,14 @@ def run_simulation(
 ) -> dict:
     """Runs one simulation task in work_dir and returns what the engine needs from it
 
-    The result files stay in work_dir, the merge reads them and removes the directory.
+    The result files go to storage under the returned "result_key", for the merge; work_dir is removed.
     Progress goes to report while the simulator runs; the final state of the task is in the returned "final_update".
-    Each save the simulator makes before the end is copied to a snapshot directory passed to saved, with its primaries.
+    Each save the simulator makes before the end goes to storage under the same key, passed to saved with its
+    primaries.
     """
     logging.info("Running simulation, simulation_id: %s, task_id: %d, directory: %s", simulation_id, task_id, work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
+    key = result_storage.work_key(simulation_id, task_id)
     try:
         write_simulation_input_files(files_dict=files_dict, output_dir=work_dir)
         if sim_type == "shieldhit":
@@ -65,14 +71,23 @@ def run_simulation(
             simulation_result = run_single_simulation_for_fluka(work_dir, task_id, simulation_id, report)
         else:
             raise ValueError(f"Unknown simulator type: {sim_type}")
+        if simulation_result.output_files:
+            # the simulator has ended, nothing rewrites the files any more
+            result_storage.put_file(key, pack_results(work_dir))
+        else:
+            logfiles = simulation_logfiles(path=work_dir)
     except BaseException:
-        shutil.rmtree(work_dir, ignore_errors=True)
+        # a save stored before a cancel would stay in storage
+        try:
+            result_storage.delete_objects(key)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Removing the saved results of task %d failed", task_id)
         raise
+    finally:
+        shutil.rmtree(work_dir, ignore_errors=True)
 
     if not simulation_result.output_files:
         logging.info("Simulation failed for task %d", task_id)
-        logfiles = simulation_logfiles(path=work_dir)
-        shutil.rmtree(work_dir, ignore_errors=True)
         return {
             "logfiles": logfiles,
             "stdout": simulation_result.command_stdout,
@@ -82,7 +97,7 @@ def run_simulation(
 
     # the monitor may have missed the last lines of the log, so the final state comes with the result
     return {
-        "output_dir": str(work_dir),
+        "result_key": key,
         "final_update": {
             "task_state": EntityState.COMPLETED.value,
             "end_time": datetime.utcnow().isoformat(sep=" "),
@@ -111,7 +126,9 @@ def run_single_simulation_for_shieldhit(
         simulation_id=simulation_id,
         task_id=task_id,
         report=report,
-        on_save=lambda primaries: take_snapshot(work_dir, primaries, saved),
+        on_save=lambda primaries: store_save(
+            work_dir, result_storage.work_key(simulation_id, task_id), primaries, saved
+        ),
     )
     try:
         process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
@@ -169,29 +186,35 @@ def run_single_simulation_for_fluka(
     )
 
 
-def take_snapshot(work_dir: Path, primaries: int, saved: Callable[[str, int], None]) -> None:
-    """Copies the result files of a finished save aside: the simulator rewrites them in place at its next save"""
-    try:
-        snapshot = work_dir / f"snapshot_{primaries:012d}"
-        partial = work_dir / "snapshot_tmp"
-        shutil.rmtree(partial, ignore_errors=True)
-        partial.mkdir()
-        result_files = list(work_dir.glob("*.bdo"))
-        before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]
+class TornSave(Exception):
+    """The simulator's next save began while the last one was packed (its log is read up to a second late)"""
+
+
+def pack_results(work_dir: Path) -> Path:
+    """Packs the result files into one archive in work_dir; raises if the simulator rewrote one meanwhile"""
+    result_files = sorted(path for pattern in RESULT_PATTERNS for path in work_dir.glob(pattern))
+    before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]
+    archive = work_dir / "results.tar.gz"
+    # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
+    with tarfile.open(archive, "w:gz", compresslevel=1) as tar:
         for result_file in result_files:
-            shutil.copy(result_file, partial)
-        # the next save may have begun meanwhile (the log is read up to a second late), leaving a torn copy
-        if before != [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]:
-            shutil.rmtree(partial, ignore_errors=True)
-            logging.info("Snapshot of %s at %d primaries skipped, a save was under way", work_dir, primaries)
-            return
-        partial.rename(snapshot)
-        for old in sorted(work_dir.glob("snapshot_[0-9]*"))[:-SNAPSHOTS_KEPT]:
-            shutil.rmtree(old, ignore_errors=True)
-        saved(str(snapshot), primaries)
-    except OSError:
-        # a missed snapshot only delays the partial results, the task goes on
-        logging.exception("Snapshot of %s at %d primaries failed", work_dir, primaries)
+            tar.add(result_file, arcname=result_file.name)
+    if before != [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]:
+        archive.unlink()
+        raise TornSave(f"result files in {work_dir} changed while packed")
+    return archive
+
+
+def store_save(work_dir: Path, key: str, primaries: int, saved: Callable[[str, int], None]) -> None:
+    """Stores the result files of a finished save: the simulator rewrites them in place at its next save"""
+    try:
+        result_storage.put_file(key, pack_results(work_dir))
+        saved(key, primaries)
+    except TornSave:
+        logging.info("Save of %s at %d primaries skipped, the next one was under way", work_dir, primaries)
+    except Exception:  # skipcq: PYL-W0703
+        # a missed save only delays the partial results, the task goes on
+        logging.exception("Storing the save of %s at %d primaries failed", work_dir, primaries)
 
 
 def start_monitor(target: Callable, event: threading.Event, **kwargs) -> threading.Thread:
@@ -211,8 +234,23 @@ def backend_app():
     return create_app()
 
 
-def merge_and_store(simulation_id: int, output_dirs: list[str]) -> bool:
-    """Merges the result files of the finished tasks, stores them and removes the task directories
+def merge_stored(keys: list[str]) -> list[dict]:
+    """Merges the result files the tasks stored under the keys; a missing one raises"""
+    with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
+        task_dirs = []
+        for number, key in enumerate(keys):
+            archive = Path(merge_dir) / f"{number}.tar.gz"
+            result_storage.get_file(key, archive)
+            task_dir = Path(merge_dir) / str(number)
+            with tarfile.open(archive) as tar:
+                tar.extractall(task_dir, filter="data")
+            archive.unlink()
+            task_dirs.append(task_dir)
+        return merge_simulation_outputs(task_dirs)
+
+
+def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
+    """Merges the result files the finished tasks stored and stores the results
 
     Returns whether there was anything to store; a simulation cancelled meanwhile keeps its state.
     """
@@ -222,24 +260,22 @@ def merge_and_store(simulation_id: int, output_dirs: list[str]) -> bool:
             if simulation is None:
                 return False
             update_simulation_state(simulation, {"job_state": EntityState.MERGING_RUNNING.value})
-            estimators = merge_simulation_outputs([Path(path) for path in output_dirs])
+            estimators = merge_stored(keys)
             if estimators:
                 store_results(simulation, estimators)
             return bool(estimators)
         finally:
             db.session.remove()
-            for path in output_dirs:
-                shutil.rmtree(path, ignore_errors=True)
 
 
-def merge_and_store_partial(simulation_id: int, snapshot_dirs: list[str], primaries: int) -> bool:
-    """Merges the latest snapshots of the tasks into the simulation's partial results; whether they were stored"""
+def merge_and_store_partial(simulation_id: int, keys: list[str], primaries: int) -> bool:
+    """Merges the latest saves of the tasks into the simulation's partial results; whether they were stored"""
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            estimators = merge_simulation_outputs([Path(path) for path in snapshot_dirs])
+            estimators = merge_stored(keys)
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

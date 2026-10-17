@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -136,3 +137,17 @@ def test_pages_go_to_the_database_when_storage_fails(client, storage, sim_id, mo
     content = client.get("/results", query_string={"job_id": "storagejob", "estimator_name": first["name"]}).get_json()
     assert content["pages"][0] == first["pages"][0]
     assert client.delete("/user/simulations", query_string={"job_id": "storagejob"}).status_code == 200
+
+
+def test_what_tasks_leave_in_storage_expires(monkeypatch):
+    """The bucket removes objects under work/ itself, in case the engine's deletes miss some"""
+    client = mock.Mock()
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setattr(result_storage, "_internal", lambda: client)
+    result_storage.expire_work_objects()
+    client.put_bucket_lifecycle_configuration.assert_called_once_with(
+        Bucket="results",
+        LifecycleConfiguration={
+            "Rules": [{"ID": "work", "Filter": {"Prefix": "work/"}, "Expiration": {"Days": 2}, "Status": "Enabled"}]
+        },
+    )

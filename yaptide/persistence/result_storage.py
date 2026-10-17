@@ -1,14 +1,19 @@
 """Result pages in S3-compatible object storage (Garage on yap-dev); the database keeps only where they are.
 
 Without RESULTS_S3_BUCKET set, pages stay in the database as before (tests, local runs, older deployments).
+The result files of direct simulation tasks pass to the merges through the storage too, so a merge may run on
+another machine than the tasks; without a bucket they pass through a local directory instead (one machine only).
 """
 
 import base64
 import gzip
 import json
 import os
+import shutil
+import tempfile
 import time
 from functools import lru_cache
+from pathlib import Path
 
 import boto3
 from botocore.config import Config
@@ -83,12 +88,17 @@ def page_url(key: str) -> str:
 
 
 def delete_simulation(sim_id: int) -> None:
-    """Removes every stored object of a simulation: its pages, and what its HPC jobs reported"""
-    bucket = os.environ["RESULTS_S3_BUCKET"]
-    client = _internal()
+    """Removes every stored object of a simulation: its pages, what its HPC jobs reported and its tasks left"""
+    _delete_listed(
+        _internal(), os.environ["RESULTS_S3_BUCKET"], f"simulations/{sim_id}/", f"hpc/{sim_id}/", work_prefix(sim_id)
+    )
+
+
+def _delete_listed(client, bucket: str, *prefixes: str) -> None:
+    """Removes every object under the prefixes, all listed before the first is removed"""
     listings = [
         listing
-        for prefix in (f"simulations/{sim_id}/", f"hpc/{sim_id}/")
+        for prefix in prefixes
         for listing in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix)
     ]
     for listing in listings:
@@ -96,7 +106,7 @@ def delete_simulation(sim_id: int) -> None:
         if keys:
             errors = client.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True}).get("Errors")
             if errors:
-                raise RuntimeError(f"storage kept {len(errors)} objects of simulation {sim_id}: {errors[0]}")
+                raise RuntimeError(f"storage kept {len(errors)} objects under {', '.join(prefixes)}: {errors[0]}")
 
 
 def public_client():
@@ -193,3 +203,80 @@ def read_report(key: str) -> dict:
 def put_cancel(sim_id: int) -> None:
     """Tells the tasks of an HPC simulation to stop; they check for this object"""
     _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")
+
+
+# result files of direct simulation tasks on their way to the merges, removed after the final merge
+WORK_PREFIX = "work/"
+
+
+# objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; tasks run at most 10 hours
+WORK_EXPIRY_DAYS = 2
+
+
+def expire_work_objects() -> None:
+    """Has the storage itself remove what is left under WORK_PREFIX, as a backstop to the engine's deletes;
+    replaces any other lifecycle rules of the bucket (there are none)
+    """
+    rule = {
+        "ID": "work",
+        "Filter": {"Prefix": WORK_PREFIX},
+        "Expiration": {"Days": WORK_EXPIRY_DAYS},
+        "Status": "Enabled",
+    }
+    _internal().put_bucket_lifecycle_configuration(
+        Bucket=os.environ["RESULTS_S3_BUCKET"], LifecycleConfiguration={"Rules": [rule]}
+    )
+
+
+def work_prefix(sim_id: int) -> str:
+    """Where the tasks of a direct simulation put their result files"""
+    return f"{WORK_PREFIX}{sim_id}/"
+
+
+def work_key(sim_id: int, task_id: int) -> str:
+    """A task's latest result files, one archive replaced at every save and at the end"""
+    return f"{work_prefix(sim_id)}task_{task_id}.tar.gz"
+
+
+def _local(key: str) -> Path:
+    """Where an object is kept without a bucket"""
+    # read every time: tempfile keeps the directory it found first, before a test or a worker set TMPDIR
+    return Path(os.environ.get("TMPDIR") or tempfile.gettempdir()) / "yaptide_objects" / key
+
+
+def put_file(key: str, path: Path) -> None:
+    """Stores the file under the key, replacing the object at once (readers get the old or the new one, never a
+    part), and removes the file
+    """
+    if configured():
+        _internal().upload_file(str(path), os.environ["RESULTS_S3_BUCKET"], key)
+        path.unlink()
+        return
+    target = _local(key)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    partial = target.with_name(target.name + ".part")
+    shutil.move(path, partial)
+    os.replace(partial, target)
+
+
+def get_file(key: str, path: Path) -> None:
+    """Writes the object to the file; a missing object raises"""
+    if configured():
+        # one request, so the object cannot be replaced half way through (a download in parts could mix two)
+        body = _internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"]
+        with open(path, "wb") as file:
+            shutil.copyfileobj(body, file)
+    else:
+        shutil.copyfile(_local(key), path)
+
+
+def delete_objects(prefix: str) -> None:
+    """Removes the objects whose keys start with the prefix (a whole directory or one object without a bucket)"""
+    if configured():
+        _delete_listed(_internal(), os.environ["RESULTS_S3_BUCKET"], prefix)
+        return
+    local = _local(prefix)
+    if local.is_dir():
+        shutil.rmtree(local, ignore_errors=True)
+    else:
+        local.unlink(missing_ok=True)
