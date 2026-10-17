@@ -19,7 +19,8 @@ from paramiko import AuthenticationException
 
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
-from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH
+from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH
+from yaptide.batch.shieldhit_string_templates import ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
@@ -418,3 +419,93 @@ def test_no_login_with_an_expired_certificate():
         KeycloakUserModel(username="plgtest", cert=valid, private_key=pem), cluster
     )
     assert connection.user == "plgtest" and not connection.is_connected  # nothing connects before a command
+
+
+def stub_commands(bin_dir, **scripts: str) -> dict:
+    """Executables standing in for the cluster's commands, each a line of bash; the environment to run with them"""
+    bin_dir.mkdir()
+    for name, body in scripts.items():
+        (bin_dir / name).write_text(f"#!/bin/bash\n{body}\n")
+        (bin_dir / name).chmod(0o755)
+    return {"PATH": f"{bin_dir}:/usr/bin:/bin"}
+
+
+def render(template: str, root_dir) -> str:
+    """A job script as the submit writes it"""
+    return template.format(
+        array_header="",
+        collect_header="",
+        root_dir=root_dir,
+        n_tasks=3,
+        sim_id=1,
+        update_key="key",
+        backend_url="https://yaptide.test",
+        remove_output_from_workspace="true",
+    )
+
+
+@pytest.mark.parametrize("array_template", [ARRAY_SHIELDHIT_BASH, ARRAY_FLUKA_BASH], ids=["shieldhit", "fluka"])
+def test_the_last_array_task_collects_once(tmp_path, array_template):
+    """Three tasks ending at once: exactly one of them runs the collect script, as the last of them"""
+    for attempt in range(5):
+        root = tmp_path / str(attempt)
+        for task in (1, 2, 3):
+            (root / "workspaces" / f"task_{task:04d}").mkdir(parents=True)
+        (root / "input").mkdir()
+        (root / "input" / "x.inp").write_text("")
+        (root / "done").mkdir()
+        (root / "array_script.sh").write_text(render(array_template, root))
+        # the collect looks at the done markers: all three are there when it runs
+        (root / "collect_script.sh").write_text(f"echo $1 `ls {root}/done | wc -l` >> {root}/collects; sleep 0.3\n")
+        env = stub_commands(root / "bin", srun="sleep 0.2", python3="true", module="true")
+        tasks = [
+            subprocess.Popen(
+                ["bash", str(root / "array_script.sh")],
+                env={**env, "SLURM_ARRAY_TASK_ID": str(task)},
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            for task in (1, 2, 3)
+        ]
+        assert [task.wait() for task in tasks] == [0, 0, 0]
+        assert (root / "collects").read_text().split() == ["inline", "3"]
+        assert (root / "collect.lock").is_dir()
+
+
+@pytest.mark.parametrize("collect_template", [COLLECT_SHIELDHIT_BASH, COLLECT_FLUKA_BASH], ids=["shieldhit", "fluka"])
+def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, collect_template):
+    """A failed inline collect reports nothing final and keeps the task outputs; the collect job then tries
+    again (whatever the lock) and reports the failure; after a successful one it just ends
+    """
+    (tmp_path / "workspaces" / "task_0001").mkdir(parents=True)
+    task_output = tmp_path / "workspaces" / "task_0001" / "a.bdo_fort.1"
+    task_output.write_text("")
+    script = tmp_path / "collect_script.sh"
+    script.write_text(render(collect_template, tmp_path).replace("*.bdo", "*.bdo_fort.1"))
+    (tmp_path / "collect.lock").mkdir()  # left by the task that tried
+    reports = tmp_path / "reports"
+    env = stub_commands(
+        tmp_path / "bin",
+        python3=f'echo "$@" >> {reports}',
+        module="true",
+        convertmc='[ -f "$HOME/merges" ] && touch out.json',
+    )
+
+    def collect(*args) -> int:
+        """Runs the collect script; its exit code"""
+        return subprocess.run(["bash", str(script), *args], env=env, capture_output=True, check=False).returncode
+
+    env["HOME"] = str(tmp_path)  # convertmc fails until the file $HOME/merges exists
+    assert collect("inline") == 1
+    assert "FAILED" not in reports.read_text() and task_output.exists()
+    assert collect() == 1
+    assert "--simulation_state=FAILED" in reports.read_text()
+
+    (tmp_path / "merges").write_text("")
+    reports.unlink()
+    assert collect() == 0
+    assert "results_uploader.py" in reports.read_text() and (tmp_path / "collected").exists()
+    assert not task_output.exists()  # removed only after the upload
+    reports.unlink()
+    assert collect() == 0
+    assert not reports.exists()  # collected already: no report at all
