@@ -28,14 +28,16 @@ def convert_dict_to_sbatch_options(payload_dict: dict, target_key: str) -> str:
     return " ".join(opt_list)
 
 
-# only the queue placement and the time limit of the array job apply to the aggregator, never its resources -
+# only the queue placement and the time limit of the array job apply to the reporter job, never its resources -
 # the UI lets users type any sbatch option (exclusive, constraint, nodelist...), so this is an allowlist;
 # a --time in the array header is overridden for the array too by the --time on the command line
-AGGREGATOR_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "reservation"}
+HELPER_INHERITED_ARRAY_OPTIONS = {"account", "partition", "qos", "time", "reservation"}
 
 
-def extract_aggregator_header(array_header: str) -> str:
-    """Queue placement lines of the array header - the aggregator has to land in the same account and partition"""
+def queue_placement_options(array_header: str) -> list[str]:
+    """Queue placement options typed as #SBATCH lines of the array header - the reporter job has to land in the
+    same account and partition
+    """
     # matches the long and short sbatch forms, with "=" or a space:
     #   --account=plgccbmc15-cpu   --partition plgrid   --qos=normal   --reservation=demo
     #   -A plgccbmc15-cpu   -p plgrid   -pplgrid   -q normal
@@ -46,20 +48,19 @@ def extract_aggregator_header(array_header: str) -> str:
         # like sbatch: only lines starting with #SBATCH in the first column, anything after the next # is a comment
         if line.startswith("#SBATCH"):
             options.extend(placement.findall(line[len("#SBATCH") :].split("#", 1)[0]))
-    return "\n".join(f"#SBATCH {option}" for option in options)
+    return options
 
 
-def convert_dict_to_aggregator_sbatch_options(
-    payload_dict: dict, sim_id: int, job_dir: str, role: str = "aggregator"
-) -> str:
-    """Function building sbatch options for a small helper job: the aggregator, or the reporter of a failed collect
+def helper_job_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str, role: str = "reporter") -> str:
+    """sbatch command line options of a small helper job (the reporter of a failed collect)
 
-    It keeps whatever the array job needs to be accepted by the queue (account, partition, qos, reservation, time)
-    and asks for a single cheap cpu, because the helper only forwards updates.
+    It keeps whatever the array job needs to be accepted by the queue (account, partition, qos, reservation, time),
+    from the array's header and options - the options last, as they win - and asks for a single cheap cpu.
     """
+    array_header = extract_sbatch_header(payload_dict=payload_dict, target_key="array_header")
     options_dict = {"time": "00:59:59"}
     array_options = payload_dict.get("batch_options", {}).get("array_options", {})
-    options_dict.update({key: val for key, val in array_options.items() if key in AGGREGATOR_INHERITED_ARRAY_OPTIONS})
+    options_dict.update({key: val for key, val in array_options.items() if key in HELPER_INHERITED_ARRAY_OPTIONS})
     options_dict.update(
         {
             "ntasks": "1",
@@ -69,7 +70,7 @@ def convert_dict_to_aggregator_sbatch_options(
             "output": f"{job_dir}/{role}.log",
         }
     )
-    opt_list = []
+    opt_list = [sanitize_string(option) for option in queue_placement_options(array_header)]
     for key, val in options_dict.items():
         opt_list.append(f"--{sanitize_string(key)}={sanitize_string(str(val))}")
     return " ".join(opt_list)

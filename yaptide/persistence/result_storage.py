@@ -7,6 +7,7 @@ import base64
 import gzip
 import json
 import os
+import time
 from functools import lru_cache
 
 import boto3
@@ -82,10 +83,15 @@ def page_url(key: str) -> str:
 
 
 def delete_simulation(sim_id: int) -> None:
-    """Removes every stored page of a simulation"""
+    """Removes every stored object of a simulation: its pages, and what its HPC jobs reported"""
     bucket = os.environ["RESULTS_S3_BUCKET"]
     client = _internal()
-    for listing in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=f"simulations/{sim_id}/"):
+    listings = [
+        listing
+        for prefix in (f"simulations/{sim_id}/", f"hpc/{sim_id}/")
+        for listing in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix)
+    ]
+    for listing in listings:
         keys = [{"Key": item["Key"]} for item in listing.get("Contents", [])]
         if keys:
             errors = client.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True}).get("Errors")
@@ -124,3 +130,66 @@ def stored_matches(key: str, size: int, md5: str) -> bool:
         raise
     # the ETag of an object uploaded in one piece is its MD5, in hex
     return head["ContentLength"] == size and head["ETag"].strip('"') == base64.b64decode(md5).hex()
+
+
+# HPC jobs report progress and learn about a cancel through storage, with links signed at submit; a signature
+# lasts at most 7 days, a job running longer asks the backend for new ones
+JOB_LINK_SECONDS = 7 * 24 * 3600
+# a task's progress report: a few numbers
+MAX_PROGRESS_BYTES = 64 * 1024
+
+
+def progress_prefix(sim_id: int) -> str:
+    """Where the tasks of an HPC simulation put their progress, one object per task"""
+    # apart from the result pages (simulations/...), which an estimator called "progress" would otherwise mix with
+    return f"hpc/{sim_id}/progress/"
+
+
+def cancel_key(sim_id: int) -> str:
+    """The object whose presence tells an HPC simulation's tasks to stop"""
+    return f"hpc/{sim_id}/cancel"
+
+
+def job_links(sim_id: int) -> dict:
+    """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
+    progress prefix only (each at most MAX_PROGRESS_BYTES), and a HEAD of its cancel object
+    """
+    bucket = os.environ["RESULTS_S3_BUCKET"]
+    prefix = progress_prefix(sim_id)
+    client = public_client()
+    post = client.generate_presigned_post(
+        bucket,
+        prefix + "${filename}",
+        Conditions=[["starts-with", "$key", prefix], ["content-length-range", 1, MAX_PROGRESS_BYTES]],
+        ExpiresIn=JOB_LINK_SECONDS,
+    )
+    cancel = client.generate_presigned_url(
+        "head_object", Params={"Bucket": bucket, "Key": cancel_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
+    )
+    # the jobs ask for new links a day before these expire (Garage answers an expired link with 400, like a bad one)
+    expires = int(time.time()) + JOB_LINK_SECONDS
+    return {
+        "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
+        "cancel": cancel,
+        "expires": expires,
+    }
+
+
+def progress_reports(sim_id: int) -> dict[str, str]:
+    """The progress objects of an HPC simulation: key -> ETag, which changes with every new report"""
+    bucket = os.environ["RESULTS_S3_BUCKET"]
+    reports = {}
+    for listing in _internal().get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=progress_prefix(sim_id)):
+        for item in listing.get("Contents", []):
+            reports[item["Key"]] = item["ETag"]
+    return reports
+
+
+def read_report(key: str) -> dict:
+    """A task's progress report"""
+    return json.load(_internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"])
+
+
+def put_cancel(sim_id: int) -> None:
+    """Tells the tasks of an HPC simulation to stop; they check for this object"""
+    _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")

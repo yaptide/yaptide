@@ -8,7 +8,7 @@ from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.events_routes import SimulationEventsResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
 from yaptide.routes.results_upload_routes import ResultsDoneResource, ResultsUploadsResource
-from yaptide.routes.task_routes import TasksBulkResource, TasksResource
+from yaptide.routes.task_routes import TaskLinksResource, TasksBulkResource, TasksResource
 from yaptide.routes.user_routes import UserSimulations, UserUpdate
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import local_users_enabled
@@ -38,6 +38,7 @@ def initialize_routes(api: Api):
 
     api.add_resource(TasksResource, "/tasks")
     api.add_resource(TasksBulkResource, "/tasks/bulk")
+    api.add_resource(TaskLinksResource, "/tasks/links")
 
     api.add_resource(ResultsResource, "/results")
     api.add_resource(ResultsUploadsResource, "/results/uploads")

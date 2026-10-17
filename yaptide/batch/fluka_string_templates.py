@@ -102,26 +102,24 @@ cp $INPUT_DIR/*.inp .
 INPUT_FILE=$(ls *.inp)
 
 module load pymchelper
-python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)" # noqa: E501
+python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('${{INPUT_FILE}}',${{RNG_SEED}}.0)" # noqa: E501
 sig_handler()
 {{
     echo "BATCH interrupted"
     wait # wait for all children, this is important!
 }}
 
-# FILE_TO_WATCH=$WORK_DIR/fluka_`printf %04d $SLURM_ARRAY_TASK_ID`.log
-# python3 $ROOT_DIR/watcher.py \
-#     --filepath=$FILE_TO_WATCH\
-#     --sim_id={sim_id}\
-#     --task_id=$SLURM_ARRAY_TASK_ID\
-#     --update_key={update_key}\
-#     --backend_url={backend_url}\
-#     --verbose 1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
-
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
 srun rfluka -N0 -M1 $WORK_DIR/*.inp &
+SIMULATOR_PID=$!
+
+# reports the progress into storage and stops the simulator when the simulation is cancelled
+python3 $ROOT_DIR/watcher.py --simulator=fluka --work_dir=$WORK_DIR --pid=$SIMULATOR_PID \\
+    --links=$ROOT_DIR/storage_links.json --ntasks={n_tasks} --sim_id={sim_id} --task_id=$SLURM_ARRAY_TASK_ID \\
+    --update_key={update_key} --backend_url={backend_url} \\
+    1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 wait
 """
