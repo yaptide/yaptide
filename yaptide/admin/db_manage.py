@@ -7,6 +7,8 @@ We do not use ORM model classes here, because we do not want to import the yapti
 """
 
 from enum import Enum, auto
+import gzip
+import json
 import os
 
 import click
@@ -27,6 +29,7 @@ class TableTypes(Enum):
     Input = auto()
     Estimator = auto()
     Page = auto()
+    PageObject = auto()
 
 
 def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
@@ -345,6 +348,261 @@ def list_clusters():
     click.echo(f"{len(clusters)} clusters in DB:")
     for cluster in clusters:
         click.echo(f"id {cluster.id}; cluster name {cluster.cluster_name};")
+
+
+def results_storage():
+    """The result_storage module, when a results bucket is configured; imported only here, see the module docstring"""
+    if not os.environ.get("RESULTS_S3_BUCKET"):
+        click.echo("RESULTS_S3_BUCKET not set - aborting", err=True)
+        raise click.Abort()
+    from yaptide.persistence import result_storage
+
+    return result_storage
+
+
+def pages_in_postgres(con, metadata: db.MetaData, after_id: int, batch_size: int) -> list:
+    """The next pages kept only in the database, by id: id, the page's object key parts and its gzipped data"""
+    pages = metadata.tables[TableTypes.Page.name]
+    estimators = metadata.tables[TableTypes.Estimator.name]
+    objects = metadata.tables[TableTypes.PageObject.name]
+    stmt = (
+        db.select(
+            pages.c.id,
+            pages.c.page_number,
+            pages.c.compressed_data,
+            estimators.c.simulation_id,
+            estimators.c.file_name,
+        )
+        .join(estimators, pages.c.estimator_id == estimators.c.id)
+        .outerjoin(objects, objects.c.page_id == pages.c.id)
+        .where(pages.c.compressed_data.is_not(None), objects.c.page_id.is_(None), pages.c.id > after_id)
+        .order_by(pages.c.id)
+        .limit(batch_size)
+    )
+    return con.execute(stmt).all()
+
+
+def count_pages_in_postgres(con, metadata: db.MetaData) -> tuple[int, int]:
+    """How many pages are kept only in the database, and their size in bytes"""
+    pages = metadata.tables[TableTypes.Page.name]
+    objects = metadata.tables[TableTypes.PageObject.name]
+    stmt = (
+        db.select(db.func.count(), db.func.coalesce(db.func.sum(db.func.length(pages.c.compressed_data)), 0))
+        .select_from(pages)
+        .outerjoin(objects, objects.c.page_id == pages.c.id)
+        .where(pages.c.compressed_data.is_not(None), objects.c.page_id.is_(None))
+    )
+    return tuple(con.execute(stmt).one())
+
+
+def lock_simulations(con, simulation_ids) -> None:
+    """Waits for results of these simulations being stored by the backend, as it does (lock_results in
+    yaptide/routes/common_sim_routes.py), so it reads the pages again after this transaction
+    """
+    if con.dialect.name == "postgresql":
+        for simulation_id in sorted(set(simulation_ids)):
+            con.execute(db.text("SELECT pg_advisory_xact_lock(:simulation_id)"), {"simulation_id": simulation_id})
+
+
+def megabytes(size: int) -> str:
+    """Size for the progress output"""
+    return f"{size / 1e6:.1f} MB"
+
+
+@run.command
+@click.option("--batch-size", default=100, show_default=True, help="Pages read from the database at once")
+@click.option("--dry-run", is_flag=True, help="Only check which pages are already in storage, upload nothing")
+@click.option("-v", "--verbose", count=True)
+def copy_pages_to_storage(batch_size, dry_run, verbose):
+    """Copies result pages from the database to storage; the database keeps them.
+
+    Each copy is checked in the results bucket (size and MD5). Only reads the database: the pages are still read
+    from it until clear-pages-in-postgres. Can be stopped and repeated at any time; a page already in storage
+    unchanged is not uploaded again.
+    """
+    result_storage = results_storage()
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    # closed at the end, also when stopped: an open transaction would hold its locks until the process exits
+    with con:
+        objects = metadata.tables[TableTypes.PageObject.name]
+        total, total_size = count_pages_in_postgres(con, metadata)
+        click.echo(f"{total} pages ({megabytes(total_size)}) kept only in the database")
+        done, uploaded, skipped, after_id = 0, 0, [], 0
+        keys_seen = set()
+        while batch := pages_in_postgres(con, metadata, after_id, batch_size):
+            # read-only: end the transaction, so it holds nothing while the batch uploads
+            con.rollback()
+            after_id = batch[-1].id
+            keys = {
+                page.id: result_storage.page_key(page.simulation_id, page.file_name, page.page_number) for page in batch
+            }
+            # a key another page's object already has: uploading would replace the only copy of that page
+            taken = set(con.execute(db.select(objects.c.key).where(objects.c.key.in_(keys.values()))).scalars())
+            con.rollback()
+            batch_size_bytes = 0
+            for page in batch:
+                key = keys[page.id]
+                if key in taken or key in keys_seen:
+                    skipped.append(page.id)
+                    click.echo(f"Page {page.id}: key {key} belongs to another page, skipped", err=True)
+                    continue
+                keys_seen.add(key)
+                body = page.compressed_data
+                md5 = result_storage.body_md5(body)
+                if not result_storage.stored_matches(key, len(body), md5):
+                    if dry_run:
+                        continue
+                    result_storage.put_gzipped_page(key, body)
+                    if not result_storage.stored_matches(key, len(body), md5):
+                        raise click.ClickException(f"Page {page.id}: the copy in storage does not match ({key})")
+                    uploaded += 1
+                    batch_size_bytes += len(body)
+                done += 1
+            click.echo(
+                f"up to page {after_id}: {done}/{total} in storage, {uploaded} uploaded in this run "
+                f"(+{megabytes(batch_size_bytes)})"
+            )
+        if dry_run:
+            click.echo(f"Dry run: {done} of {total} pages already in storage, {total - done - len(skipped)} to upload")
+        if skipped:
+            click.echo(f"{len(skipped)} pages skipped (keys taken), still only in the database: {skipped}", err=True)
+
+
+@run.command
+@click.option("--batch-size", default=100, show_default=True, help="Pages cleared in one transaction")
+@click.option("--dry-run", is_flag=True, help="Only check that the pages are in storage, change nothing")
+@click.option("-v", "--verbose", count=True)
+def clear_pages_in_postgres(batch_size, dry_run, verbose):
+    """Removes from the database the pages verified in storage (pg_dump first).
+
+    Makes the copies made by copy-pages-to-storage the only ones: the pages are read from storage from now on.
+
+    A batch is changed only when every page of it is in storage with the same size and MD5, then in one
+    transaction; otherwise the command stops and that batch stays in the database. Undone by move-pages-to-postgres.
+    """
+    result_storage = results_storage()
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    # closed at the end, also when stopped: an open transaction would hold its locks until the process exits
+    with con:
+        pages = metadata.tables[TableTypes.Page.name]
+        objects = metadata.tables[TableTypes.PageObject.name]
+        total, total_size = count_pages_in_postgres(con, metadata)
+        click.echo(f"{total} pages ({megabytes(total_size)}) kept only in the database")
+        cleared, changed, after_id = 0, [], 0
+        while batch := pages_in_postgres(con, metadata, after_id, batch_size):
+            con.rollback()
+            after_id = batch[-1].id
+            keys = {
+                page.id: result_storage.page_key(page.simulation_id, page.file_name, page.page_number) for page in batch
+            }
+            missing = [
+                page.id
+                for page in batch
+                if not result_storage.stored_matches(
+                    keys[page.id], len(page.compressed_data), result_storage.body_md5(page.compressed_data)
+                )
+            ]
+            if missing:
+                raise click.ClickException(
+                    f"{len(missing)} pages of this batch are not in storage as in the database, run "
+                    f"copy-pages-to-storage first; nothing changed from page {batch[0].id} on: {missing}"
+                )
+            if dry_run:
+                cleared += len(batch)
+                continue
+            with con.begin():
+                lock_simulations(con, (page.simulation_id for page in batch))
+                for page in batch:
+                    # only if the backend did not store the page again since it was read
+                    stmt = (
+                        db.update(pages)
+                        .where(pages.c.id == page.id, pages.c.compressed_data == page.compressed_data)
+                        .values(compressed_data=None)
+                    )
+                    if con.execute(stmt).rowcount != 1:
+                        changed.append(page.id)
+                        continue
+                    con.execute(
+                        db.insert(objects).values(
+                            page_id=page.id,
+                            key=keys[page.id],
+                            size=len(page.compressed_data),
+                            format=result_storage.PAGE_FORMAT,
+                        )
+                    )
+                    cleared += 1
+            click.echo(f"up to page {after_id}: {cleared}/{total} cleared")
+        if dry_run:
+            click.echo(f"Dry run: all {cleared} pages are in storage and can be cleared")
+        if changed:
+            click.echo(f"{len(changed)} pages changed meanwhile and stay in the database: {changed}", err=True)
+
+
+@run.command
+@click.option("--batch-size", default=100, show_default=True, help="Pages written to the database in one transaction")
+@click.option("--dry-run", is_flag=True, help="Only count the pages, change nothing")
+@click.option("-v", "--verbose", count=True)
+def move_pages_to_postgres(batch_size, dry_run, verbose):
+    """Moves every result page kept in storage back into the database.
+
+    The database reads the pages from itself again.
+
+    Run before downgrading below the PageObject migration (c75a1d0e4f21), or to undo clear-pages-in-postgres.
+    Each batch is one transaction; the objects stay in the bucket.
+    """
+    result_storage = results_storage()
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    # closed at the end, also when stopped: an open transaction would hold its locks until the process exits
+    with con:
+        pages = metadata.tables[TableTypes.Page.name]
+        estimators = metadata.tables[TableTypes.Estimator.name]
+        objects = metadata.tables[TableTypes.PageObject.name]
+        total, total_size = con.execute(
+            db.select(db.func.count(), db.func.coalesce(db.func.sum(objects.c.size), 0))
+        ).one()
+        con.rollback()
+        click.echo(f"{total} pages ({megabytes(total_size)}) kept in object storage")
+        if dry_run:
+            return
+        moved = 0
+        stmt = (
+            db.select(objects.c.page_id, objects.c.key, objects.c.size, objects.c.format, estimators.c.simulation_id)
+            .join(pages, pages.c.id == objects.c.page_id)
+            .join(estimators, pages.c.estimator_id == estimators.c.id)
+            .order_by(objects.c.page_id)
+            .limit(batch_size)
+        )
+        while batch := con.execute(stmt).all():
+            con.rollback()
+            bodies = {}
+            for page in batch:
+                if page.format != result_storage.PAGE_FORMAT:
+                    raise click.ClickException(
+                        f"Page {page.page_id} is stored as {page.format}, which is not known here"
+                    )
+                body = result_storage.get_gzipped_page(page.key)
+                # the size it was stored with, and a whole gzip (its CRC) of JSON
+                if len(body) != page.size:
+                    raise click.ClickException(
+                        f"Page {page.page_id}: {page.key} has {len(body)} bytes, not {page.size}"
+                    )
+                json.loads(gzip.decompress(body))
+                bodies[page.page_id] = body
+            with con.begin():
+                lock_simulations(con, (page.simulation_id for page in batch))
+                for page in batch:
+                    # only if the backend did not store the page again since it was read
+                    removed = con.execute(
+                        db.delete(objects).where(objects.c.page_id == page.page_id, objects.c.key == page.key)
+                    ).rowcount
+                    if removed == 1:
+                        con.execute(
+                            db.update(pages)
+                            .where(pages.c.id == page.page_id)
+                            .values(compressed_data=bodies[page.page_id])
+                        )
+                        moved += 1
+            click.echo(f"up to page {batch[-1].page_id}: {moved}/{total} back in the database")
 
 
 if __name__ == "__main__":

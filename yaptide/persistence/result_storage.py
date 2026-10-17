@@ -7,6 +7,7 @@ another machine than the tasks; without a bucket they pass through a local direc
 
 import base64
 import gzip
+import hashlib
 import json
 import os
 import shutil
@@ -70,14 +71,30 @@ def page_key(sim_id: int, estimator_file_name: str, page_number: int) -> str:
 def put_page(key: str, page: dict) -> int:
     """Stores a page as gzipped JSON the browser decompresses itself; returns the stored size in bytes"""
     body = gzip.compress(json.dumps(page).encode())
+    put_gzipped_page(key, body)
+    return len(body)
+
+
+def body_md5(body: bytes) -> str:
+    """MD5 of an object's body in base64, as the Content-MD5 header carries it"""
+    return base64.b64encode(hashlib.md5(body).digest()).decode()
+
+
+def put_gzipped_page(key: str, body: bytes) -> None:
+    """Stores a page already gzipped (as the database kept it); the storage rejects a body that arrives changed"""
     _internal().put_object(
         Bucket=os.environ["RESULTS_S3_BUCKET"],
         Key=key,
         Body=body,
+        ContentMD5=body_md5(body),
         ContentType="application/json",
         ContentEncoding="gzip",
     )
-    return len(body)
+
+
+def get_gzipped_page(key: str) -> bytes:
+    """The stored body of a page, still gzipped"""
+    return _internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"].read()
 
 
 def page_url(key: str) -> str:
