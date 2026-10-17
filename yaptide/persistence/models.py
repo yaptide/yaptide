@@ -98,6 +98,12 @@ class SimulationModel(db.Model):
         default=EntityState.UNKNOWN.value,
         doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')",
     )
+    partial_primaries: Column[int] = db.Column(
+        db.Integer, nullable=True, doc="Primaries the stored results cover while the simulation runs"
+    )
+    partial_time: Column[datetime] = db.Column(
+        db.DateTime(timezone=True), nullable=True, doc="When the partial results were stored"
+    )
 
     # the database removes the children (ON DELETE CASCADE); loading them first would read every result page
     tasks = relationship("TaskModel", cascade="delete", passive_deletes=True)
@@ -164,7 +170,33 @@ CREATE OR REPLACE TRIGGER simulation_engine_events AFTER INSERT OR UPDATE OF job
 FOR EACH ROW EXECUTE FUNCTION notify_engine()
 """
 )
-for statement in (NOTIFY_ENGINE_FUNCTION, NOTIFY_ENGINE_TRIGGER):
+# the open event streams of a simulation (yaptide/routes/events_routes.py) learn about a new state or partial results;
+# the migration 7c2e9a4d1b3f creates the same for databases created before
+SIMULATION_CHANNEL = "yaptide_simulation"
+NOTIFY_SIMULATION_FUNCTION = DDL(
+    """
+CREATE OR REPLACE FUNCTION notify_simulation() RETURNS trigger AS $$
+BEGIN
+    PERFORM pg_notify('yaptide_simulation', NEW.id::text);
+    RETURN NEW;
+END
+$$ LANGUAGE plpgsql
+"""
+)
+NOTIFY_SIMULATION_TRIGGER = DDL(
+    """
+CREATE OR REPLACE TRIGGER simulation_stream_events AFTER UPDATE OF job_state, partial_primaries ON "Simulation"
+FOR EACH ROW WHEN (OLD.job_state IS DISTINCT FROM NEW.job_state OR OLD.partial_primaries IS DISTINCT FROM
+NEW.partial_primaries) EXECUTE FUNCTION notify_simulation()
+"""
+)
+NOTIFY_STATEMENTS = (
+    NOTIFY_ENGINE_FUNCTION,
+    NOTIFY_ENGINE_TRIGGER,
+    NOTIFY_SIMULATION_FUNCTION,
+    NOTIFY_SIMULATION_TRIGGER,
+)
+for statement in NOTIFY_STATEMENTS:
     event.listen(SimulationModel.__table__, "after_create", statement.execute_if(dialect="postgresql"))
 
 
@@ -465,9 +497,9 @@ def prepare_database():
     else:
         db.create_all()
         if db.engine.dialect.name == "postgresql":
-            # create_all skips existing tables, and with them their after_create trigger; the stamp below skips
-            # its migration, so a database whose tables were only ever created from the models gets it here
+            # create_all skips existing tables, and with them their after_create triggers; the stamp below skips
+            # their migrations, so a database whose tables were only ever created from the models gets them here
             with db.engine.begin() as connection:
-                connection.execute(NOTIFY_ENGINE_FUNCTION)
-                connection.execute(NOTIFY_ENGINE_TRIGGER)
+                for notify_statement in NOTIFY_STATEMENTS:
+                    connection.execute(notify_statement)
         flask_migrate.stamp()

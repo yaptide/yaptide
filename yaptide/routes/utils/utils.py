@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 import logging
 
@@ -60,6 +60,13 @@ PROGRESSION = [
 def job_status_content(simulation: SimulationModel, with_tasks: bool) -> dict:
     """Simulation status as the UI polls it: totals over the tasks always, the list of tasks only when asked for"""
     content = {"job_state": simulation.job_state, "job_tasks_summary": fetch_task_summary(simulation.id)}
+    if simulation.partial_primaries is not None:
+        # the stored results cover only these primaries: the simulation has not finished
+        content["partial_results"] = {
+            "simulated_primaries": simulation.partial_primaries,
+            # SQLite drops the time zone of the UTC time stored
+            "time": simulation.partial_time.replace(tzinfo=simulation.partial_time.tzinfo or timezone.utc).isoformat(),
+        }
     if with_tasks:
         content["job_tasks_status"] = [task.get_status_dict() for task in fetch_tasks_by_sim_id(sim_id=simulation.id)]
     return content

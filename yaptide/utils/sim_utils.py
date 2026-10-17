@@ -15,6 +15,8 @@ from converter.api import get_parser_from_str, run_parser
 from yaptide.utils.enums import InputType, SimulationType
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
+# NSTAT without a step of saving, or with 0 (save only at the end)
+NSTAT_WITHOUT_SAVES = re.compile(r"^(\s*NSTAT\s+\d+)(?:[ \t]+0)?(?=[ \t]*(?:!|$))", re.MULTILINE)
 
 
 def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
@@ -337,6 +339,15 @@ def adjust_primaries_for_fluka_files(
             break
     files_dict[fluka_input_file] = "\n".join(all_input_lines)
     return files_dict, parsed_number_of_all_primaries
+
+
+def set_shieldhit_save_step(files_dict: dict, primaries_per_task: int) -> None:
+    """Makes SHIELD-HIT12A save its results every tenth of a task's primaries, for partial results; a step of saving
+    set in the input is kept
+    """
+    if "beam.dat" in files_dict:
+        step = max(1, primaries_per_task // 10)
+        files_dict["beam.dat"] = NSTAT_WITHOUT_SAVES.sub(lambda match: f"{match[1]}    {step}", files_dict["beam.dat"])
 
 
 def files_dict_with_adjusted_primaries(payload_dict: dict, ntasks: int = None) -> tuple[dict, int]:

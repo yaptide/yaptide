@@ -18,12 +18,14 @@ from yaptide.engine.pymc import (
 )
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import fetch_simulation_by_sim_id, update_simulation_state
-from yaptide.routes.common_sim_routes import store_results
+from yaptide.routes.common_sim_routes import store_partial_results, store_results
 from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import merge_simulation_outputs, simulation_logfiles, write_simulation_input_files
 
 # prefix of the task working directories, so the ones left behind can be found
 WORK_DIR_PREFIX = "yaptide_task_"
+# a partial merge may still read the snapshot before the latest one
+SNAPSHOTS_KEPT = 2
 
 
 @dataclass
@@ -45,18 +47,20 @@ def run_simulation(
     work_dir: Path,
     simulation_id: Optional[int],
     report: Callable[[dict], None],
+    saved: Callable[[str, int], None],
 ) -> dict:
     """Runs one simulation task in work_dir and returns what the engine needs from it
 
     The result files stay in work_dir, the merge reads them and removes the directory.
     Progress goes to report while the simulator runs; the final state of the task is in the returned "final_update".
+    Each save the simulator makes before the end is copied to a snapshot directory passed to saved, with its primaries.
     """
     logging.info("Running simulation, simulation_id: %s, task_id: %d, directory: %s", simulation_id, task_id, work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     try:
         write_simulation_input_files(files_dict=files_dict, output_dir=work_dir)
         if sim_type == "shieldhit":
-            simulation_result = run_single_simulation_for_shieldhit(work_dir, task_id, simulation_id, report)
+            simulation_result = run_single_simulation_for_shieldhit(work_dir, task_id, simulation_id, report, saved)
         elif sim_type == "fluka":
             simulation_result = run_single_simulation_for_fluka(work_dir, task_id, simulation_id, report)
         else:
@@ -89,7 +93,11 @@ def run_simulation(
 
 
 def run_single_simulation_for_shieldhit(
-    work_dir: Path, task_id: int, simulation_id: Optional[int], report: Callable[[dict], None]
+    work_dir: Path,
+    task_id: int,
+    simulation_id: Optional[int],
+    report: Callable[[dict], None],
+    saved: Callable[[str, int], None],
 ) -> SimulationTaskResult:
     """Function running single simulation for shieldhit"""
     command_as_list = command_to_run_shieldhit(dir_path=work_dir, task_id=task_id)
@@ -97,7 +105,13 @@ def run_single_simulation_for_shieldhit(
     log_path = work_dir / f"shieldhit_{task_id:04d}.log"
     event = threading.Event()
     monitor = start_monitor(
-        read_shieldhit_file, event, filepath=log_path, simulation_id=simulation_id, task_id=task_id, report=report
+        read_shieldhit_file,
+        event,
+        filepath=log_path,
+        simulation_id=simulation_id,
+        task_id=task_id,
+        report=report,
+        on_save=lambda primaries: take_snapshot(work_dir, primaries, saved),
     )
     try:
         process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
@@ -155,6 +169,24 @@ def run_single_simulation_for_fluka(
     )
 
 
+def take_snapshot(work_dir: Path, primaries: int, saved: Callable[[str, int], None]) -> None:
+    """Copies the result files of a finished save aside: the simulator rewrites them in place at its next save"""
+    try:
+        snapshot = work_dir / f"snapshot_{primaries:012d}"
+        partial = work_dir / "snapshot_tmp"
+        shutil.rmtree(partial, ignore_errors=True)
+        partial.mkdir()
+        for result_file in work_dir.glob("*.bdo"):
+            shutil.copy(result_file, partial)
+        partial.rename(snapshot)
+        for old in sorted(work_dir.glob("snapshot_[0-9]*"))[:-SNAPSHOTS_KEPT]:
+            shutil.rmtree(old, ignore_errors=True)
+        saved(str(snapshot), primaries)
+    except OSError:
+        # a missed snapshot only delays the partial results, the task goes on
+        logging.exception("Snapshot of %s at %d primaries failed", work_dir, primaries)
+
+
 def start_monitor(target: Callable, event: threading.Event, **kwargs) -> threading.Thread:
     """Starts a thread following the simulator's log and reporting progress until the event is set"""
     thread = threading.Thread(
@@ -191,3 +223,16 @@ def merge_and_store(simulation_id: int, output_dirs: list[str]) -> bool:
             db.session.remove()
             for path in output_dirs:
                 shutil.rmtree(path, ignore_errors=True)
+
+
+def merge_and_store_partial(simulation_id: int, snapshot_dirs: list[str], primaries: int) -> bool:
+    """Merges the latest snapshots of the tasks into the simulation's partial results; whether they were stored"""
+    with backend_app().app_context():
+        try:
+            simulation = fetch_simulation_by_sim_id(simulation_id)
+            if simulation is None:
+                return False
+            estimators = merge_simulation_outputs([Path(path) for path in snapshot_dirs])
+            return bool(estimators) and store_partial_results(simulation, estimators, primaries)
+        finally:
+            db.session.remove()
