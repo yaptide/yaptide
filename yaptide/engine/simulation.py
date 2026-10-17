@@ -226,7 +226,7 @@ def merge_and_store(simulation_id: int, output_dirs: list[str]) -> bool:
 
 
 def merge_and_store_partial(simulation_id: int, snapshot_dirs: list[str], primaries: int) -> bool:
-    """Merges the latest snapshots of the tasks into the simulation's partial results; returns whether they were stored"""
+    """Merges the latest snapshots of the tasks into the simulation's partial results; whether they were stored"""
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)

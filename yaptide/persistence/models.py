@@ -500,6 +500,6 @@ def prepare_database():
             # create_all skips existing tables, and with them their after_create triggers; the stamp below skips
             # their migrations, so a database whose tables were only ever created from the models gets them here
             with db.engine.begin() as connection:
-                for statement in NOTIFY_STATEMENTS:
-                    connection.execute(statement)
+                for notify_statement in NOTIFY_STATEMENTS:
+                    connection.execute(notify_statement)
         flask_migrate.stamp()

@@ -343,7 +343,8 @@ def adjust_primaries_for_fluka_files(
 
 def set_shieldhit_save_step(files_dict: dict, primaries_per_task: int) -> None:
     """Makes SHIELD-HIT12A save its results every tenth of a task's primaries, for partial results; a step of saving
-    set in the input is kept"""
+    set in the input is kept
+    """
     if "beam.dat" in files_dict:
         step = max(1, primaries_per_task // 10)
         files_dict["beam.dat"] = NSTAT_WITHOUT_SAVES.sub(lambda match: f"{match[1]}    {step}", files_dict["beam.dat"])

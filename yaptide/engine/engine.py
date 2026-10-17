@@ -657,7 +657,8 @@ class Engine:
 
 def listen(database_uri: str, events: queue.Queue) -> None:
     """Puts the database's events for the engine into the queue, and a sweep after every (re)connection, which
-    catches what was committed while nobody listened"""
+    catches what was committed while nobody listened
+    """
 
     def notified(payload: str) -> None:
         """Queues one event"""

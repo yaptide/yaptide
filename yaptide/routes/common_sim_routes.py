@@ -220,7 +220,8 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
 
 def lock_results(simulation: SimulationModel) -> None:
     """Waits for results of the simulation stored at the same time (a repeated request, partial and final results),
-    which would both create the estimators and pages, then reads the simulation again"""
+    which would both create the estimators and pages, then reads the simulation again
+    """
     if db.engine.dialect.name == "postgresql":
         db.session.execute(text("SELECT pg_advisory_xact_lock(:simulation_id)"), {"simulation_id": simulation.id})
     db.session.refresh(simulation)
@@ -265,7 +266,8 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
 
 def store_partial_results(simulation: SimulationModel, estimators: list[dict], primaries: int) -> bool:
     """Stores the results of a running simulation so far in place of the previous ones; the final results replace
-    them. Returns whether they were stored, i.e. the simulation still runs."""
+    them. Returns whether they were stored, i.e. the simulation still runs.
+    """
     lock_results(simulation)
     if simulation.job_state != EntityState.RUNNING.value:
         return False
