@@ -32,12 +32,14 @@ class FakeStorage(BaseHTTPRequestHandler):
     always_refused = False
     down_for = 0
     renewals = 0
+    renewal_keys: list = []
 
     def do_POST(self):
         """A progress report (multipart, as an S3 POST policy upload) or a request for new links"""
         data = self.rfile.read(int(self.headers["Content-Length"]))
         if self.path == "/tasks/links":
             FakeStorage.renewals += 1
+            FakeStorage.renewal_keys.append(json.loads(data)["update_key"])
             return self.answer(200, {"links": links(self.server.server_address[1])})
         if FakeStorage.down_for > 0:
             FakeStorage.down_for -= 1
@@ -90,7 +92,7 @@ def links(port: int) -> dict:
 def storage(tmp_path, monkeypatch):
     """The fake storage running, the links file written, and the watcher's waits shortened"""
     FakeStorage.objects, FakeStorage.cancelled, FakeStorage.expired_once, FakeStorage.renewals = {}, False, False, 0
-    FakeStorage.always_refused, FakeStorage.down_for = False, 0
+    FakeStorage.always_refused, FakeStorage.down_for, FakeStorage.renewal_keys = False, 0, []
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeStorage)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     port = server.server_address[1]
@@ -177,6 +179,22 @@ def test_expired_links_are_renewed_by_the_backend(storage):
     assert FakeStorage.renewals == 1
     assert report()["task_state"] == "RUNNING"
     assert json.loads((tmp_path / "storage_links.json").read_text())["progress"]["fields"] == {"policy": "signed"}
+
+
+def test_update_key_comes_from_the_links_file(storage):
+    """Without --update_key (a command line other users of the node see) the key is read from the links file, and
+    kept there when the links are renewed
+    """
+    tmp_path, backend_url = storage
+    links_file = tmp_path / "storage_links.json"
+    links_file.write_text(json.dumps({**json.loads(links_file.read_text()), "update_key": "from-file"}))
+    FakeStorage.expired_once = True
+    task = watcher.Reporter(links_file, 3, 0, {"sim_id": 7, "update_key": None, "backend_url": backend_url})
+
+    task.update({"task_state": "RUNNING"})
+
+    assert FakeStorage.renewal_keys == ["from-file"]
+    assert json.loads(links_file.read_text())["update_key"] == "from-file"
 
 
 def test_progress_is_reported_at_most_every_few_seconds(storage):

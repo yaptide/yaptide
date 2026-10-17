@@ -496,6 +496,58 @@ def test_unreachable_storage_skips_a_round(client, engine, monkeypatch):
     engine.read_hpc_progress()
 
 
+def too_deep(key: str) -> dict:
+    """A report nested deeper than the JSON parser goes"""
+    raise RecursionError(f"maximum recursion depth exceeded reading {key}")
+
+
+@pytest.mark.parametrize(
+    "bad",
+    [{"update": []}, {"update": "x"}, [], "x", None, too_deep],
+    ids=["update list", "update string", "list", "string", "null", "too deep"],
+)
+def test_malformed_report_does_not_stop_the_round(client, engine, monkeypatch, bad):
+    """A malformed report is left out and not read again; the other reports of the round are still saved"""
+    simulation_ids = [hpc_simulation(), hpc_simulation(job_id="other")]
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+
+    def listing(sim_id: int) -> dict:
+        """Every simulation has one malformed report, one good one and objects that are not its tasks' reports"""
+        prefix = f"hpc/{sim_id}/progress/"
+        return {
+            prefix + "task_0001.json": "bad",
+            prefix + "task_0002.json": "good",
+            prefix + "nested/task_0001.json": "nested",
+            f"hpc/{sim_id + 100}/progress/task_0001.json": "foreign",
+        }
+
+    def read(key: str):
+        """The good report for task 2, the malformed one otherwise"""
+        reads.append(key)
+        if key.endswith("task_0002.json"):
+            return {"update": {"task_state": "RUNNING", "simulated_primaries": 700}}
+        return bad(key) if callable(bad) else bad
+
+    reads = []
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", listing)
+    monkeypatch.setattr(engine_module.result_storage, "read_report", read)
+
+    engine.read_hpc_progress()
+
+    assert sorted(reads) == sorted(
+        f"hpc/{sim_id}/progress/task_000{task}.json" for sim_id in simulation_ids for task in (1, 2)
+    )
+    db.session.remove()
+    for simulation_id in simulation_ids:
+        tasks = {task.task_id: task for task in db.session.query(TaskModel).filter_by(simulation_id=simulation_id)}
+        assert tasks[1].task_state == EntityState.PENDING.value
+        assert (tasks[2].task_state, tasks[2].simulated_primaries) == (EntityState.RUNNING.value, 700)
+
+    reads.clear()
+    engine.read_hpc_progress()
+    assert not reads
+
+
 def test_hpc_cancel_goes_into_storage(client, engine, monkeypatch):
     """The tasks learn about a cancel from storage, also after the user's certificate expired"""
     simulation_id = hpc_simulation(EntityState.CANCELED.value)

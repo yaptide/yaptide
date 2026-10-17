@@ -187,3 +187,16 @@ def test_bulk_update_rejects_a_user_token_as_update_key(app, simulation_with_tas
     token, _ = encode_auth_token(user_id=1)
     payload = {"simulation_id": simulation_with_tasks.id, "update_key": token, "tasks": []}
     assert app.test_client().post("/tasks/bulk", json=payload).status_code == 400
+
+
+@pytest.mark.parametrize("path", ["/tasks", "/tasks/links"])
+@pytest.mark.parametrize("simulation_id", [[1], "1", True, {"id": 1}])
+def test_task_routes_reject_a_simulation_id_that_is_not_an_integer(app, simulation_with_tasks, path, simulation_id):
+    """A malformed simulation_id is a bad request, not a server error"""
+    payload = {
+        "simulation_id": simulation_id,
+        "update_key": encode_simulation_auth_token(simulation_id=simulation_with_tasks.id),
+    }
+    if path == "/tasks":
+        payload.update(task_id=1, update_dict={"simulated_primaries": 5})
+    assert app.test_client().post(path, json=payload).status_code == 400

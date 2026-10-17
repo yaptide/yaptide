@@ -160,13 +160,13 @@ class Reporter:
 
     def __init__(self, links_path: Path, task_id: int, interval_seconds: float, backend: dict):
         """interval_seconds: how often progress is reported and a cancel looked for; backend: sim_id, update_key
-        and backend_url, for new links before the old ones expire
+        (by default the one in the links file) and backend_url, for new links before the old ones expire
         """
         self.links_path = links_path
         self.links = json.loads(links_path.read_text())
         self.task_id = task_id
         self.interval_seconds = interval_seconds
-        self.backend = backend
+        self.backend = dict(backend, update_key=backend.get("update_key") or self.links.get("update_key"))
         self.state: dict = {}
         self.unsent = False
         self.last_report = 0.0
@@ -253,7 +253,7 @@ class Reporter:
             return False
         self.links = links
         temporary = self.links_path.with_suffix(f".{self.task_id}.tmp")
-        temporary.write_text(json.dumps(links))
+        temporary.write_text(json.dumps(dict(links, update_key=self.backend["update_key"])))
         temporary.replace(self.links_path)
         return True
 
@@ -380,7 +380,8 @@ if __name__ == "__main__":
     parser.add_argument("--ntasks", type=int, default=1)
     parser.add_argument("--sim_id", type=int, required=True)
     parser.add_argument("--task_id", type=int, required=True)
-    parser.add_argument("--update_key", required=True)
+    # by default from the links file: a command line is visible to other users of the node
+    parser.add_argument("--update_key")
     parser.add_argument("--backend_url", required=True)
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     main(parser.parse_args())

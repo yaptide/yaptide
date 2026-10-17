@@ -110,7 +110,7 @@ SIMULATOR_PID=$!
 FILE_TO_WATCH=$WORK_DIR/shieldhit_`printf %04d $SLURM_ARRAY_TASK_ID`.log
 python3 $ROOT_DIR/watcher.py --simulator=shieldhit --filepath=$FILE_TO_WATCH --pid=$SIMULATOR_PID \\
     --links=$ROOT_DIR/storage_links.json --ntasks={n_tasks} --sim_id={sim_id} --task_id=$SLURM_ARRAY_TASK_ID \\
-    --update_key={update_key} --backend_url={backend_url} \\
+    --backend_url={backend_url} \\
     1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 wait
