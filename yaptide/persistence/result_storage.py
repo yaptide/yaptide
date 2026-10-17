@@ -178,9 +178,10 @@ def cancel_key(sim_id: int) -> str:
     return f"hpc/{sim_id}/cancel"
 
 
-def job_links(sim_id: int) -> dict:
+def job_links(sim_id: int, saving_tasks: int = 0) -> dict:
     """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
-    progress prefix only (each at most MAX_PROGRESS_BYTES), and a HEAD of its cancel object
+    progress prefix only (each at most MAX_PROGRESS_BYTES), a HEAD of its cancel object and, for each of the first
+    saving_tasks tasks, a PUT of its saves (the work_key of the task, at most HPC_SAVES_MAX_BYTES)
     """
     bucket = os.environ["RESULTS_S3_BUCKET"]
     prefix = progress_prefix(sim_id)
@@ -194,11 +195,21 @@ def job_links(sim_id: int) -> dict:
     cancel = client.generate_presigned_url(
         "head_object", Params={"Bucket": bucket, "Key": cancel_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
     )
+    # a PUT link per task, not a POST policy: the storage may read a POST body whole into memory before refusing it,
+    # so nginx lets only small ones through; a PUT link is checked before any data is taken (nginx caps it at 2 GB,
+    # the engine merges only saves within HPC_SAVES_MAX_BYTES)
+    saves = {
+        str(task_id): client.generate_presigned_url(
+            "put_object", Params={"Bucket": bucket, "Key": work_key(sim_id, task_id)}, ExpiresIn=JOB_LINK_SECONDS
+        )
+        for task_id in range(1, saving_tasks + 1)
+    }
     # the jobs ask for new links a day before these expire (Garage answers an expired link with 400, like a bad one)
     expires = int(time.time()) + JOB_LINK_SECONDS
     return {
         "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
         "cancel": cancel,
+        "saves": {"urls": saves, "max_bytes": HPC_SAVES_MAX_BYTES},
         "expires": expires,
     }
 
@@ -223,11 +234,16 @@ def put_cancel(sim_id: int) -> None:
     _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")
 
 
-# result files of direct simulation tasks on their way to the merges, removed after the final merge
+# result files of direct simulation tasks on their way to the merges, removed after the final merge; the saves of
+# HPC tasks on their way to the partial merges, removed once the simulation stops running
 WORK_PREFIX = "work/"
+# the saves of an HPC simulation's tasks merged into partial results at once, in bytes, packed and unpacked, which
+# bounds one task's save too: a simulation with larger results gets them only at the end
+HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 1 << 30))
 
 
-# objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; tasks run at most 10 hours
+# objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; direct tasks run at most 10 hours,
+# an HPC task replaces its save at every save (one expiring first only leaves the partial results without it)
 WORK_EXPIRY_DAYS = 2
 
 
@@ -247,7 +263,7 @@ def expire_work_objects() -> None:
 
 
 def work_prefix(sim_id: int) -> str:
-    """Where the tasks of a direct simulation put their result files"""
+    """Where the tasks of a simulation put their result files for the merges"""
     return f"{WORK_PREFIX}{sim_id}/"
 
 
@@ -286,6 +302,17 @@ def get_file(key: str, path: Path) -> None:
             shutil.copyfileobj(body, file)
     else:
         shutil.copyfile(_local(key), path)
+
+
+def stored_sizes(prefix: str) -> dict[str, int]:
+    """The objects under the prefix in the bucket: key -> size in bytes"""
+    sizes = {}
+    for listing in (
+        _internal().get_paginator("list_objects_v2").paginate(Bucket=os.environ["RESULTS_S3_BUCKET"], Prefix=prefix)
+    ):
+        for item in listing.get("Contents", []):
+            sizes[item["Key"]] = item["Size"]
+    return sizes
 
 
 def delete_objects(prefix: str) -> None:

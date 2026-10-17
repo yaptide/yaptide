@@ -1,9 +1,11 @@
 """The watcher of an HPC task: progress into storage with a signed policy, a cancel from storage stops the simulator"""
 
 import email
+import io
 import json
 import subprocess
 import sys
+import tarfile
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -60,6 +62,21 @@ class FakeStorage(BaseHTTPRequestHandler):
         FakeStorage.objects[key] = json.loads(fields["file"])
         return self.answer(204, None)
 
+    def do_PUT(self):
+        """A save, with its signed link"""
+        data = self.rfile.read(int(self.headers["Content-Length"]))
+        if FakeStorage.down_for > 0:
+            FakeStorage.down_for -= 1
+            return self.answer(503, {})
+        if FakeStorage.expired_once:
+            FakeStorage.expired_once = False
+            return self.answer(400, {})
+        path, _, query = self.path.partition("?")
+        if query != "signed":
+            return self.answer(403, {})
+        FakeStorage.objects[path] = data
+        return self.answer(200, None)
+
     def do_HEAD(self):
         """The cancel object exists once the simulation is cancelled"""
         self.send_response(200 if FakeStorage.cancelled else 404)
@@ -85,6 +102,7 @@ def links(port: int) -> dict:
             "prefix": "simulations/7/progress/",
         },
         "cancel": f"http://127.0.0.1:{port}/bucket/simulations/7/cancel",
+        "saves": {"urls": {"3": f"http://127.0.0.1:{port}/bucket/work/7/task_3.tar.gz?signed"}, "max_bytes": 10**6},
     }
 
 
@@ -270,3 +288,99 @@ def test_final_state_waits_for_the_storage(storage):
     task.report_final()
 
     assert report()["task_state"] == "COMPLETED"
+
+
+SAVE = "/bucket/work/7/task_3.tar.gz"
+
+
+def saved_files() -> dict:
+    """The result files in the task's save in storage: name -> content"""
+    with tarfile.open(fileobj=io.BytesIO(FakeStorage.objects[SAVE]), mode="r:gz") as tar:
+        return {member.name: tar.extractfile(member).read() for member in tar}
+
+
+def saver(tmp_path: Path, backend_url: str, simulated: int) -> watcher.Saver:
+    """Task 3's saver, with 1000 primaries requested and some simulated, and a result file in its directory"""
+    (tmp_path / "dose.bdo").write_bytes(b"dose")
+    task = reporter(tmp_path, backend_url)
+    task.state.update({"requested_primaries": 1000, "simulated_primaries": simulated})
+    return watcher.Saver(tmp_path, task)
+
+
+def test_saves_go_into_storage_with_their_primaries(storage):
+    """A save half way through goes into the task's object, packed; its primaries are reported, the last save at
+    the end is left to the collect
+    """
+    tmp_path, backend_url = storage
+    log = tmp_path / "shieldhit_0003.log"
+    (tmp_path / "dose.bdo").write_bytes(b"dose")
+    lines = SHIELDHIT_RUN.replace("4 seconds\n", "4 seconds\n  Saved all 1 estimator(s)\n")
+    process = simulator(log, lines + "  Saved all 1 estimator(s)\n", 0)
+    task = reporter(tmp_path, backend_url)
+
+    watcher.watch(
+        lambda: log if log.exists() else None,
+        watcher.shieldhit_update,
+        process.pid,
+        task,
+        saved=watcher.Saver(tmp_path, task).saved,
+    )
+
+    assert saved_files() == {"dose.bdo": b"dose"}
+    assert (report()["saved_primaries"], report()["task_state"]) == (500, "COMPLETED")
+    assert not (tmp_path / "yaptide_save.tar.gz").exists()
+
+
+def test_saves_are_sent_at_most_every_minute_and_tenth(storage, monkeypatch):
+    """Saves bound the transfer: one a minute at most, and each covering more primaries"""
+    tmp_path, backend_url = storage
+    task = saver(tmp_path, backend_url, 100)
+    task.saved()
+    task.reporter.state["simulated_primaries"] = 300
+    task.saved()
+    assert task.reporter.state["saved_primaries"] == 100  # within the minute
+
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task.reporter.state["simulated_primaries"] = 120
+    task.saved()
+    assert task.reporter.state["saved_primaries"] == 100  # too few new primaries
+    task.reporter.state["simulated_primaries"] = 300
+    task.saved()
+    assert task.reporter.state["saved_primaries"] == 300
+
+
+def test_failed_save_does_not_stop_the_task(storage, monkeypatch):
+    """Storage down, a save too large or one rewritten while packed: nothing is reported, the next save tries"""
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task = saver(tmp_path, backend_url, 100)
+    FakeStorage.down_for = 1
+    task.saved()
+    assert "saved_primaries" not in task.reporter.state and SAVE not in FakeStorage.objects
+
+    task.reporter.links["saves"]["max_bytes"] = 10
+    task.saved()
+    assert SAVE not in FakeStorage.objects
+
+    task.reporter.links["saves"]["max_bytes"] = 10**6
+    add = tarfile.TarFile.add
+    monkeypatch.setattr(
+        tarfile.TarFile, "add", lambda tar, name, **kwargs: (add(tar, name, **kwargs), Path(name).write_bytes(b"next"))
+    )
+    task.saved()
+    assert SAVE not in FakeStorage.objects
+    monkeypatch.setattr(tarfile.TarFile, "add", add)
+
+    task.saved()
+    assert saved_files() == {"dose.bdo": b"next"} and task.reporter.state["saved_primaries"] == 100
+    assert not (tmp_path / "yaptide_save.tar.gz").exists()
+
+
+def test_expired_save_link_is_renewed(storage):
+    """A save refused for an expired link goes again with new links"""
+    tmp_path, backend_url = storage
+    FakeStorage.expired_once = True
+
+    saver(tmp_path, backend_url, 100).saved()
+
+    assert FakeStorage.renewals == 1 and saved_files() == {"dose.bdo": b"dose"}

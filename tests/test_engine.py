@@ -699,3 +699,55 @@ def test_partial_merges_are_limited_and_a_failed_one_is_repeated(engine, monkeyp
     engine.merge_partial(1, engine.running[1])
     assert started == [1, 2, 3, 1]
     engine.running.clear()
+
+
+def test_saves_of_hpc_tasks_become_partial_results_at_most_once_a_minute(client, engine, monkeypatch):
+    """The saves HPC tasks put into storage are merged on the server as those of direct tasks: once they cover
+    enough new primaries, at most once a minute, only the reported tasks' own objects within the size limit, and
+    not once the simulation stopped running, when they are removed
+    """
+    simulation_id = hpc_simulation(EntityState.RUNNING.value)
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    first, second = (f"hpc/{simulation_id}/progress/task_000{task}.json" for task in (1, 2))
+    reports = {first: ("e1", {"task_state": "RUNNING", "saved_primaries": 100}), second: ("e2", {})}
+    saves = [result_storage.work_key(simulation_id, task) for task in (1, 2)]
+    sizes = {saves[0]: 10, saves[1]: 10, result_storage.work_key(simulation_id, 3): 10}
+    monkeypatch.setattr(
+        engine_module.result_storage, "progress_reports", lambda sim_id: {k: v[0] for k, v in reports.items()}
+    )
+    monkeypatch.setattr(engine_module.result_storage, "read_report", lambda key: {"update": reports[key][1]})
+    monkeypatch.setattr(engine_module.result_storage, "stored_sizes", lambda prefix: sizes)
+    merges, deleted = [], []
+    monkeypatch.setattr(
+        engine_module, "partial_merge_task", mock.Mock(remote=lambda *args: merges.append(args) or ray.put(True))
+    )
+    monkeypatch.setattr(engine_module, "delete_task_results", mock.Mock(remote=deleted.append))
+    monkeypatch.setattr(engine, "watch", lambda *args: None)
+
+    def report(etag: str, task: str, primaries: int) -> list:
+        """A task reports a new save; the merges started so far"""
+        reports[task] = (etag, {"saved_primaries": primaries})
+        engine.read_hpc_progress()
+        return merges
+
+    engine.read_hpc_progress()
+    assert merges == [(simulation_id, saves[:1], 100, result_storage.HPC_SAVES_MAX_BYTES)]
+    engine.handle("PARTIAL", simulation_id)
+    assert engine.hpc_partials[simulation_id].partial_primaries == 100
+    db.session.remove()
+    assert db.session.query(TaskModel).filter_by(simulation_id=simulation_id, task_id=1).one().simulated_primaries == 0
+
+    assert len(report("e3", second, 200)) == 1  # within the minute
+    monkeypatch.setattr(engine_module, "HPC_PARTIAL_SECONDS", 0)
+    engine.read_hpc_progress()
+    assert merges[-1][1:3] == (saves, 300)
+    engine.handle("PARTIAL", simulation_id)
+    assert len(report("e4", first, 150)) == 2  # 50 more of 2000 requested is too few
+    monkeypatch.setattr(engine_module.result_storage, "HPC_SAVES_MAX_BYTES", 15)
+    assert len(report("e5", first, 400)) == 2  # too large to merge here
+    monkeypatch.setattr(engine_module.result_storage, "HPC_SAVES_MAX_BYTES", 20)
+
+    db.session.query(SimulationModel).filter_by(id=simulation_id).update({"job_state": "MERGING_QUEUED"})
+    db.session.commit()
+    assert len(report("e6", first, 900)) == 2
+    assert deleted == [simulation_id] and simulation_id not in engine.hpc_partials

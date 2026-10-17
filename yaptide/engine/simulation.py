@@ -1,3 +1,4 @@
+import fnmatch
 import logging
 import shutil
 import tarfile
@@ -234,16 +235,34 @@ def backend_app():
     return create_app()
 
 
-def merge_stored(keys: list[str]) -> list[dict]:
-    """Merges the result files the tasks stored under the keys; a missing one raises"""
+def extract_results(archive: Path, task_dir: Path, max_bytes: float) -> int:
+    """Unpacks a task's result files, up to max_bytes; anything but result files raises, as does more data
+
+    The saves of HPC tasks come from the cluster. Returns the bytes unpacked.
+    """
+    members, unpacked = [], 0
+    with tarfile.open(archive, "r:gz") as tar:
+        # read one by one, so a long archive is refused before it is read to the end
+        for member in tar:
+            unpacked += member.size
+            if not (member.isfile() and any(fnmatch.fnmatchcase(member.name, p) for p in RESULT_PATTERNS)):
+                raise ValueError(f"{member.name!r} in {archive.name} is not a result file")
+            if "/" in member.name or unpacked > max_bytes:
+                raise ValueError(f"{archive.name} holds too much or nested files")
+            members.append(member)
+        tar.extractall(task_dir, members=members, filter="data")
+    return unpacked
+
+
+def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]:
+    """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises"""
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
         task_dirs = []
         for number, key in enumerate(keys):
             archive = Path(merge_dir) / f"{number}.tar.gz"
             result_storage.get_file(key, archive)
             task_dir = Path(merge_dir) / str(number)
-            with tarfile.open(archive) as tar:
-                tar.extractall(task_dir, filter="data")
+            max_bytes -= extract_results(archive, task_dir, max_bytes)
             archive.unlink()
             task_dirs.append(task_dir)
         return merge_simulation_outputs(task_dirs)
@@ -268,14 +287,18 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
             db.session.remove()
 
 
-def merge_and_store_partial(simulation_id: int, keys: list[str], primaries: int) -> bool:
-    """Merges the latest saves of the tasks into the simulation's partial results; whether they were stored"""
+def merge_and_store_partial(
+    simulation_id: int, keys: list[str], primaries: int, max_bytes: float = float("inf")
+) -> bool:
+    """Merges the latest saves of the tasks, at most max_bytes of result files, into the simulation's partial
+    results; whether they were stored
+    """
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            estimators = merge_stored(keys)
+            estimators = merge_stored(keys, max_bytes)
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

@@ -47,7 +47,11 @@ def client(monkeypatch):
     monkeypatch.setattr(
         batch_methods.result_storage,
         "job_links",
-        lambda sim_id: {"progress": {"url": "https://s3.test", "fields": {}, "prefix": f"{sim_id}/"}, "cancel": "x"},
+        lambda sim_id, saving_tasks=0: {
+            "progress": {"url": "https://s3.test", "fields": {}, "prefix": f"{sim_id}/"},
+            "cancel": "x",
+            "saves": {"urls": {str(task): f"https://s3.test/{task}" for task in range(1, saving_tasks + 1)}},
+        },
     )
     app = create_app()
     with app.app_context():
@@ -377,6 +381,21 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
             ["bash", "-n"], input=put[script].getvalue().decode(), capture_output=True, text=True, check=False
         )
         assert checked.returncode == 0, checked.stderr
+
+
+def test_shieldhit_tasks_on_the_cluster_save_along_the_way(client, cluster_connection, monkeypatch):
+    """The cluster's copy of the input saves every tenth of a task, and each task gets a link for its saves; the
+    stored input stays the user's
+    """
+    uploaded = {}
+    monkeypatch.setattr(batch_methods, "upload_inputs", lambda con, job_dir, files: uploaded.update(files))
+    simulation = submit(client, ntasks=2)
+    batch_methods.submit_simulation(simulation.id)
+
+    assert uploaded["beam.dat"].startswith("NSTAT 50    5\n")
+    put = {call.args[1].rsplit("/", 1)[-1]: call.args[0] for call in cluster_connection.put.call_args_list}
+    assert set(json.loads(put["storage_links.json"].getvalue())["saves"]["urls"]) == {"1", "2"}
+    assert stored(simulation.id).inputs[0].data["input_files"]["beam.dat"] == "NSTAT 50 0\n"
 
 
 def test_uploads_to_the_cluster_have_a_timeout(client, cluster_connection):

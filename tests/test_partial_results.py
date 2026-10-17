@@ -1,6 +1,7 @@
 """Partial results: stored in place of the previous ones while a simulation runs, replaced by the final ones"""
 
 import copy
+import io
 import json
 import shutil
 import tarfile
@@ -12,6 +13,7 @@ from botocore.exceptions import ClientError
 from flask import current_app
 
 from yaptide.application import create_app
+from yaptide.batch import watcher
 from yaptide.engine import simulation as simulation_module
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
@@ -240,6 +242,53 @@ def test_results_passed_through_storage_merge_as_from_the_task_directories(tmp_p
 
     result_storage.delete_objects(result_storage.work_prefix(1))
     assert not list(tmp_path.rglob("*.tar.gz"))
+
+
+def test_saves_from_the_cluster_merge_as_from_the_task_directories(tmp_path, monkeypatch):
+    """An HPC task's save, packed by its watcher, goes through the same merge as the saves of direct tasks"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    keys = []
+    for task in ("task_1", "task_2"):
+        keys.append(result_storage.work_key(1, int(task[-1])))
+        archive = tmp_path / f"{task}.tar.gz"
+        assert watcher.pack(BDO_DIR / task, archive)
+        result_storage.put_file(keys[-1], archive)
+
+    assert simulation_module.merge_stored(keys) == merge_simulation_outputs([BDO_DIR / "task_1", BDO_DIR / "task_2"])
+
+
+def archive_with(tmp_path: Path, name: str, size: int = 4, kind: bytes = tarfile.REGTYPE) -> Path:
+    """An archive with one member, as a job on the cluster could put it into storage"""
+    archive = tmp_path / "bad.tar.gz"
+    member = tarfile.TarInfo(name)
+    member.type, member.size = kind, size if kind == tarfile.REGTYPE else 0
+    if kind == tarfile.SYMTYPE:
+        member.linkname = "/etc/passwd"
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.addfile(member, io.BytesIO(b"x" * member.size))
+    return archive
+
+
+@pytest.mark.parametrize(
+    "name, size, kind",
+    [
+        ("notes.txt", 4, tarfile.REGTYPE),
+        ("../dose.bdo", 4, tarfile.REGTYPE),
+        ("nested/dose.bdo", 4, tarfile.REGTYPE),
+        ("dose.bdo", 0, tarfile.SYMTYPE),
+        ("dose.bdo", 2000, tarfile.REGTYPE),
+    ],
+    ids=["other file", "outside", "nested", "link", "too large"],
+)
+def test_saves_with_anything_but_result_files_are_not_merged(tmp_path, monkeypatch, name, size, kind):
+    """A save comes from the cluster: other files, links, paths or more data than allowed fail the merge"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path / "objects"))
+    key = result_storage.work_key(1, 1)
+    result_storage.put_file(key, archive_with(tmp_path, name, size, kind))
+
+    with pytest.raises(ValueError):
+        simulation_module.merge_stored([key], max_bytes=1000)
+    assert not [path for path in tmp_path.rglob("*") if path.is_file() and path.suffix != ".gz"]
 
 
 def test_save_rewritten_while_packed_is_not_stored(tmp_path, monkeypatch):

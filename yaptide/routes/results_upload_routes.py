@@ -11,12 +11,14 @@ from flask import request
 from flask_restful import Resource
 
 from yaptide.persistence import result_storage
-from yaptide.persistence.db_methods import fetch_simulation_by_sim_id
+from yaptide.persistence.database import db
+from yaptide.persistence.db_methods import fetch_simulation_by_sim_id, update_simulation_state
 from yaptide.persistence.models import SimulationModel
-from yaptide.routes.common_sim_routes import store_results
+from yaptide.routes.common_sim_routes import lock_results, store_results
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.tokens import decode_auth_token
 from yaptide.routes.utils.utils import FINAL_STATES
+from yaptide.utils.enums import EntityState
 from yaptide.utils.sim_utils import is_plain_filename
 
 
@@ -81,6 +83,12 @@ class ResultsUploadsResource(Resource):
         pages = payload.get("pages")
         if not isinstance(pages, list) or not 0 < len(pages) <= MAX_PAGES or not all(valid_page(p) for p in pages):
             return yaptide_response(message="pages: estimator, page_number, size and md5 of each", code=400)
+        # partial results the engine merges go to the same pages: one being stored is waited for, and none is stored
+        # after this (it takes a RUNNING simulation), so it cannot replace a page uploaded with these links
+        lock_results(simulation)
+        if simulation.job_state == EntityState.RUNNING.value:
+            update_simulation_state(simulation, {"job_state": EntityState.MERGING_RUNNING.value})
+        db.session.commit()
         uploads = [
             {
                 "estimator": page["estimator"],
