@@ -23,6 +23,7 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
 )
+from yaptide.routes.common_sim_routes import store_partial_results
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
@@ -298,7 +299,8 @@ def test_uploader_waits_out_a_restart_of_several_minutes(fake_server, monkeypatc
     """Transient errors are retried with doubling pauses, about a quarter of an hour in all"""
     FakeServer.errors = [502, 503, 429, 504] * 2 + [503, 502]
     pauses = []
-    monkeypatch.setattr(results_uploader.time, "sleep", pauses.append)
+    # only the uploader's own pauses: replacing time.sleep for the process makes other threads spin
+    monkeypatch.setattr(results_uploader, "time", SimpleNamespace(sleep=pauses.append))
     monkeypatch.setattr(results_uploader, "RETRY_SECONDS", 5)
 
     assert results_uploader.main(fake_server) == 0
@@ -312,9 +314,26 @@ def test_uploader_does_not_retry_a_refusal(fake_server, monkeypatch):
     """A 4xx answer, e.g. 409 for a simulation already in a final state, ends the upload at once"""
     FakeServer.errors = [409]
     pauses = []
-    monkeypatch.setattr(results_uploader.time, "sleep", pauses.append)
+    # only the uploader's own pauses: replacing time.sleep for the process makes other threads spin
+    monkeypatch.setattr(results_uploader, "time", SimpleNamespace(sleep=pauses.append))
 
     assert results_uploader.main(fake_server) == 1
 
     assert FakeServer.calls == ["/results/uploads"]
     assert not pauses
+
+
+def test_no_partial_results_once_the_final_pages_are_uploaded(client, storage):
+    """The engine's partial results go to the same pages as the final ones: none is stored after the links for the
+    final ones were handed out
+    """
+    db.session.query(SimulationModel).update({"job_state": EntityState.RUNNING.value})
+    db.session.commit()
+    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": MD5}]
+
+    assert client.post("/results/uploads", json=body(pages=pages)).status_code == 200
+
+    db.session.remove()
+    simulation = db.session.get(SimulationModel, simulation_id())
+    assert simulation.job_state == EntityState.MERGING_RUNNING.value
+    assert not store_partial_results(simulation, RESULTS, 100)

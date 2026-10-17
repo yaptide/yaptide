@@ -1,6 +1,7 @@
 from flask import request
 from flask_restful import Resource
 
+from yaptide.batch.batch_methods import saving_tasks
 from yaptide.persistence import result_storage
 from yaptide.persistence.db_methods import (
     bulk_update_task_states,
@@ -137,4 +138,8 @@ class TaskLinksResource(Resource):
             return yaptide_response(message="Invalid update key", code=400)
         if simulation.job_state in FINAL_STATES or not result_storage.configured():
             return yaptide_response(message=f"No links for a simulation in {simulation.job_state}", code=409)
-        return yaptide_response(message="Links", code=200, content={"links": result_storage.job_links(simulation.id)})
+        return yaptide_response(
+            message="Links",
+            code=200,
+            content={"links": result_storage.job_links(simulation.id, saving_tasks(simulation))},
+        )

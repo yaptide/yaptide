@@ -1,5 +1,7 @@
+import fnmatch
 import logging
 import shutil
+import struct
 import tarfile
 import tempfile
 import threading
@@ -8,6 +10,8 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
+
+import numpy as np
 
 from yaptide.application import create_app
 from yaptide.engine.pymc import (
@@ -30,6 +34,8 @@ from yaptide.utils.sim_utils import merge_simulation_outputs, simulation_logfile
 WORK_DIR_PREFIX = "yaptide_task_"
 # the result files of the simulators
 RESULT_PATTERNS = ("*.bdo", "*_fort.*")
+# result files in a task's archive: one per output of the simulation
+MAX_RESULT_FILES = 10_000
 
 
 @dataclass
@@ -196,9 +202,14 @@ def pack_results(work_dir: Path) -> Path:
     before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]
     archive = work_dir / "results.tar.gz"
     # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
-    with tarfile.open(archive, "w:gz", compresslevel=1) as tar:
-        for result_file in result_files:
-            tar.add(result_file, arcname=result_file.name)
+    try:
+        with tarfile.open(archive, "w:gz", compresslevel=1) as tar:
+            for result_file in result_files:
+                tar.add(result_file, arcname=result_file.name)
+    except OSError as error:
+        # a file the simulator truncated while it was read ("unexpected end of data")
+        archive.unlink(missing_ok=True)
+        raise TornSave(f"result files in {work_dir} changed while packed: {error}") from error
     if before != [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]:
         archive.unlink()
         raise TornSave(f"result files in {work_dir} changed while packed")
@@ -234,16 +245,62 @@ def backend_app():
     return create_app()
 
 
-def merge_stored(keys: list[str]) -> list[dict]:
-    """Merges the result files the tasks stored under the keys; a missing one raises"""
+def extract_results(archive: Path, task_dir: Path, max_bytes: float) -> int:
+    """Unpacks a task's result files, up to max_bytes; anything but result files raises, as does more data
+
+    The saves of HPC tasks come from the cluster. Returns the bytes unpacked.
+    """
+    # a limit is set for the saves from the cluster, of SHIELD-HIT12A only
+    patterns = RESULT_PATTERNS if max_bytes == float("inf") else ("*.bdo",)
+    members, unpacked = [], 0
+    with tarfile.open(archive, "r:gz") as tar:
+        # read one by one, so a long archive is refused before it is read to the end
+        for member in tar:
+            unpacked += member.size
+            if not (member.isfile() and any(fnmatch.fnmatchcase(member.name, p) for p in patterns)):
+                raise ValueError(f"{member.name!r} in {archive.name} is not a result file")
+            if "/" in member.name or unpacked > max_bytes or len(members) >= MAX_RESULT_FILES:
+                raise ValueError(f"{archive.name} holds too much or nested files")
+            members.append(member)
+        tar.extractall(task_dir, members=members, filter="data")
+    for member in members:
+        if member.name.endswith(".bdo"):
+            check_bdo(task_dir / member.name)
+    return unpacked
+
+
+def check_bdo(path: Path) -> None:
+    """Raises ValueError unless the file is a SHIELD-HIT12A result file whose every entry fits in it: its reader
+    allocates the memory an entry declares, a few bytes may declare terabytes
+    """
+    size = path.stat().st_size
+    with open(path, "rb") as file:
+        # magic number, byte order and version, then entries: id, numpy type and number of items, the items
+        if not file.read(24).startswith(b"xSH12AII"):
+            raise ValueError(f"{path.name} is not a SHIELD-HIT12A result file")
+        while file.tell() < size:
+            header = file.read(24)
+            if len(header) < 24:
+                raise ValueError(f"{path.name} ends within an entry")
+            _, kind, count = struct.unpack("<Q8sQ", header)
+            try:
+                itemsize = np.dtype(kind.rstrip(b"\0").decode("ascii")).itemsize
+            except (TypeError, ValueError):  # UnicodeDecodeError is one
+                raise ValueError(f"{path.name} has an entry of an unknown type") from None
+            if count * itemsize > size - file.tell():
+                raise ValueError(f"{path.name} has an entry larger than the file")
+            file.seek(count * itemsize, 1)
+
+
+def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]:
+    """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises"""
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
         task_dirs = []
         for number, key in enumerate(keys):
             archive = Path(merge_dir) / f"{number}.tar.gz"
             result_storage.get_file(key, archive)
             task_dir = Path(merge_dir) / str(number)
-            with tarfile.open(archive) as tar:
-                tar.extractall(task_dir, filter="data")
+            max_bytes -= extract_results(archive, task_dir, max_bytes)
             archive.unlink()
             task_dirs.append(task_dir)
         return merge_simulation_outputs(task_dirs)
@@ -268,14 +325,18 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
             db.session.remove()
 
 
-def merge_and_store_partial(simulation_id: int, keys: list[str], primaries: int) -> bool:
-    """Merges the latest saves of the tasks into the simulation's partial results; whether they were stored"""
+def merge_and_store_partial(
+    simulation_id: int, keys: list[str], primaries: int, max_bytes: float = float("inf")
+) -> bool:
+    """Merges the latest saves of the tasks, at most max_bytes of result files, into the simulation's partial
+    results; whether they were stored
+    """
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            estimators = merge_stored(keys)
+            estimators = merge_stored(keys, max_bytes)
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

@@ -1,8 +1,10 @@
 """Partial results: stored in place of the previous ones while a simulation runs, replaced by the final ones"""
 
 import copy
+import io
 import json
 import shutil
+import struct
 import tarfile
 import threading
 from pathlib import Path
@@ -12,10 +14,17 @@ from botocore.exceptions import ClientError
 from flask import current_app
 
 from yaptide.application import create_app
+from yaptide.batch import watcher
 from yaptide.engine import simulation as simulation_module
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
-from yaptide.persistence.models import CelerySimulationModel, PageModel, SimulationModel, YaptideUserModel
+from yaptide.persistence.models import (
+    CelerySimulationModel,
+    EstimatorModel,
+    PageModel,
+    SimulationModel,
+    YaptideUserModel,
+)
 from yaptide.routes import events_routes
 from yaptide.routes.common_sim_routes import store_partial_results, store_results
 from yaptide.routes.utils.tokens import encode_auth_token
@@ -208,6 +217,19 @@ def test_final_results_are_no_longer_partial(client):
     assert "partial_results" not in status
 
 
+def test_final_results_replace_partial_ones_named_otherwise(client):
+    """The cluster's convertmc names the estimators of input files with a trailing underscore, the merge on the
+    server without: the final results leave none of the partial ones behind
+    """
+    partial = [{**estimator, "name": estimator["name"].rstrip("_")} for estimator in scaled(2)]
+    assert store_partial_results(simulation(), partial, 300)
+    store_results(simulation(), RESULTS)
+
+    names = {estimator.file_name for estimator in db.session.query(EstimatorModel)}
+    assert names == {estimator["name"] for estimator in RESULTS} and names != {e["name"] for e in partial}
+    assert db.session.query(PageModel).count() == sum(len(estimator["pages"]) for estimator in RESULTS)
+
+
 def test_files_from_windows_get_a_step_of_saving():
     """Line ends of beam.dat written on Windows"""
     files = {"beam.dat": "NSTAT 1000 0\r\nTMAX0 10.0\r\n"}
@@ -240,6 +262,88 @@ def test_results_passed_through_storage_merge_as_from_the_task_directories(tmp_p
 
     result_storage.delete_objects(result_storage.work_prefix(1))
     assert not list(tmp_path.rglob("*.tar.gz"))
+
+
+def test_saves_from_the_cluster_merge_as_from_the_task_directories(tmp_path, monkeypatch):
+    """An HPC task's save, packed by its watcher, goes through the same merge as the saves of direct tasks"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    keys = []
+    for task in ("task_1", "task_2"):
+        keys.append(result_storage.work_key(1, int(task[-1])))
+        archive = tmp_path / f"{task}.tar.gz"
+        assert watcher.pack(BDO_DIR / task, archive)
+        result_storage.put_file(keys[-1], archive)
+
+    assert simulation_module.merge_stored(keys) == merge_simulation_outputs([BDO_DIR / "task_1", BDO_DIR / "task_2"])
+
+
+def archive_with(tmp_path: Path, name: str, size: int = 4, kind: bytes = tarfile.REGTYPE) -> Path:
+    """An archive with one member, as a job on the cluster could put it into storage"""
+    archive = tmp_path / "bad.tar.gz"
+    member = tarfile.TarInfo(name)
+    member.type, member.size = kind, size if kind == tarfile.REGTYPE else 0
+    if kind == tarfile.SYMTYPE:
+        member.linkname = "/etc/passwd"
+    with tarfile.open(archive, "w:gz") as tar:
+        tar.addfile(member, io.BytesIO(b"x" * member.size))
+    return archive
+
+
+@pytest.mark.parametrize(
+    "name, size, kind",
+    [
+        ("notes.txt", 4, tarfile.REGTYPE),
+        ("../dose.bdo", 4, tarfile.REGTYPE),
+        ("nested/dose.bdo", 4, tarfile.REGTYPE),
+        ("dose.bdo", 0, tarfile.SYMTYPE),
+        ("dose.bdo", 2000, tarfile.REGTYPE),
+    ],
+    ids=["other file", "outside", "nested", "link", "too large"],
+)
+def test_saves_with_anything_but_result_files_are_not_merged(tmp_path, monkeypatch, name, size, kind):
+    """A save comes from the cluster: other files, links, paths or more data than allowed fail the merge"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path / "objects"))
+    key = result_storage.work_key(1, 1)
+    result_storage.put_file(key, archive_with(tmp_path, name, size, kind))
+
+    with pytest.raises(ValueError):
+        simulation_module.merge_stored([key], max_bytes=1000)
+    assert not [path for path in tmp_path.rglob("*") if path.is_file() and path.suffix != ".gz"]
+
+
+def crafted_bdo(offset: int, value: int) -> bytes:
+    """A result file of the test data with one number changed, as a job on the cluster could write it"""
+    data = bytearray((BDO_DIR / "task_1" / "z_profile_0001.bdo").read_bytes())
+    data[offset : offset + 8] = struct.pack("<q", value)
+    return bytes(data)
+
+
+@pytest.mark.parametrize(
+    "files, error",
+    [
+        # the items of the first page declared as 2**36 numbers: its reader would take 512 GB of memory
+        ({"z_profile_0001.bdo": crafted_bdo(1808 + 16, 1 << 36)}, "larger than the file"),
+        # 10**9 bins along z with 10 values: the JSON would hold a value for every bin
+        ({"z_profile_0001.bdo": crafted_bdo(1240 + 16, 10**9)}, "values for"),
+        ({"fluence_fort.21": b"x"}, "not a result file"),
+        ({f"{number}.bdo": b"" for number in range(simulation_module.MAX_RESULT_FILES + 1)}, "too much"),
+    ],
+    ids=["entry larger than the file", "more bins than values", "FLUKA file", "too many files"],
+)
+def test_crafted_saves_are_not_merged(tmp_path, monkeypatch, files, error):
+    """A few bytes from the cluster must not take the server's memory or time"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path / "objects"))
+    archive = tmp_path / "save.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name, data in files.items():
+            member = tarfile.TarInfo(name)
+            member.size = len(data)
+            tar.addfile(member, io.BytesIO(data))
+    key = result_storage.work_key(1, 1)
+    result_storage.put_file(key, archive)
+
+    with pytest.raises(ValueError, match=error):
+        simulation_module.merge_stored([key], max_bytes=1 << 20)
 
 
 def test_save_rewritten_while_packed_is_not_stored(tmp_path, monkeypatch):
@@ -279,3 +383,17 @@ def test_one_user_cannot_take_every_stream(monkeypatch):
     assert events_routes.subscribers.admit(8)
     events_routes.subscribers.release(7)
     assert events_routes.subscribers.admit(7)
+
+
+def test_a_file_truncated_while_packed_skips_the_save(tmp_path, monkeypatch):
+    """The simulator may shorten a result file while it is read; that save is skipped, not stored broken"""
+    (tmp_path / "dose.bdo").write_bytes(b"save 1")
+
+    def truncated(*args, **kwargs):
+        """Fails like a file that got shorter while read"""
+        raise OSError("unexpected end of data")
+
+    monkeypatch.setattr(simulation_module.tarfile.TarFile, "add", truncated)
+    with pytest.raises(simulation_module.TornSave):
+        simulation_module.pack_results(tmp_path)
+    assert not (tmp_path / "results.tar.gz").exists()

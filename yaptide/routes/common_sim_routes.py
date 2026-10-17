@@ -257,6 +257,13 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
         logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
         return
     prepare_estimators_and_pages(simulation, estimators)
+    if simulation.partial_primaries is not None:
+        # the partial results of an HPC simulation are merged on the server, which names the estimators of input
+        # files a little differently from the cluster's convertmc ("dose" and "dose_"): theirs go with them
+        db.session.query(EstimatorModel).filter(
+            EstimatorModel.simulation_id == simulation.id,
+            EstimatorModel.file_name.notin_([estimator["name"] for estimator in estimators]),
+        ).delete(synchronize_session=False)
     # the stored results are the final ones now
     simulation.partial_primaries = None
     simulation.partial_time = None

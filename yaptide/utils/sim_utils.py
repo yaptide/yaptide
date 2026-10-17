@@ -1,6 +1,7 @@
 import copy
 import json
 import logging
+import math
 import re
 import tempfile
 from pathlib import Path
@@ -11,6 +12,7 @@ from pymchelper.estimator import Estimator
 from pymchelper.input_output import AggregationType, fromfile, group_input_files
 from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
+from pymchelper.shieldhit.detector.detector_type import SHDetType
 from converter.api import get_parser_from_str, run_parser
 from yaptide.utils.enums import InputType, SimulationType
 
@@ -42,12 +44,25 @@ def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
     return result_estimators
 
 
+def read_estimator(file: str) -> Optional[Estimator]:
+    """Reads a result file; raises ValueError when a page of a SHIELD-HIT12A file holds other than the bins its
+    estimator declares (the JSON for the UI has values for every bin declared)
+    """
+    estimator = fromfile(file)
+    if estimator and file.endswith(".bdo"):
+        for page in estimator.pages:
+            axes = (estimator.x.n, estimator.y.n, estimator.z.n, page.diff_axis1.n, page.diff_axis2.n)
+            if page.dettyp != SHDetType.mcpl and page.data_raw.size != math.prod(axes):
+                raise ValueError(f"{file}: {page.data_raw.size} values for {axes} bins")
+    return estimator
+
+
 def merge_estimator_files(files: list[str]) -> Optional[Estimator]:
     """Merge one estimator's task files: each page aggregated by its normalisation, averages weighted by primaries.
 
     Mean only - pymchelper's WeightedStatsAggregator also accumulates a variance, which the JSON for the UI drops.
     """
-    result = fromfile(files[0])
+    result = read_estimator(files[0])
     if not result:
         return None
     kinds = [getattr(page, "page_normalized", AggregationType.AveragingCumulative) for page in result.pages]
@@ -59,7 +74,7 @@ def merge_estimator_files(files: list[str]) -> Optional[Estimator]:
         if avg:
             page.data_raw = page.data_raw * result.number_of_primaries
     for file in files[1:]:
-        estimator = fromfile(file)
+        estimator = read_estimator(file)
         for page, other, kind, avg in zip(result.pages, estimator.pages, kinds, averaged):
             if avg:
                 page.data_raw += other.data_raw * estimator.number_of_primaries

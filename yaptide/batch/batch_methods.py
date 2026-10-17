@@ -39,7 +39,7 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, SimulationType
-from yaptide.utils.sim_utils import write_simulation_input_files
+from yaptide.utils.sim_utils import set_shieldhit_save_step, write_simulation_input_files
 
 
 # a command on the login node that does not end in this time is given up (a hung login node must not hold one of
@@ -150,9 +150,15 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
             con.run(f"mkdir -p -m 700 {job_dir}", timeout=COMMAND_SECONDS)
             # uploads to a hung login node are given up too
             con.sftp().get_channel().settimeout(COMMAND_SECONDS)
-            upload_inputs(con, job_dir, input_dict["input_files"])
-            # signed links the jobs report progress and look for a cancel with, and the key to ask for new ones
-            links = json.dumps(dict(result_storage.job_links(simulation.id), update_key=update_key)).encode()
+            files = dict(input_dict["input_files"])
+            if simulation.sim_type == SimulationType.SHIELDHIT.value:
+                # saves along the way for partial results, in the cluster's copy only: the stored input stays the user's
+                set_shieldhit_save_step(files, max(task.requested_primaries or 0 for task in simulation.tasks))
+            upload_inputs(con, job_dir, files)
+            # signed links the jobs report progress, look for a cancel and send their saves with, and the key to ask
+            # for new ones
+            job_links = result_storage.job_links(simulation.id, saving_tasks(simulation))
+            links = json.dumps(dict(job_links, update_key=update_key)).encode()
             con.put(io.BytesIO(links), f"{job_dir}/storage_links.json")
             submit_file, sh_files = prepare_script_files(
                 payload_dict=payload_dict, job_dir=job_dir, sim_id=simulation.id, update_key=update_key, con=con
@@ -185,6 +191,11 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
     # a cancel stored while submitting found nothing to stop on the cluster yet
     if simulation.job_state == EntityState.CANCELED.value:
         cancel_simulation(simulation_id)
+
+
+def saving_tasks(simulation: SimulationModel) -> int:
+    """How many tasks of the simulation send their saves for partial results: SHIELD-HIT12A's tasks"""
+    return len(simulation.tasks) if simulation.sim_type == SimulationType.SHIELDHIT.value else 0
 
 
 def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:

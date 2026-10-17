@@ -151,3 +151,21 @@ def test_what_tasks_leave_in_storage_expires(monkeypatch):
             "Rules": [{"ID": "work", "Filter": {"Prefix": "work/"}, "Expiration": {"Days": 2}, "Status": "Enabled"}]
         },
     )
+
+
+def test_job_links_let_each_task_put_only_its_own_save(monkeypatch):
+    """A PUT link per saving task, for its work key only, at the public address and lasting as long as the others"""
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setenv("RESULTS_S3_PUBLIC_ENDPOINT", "https://yaptide.test")
+    monkeypatch.setenv("RESULTS_S3_ACCESS_KEY", "GK0")
+    monkeypatch.setenv("RESULTS_S3_SECRET_KEY", "secret")
+    result_storage._client.cache_clear()  # skipcq: PYL-W0212
+
+    links = result_storage.job_links(5, saving_tasks=2)
+    result_storage._client.cache_clear()  # skipcq: PYL-W0212
+
+    urls = links["saves"]["urls"]
+    assert sorted(urls) == ["1", "2"] and links["saves"]["max_bytes"] == result_storage.HPC_SAVES_MAX_BYTES // 2
+    for task, url in urls.items():
+        assert url.startswith(f"https://yaptide.test/results/work/5/task_{task}.tar.gz?")
+        assert f"X-Amz-Expires={result_storage.JOB_LINK_SECONDS}" in url

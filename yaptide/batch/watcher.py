@@ -2,7 +2,8 @@
 
 Runs next to the simulator on the compute node, with the standard library only. The task's state goes into one
 small object of its own, at most every few seconds and at once when the state changes; the backend's engine reads
-these objects. A cancel is an object the backend puts into storage: the watcher checks for it and kills the
+these objects. The result files SHIELD-HIT12A saves along the way go into storage too, for the engine to merge into
+partial results. A cancel is an object the backend puts into storage: the watcher checks for it and kills the
 simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
 the watcher asks the backend for new ones.
 """
@@ -14,6 +15,7 @@ import os
 import re
 import signal
 import ssl
+import tarfile
 import time
 import uuid
 from datetime import datetime
@@ -44,6 +46,10 @@ RENEW_INTERVAL_SECONDS = 600
 # the final state is retried for about two minutes, longer than a restart of the storage
 FINAL_ATTEMPTS = 6
 FINAL_RETRY_SECONDS = 20
+# a save goes into storage at most this often, and once it covers this much more of the task's primaries (half the
+# step of saving the backend sets, which a save may miss by a few primaries): at most twenty per task
+SAVE_SECONDS = 60
+SAVE_GROWTH = 0.05
 
 
 def log_generator(
@@ -271,6 +277,88 @@ class Reporter:
             return 0
 
 
+def pack(work_dir: Path, archive: Path) -> bool:
+    """Packs the simulator's result files into the archive; False when there are none, or when the simulator began
+    rewriting one meanwhile (its next save)
+    """
+    files = sorted(work_dir.glob("*.bdo"))
+    before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
+    # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
+    try:
+        with tarfile.open(str(archive), "w:gz", compresslevel=1) as tar:
+            for path in files:
+                tar.add(str(path), arcname=path.name)
+    except OSError:
+        # a file the simulator truncated while it was read
+        return False
+    return bool(files) and before == [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
+
+
+class Saver:
+    """Puts the simulator's result files into storage after it saved them, for the partial results"""
+
+    def __init__(self, work_dir: Path, reporter: Reporter):
+        """work_dir: where the simulator writes its result files; reporter: the task's, with the links and state"""
+        self.work_dir = work_dir
+        self.reporter = reporter
+        self.last_time = float("-inf")
+        self.last_primaries = 0
+
+    def saved(self) -> None:
+        """The simulator wrote all its result files: put into storage when due, and its primaries reported; a
+        failure loses only this save
+        """
+        simulated = self.reporter.state.get("simulated_primaries", 0)
+        requested = self.reporter.state.get("requested_primaries", 0)
+        # the last save, at the end, is collected with the others; jobs submitted before saves went to storage have
+        # no links for them
+        if not 0 < simulated < requested or time.monotonic() - self.last_time < SAVE_SECONDS:
+            return
+        if "saves" not in self.reporter.links:
+            return
+        if simulated - self.last_primaries < SAVE_GROWTH * requested:
+            return
+        self.last_time = time.monotonic()
+        try:
+            sent = self.send()
+        except Exception as err:  # skipcq: PYL-W0703
+            logging.warning("Sending the save at %d primaries failed: %s", simulated, err)
+            return
+        if sent:
+            self.last_primaries = simulated
+            self.reporter.update({"saved_primaries": simulated})
+
+    def send(self) -> bool:
+        """Packs the result files and puts them into the task's object; whether they are there"""
+        archive = self.work_dir / "yaptide_save.tar.gz"
+        try:
+            if not pack(self.work_dir, archive):
+                logging.info("Save skipped: no result files, or the next save began")
+                return False
+            size = archive.stat().st_size
+            if size > self.reporter.links.get("saves", {}).get("max_bytes", 0):
+                logging.info("Save of %d bytes is too large for partial results", size)
+                return False
+            self.reporter.renew_links_if_expiring()
+            status = self.put(archive, size)
+            # 400 or 403: an expired or otherwise refused link - new links, then one more try
+            if status in (400, 403) and self.reporter.renew_links():
+                status = self.put(archive, size)
+            return status in (200, 201, 204)
+        finally:
+            if archive.exists():
+                archive.unlink()
+
+    def put(self, archive: Path, size: int) -> int:
+        """One upload of the archive, read from the file as it is sent; the status, 0 without a link"""
+        url = self.reporter.links.get("saves", {}).get("urls", {}).get(str(self.reporter.task_id))
+        if not url:
+            return 0
+        with open(str(archive), "rb") as body:  # skipcq: PTC-W6004 # the archive this watcher made
+            headers = {"Content-Length": str(size), "Content-Type": "application/gzip"}
+            return self.reporter.send(url, "PUT", body, headers)
+
+
 def running(pid: int) -> bool:
     """Whether the simulator still runs"""
     try:
@@ -312,8 +400,11 @@ def watch(  # skipcq: PY-R1000
     pid: int,
     reporter: Reporter,
     poll_seconds: float = 1,
+    saved: Optional[Callable[[], None]] = None,
 ) -> None:
-    """Follows the simulator's log until it ends or the simulation is cancelled, reporting the task's state"""
+    """Follows the simulator's log until it ends or the simulation is cancelled, reporting the task's state;
+    saved is called when SHIELD-HIT12A has saved all its result files
+    """
     path = find_log(find, pid, poll_seconds)
     if path is None:
         reporter.update({"task_state": "FAILED", "end_time": now()})
@@ -322,6 +413,8 @@ def watch(  # skipcq: PY-R1000
         while True:
             line = log.readline()
             if line:
+                if saved and re.search(SAVED_MATCH, line):
+                    saved()
                 update = parse(line)
                 if update:
                     reporter.update(update)
@@ -365,7 +458,8 @@ def main(args) -> None:
         watch(fluka_log(Path(args.work_dir)), FlukaParser(), args.pid, reporter)
     else:
         log_path = Path(args.filepath)
-        watch(lambda: log_path if log_path.exists() else None, shieldhit_update, args.pid, reporter)
+        saver = Saver(log_path.parent, reporter)
+        watch(lambda: log_path if log_path.exists() else None, shieldhit_update, args.pid, reporter, saved=saver.saved)
     reporter.report_final()
 
 
