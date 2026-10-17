@@ -181,7 +181,7 @@ def cancel_key(sim_id: int) -> str:
 def job_links(sim_id: int, saving_tasks: int = 0) -> dict:
     """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
     progress prefix only (each at most MAX_PROGRESS_BYTES), a HEAD of its cancel object and, for each of the first
-    saving_tasks tasks, a PUT of its saves (the work_key of the task, at most HPC_SAVES_MAX_BYTES)
+    saving_tasks tasks, a PUT of its saves (the work_key of the task, at most its share of HPC_SAVES_MAX_BYTES)
     """
     bucket = os.environ["RESULTS_S3_BUCKET"]
     prefix = progress_prefix(sim_id)
@@ -209,7 +209,9 @@ def job_links(sim_id: int, saving_tasks: int = 0) -> dict:
     return {
         "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
         "cancel": cancel,
-        "saves": {"urls": saves, "max_bytes": HPC_SAVES_MAX_BYTES},
+        # each task its share: the engine merges the saves of all tasks only within the limit, larger ones would be
+        # sent for nothing
+        "saves": {"urls": saves, "max_bytes": HPC_SAVES_MAX_BYTES // max(saving_tasks, 1)},
         "expires": expires,
     }
 

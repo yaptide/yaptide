@@ -165,7 +165,7 @@ def test_job_links_let_each_task_put_only_its_own_save(monkeypatch):
     result_storage._client.cache_clear()  # skipcq: PYL-W0212
 
     urls = links["saves"]["urls"]
-    assert sorted(urls) == ["1", "2"] and links["saves"]["max_bytes"] == result_storage.HPC_SAVES_MAX_BYTES
+    assert sorted(urls) == ["1", "2"] and links["saves"]["max_bytes"] == result_storage.HPC_SAVES_MAX_BYTES // 2
     for task, url in urls.items():
         assert url.startswith(f"https://yaptide.test/results/work/5/task_{task}.tar.gz?")
         assert f"X-Amz-Expires={result_storage.JOB_LINK_SECONDS}" in url
