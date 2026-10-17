@@ -21,9 +21,13 @@ from typing import List, Tuple
 from http.client import HTTPException
 from urllib import error, request
 
-# attempts with growing pauses: 10 + 20 + ... + 50 s, longer than a restart of the backend
-ATTEMPTS = 6
-RETRY_SECONDS = 10
+# attempts with doubling pauses, 5 s up to 2 min: 5 + 10 + ... + 120 s, about 15 min in all - longer than a restart
+# of the backend or the storage, and well within the collect job's time limit
+ATTEMPTS = 12
+RETRY_SECONDS = 5
+MAX_PAUSE_SECONDS = 120
+# rounds of new links (when they expired), and of uploading again what the storage is missing
+ROUNDS = 6
 # the TLS certificate chain of the backend is not always complete for the cluster's OpenSSL, so it is not verified,
 # as in the other scripts sending to the backend
 CONTEXT = ssl.create_default_context()
@@ -71,6 +75,18 @@ def manifest(estimators: List[dict]) -> List[dict]:
     return result
 
 
+def pause(attempt: int) -> None:
+    """Waits before the next attempt"""
+    time.sleep(min(RETRY_SECONDS * 2**attempt, MAX_PAUSE_SECONDS))
+
+
+def transient(code: int) -> bool:
+    """Whether an error answer may go away, e.g. while the backend or the storage restarts; 501 is the backend
+    without object storage - an answer, not a failure to retry
+    """
+    return code == 429 or (code >= 500 and code != 501)
+
+
 def post(url: str, payload: dict) -> Tuple[int, dict]:
     """POSTs JSON to the backend, retrying when it cannot be reached; returns the status and the answer"""
     data = json.dumps(payload).encode()
@@ -80,15 +96,14 @@ def post(url: str, payload: dict) -> Tuple[int, dict]:
             with request.urlopen(req, context=CONTEXT, timeout=60) as response:  # skipcq: BAN-B310
                 return response.status, json.loads(response.read() or b"{}")
         except error.HTTPError as http_error:
-            # 501: the backend has no object storage - an answer, not a failure to retry
-            if http_error.code < 500 or http_error.code == 501:
+            if not transient(http_error.code):
                 return http_error.code, json.loads(http_error.read() or b"{}")
             logging.warning("%s answered %d", url, http_error.code)
         except (OSError, HTTPException) as connection_error:
             # unreachable, or the connection dropped (e.g. a restart of the backend)
             logging.warning("%s unreachable: %s", url, connection_error)
         if attempt < ATTEMPTS - 1:
-            time.sleep(RETRY_SECONDS * (attempt + 1))
+            pause(attempt)
     return 0, {}
 
 
@@ -108,14 +123,14 @@ def put(url: str, body: bytes, md5: str) -> str:
             if http_error.code == 403:
                 # links last minutes; a long upload gets new ones
                 return LINK_EXPIRED
-            if http_error.code < 500:
+            if not transient(http_error.code):
                 logging.error("Upload refused: %d %s", http_error.code, http_error.read()[:500])
                 return REFUSED
             logging.warning("Upload answered %d", http_error.code)
         except (OSError, HTTPException) as connection_error:
             logging.warning("Upload failed: %s", connection_error)
         if attempt < ATTEMPTS - 1:
-            time.sleep(RETRY_SECONDS * (attempt + 1))
+            pause(attempt)
     return REFUSED
 
 
@@ -173,9 +188,9 @@ def main(args) -> int:
         return 1
     listed = manifest(estimators)
     wanted = {(estimator["name"], page["page_number"]) for estimator in listed for page in estimator["pages"]}
-    for _ in range(ATTEMPTS):
+    for _ in range(ROUNDS):
         uploaded = upload(estimators, listed, wanted, args)
-        for _ in range(ATTEMPTS):
+        for _ in range(ROUNDS):
             if uploaded != AGAIN:
                 break
             # what is left of wanted, with new links
