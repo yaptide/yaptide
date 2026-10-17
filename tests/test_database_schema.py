@@ -12,7 +12,7 @@ from yaptide.application import create_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import prepare_database
 
-PREVIOUS = "5003b9acb1f4"  # the revision before the PageObject table
+PREVIOUS = "5003b9acb1f4"  # the revision before the PageObject table and the partial results columns
 
 
 @pytest.fixture
@@ -47,6 +47,8 @@ def test_database_under_migrations_is_migrated(app):
     """A table added by a migration is created by that migration, without clashing with the models"""
     db.create_all()
     db.session.execute(text('DROP TABLE "PageObject"'))
+    db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_primaries'))
+    db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_time'))
     db.session.commit()
     flask_migrate.stamp(revision=PREVIOUS)
 
@@ -56,6 +58,9 @@ def test_database_under_migrations_is_migrated(app):
 
     create_all.assert_not_called()
     assert inspect(db.engine).has_table("PageObject")
+    assert {"partial_primaries", "partial_time"} <= {
+        column["name"] for column in inspect(db.engine).get_columns("Simulation")
+    }
     assert version() == head()
 
 

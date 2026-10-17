@@ -13,7 +13,7 @@ from typing import Callable, Optional, Protocol
 from pymchelper.executor.options import SimulationSettings, SimulatorType
 from pymchelper.executor.runner import Runner
 
-from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, log_generator
+from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, SAVED_MATCH, log_generator
 from yaptide.engine.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.utils.enums import EntityState
 
@@ -151,6 +151,7 @@ def read_shieldhit_file(
     update_interval_seconds: float = 2,
     polling_interval_seconds: float = 1,
     logging_level: int = logging.WARNING,
+    on_save: Callable[[int], None] = lambda _: None,
 ):
     """
     Monitors log file of a shieldhit task, when new line with message matching regex appears, sends update to backend
@@ -170,6 +171,7 @@ def read_shieldhit_file(
         polling_interval_seconds: Interval between successive file polls while no new
             data is available or while waiting for the file to be created.
         logging_level: Logging level to use for monitoring logs.
+        on_save: Called with the primaries simulated when the simulator saved its results before the end.
     """
     try:
         logging.getLogger(__name__).setLevel(logging_level)
@@ -251,6 +253,9 @@ def read_shieldhit_file(
                 }
                 logging.debug("Sending update for task %d", task_id)
                 report(up_dict)
+            elif re.search(SAVED_MATCH, line):
+                if simulated_primaries < requested_primaries:
+                    on_save(simulated_primaries)
             elif re.search(COMPLETE_MATCH, line):
                 logging.debug("Found COMPLETE_MATCH in line: %s for file: %s and task: %d ", line, filepath, task_id)
                 logging.info("Parsing log file for task %d finished", task_id)

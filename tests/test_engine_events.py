@@ -11,6 +11,7 @@ from yaptide.application import create_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     ENGINE_CHANNEL,
+    SIMULATION_CHANNEL,
     BatchSimulationModel,
     CelerySimulationModel,
     ClusterModel,
@@ -121,10 +122,12 @@ def test_batch_simulations_send_events_with_their_platform(listener):
     ]
 
 
-def test_database_with_tables_from_the_models_only_gets_the_trigger(listener):
-    """Deployments where the tables were only ever created from the models get the trigger on start, too"""
+def test_database_with_tables_from_the_models_only_gets_the_triggers(listener):
+    """Deployments where the tables were only ever created from the models get the triggers on start, too"""
     db.session.execute(text('DROP TRIGGER simulation_engine_events ON "Simulation"'))
     db.session.execute(text("DROP FUNCTION notify_engine()"))
+    db.session.execute(text('DROP TRIGGER simulation_stream_events ON "Simulation"'))
+    db.session.execute(text("DROP FUNCTION notify_simulation()"))
     db.session.commit()
 
     prepare_database()
@@ -132,4 +135,21 @@ def test_database_with_tables_from_the_models_only_gets_the_trigger(listener):
     triggers = db.session.execute(text("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal")).scalars().all()
     db.session.execute(text("DROP TABLE alembic_version"))
     db.session.commit()
-    assert triggers == ["simulation_engine_events"]
+    assert sorted(triggers) == ["simulation_engine_events", "simulation_stream_events"]
+
+
+def test_state_and_partial_results_wake_the_streams_of_a_simulation(listener):
+    """The UI's streams follow the state and the partial results, not every write to the simulation"""
+    listener.execute(f"LISTEN {SIMULATION_CHANNEL}")
+    simulation = direct_simulation(EntityState.RUNNING.value)
+
+    simulation.partial_primaries = 300
+    db.session.commit()
+    simulation.title = "renamed"
+    db.session.commit()
+    simulation.job_state = EntityState.COMPLETED.value
+    db.session.commit()
+
+    assert [(notify.channel, notify.payload) for notify in listener.notifies(timeout=0.5)] == [
+        (SIMULATION_CHANNEL, str(simulation.id))
+    ] * 2

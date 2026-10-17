@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List
 
 from flask import request, current_app as app
@@ -218,15 +218,16 @@ def prepare_create_or_update_pages_in_db(sim_id: int, estimator_dict, use_storag
     return use_storage
 
 
-def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
-    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile"""
+def lock_results(simulation: SimulationModel) -> None:
+    """Waits for results of the simulation stored at the same time (a repeated request, partial and final results),
+    which would both create the estimators and pages, then reads the simulation again"""
     if db.engine.dialect.name == "postgresql":
-        # results stored twice at once (a repeated request) would both create the estimators and pages; one waits
         db.session.execute(text("SELECT pg_advisory_xact_lock(:simulation_id)"), {"simulation_id": simulation.id})
     db.session.refresh(simulation)
-    if simulation.job_state in FINAL_STATES:
-        logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
-        return
+
+
+def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[dict]) -> None:
+    """Prepares the estimators and their pages in place of the stored ones, without committing"""
     if simulation.input_type == InputType.EDITOR.value:
         outputs = simulation.inputs[0].data["input_json"]["scoringManager"]["outputs"]
         sorted_estimator_names = sorted([output["name"] for output in outputs])
@@ -247,11 +248,32 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
             sim_id=simulation.id, estimator_dict=estimator_dict, use_storage=use_storage
         )
 
+
+def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
+    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile"""
+    lock_results(simulation)
+    if simulation.job_state in FINAL_STATES:
+        logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
+        return
+    prepare_estimators_and_pages(simulation, estimators)
     # estimators and pages together, so a failure in between does not leave estimators without pages
     make_commit_to_db()
 
     update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     update_simulation_state(simulation=simulation, update_dict=update_dict)
+
+
+def store_partial_results(simulation: SimulationModel, estimators: list[dict], primaries: int) -> bool:
+    """Stores the results of a running simulation so far in place of the previous ones; the final results replace
+    them. Returns whether they were stored, i.e. the simulation still runs."""
+    lock_results(simulation)
+    if simulation.job_state != EntityState.RUNNING.value:
+        return False
+    prepare_estimators_and_pages(simulation, estimators)
+    simulation.partial_primaries = primaries
+    simulation.partial_time = datetime.now(timezone.utc)
+    make_commit_to_db()
+    return True
 
 
 def parse_page_numbers(param: str) -> List[int]:

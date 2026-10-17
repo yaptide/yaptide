@@ -70,6 +70,34 @@ services:
       postgresql:
         condition: service_healthy
 
+  # streams of simulation status for the UI (yaptide/routes/events_routes.py): each open stream holds a thread, so
+  # they get their own threaded server instead of the sync workers above; nginx sends /events/ here
+  yaptide_events:
+    image: yaptide_flask
+    container_name: yaptide_events
+    restart: unless-stopped
+    entrypoint:
+      - gunicorn
+      - --worker-class=gthread
+      - --workers=1
+      - --threads=200
+      - --bind=0.0.0.0:6001
+      - yaptide.application:create_app()
+    # the image's own check asks port 6000, where yaptide_flask listens
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; exit(0) if requests.get('http://localhost:6001/').ok else exit(1)"]
+    environment:
+      # the tokens of yaptide_flask are checked here: without both secrets set, each server draws its own and
+      # every stream is refused
+      - YAPTIDE_TOKEN_SECRET=${YAPTIDE_TOKEN_SECRET:-}
+      - YAPTIDE_REFRESH_TOKEN_SECRET=${YAPTIDE_REFRESH_TOKEN_SECRET:-}
+      - ENABLE_LOCAL_USERS=${ENABLE_LOCAL_USERS:-false}
+      - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+    depends_on:
+      # Flask prepares the database schema before it reports healthy
+      yaptide_flask:
+        condition: service_healthy
+
   yaptide_simulation_worker:
     build:
       context: .
@@ -128,6 +156,8 @@ services:
         condition: service_healthy
       yaptide_simulation_worker:
         condition: service_healthy
+      yaptide_events:
+        condition: service_started
 
 
 volumes:

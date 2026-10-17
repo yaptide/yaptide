@@ -21,14 +21,18 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-import psycopg
 import ray
-from sqlalchemy import make_url
 
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
-from yaptide.engine.simulation import WORK_DIR_PREFIX, backend_app, merge_and_store, run_simulation
-from yaptide.persistence.database import db
+from yaptide.engine.simulation import (
+    WORK_DIR_PREFIX,
+    backend_app,
+    merge_and_store,
+    merge_and_store_partial,
+    run_simulation,
+)
+from yaptide.persistence.database import db, listen_to
 from yaptide.persistence.db_methods import (
     DATABASE_FAILURES,
     add_object_to_db,
@@ -55,26 +59,33 @@ TASK_SECONDS_LIMIT = 10 * 3600
 OVERDUE_CHECK_SECONDS = 60
 # the engine gives up and restarts with its container after failing for this long
 GIVE_UP_SECONDS = 60
+# partial results are merged again once the saves of the tasks cover this much more of the requested primaries
+PARTIAL_GROWTH = 0.05
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
 
 
 # restarted when it dies: only progress not saved yet is lost, final states come with the task results
 @ray.remote(num_cpus=0, max_restarts=-1, max_task_retries=-1)
 class ProgressInbox:
-    """Keeps the latest progress of every task until the engine saves it"""
+    """Keeps the latest progress and the latest save of every task until the engine takes them"""
 
     def __init__(self):
         """Empty inbox"""
         self.updates: dict[tuple[int, int], dict] = {}
+        self.saves: dict[tuple[int, int], tuple[str, int]] = {}
 
     def report(self, simulation_id: int, task_id: int, update_dict: dict) -> None:
         """Merges a task's update into the one waiting to be saved"""
         self.updates.setdefault((simulation_id, task_id), {}).update(update_dict)
 
-    def drain(self) -> dict[tuple[int, int], dict]:
-        """Hands over the waiting updates"""
-        updates, self.updates = self.updates, {}
-        return updates
+    def saved(self, simulation_id: int, task_id: int, snapshot_dir: str, primaries: int) -> None:
+        """Replaces a task's save waiting to be taken"""
+        self.saves[(simulation_id, task_id)] = (snapshot_dir, primaries)
+
+    def drain(self) -> tuple[dict[tuple[int, int], dict], dict[tuple[int, int], tuple[str, int]]]:
+        """Hands over the waiting updates and saves"""
+        updates, saves, self.updates, self.saves = self.updates, self.saves, {}, {}
+        return updates, saves
 
 
 @ray.remote(num_cpus=1, max_retries=0)
@@ -85,7 +96,11 @@ def run_task(inbox, files_dict: dict, sim_type: str, simulation_id: int, task_id
         """Hands a progress update to the inbox"""
         inbox.report.remote(simulation_id, task_id, update_dict)
 
-    return run_simulation(files_dict, task_id, sim_type, Path(work_dir), simulation_id, report)
+    def saved(snapshot_dir: str, primaries: int) -> None:
+        """Hands a save of the results to the inbox"""
+        inbox.saved.remote(simulation_id, task_id, snapshot_dir, primaries)
+
+    return run_simulation(files_dict, task_id, sim_type, Path(work_dir), simulation_id, report, saved)
 
 
 # a merge killed for memory must not be retried forever, which Ray does unless retries are off;
@@ -94,6 +109,13 @@ def run_task(inbox, files_dict: dict, sim_type: str, simulation_id: int, task_id
 def merge_task(simulation_id: int, output_dirs: list[str]) -> bool:
     """Merges and stores the results of a simulation"""
     return merge_and_store(simulation_id, output_dirs)
+
+
+# like the merge; one that fails is skipped, the next saves bring the next partial results
+@ray.remote(num_cpus=0, max_retries=0)
+def partial_merge_task(simulation_id: int, snapshot_dirs: list[str], primaries: int) -> bool:
+    """Merges the latest saves of the tasks of a running simulation and stores them as its partial results"""
+    return merge_and_store_partial(simulation_id, snapshot_dirs, primaries)
 
 
 @ray.remote(num_cpus=0, max_concurrency=CLUSTER_CONNECTIONS, max_restarts=-1)
@@ -125,9 +147,14 @@ class Running:
 
     tasks: dict  # task ref -> task id
     work_dirs: dict[int, Path]
+    requested_primaries: int = 0
     output_dirs: list[str] = field(default_factory=list)
     logfiles: dict = field(default_factory=dict)
     merge: Optional[ray.ObjectRef] = None
+    # the latest results of every task, saved while running or final: task id -> (directory, primaries)
+    saves: dict[int, tuple[str, int]] = field(default_factory=dict)
+    partial: Optional[ray.ObjectRef] = None
+    partial_primaries: int = 0
 
     def refs(self) -> list:
         """What the engine waits for"""
@@ -208,6 +235,8 @@ class Engine:
                 self.start_guarded(simulation)
         elif event in (EntityState.CANCELED.value, "DELETED"):
             self.stop(simulation_id)
+        elif event == "PARTIAL" and simulation_id in self.running:
+            self.partial_merged(simulation_id, self.running[simulation_id])
         elif event == "FINISHED" and simulation_id in self.running:
             running = self.running[simulation_id]
             ready, _ = ray.wait(running.refs(), num_returns=len(running.refs()), timeout=0)
@@ -324,19 +353,48 @@ class Engine:
             run_task.remote(self.inbox, files_ref, simulation.sim_type, simulation.id, task_id, str(work_dir)): task_id
             for task_id, work_dir in work_dirs.items()
         }
-        self.running[simulation.id] = Running(tasks=tasks, work_dirs=work_dirs)
+        requested_primaries = sum(task.requested_primaries or 0 for task in simulation.tasks)
+        self.running[simulation.id] = Running(tasks=tasks, work_dirs=work_dirs, requested_primaries=requested_primaries)
         for ref in tasks:
             self.watch(ref, simulation.id)
         logging.info("Started simulation %d with %d tasks", simulation.id, len(tasks))
 
     def save_progress(self) -> None:
-        """Saves the progress the tasks reported since the last save"""
+        """Saves the progress the tasks reported since the last save, merges partial results when they are due"""
+        task_updates, saves = ray.get(self.inbox.drain.remote())
         by_simulation: dict[int, list[dict]] = {}
-        for (simulation_id, task_id), update_dict in ray.get(self.inbox.drain.remote()).items():
+        for (simulation_id, task_id), update_dict in task_updates.items():
             by_simulation.setdefault(simulation_id, []).append({"task_id": task_id, "update_dict": update_dict})
         for simulation_id, updates in by_simulation.items():
             if simulation_id in self.running:
                 self.save_task_updates(simulation_id, updates)
+        for (simulation_id, task_id), save in saves.items():
+            # a save reported after its task finished is older than the task's final results
+            running = self.running.get(simulation_id)
+            if running and task_id in running.tasks.values():
+                running.saves[task_id] = save
+        for simulation_id, running in self.running.items():
+            self.merge_partial(simulation_id, running)
+
+    def merge_partial(self, simulation_id: int, running: Running) -> None:
+        """Merges the latest results of the tasks into partial results, when they cover enough new primaries"""
+        primaries = sum(primaries for _, primaries in running.saves.values())
+        grown = primaries - running.partial_primaries
+        if running.partial or running.merge or grown <= 0 or grown < PARTIAL_GROWTH * running.requested_primaries:
+            return
+        snapshot_dirs = [snapshot_dir for snapshot_dir, _ in running.saves.values()]
+        running.partial = partial_merge_task.remote(simulation_id, snapshot_dirs, primaries)
+        running.partial_primaries = primaries
+        self.watch(running.partial, simulation_id, "PARTIAL")
+
+    @staticmethod
+    def partial_merged(simulation_id: int, running: Running) -> None:
+        """Partial results that could not be merged are skipped, the simulation goes on"""
+        try:
+            ray.get(running.partial)
+        except Exception as error:  # skipcq: PYL-W0703
+            logging.warning("Partial results of simulation %d failed: %s", simulation_id, error)
+        running.partial = None
 
     @staticmethod
     def save_task_updates(simulation_id: int, updates: list[dict]) -> None:
@@ -379,9 +437,12 @@ class Engine:
             updates = [{"task_id": running.tasks[ref], "update_dict": r["final_update"]} for ref, r in results.items()]
             self.save_task_updates(simulation_id, updates)
             for ref, result in results.items():
-                del running.tasks[ref]
+                task_id = running.tasks.pop(ref)
+                # a failed task's directory is gone, its saves with it
+                running.saves.pop(task_id, None)
                 if "output_dir" in result:
                     running.output_dirs.append(result["output_dir"])
+                    running.saves[task_id] = (result["output_dir"], result["final_update"]["simulated_primaries"])
                 running.logfiles.update(result.get("logfiles", {}))
         if not running.tasks and running.merge is None:
             self.start_merge(simulation_id, running)
@@ -482,30 +543,15 @@ class Engine:
 
 
 def listen(database_uri: str, events: queue.Queue) -> None:
-    """Puts the database's events for the engine into the queue, connecting again whenever the connection is lost
+    """Puts the database's events for the engine into the queue, and a sweep after every (re)connection, which
+    catches what was committed while nobody listened"""
 
-    Every (re)connection is followed by a sweep, which catches what was committed while nobody listened.
-    """
-    if make_url(database_uri).get_backend_name() != "postgresql":
-        # SQLite has no notifications (local development only)
-        while True:
-            events.put(("SWEEP", None))
-            time.sleep(2)
-    conninfo = make_url(database_uri).set(drivername="postgresql").render_as_string(hide_password=False)
-    while True:
-        try:
-            # keepalives notice a connection that died silently, so the engine does not wait on it forever
-            with psycopg.connect(
-                conninfo, autocommit=True, keepalives=1, keepalives_idle=30, keepalives_interval=10, keepalives_count=3
-            ) as connection:
-                connection.execute(f"LISTEN {ENGINE_CHANNEL}")
-                events.put(("SWEEP", None))
-                for notify in connection.notifies():
-                    payload = json.loads(notify.payload)
-                    events.put((payload["event"], payload["simulation"], payload.get("platform")))
-        except Exception:  # skipcq: PYL-W0703
-            logging.exception("Listening for engine events failed, connecting again")
-            time.sleep(1)
+    def notified(payload: str) -> None:
+        """Queues one event"""
+        event = json.loads(payload)
+        events.put((event["event"], event["simulation"], event.get("platform")))
+
+    listen_to(database_uri, ENGINE_CHANNEL, lambda: events.put(("SWEEP", None)), notified)
 
 
 def main() -> None:

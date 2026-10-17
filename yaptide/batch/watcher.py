@@ -18,6 +18,8 @@ import math
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 REQUESTED_MATCH = r"\bRequested number of primaries NSTAT"
+# logged when a save every NSAVE primaries has written all result files
+SAVED_MATCH = r"\bSaved all \d+ estimator\(s\)"
 
 
 def log_generator(

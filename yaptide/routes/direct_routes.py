@@ -23,7 +23,8 @@ from yaptide.routes.utils.utils import (
     get_clamped_ntasks_value,
     job_status_content,
 )
-from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.enums import EntityState, PlatformType, SimulationType
+from yaptide.utils.sim_utils import set_shieldhit_save_step
 
 
 class JobsDirect(Resource):
@@ -55,6 +56,8 @@ class JobsDirect(Resource):
         job_id = datetime.now().strftime("%Y%m%d-%H%M%S-") + str(uuid4()) + PlatformType.DIRECT.value
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
         requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
+        if payload_dict["sim_type"] == SimulationType.SHIELDHIT.value:
+            set_shieldhit_save_step(input_dict["input_files"], requested_primaries)
         simulation = CelerySimulationModel(
             user_id=user.id,
             job_id=job_id,

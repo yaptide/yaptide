@@ -144,6 +144,18 @@ def test_simulation_runs_and_its_results_are_stored(client, engine, cluster):
     assert not work_dirs(cluster)
 
 
+def test_saves_of_running_tasks_become_partial_results(client, engine):
+    """A save half way through the tasks is merged and stored while they run; the final results replace it"""
+    simulation_id = submit(client, "FAKE_SAVES")
+
+    run_until(engine, lambda: db.session.get(SimulationModel, simulation_id).partial_primaries is not None)
+
+    assert state(simulation_id) == EntityState.RUNNING.value
+    assert db.session.get(SimulationModel, simulation_id).partial_primaries == 100
+    assert db.session.query(PageModel).count() > 0
+    run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value)
+
+
 def test_failing_tasks_fail_the_simulation_with_their_logs(client, engine):
     """No results to merge: the simulation fails and the logs of its tasks are kept"""
     simulation_id = submit(client, "FAKE_FAIL")
