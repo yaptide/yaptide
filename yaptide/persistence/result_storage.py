@@ -209,6 +209,25 @@ def put_cancel(sim_id: int) -> None:
 WORK_PREFIX = "work/"
 
 
+# objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; tasks run at most 10 hours
+WORK_EXPIRY_DAYS = 2
+
+
+def expire_work_objects() -> None:
+    """Has the storage itself remove what is left under WORK_PREFIX, as a backstop to the engine's deletes;
+    replaces any other lifecycle rules of the bucket (there are none)
+    """
+    rule = {
+        "ID": "work",
+        "Filter": {"Prefix": WORK_PREFIX},
+        "Expiration": {"Days": WORK_EXPIRY_DAYS},
+        "Status": "Enabled",
+    }
+    _internal().put_bucket_lifecycle_configuration(
+        Bucket=os.environ["RESULTS_S3_BUCKET"], LifecycleConfiguration={"Rules": [rule]}
+    )
+
+
 def work_prefix(sim_id: int) -> str:
     """Where the tasks of a direct simulation put their result files"""
     return f"{WORK_PREFIX}{sim_id}/"

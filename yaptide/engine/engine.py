@@ -422,6 +422,11 @@ class Engine:
             result_storage.delete_objects(result_storage.WORK_PREFIX)
         except Exception:  # skipcq: PYL-W0703
             logging.exception("Removing the results stored by lost tasks failed")
+        try:
+            if result_storage.configured():
+                result_storage.expire_work_objects()
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Setting the expiry of what tasks leave in storage failed")
         lost = db.session.query(CelerySimulationModel).filter(CelerySimulationModel.job_state.in_(RUNNING_STATES)).all()
         for simulation in lost:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
