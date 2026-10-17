@@ -534,12 +534,13 @@ class Engine:
 
     @staticmethod
     def save_task_updates(simulation_id: int, updates: list[dict]) -> None:
-        """Saves task updates and moves the simulation's state when a task's state changed"""
+        """Saves task updates and moves the simulation's state when a task's state changed; the streams of the
+        simulation get one event for the whole batch
+        """
         bulk_update_task_states(simulation_id, updates)
-        if any("task_state" in update["update_dict"] for update in updates):
-            simulation = db.session.get(SimulationModel, simulation_id)
-            if simulation:
-                update_state_from_tasks(simulation)
+        simulation = db.session.get(SimulationModel, simulation_id)
+        if simulation:
+            update_state_from_tasks(simulation, any("task_state" in update["update_dict"] for update in updates))
 
     def collect_finished(self) -> None:
         """Takes the results of finished tasks; when all tasks of a simulation finished, merges them"""

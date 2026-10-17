@@ -14,11 +14,14 @@ from yaptide.persistence.models import (
     SIMULATION_CHANNEL,
     BatchSimulationModel,
     CelerySimulationModel,
+    CeleryTaskModel,
     ClusterModel,
     SimulationModel,
     YaptideUserModel,
     prepare_database,
 )
+from yaptide.routes import events_routes
+from yaptide.routes.utils.utils import update_state_from_tasks
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
 URI = os.environ.get("TEST_DATABASE_URI", "")
@@ -138,8 +141,19 @@ def test_database_with_tables_from_the_models_only_gets_the_triggers(listener):
     assert sorted(triggers) == ["simulation_engine_events", "simulation_stream_events"]
 
 
-def test_state_and_partial_results_wake_the_streams_of_a_simulation(listener):
-    """The UI's streams follow the state and the partial results, not every write to the simulation"""
+def stream_events(connection) -> list[dict]:
+    """Events for the UI's streams delivered so far"""
+    return [
+        json.loads(notify.payload)
+        for notify in connection.notifies(timeout=0.5)
+        if notify.channel == SIMULATION_CHANNEL
+    ]
+
+
+def test_new_simulations_state_partial_results_and_progress_wake_the_streams_of_its_user(listener):
+    """The UI's streams follow new simulations, the state, partial results and saves of the tasks' progress, not
+    every write to the simulation
+    """
     listener.execute(f"LISTEN {SIMULATION_CHANNEL}")
     simulation = direct_simulation(EntityState.RUNNING.value)
 
@@ -147,9 +161,37 @@ def test_state_and_partial_results_wake_the_streams_of_a_simulation(listener):
     db.session.commit()
     simulation.title = "renamed"
     db.session.commit()
+    update_state_from_tasks(simulation, states_changed=False)
     simulation.job_state = EntityState.COMPLETED.value
     db.session.commit()
+    update_state_from_tasks(simulation, states_changed=False)
 
-    assert [(notify.channel, notify.payload) for notify in listener.notifies(timeout=0.5)] == [
-        (SIMULATION_CHANNEL, str(simulation.id))
-    ] * 2
+    assert stream_events(listener) == [{"simulation": simulation.id, "user": simulation.user_id}] * 4
+
+
+def test_a_save_of_progress_moving_the_state_wakes_the_streams_once(listener):
+    """The engine saves the tasks of a simulation once per cycle; one event, also when the state moves with it"""
+    simulation = direct_simulation(EntityState.PENDING.value)
+    db.session.add(CeleryTaskModel(simulation_id=simulation.id, task_id=1, task_state=EntityState.RUNNING.value))
+    db.session.commit()
+    listener.execute(f"LISTEN {SIMULATION_CHANNEL}")
+
+    update_state_from_tasks(simulation)
+
+    assert db.session.get(SimulationModel, simulation.id).job_state == EntityState.RUNNING.value
+    assert stream_events(listener) == [{"simulation": simulation.id, "user": simulation.user_id}]
+
+
+def test_streams_of_the_user_are_woken_with_the_simulation(listener):
+    """The events server's listener hands each stream of the user the simulation that changed"""
+    simulation = direct_simulation(EntityState.RUNNING.value)
+    subscribers = events_routes.Subscribers()
+    wakeup = subscribers.subscribe(simulation.user_id, URI)
+    other_user = subscribers.subscribe(simulation.user_id + 1, URI)
+    assert wakeup.get(timeout=5) is None  # connected: anything may have changed meanwhile
+
+    simulation.partial_primaries = 300
+    db.session.commit()
+
+    assert wakeup.get(timeout=5) == simulation.id
+    assert other_user.get(timeout=5) is None and other_user.empty()

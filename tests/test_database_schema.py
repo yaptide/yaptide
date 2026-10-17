@@ -49,6 +49,7 @@ def test_database_under_migrations_is_migrated(app):
     db.session.execute(text('DROP TABLE "PageObject"'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_primaries'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_time'))
+    db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN progress_revision'))
     db.session.commit()
     flask_migrate.stamp(revision=PREVIOUS)
 

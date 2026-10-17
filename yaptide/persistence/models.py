@@ -104,6 +104,13 @@ class SimulationModel(db.Model):
     partial_time: Column[datetime] = db.Column(
         db.DateTime(timezone=True), nullable=True, doc="When the partial results were stored"
     )
+    progress_revision: Column[int] = db.Column(
+        db.BigInteger,
+        nullable=False,
+        default=0,
+        server_default="0",
+        doc="Counts the saves of the tasks' progress, so that each save wakes the streams of the simulation once",
+    )
 
     # the database removes the children (ON DELETE CASCADE); loading them first would read every result page
     tasks = relationship("TaskModel", cascade="delete", passive_deletes=True)
@@ -170,14 +177,18 @@ CREATE OR REPLACE TRIGGER simulation_engine_events AFTER INSERT OR UPDATE OF job
 FOR EACH ROW EXECUTE FUNCTION notify_engine()
 """
 )
-# the open event streams of a simulation (yaptide/routes/events_routes.py) learn about a new state or partial results;
-# the migration 7c2e9a4d1b3f creates the same for databases created before
+# the open event streams of a user (yaptide/routes/events_routes.py) learn about a new simulation, a new state, partial
+# results or a save of the tasks' progress; the migration 2a6c8e0b4d17 creates the same for databases created before
 SIMULATION_CHANNEL = "yaptide_simulation"
 NOTIFY_SIMULATION_FUNCTION = DDL(
     """
 CREATE OR REPLACE FUNCTION notify_simulation() RETURNS trigger AS $$
 BEGIN
-    PERFORM pg_notify('yaptide_simulation', NEW.id::text);
+    IF TG_OP = 'INSERT' OR OLD.job_state IS DISTINCT FROM NEW.job_state
+            OR OLD.partial_primaries IS DISTINCT FROM NEW.partial_primaries
+            OR OLD.progress_revision IS DISTINCT FROM NEW.progress_revision THEN
+        PERFORM pg_notify('yaptide_simulation', json_build_object('simulation', NEW.id, 'user', NEW.user_id)::text);
+    END IF;
     RETURN NEW;
 END
 $$ LANGUAGE plpgsql
@@ -185,9 +196,9 @@ $$ LANGUAGE plpgsql
 )
 NOTIFY_SIMULATION_TRIGGER = DDL(
     """
-CREATE OR REPLACE TRIGGER simulation_stream_events AFTER UPDATE OF job_state, partial_primaries ON "Simulation"
-FOR EACH ROW WHEN (OLD.job_state IS DISTINCT FROM NEW.job_state OR OLD.partial_primaries IS DISTINCT FROM
-NEW.partial_primaries) EXECUTE FUNCTION notify_simulation()
+CREATE OR REPLACE TRIGGER simulation_stream_events
+AFTER INSERT OR UPDATE OF job_state, partial_primaries, progress_revision ON "Simulation"
+FOR EACH ROW EXECUTE FUNCTION notify_simulation()
 """
 )
 NOTIFY_STATEMENTS = (

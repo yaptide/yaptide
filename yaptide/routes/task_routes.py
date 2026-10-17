@@ -57,8 +57,7 @@ class TasksResource(Resource):
 
         update_task_state(task=task, update_dict=payload_dict["update_dict"])
         # most reports carry only progress; the state of the simulation depends only on the states of its tasks
-        if "task_state" in payload_dict["update_dict"]:
-            update_state_from_tasks(simulation)
+        update_state_from_tasks(simulation, "task_state" in payload_dict["update_dict"])
 
         return yaptide_response(message="Task updated", code=202)
 
@@ -113,9 +112,9 @@ class TasksBulkResource(Resource):
                 return yaptide_response(message="task_id must be an integer and update_dict a dictionary", code=400)
 
         updated_count = bulk_update_task_states(sim_id=simulation.id, task_updates=task_updates)
-        reports_state = any("task_state" in task_update["update_dict"] for task_update in task_updates)
-        if reports_state:
-            update_state_from_tasks(simulation)
+        update_state_from_tasks(
+            simulation, any("task_state" in task_update["update_dict"] for task_update in task_updates)
+        )
 
         return yaptide_response(message=f"Updated {updated_count} tasks", code=202)
 
