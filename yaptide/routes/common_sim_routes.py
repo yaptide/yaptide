@@ -257,6 +257,9 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
         logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
         return
     prepare_estimators_and_pages(simulation, estimators)
+    # the stored results are the final ones now
+    simulation.partial_primaries = None
+    simulation.partial_time = None
     # estimators and pages together, so a failure in between does not leave estimators without pages
     make_commit_to_db()
 
