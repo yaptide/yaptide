@@ -125,6 +125,12 @@ def state(simulation_id: int) -> str:
     return db.session.get(SimulationModel, simulation_id).job_state
 
 
+def partial_primaries(simulation_id: int) -> int:
+    """Primaries of the simulation's partial results as stored"""
+    db.session.remove()
+    return db.session.get(SimulationModel, simulation_id).partial_primaries
+
+
 def task_states(simulation_id: int) -> list[str]:
     """Task states as stored, by task id"""
     db.session.remove()
@@ -167,13 +173,17 @@ def test_saves_of_running_tasks_become_partial_results(client, engine, cluster):
     replace it
     """
     simulation_id = submit(client, "FAKE_SAVES")
+    engine.handle(EntityState.PENDING.value, simulation_id)
 
-    run_until(engine, lambda: db.session.get(SimulationModel, simulation_id).partial_primaries is not None)
+    # the tasks hold after their saves: the save of one may be merged before the other's comes, then both are, once
+    # the engine handles the event of the first merge
+    run_events_until(engine, lambda: partial_primaries(simulation_id) == 100)
 
     assert state(simulation_id) == EntityState.RUNNING.value
-    assert db.session.get(SimulationModel, simulation_id).partial_primaries == 100
     assert db.session.query(PageModel).count() > 0
     assert len(stored_results(cluster)) == 2
+    for work_dir in cluster.glob(f"{WORK_DIR_PREFIX}{simulation_id}_*"):
+        (work_dir / "release").touch()
     run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value)
     run_until(engine, lambda: not stored_results(cluster), timeout=20)
     # the step of saving goes to the tasks only, the stored input is as the user sent it

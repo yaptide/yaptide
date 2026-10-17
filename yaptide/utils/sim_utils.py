@@ -95,7 +95,7 @@ def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
 
     Each page is aggregated by its normalisation and averages are weighted by primaries, as convertmc does for
     batch simulations. JSON is produced once, from the merged result.
-    The list is sorted by name, as POST /results matches estimators to editor outputs by sorted name.
+    The list is sorted by name, the same for every merge.
     """
     missing = [str(path) for path in output_dirs if not path.is_dir()]
     if missing:
