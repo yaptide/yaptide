@@ -521,7 +521,14 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
 
     (tmp_path / "merges").write_text("")
     reports.unlink()
+    assert collect("inline") == 0
+    # inline the array task holds its node: a few upload attempts, the collect job has more
+    assert "--attempts=3" in reports.read_text()
+    (tmp_path / "collected").unlink()
+    task_output.write_text("")
+    reports.unlink()
     assert collect() == 0
+    assert "--attempts=12" in reports.read_text()
     assert "results_uploader.py" in reports.read_text() and (tmp_path / "collected").exists()
     assert not task_output.exists()  # removed only after the upload
     reports.unlink()

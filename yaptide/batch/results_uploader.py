@@ -223,4 +223,7 @@ if __name__ == "__main__":
     parser.add_argument("--sim_id", type=int, required=True)
     parser.add_argument("--update_key", required=True)
     parser.add_argument("--backend_url", required=True)
-    sys.exit(main(parser.parse_args()))
+    parser.add_argument("--attempts", type=int, default=ATTEMPTS)
+    parsed = parser.parse_args()
+    ATTEMPTS = parsed.attempts
+    sys.exit(main(parsed))
