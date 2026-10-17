@@ -61,9 +61,13 @@ Restore (also on a new server, after `docker compose --profile storage up -d pos
 
 ```
 docker compose stop nginx yaptide_flask yaptide_events yaptide_simulation_worker
-scripts/backup.sh restore 2026-10-17     # pg_restore of that dump, then the pages copied back into Garage
+scripts/backup.sh restore 2026-10-17     # pg_restore of that dump, then the missing pages copied back into Garage
 docker compose --profile storage up -d
 ```
+
+The restore asks for the database name, and first saves the database it replaces to
+`postgres/before-restore/` (kept), to undo it with `pg_restore --clean`. The nightly run stops, before removing any
+backup, when the dump fails or when the bucket has less than half of the pages mirrored (a lost Garage).
 
 ## For developers
 
