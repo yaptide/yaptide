@@ -154,13 +154,13 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
         .all()
     )
     found_task_ids = [task.task_id for task in tasks]
-    # one malformed update must not fail the whole batch - the aggregator would retry it forever
+    # one malformed update must not fail the whole batch - its sender would send the whole batch again
     for task in tasks:
         _apply_task_update(task, updates_by_task_id[task.task_id], sim_id)
     try:
         db.session.commit()
     except DATABASE_FAILURES:
-        # the database itself is failing, not the data - an error answer makes the aggregator retry the batch
+        # the database itself is failing, not the data - an error makes the sender (the engine) try the batch again
         db.session.rollback()
         raise
     except Exception as e:  # skipcq: PYL-W0703

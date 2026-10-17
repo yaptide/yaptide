@@ -17,6 +17,7 @@ import ssl
 import sys
 import time
 from pathlib import Path
+from typing import List, Tuple
 from http.client import HTTPException
 from urllib import error, request
 
@@ -38,7 +39,7 @@ def page_body(page: dict) -> bytes:
     return buffer.getvalue()
 
 
-def read_estimators(output_dir: Path) -> list[dict]:
+def read_estimators(output_dir: Path) -> List[dict]:
     """Estimators as convertmc wrote them, one JSON file each, named by the file"""
     estimators = []
     for path in sorted(output_dir.glob("*.json")):
@@ -48,7 +49,7 @@ def read_estimators(output_dir: Path) -> list[dict]:
     return estimators
 
 
-def manifest(estimators: list[dict]) -> list[dict]:
+def manifest(estimators: List[dict]) -> List[dict]:
     """What will be uploaded: every page with its size and MD5, without the page data"""
     result = []
     for estimator in estimators:
@@ -69,7 +70,7 @@ def manifest(estimators: list[dict]) -> list[dict]:
     return result
 
 
-def post(url: str, payload: dict) -> tuple[int, dict]:
+def post(url: str, payload: dict) -> Tuple[int, dict]:
     """POSTs JSON to the backend, retrying when it cannot be reached; returns the status and the answer"""
     data = json.dumps(payload).encode()
     for attempt in range(ATTEMPTS):
@@ -121,7 +122,7 @@ def put(url: str, body: bytes, md5: str) -> str:
 UPLOADED, NO_STORAGE, FAILED, AGAIN = "uploaded", "no storage", "failed", "again"
 
 
-def upload(estimators: list[dict], listed: list[dict], wanted: set, args) -> str:
+def upload(estimators: List[dict], listed: List[dict], wanted: set, args) -> str:
     """Uploads the wanted pages ((estimator, page number) pairs)"""
     entries = [
         {"estimator": estimator["name"], **{key: page[key] for key in ("page_number", "size", "md5")}}
@@ -154,7 +155,7 @@ def upload(estimators: list[dict], listed: list[dict], wanted: set, args) -> str
     return UPLOADED
 
 
-def send_old_way(estimators: list[dict], args) -> bool:
+def send_old_way(estimators: List[dict], args) -> bool:
     """A backend without object storage takes the results in one request, as before"""
     status, _ = post(
         f"{args.backend_url}/results",
