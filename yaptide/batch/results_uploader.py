@@ -21,7 +21,8 @@ from typing import List, Tuple
 from http.client import HTTPException
 from urllib import error, request
 
-ATTEMPTS = 3
+# attempts with growing pauses: 10 + 20 + ... + 50 s, longer than a restart of the backend
+ATTEMPTS = 6
 RETRY_SECONDS = 10
 # the TLS certificate chain of the backend is not always complete for the cluster's OpenSSL, so it is not verified,
 # as in the other scripts sending to the backend

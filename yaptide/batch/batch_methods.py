@@ -5,11 +5,13 @@ import os
 import re
 import shlex
 import tempfile
+import time
 from datetime import datetime
 from pathlib import Path
 from zipfile import ZipFile
 
 import pymchelper
+from cryptography.hazmat.primitives.serialization import SSHCertificate, load_ssh_public_identity
 from fabric import Connection, Result
 from paramiko import AuthenticationException, RSAKey
 
@@ -40,8 +42,26 @@ from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import write_simulation_input_files
 
 
+# a command on the login node that does not end in this time is given up (a hung login node must not hold one of
+# the engine's few connections forever); the submit script waits for sbatch several times
+COMMAND_SECONDS = 60
+SUBMIT_SECONDS = 300
+
+
+def certificate_expired(cert: str) -> bool:
+    """Whether an SSH certificate is past its end; one that cannot be read is left for the login to judge"""
+    try:
+        certificate = load_ssh_public_identity(cert.encode())
+    except (ValueError, TypeError, AttributeError):
+        return False
+    return isinstance(certificate, SSHCertificate) and certificate.valid_before < time.time()
+
+
 def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection:
     """Returns connection object to cluster"""
+    # a login with an expired certificate fails anyway, and failed logins count against the account on the cluster
+    if certificate_expired(user.cert):
+        raise AuthenticationException("The certificate for the cluster expired, log in again")
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
 
@@ -122,12 +142,12 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
     update_key = encode_simulation_auth_token(simulation.id)
     try:
         with get_connection(user=user, cluster=cluster) as con:
-            scratch = con.run("echo $SCRATCH", hide=True).stdout.split()[0]
+            scratch = con.run("echo $SCRATCH", hide=True, timeout=COMMAND_SECONDS).stdout.split()[0]
             job_dir = f"{scratch}/yaptide_runs/{simulation.id}_{int(datetime.utcnow().timestamp() * 1e6)}"
             if not claim_job_dir(simulation.id, job_dir):
                 return
             # readable by the user only: the signed links and the update key are in there
-            con.run(f"mkdir -p -m 700 {job_dir}")
+            con.run(f"mkdir -p -m 700 {job_dir}", timeout=COMMAND_SECONDS)
             upload_inputs(con, job_dir, input_dict["input_files"])
             # signed links the jobs report progress and look for a cancel with
             links = json.dumps(result_storage.job_links(simulation.id)).encode()
@@ -135,10 +155,12 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
             submit_file, sh_files = prepare_script_files(
                 payload_dict=payload_dict, job_dir=job_dir, sim_id=simulation.id, update_key=update_key, con=con
             )
-            result: Result = con.run(f"sh {submit_file}", hide=True, warn=True)
+            result: Result = con.run(f"sh {submit_file}", hide=True, warn=True, timeout=SUBMIT_SECONDS)
     except Exception as e:  # skipcq: PYL-W0703
         db.session.rollback()
         fail_submit(db.session.get(BatchSimulationModel, simulation_id), {"error": str(e)})
+        # whatever reached the cluster before the error (some jobs, the directory) is cancelled and removed
+        cancel_simulation(simulation_id)
         return
 
     job_ids = dict(line.split(" id: ") for line in result.stdout.splitlines() if " id: " in line)
@@ -147,6 +169,8 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
     if not (array_id and collect_id and array_id.isdigit() and collect_id.isdigit()):
         log = {"message": "Job submission failed", "submit_stdout": result.stdout, "submit_stderr": result.stderr}
         fail_submit(simulation, {**log, "sh_files": sh_files})
+        # the array may have been submitted before the rest failed: it would run for nothing
+        cancel_simulation(simulation_id)
         return
     # stored whatever the state: a simulation cancelled while submitting still needs its ids to cancel the jobs
     db.session.execute(
@@ -221,7 +245,7 @@ def cancel_simulation(simulation_id: int) -> None:
             cancels = "; ".join(
                 f"test -s {job_dir}/{job}_job_id && scancel `cat {job_dir}/{job}_job_id`" for job in SIMULATION_JOBS
             )
-            con.run(f"{cancels}; rm -rf {job_dir}", warn=True)
+            con.run(f"{cancels}; rm -rf {job_dir}", warn=True, timeout=COMMAND_SECONDS)
     except AuthenticationException:
         logging.warning("Certificate of simulation %d expired, its jobs stop through storage", simulation.id)
     except Exception as e:  # skipcq: PYL-W0703
@@ -271,5 +295,5 @@ def prepare_script_files(
     # put as files: one round trip each and no quoting of the scripts through a shell command
     for name, script in sh_files.items():
         con.put(io.BytesIO(script.encode()), paths[name])
-    con.run("chmod +x " + " ".join(shlex.quote(path) for path in paths.values()))
+    con.run("chmod +x " + " ".join(shlex.quote(path) for path in paths.values()), timeout=COMMAND_SECONDS)
     return paths["submit"], sh_files
