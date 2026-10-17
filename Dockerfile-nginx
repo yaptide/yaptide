@@ -16,8 +16,10 @@ FROM nginx:1.25-alpine
 # Configure Nginx to serve as the proxy
 RUN rm /etc/nginx/conf.d/default.conf
 
-# Copy SSL certificate from the build stage
-COPY --from=cert-gen /certs /etc/nginx/conf.d
+# a self-signed certificate, used when docker-compose.yml mounts none (scripts/nginx_tls.sh)
+COPY --from=cert-gen /certs /etc/nginx/self-signed
+COPY scripts/nginx_tls.sh /docker-entrypoint.d/40-yaptide-tls.sh
+RUN chmod +x /docker-entrypoint.d/40-yaptide-tls.sh
 
 # Copy the Nginx configuration
 COPY nginx.conf /etc/nginx/conf.d
