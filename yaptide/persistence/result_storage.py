@@ -241,7 +241,7 @@ def put_cancel(sim_id: int) -> None:
 WORK_PREFIX = "work/"
 # the saves of an HPC simulation's tasks merged into partial results at once, in bytes, packed and unpacked, which
 # bounds one task's save too: a simulation with larger results gets them only at the end
-HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 1 << 30))
+HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 128 << 20))
 
 
 # objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; direct tasks run at most 10 hours,

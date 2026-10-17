@@ -284,9 +284,13 @@ def pack(work_dir: Path, archive: Path) -> bool:
     files = sorted(work_dir.glob("*.bdo"))
     before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
     # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
-    with tarfile.open(str(archive), "w:gz", compresslevel=1) as tar:
-        for path in files:
-            tar.add(str(path), arcname=path.name)
+    try:
+        with tarfile.open(str(archive), "w:gz", compresslevel=1) as tar:
+            for path in files:
+                tar.add(str(path), arcname=path.name)
+    except OSError:
+        # a file the simulator truncated while it was read
+        return False
     return bool(files) and before == [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
 
 

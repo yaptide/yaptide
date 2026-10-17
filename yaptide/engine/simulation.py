@@ -202,9 +202,14 @@ def pack_results(work_dir: Path) -> Path:
     before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]
     archive = work_dir / "results.tar.gz"
     # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
-    with tarfile.open(archive, "w:gz", compresslevel=1) as tar:
-        for result_file in result_files:
-            tar.add(result_file, arcname=result_file.name)
+    try:
+        with tarfile.open(archive, "w:gz", compresslevel=1) as tar:
+            for result_file in result_files:
+                tar.add(result_file, arcname=result_file.name)
+    except OSError as error:
+        # a file the simulator truncated while it was read ("unexpected end of data")
+        archive.unlink(missing_ok=True)
+        raise TornSave(f"result files in {work_dir} changed while packed: {error}") from error
     if before != [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]:
         archive.unlink()
         raise TornSave(f"result files in {work_dir} changed while packed")

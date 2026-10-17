@@ -299,7 +299,8 @@ def test_uploader_waits_out_a_restart_of_several_minutes(fake_server, monkeypatc
     """Transient errors are retried with doubling pauses, about a quarter of an hour in all"""
     FakeServer.errors = [502, 503, 429, 504] * 2 + [503, 502]
     pauses = []
-    monkeypatch.setattr(results_uploader.time, "sleep", pauses.append)
+    # only the uploader's own pauses: replacing time.sleep for the process makes other threads spin
+    monkeypatch.setattr(results_uploader, "time", SimpleNamespace(sleep=pauses.append))
     monkeypatch.setattr(results_uploader, "RETRY_SECONDS", 5)
 
     assert results_uploader.main(fake_server) == 0
@@ -313,7 +314,8 @@ def test_uploader_does_not_retry_a_refusal(fake_server, monkeypatch):
     """A 4xx answer, e.g. 409 for a simulation already in a final state, ends the upload at once"""
     FakeServer.errors = [409]
     pauses = []
-    monkeypatch.setattr(results_uploader.time, "sleep", pauses.append)
+    # only the uploader's own pauses: replacing time.sleep for the process makes other threads spin
+    monkeypatch.setattr(results_uploader, "time", SimpleNamespace(sleep=pauses.append))
 
     assert results_uploader.main(fake_server) == 1
 

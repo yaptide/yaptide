@@ -383,3 +383,17 @@ def test_one_user_cannot_take_every_stream(monkeypatch):
     assert events_routes.subscribers.admit(8)
     events_routes.subscribers.release(7)
     assert events_routes.subscribers.admit(7)
+
+
+def test_a_file_truncated_while_packed_skips_the_save(tmp_path, monkeypatch):
+    """The simulator may shorten a result file while it is read; that save is skipped, not stored broken"""
+    (tmp_path / "dose.bdo").write_bytes(b"save 1")
+
+    def truncated(*args, **kwargs):
+        """Fails like a file that got shorter while read"""
+        raise OSError("unexpected end of data")
+
+    monkeypatch.setattr(simulation_module.tarfile.TarFile, "add", truncated)
+    with pytest.raises(simulation_module.TornSave):
+        simulation_module.pack_results(tmp_path)
+    assert not (tmp_path / "results.tar.gz").exists()
