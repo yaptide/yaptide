@@ -1,6 +1,7 @@
 import fnmatch
 import logging
 import shutil
+import struct
 import tarfile
 import tempfile
 import threading
@@ -9,6 +10,8 @@ from datetime import datetime
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable, Optional
+
+import numpy as np
 
 from yaptide.application import create_app
 from yaptide.engine.pymc import (
@@ -31,6 +34,8 @@ from yaptide.utils.sim_utils import merge_simulation_outputs, simulation_logfile
 WORK_DIR_PREFIX = "yaptide_task_"
 # the result files of the simulators
 RESULT_PATTERNS = ("*.bdo", "*_fort.*")
+# result files in a task's archive: one per output of the simulation
+MAX_RESULT_FILES = 10_000
 
 
 @dataclass
@@ -240,18 +245,46 @@ def extract_results(archive: Path, task_dir: Path, max_bytes: float) -> int:
 
     The saves of HPC tasks come from the cluster. Returns the bytes unpacked.
     """
+    # a limit is set for the saves from the cluster, of SHIELD-HIT12A only
+    patterns = RESULT_PATTERNS if max_bytes == float("inf") else ("*.bdo",)
     members, unpacked = [], 0
     with tarfile.open(archive, "r:gz") as tar:
         # read one by one, so a long archive is refused before it is read to the end
         for member in tar:
             unpacked += member.size
-            if not (member.isfile() and any(fnmatch.fnmatchcase(member.name, p) for p in RESULT_PATTERNS)):
+            if not (member.isfile() and any(fnmatch.fnmatchcase(member.name, p) for p in patterns)):
                 raise ValueError(f"{member.name!r} in {archive.name} is not a result file")
-            if "/" in member.name or unpacked > max_bytes:
+            if "/" in member.name or unpacked > max_bytes or len(members) >= MAX_RESULT_FILES:
                 raise ValueError(f"{archive.name} holds too much or nested files")
             members.append(member)
         tar.extractall(task_dir, members=members, filter="data")
+    for member in members:
+        if member.name.endswith(".bdo"):
+            check_bdo(task_dir / member.name)
     return unpacked
+
+
+def check_bdo(path: Path) -> None:
+    """Raises ValueError unless the file is a SHIELD-HIT12A result file whose every entry fits in it: its reader
+    allocates the memory an entry declares, a few bytes may declare terabytes
+    """
+    size = path.stat().st_size
+    with open(path, "rb") as file:
+        # magic number, byte order and version, then entries: id, numpy type and number of items, the items
+        if not file.read(24).startswith(b"xSH12AII"):
+            raise ValueError(f"{path.name} is not a SHIELD-HIT12A result file")
+        while file.tell() < size:
+            header = file.read(24)
+            if len(header) < 24:
+                raise ValueError(f"{path.name} ends within an entry")
+            _, kind, count = struct.unpack("<Q8sQ", header)
+            try:
+                itemsize = np.dtype(kind.rstrip(b"\0").decode("ascii")).itemsize
+            except (TypeError, ValueError):  # UnicodeDecodeError is one
+                raise ValueError(f"{path.name} has an entry of an unknown type") from None
+            if count * itemsize > size - file.tell():
+                raise ValueError(f"{path.name} has an entry larger than the file")
+            file.seek(count * itemsize, 1)
 
 
 def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]:

@@ -4,6 +4,7 @@ import copy
 import io
 import json
 import shutil
+import struct
 import tarfile
 import threading
 from pathlib import Path
@@ -308,6 +309,41 @@ def test_saves_with_anything_but_result_files_are_not_merged(tmp_path, monkeypat
     with pytest.raises(ValueError):
         simulation_module.merge_stored([key], max_bytes=1000)
     assert not [path for path in tmp_path.rglob("*") if path.is_file() and path.suffix != ".gz"]
+
+
+def crafted_bdo(offset: int, value: int) -> bytes:
+    """A result file of the test data with one number changed, as a job on the cluster could write it"""
+    data = bytearray((BDO_DIR / "task_1" / "z_profile_0001.bdo").read_bytes())
+    data[offset : offset + 8] = struct.pack("<q", value)
+    return bytes(data)
+
+
+@pytest.mark.parametrize(
+    "files, error",
+    [
+        # the items of the first page declared as 2**36 numbers: its reader would take 512 GB of memory
+        ({"z_profile_0001.bdo": crafted_bdo(1808 + 16, 1 << 36)}, "larger than the file"),
+        # 10**9 bins along z with 10 values: the JSON would hold a value for every bin
+        ({"z_profile_0001.bdo": crafted_bdo(1240 + 16, 10**9)}, "values for"),
+        ({"fluence_fort.21": b"x"}, "not a result file"),
+        ({f"{number}.bdo": b"" for number in range(simulation_module.MAX_RESULT_FILES + 1)}, "too much"),
+    ],
+    ids=["entry larger than the file", "more bins than values", "FLUKA file", "too many files"],
+)
+def test_crafted_saves_are_not_merged(tmp_path, monkeypatch, files, error):
+    """A few bytes from the cluster must not take the server's memory or time"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path / "objects"))
+    archive = tmp_path / "save.tar.gz"
+    with tarfile.open(archive, "w:gz") as tar:
+        for name, data in files.items():
+            member = tarfile.TarInfo(name)
+            member.size = len(data)
+            tar.addfile(member, io.BytesIO(data))
+    key = result_storage.work_key(1, 1)
+    result_storage.put_file(key, archive)
+
+    with pytest.raises(ValueError, match=error):
+        simulation_module.merge_stored([key], max_bytes=1 << 20)
 
 
 def test_save_rewritten_while_packed_is_not_stored(tmp_path, monkeypatch):
