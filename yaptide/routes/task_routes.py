@@ -30,12 +30,17 @@ class TasksResource(Resource):
         simulation_id and task_id self explanatory
         """
         payload_dict: dict = request.get_json(force=True)
+        if not isinstance(payload_dict, dict):
+            return yaptide_response(message="Payload must be a JSON object", code=400)
         required_keys = {"simulation_id", "task_id", "update_key", "update_dict"}
         if required_keys != set(payload_dict.keys()):
             diff = required_keys.difference(set(payload_dict.keys()))
             return yaptide_response(message=f"Missing keys in JSON payload: {diff}", code=400)
 
         sim_id: int = payload_dict["simulation_id"]
+        task_id = payload_dict["task_id"]
+        if not all(isinstance(number, int) and not isinstance(number, bool) for number in (sim_id, task_id)):
+            return yaptide_response(message="simulation_id and task_id must be integers", code=400)
         simulation = fetch_simulation_by_sim_id(sim_id=sim_id)
 
         if not simulation:
@@ -124,6 +129,8 @@ class TaskLinksResource(Resource):
         payload = request.get_json(force=True)
         if not isinstance(payload, dict) or not {"simulation_id", "update_key"} <= set(payload):
             return yaptide_response(message="simulation_id and update_key are required", code=400)
+        if not isinstance(payload["simulation_id"], int) or isinstance(payload["simulation_id"], bool):
+            return yaptide_response(message="simulation_id must be an integer", code=400)
         simulation = fetch_simulation_by_sim_id(sim_id=payload["simulation_id"])
         if simulation is None:
             return yaptide_response(message="Simulation does not exist", code=400)
