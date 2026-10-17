@@ -24,7 +24,7 @@ from typing import Optional
 
 import ray
 from botocore.exceptions import BotoCoreError, ClientError
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
@@ -107,6 +107,10 @@ PROGRESS_SECONDS = 1
 # a task running longer is stopped, as the Celery workers did; checked once a minute
 TASK_SECONDS_LIMIT = 10 * 3600
 OVERDUE_CHECK_SECONDS = 60
+# a cancel that did not reach the cluster is repeated (looked for with the overdue tasks), at most this often for
+# each simulation: logins count against the user's account; one whose certificate expired is not repeated
+# (cancel_simulation then forgets the job directory)
+CANCEL_RETRY_SECONDS = 10 * 60
 # the engine gives up and restarts with its container after failing for this long
 GIVE_UP_SECONDS = 60
 # partial results are merged again once the saves of the tasks cover this much more of the requested primaries
@@ -239,6 +243,8 @@ class Engine:
         # HPC simulations being submitted (simulation id -> the submit's ref) and cancelled on their cluster
         self.submitting: dict[int, ray.ObjectRef] = {}
         self.cancelling: set[int] = set()
+        # when the jobs of a simulation were last cancelled on its cluster (time.monotonic())
+        self.cancel_tried: dict[int, float] = {}
         self.running: dict[int, Running] = {}
         # (event, simulation id, platform): PENDING, CANCELED, DELETED from Postgres, FINISHED and SUBMITTED
         # from Ray, SWEEP
@@ -272,6 +278,7 @@ class Engine:
                 if time.monotonic() - last_overdue_check >= OVERDUE_CHECK_SECONDS:
                     last_overdue_check = time.monotonic()
                     self.stop_overdue()
+                    self.retry_cancels()
                 failing_since = None
             except Exception:  # skipcq: PYL-W0703
                 logging.exception("Handling %s failed", event)
@@ -293,7 +300,7 @@ class Engine:
         elif event == "SUBMITTED":
             self.submitted(simulation_id)
         elif event == "CANCELLED_ON_CLUSTER":
-            # done, or to be repeated by a sweep: the job directory stays in the database until it is done
+            # done, or repeated within minutes (retry_cancels): the job directory stays in the database until it is done
             self.cancelling.discard(simulation_id)
         elif event == EntityState.PENDING.value:
             simulation = db.session.get(CelerySimulationModel, simulation_id)
@@ -323,11 +330,36 @@ class Engine:
             if result_storage.configured():
                 result_storage.put_cancel(simulation_id)
         except Exception:  # skipcq: PYL-W0703
-            # put again by the cancel a sweep repeats, as long as the job directory is recorded
+            # put again by the cancel repeated within minutes, as long as the job directory is recorded
             logging.exception("Putting the cancel of simulation %d into storage failed", simulation_id)
-        if simulation_id not in self.cancelling:
-            self.cancelling.add(simulation_id)
-            self.watch(self.cluster.cancel.remote(simulation_id), simulation_id, "CANCELLED_ON_CLUSTER")
+        tried = self.cancel_tried.get(simulation_id)
+        if simulation_id in self.cancelling or (tried is not None and time.monotonic() - tried < CANCEL_RETRY_SECONDS):
+            return
+        self.cancel_tried[simulation_id] = time.monotonic()
+        self.cancelling.add(simulation_id)
+        self.watch(self.cluster.cancel.remote(simulation_id), simulation_id, "CANCELLED_ON_CLUSTER")
+
+    @staticmethod
+    def cancels_left() -> set[int]:
+        """HPC simulations with jobs still to cancel on the cluster: the job directory is still recorded - cancelled
+        ones, and failed submits (no array id: a simulation that ran keeps its directory)
+        """
+        failed_submit = and_(
+            BatchSimulationModel.job_state == EntityState.FAILED.value, BatchSimulationModel.array_id.is_(None)
+        )
+        query = db.session.query(BatchSimulationModel.id).filter(
+            BatchSimulationModel.job_dir.isnot(None),
+            or_(BatchSimulationModel.job_state == EntityState.CANCELED.value, failed_submit),
+        )
+        return {simulation_id for (simulation_id,) in query}
+
+    def retry_cancels(self) -> None:
+        """Repeats the cancels whose event was lost, or that could not reach the cluster"""
+        to_cancel = self.cancels_left()
+        # the ones done are forgotten
+        self.cancel_tried = {key: value for key, value in self.cancel_tried.items() if key in to_cancel}
+        for simulation_id in sorted(to_cancel):
+            self.cancel(simulation_id)
 
     def read_hpc_progress(self) -> None:
         """Saves what the tasks of running HPC simulations put into storage since the last look
@@ -430,6 +462,8 @@ class Engine:
                 result_storage.expire_work_objects()
         except Exception:  # skipcq: PYL-W0703
             logging.exception("Setting the expiry of what tasks leave in storage failed")
+        # cancels tried before the restart wait their turn: a restarting engine must not log in again each time
+        self.cancel_tried = dict.fromkeys(self.cancels_left(), time.monotonic())
         lost = db.session.query(CelerySimulationModel).filter(CelerySimulationModel.job_state.in_(RUNNING_STATES)).all()
         for simulation in lost:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
@@ -472,12 +506,7 @@ class Engine:
         )
         for (simulation_id,) in waiting:
             self.submit(simulation_id)
-        # cancels whose event was lost, or that could not reach the cluster: the job directory is still recorded
-        to_cancel = db.session.query(BatchSimulationModel.id).filter(
-            BatchSimulationModel.job_state == EntityState.CANCELED.value, BatchSimulationModel.job_dir.isnot(None)
-        )
-        for (simulation_id,) in to_cancel:
-            self.cancel(simulation_id)
+        self.retry_cancels()
 
     def start_guarded(self, simulation: CelerySimulationModel) -> None:
         """Starts a simulation; one that cannot start fails alone, without stopping the engine"""

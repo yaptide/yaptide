@@ -147,8 +147,12 @@ class UserSimulations(Resource):
                 code=403,
             )
 
-        # the engine still has to cancel its jobs on the cluster; deleting now would leave them running there
-        cancelling = isinstance(simulation, BatchSimulationModel) and simulation.job_state == EntityState.CANCELED.value
+        # the engine still has to cancel its jobs on the cluster (a cancelled simulation, or a failed submit: no array
+        # id); deleting now would leave them running there
+        cancelling = isinstance(simulation, BatchSimulationModel) and (
+            simulation.job_state == EntityState.CANCELED.value
+            or (simulation.job_state == EntityState.FAILED.value and simulation.array_id is None)
+        )
         if cancelling and simulation.job_dir:
             return yaptide_response(message="Its jobs are being cancelled on the cluster, try again soon", code=409)
 

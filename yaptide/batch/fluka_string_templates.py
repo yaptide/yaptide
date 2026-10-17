@@ -75,8 +75,13 @@ if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.j
     exit 1
 fi
 
-# the pages go straight to the storage of the backend; a failed upload fails the job, the reporter job reports it
-python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY \\
+# the pages go straight to the storage of the backend; a failed upload fails the job, the reporter job reports it.
+# Inline, a few attempts only: the array task holds its node meanwhile, and the collect job tries again anyway
+UPLOAD_ATTEMPTS=12
+if [ "$1" = inline ] ; then
+    UPLOAD_ATTEMPTS=3
+fi
+python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY --attempts=$UPLOAD_ATTEMPTS \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} || exit 1
 touch $ROOT_DIR/collected
 

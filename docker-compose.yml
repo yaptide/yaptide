@@ -151,6 +151,12 @@ services:
     ports:
       - 5000:5000
       - 8443:8443
+    # the TLS certificate and key, from the host: a renewal replaces the files and reloads nginx
+    # (scripts/update_certs.sh), a rebuilt image keeps them; without them nginx uses a self-signed pair
+    # (scripts/nginx_tls.sh)
+    volumes:
+      - ${TLS_CERT_PATH:-./server.crt}:/etc/nginx/certs/server.crt:ro
+      - ${TLS_KEY_PATH:-./server.key}:/etc/nginx/certs/server.key:ro
     depends_on:
       yaptide_flask:
         condition: service_healthy

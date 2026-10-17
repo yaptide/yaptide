@@ -166,12 +166,16 @@ class FakeServer(BaseHTTPRequestHandler):
     dropped_once: set = set()
     expired_once: set = set()
     calls: list = []
+    # error answers the backend gives first, e.g. while it restarts
+    errors: list = []
     has_storage = True
 
     def do_POST(self):
         """POST /results/uploads, /results/done and the old /results"""
         payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
         FakeServer.calls.append(self.path)
+        if FakeServer.errors:
+            return self.answer(FakeServer.errors.pop(0), {})
         if self.path == "/results" or not FakeServer.has_storage:
             return self.answer(202 if self.path == "/results" else 501, {})
         if self.path == "/results/uploads":
@@ -224,7 +228,7 @@ class FakeServer(BaseHTTPRequestHandler):
 def fake_server(tmp_path, monkeypatch):
     """The fake backend and storage, and the collect job's output directory with convertmc's files"""
     FakeServer.storage, FakeServer.lost_once, FakeServer.calls, FakeServer.has_storage = {}, set(), [], True
-    FakeServer.dropped_once, FakeServer.expired_once = set(), set()
+    FakeServer.dropped_once, FakeServer.expired_once, FakeServer.errors = set(), set(), []
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeServer)
     threading.Thread(target=server.serve_forever, daemon=True).start()
     for estimator in RESULTS:
@@ -288,3 +292,29 @@ def test_uploader_gets_new_links_when_one_expires(fake_server):
     assert results_uploader.main(fake_server) == 0
 
     assert FakeServer.calls == ["/results/uploads", "/results/uploads", "/results/done"]
+
+
+def test_uploader_waits_out_a_restart_of_several_minutes(fake_server, monkeypatch):
+    """Transient errors are retried with doubling pauses, about a quarter of an hour in all"""
+    FakeServer.errors = [502, 503, 429, 504] * 2 + [503, 502]
+    pauses = []
+    monkeypatch.setattr(results_uploader.time, "sleep", pauses.append)
+    monkeypatch.setattr(results_uploader, "RETRY_SECONDS", 5)
+
+    assert results_uploader.main(fake_server) == 0
+
+    assert pauses == [5, 10, 20, 40, 80, 120, 120, 120, 120, 120]
+    all_pauses = [min(5 * 2**attempt, 120) for attempt in range(results_uploader.ATTEMPTS - 1)]
+    assert 10 * 60 <= sum(all_pauses) <= 15 * 60
+
+
+def test_uploader_does_not_retry_a_refusal(fake_server, monkeypatch):
+    """A 4xx answer, e.g. 409 for a simulation already in a final state, ends the upload at once"""
+    FakeServer.errors = [409]
+    pauses = []
+    monkeypatch.setattr(results_uploader.time, "sleep", pauses.append)
+
+    assert results_uploader.main(fake_server) == 1
+
+    assert FakeServer.calls == ["/results/uploads"]
+    assert not pauses
