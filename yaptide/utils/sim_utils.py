@@ -16,7 +16,7 @@ from yaptide.utils.enums import InputType, SimulationType
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 # NSTAT without a step of saving, or with 0 (save only at the end)
-NSTAT_WITHOUT_SAVES = re.compile(r"^(\s*NSTAT\s+\d+)(?:[ \t]+0)?(?=[ \t]*(?:!|$))", re.MULTILINE)
+NSTAT_WITHOUT_SAVES = re.compile(r"^(\s*NSTAT\s+\d+)(?:[ \t]+0)?(?=[ \t]*(?:!|\r?$))", re.MULTILINE)
 
 
 def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
@@ -82,6 +82,10 @@ def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
     batch simulations. JSON is produced once, from the merged result.
     The list is sorted by name, as POST /results matches estimators to editor outputs by sorted name.
     """
+    missing = [str(path) for path in output_dirs if not path.is_dir()]
+    if missing:
+        # a merge without some tasks would be stored as the whole result
+        raise FileNotFoundError(f"Task outputs missing: {', '.join(missing)}")
     files = [
         str(file) for path in output_dirs for pattern in ("*.bdo", "*_fort.*") for file in sorted(path.glob(pattern))
     ]

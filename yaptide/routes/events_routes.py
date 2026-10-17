@@ -23,6 +23,8 @@ from yaptide.routes.utils.utils import FINAL_STATES, check_if_job_is_owned_and_e
 
 # a comment sent this often keeps proxies from closing a quiet stream and finds streams the browser closed
 KEEPALIVE_SECONDS = 25
+# each stream holds a thread of the events server (yaptide_events): one user must not take them all
+MAX_STREAMS_PER_USER = 10
 
 
 class Subscribers:
@@ -33,6 +35,22 @@ class Subscribers:
         self.lock = threading.Lock()
         self.wakeups: dict[int, set[queue.SimpleQueue]] = {}
         self.listener = None
+        self.streams_of_user: dict[int, int] = {}
+
+    def admit(self, user_id: int) -> bool:
+        """Counts a new stream of the user, unless the user has too many open"""
+        with self.lock:
+            if self.streams_of_user.get(user_id, 0) >= MAX_STREAMS_PER_USER:
+                return False
+            self.streams_of_user[user_id] = self.streams_of_user.get(user_id, 0) + 1
+            return True
+
+    def release(self, user_id: int) -> None:
+        """Forgets a closed stream of the user"""
+        with self.lock:
+            self.streams_of_user[user_id] -= 1
+            if not self.streams_of_user[user_id]:
+                del self.streams_of_user[user_id]
 
     def subscribe(self, simulation_id: int, database_uri: str) -> queue.SimpleQueue:
         """Queue that gets an item whenever the simulation may have changed"""
@@ -118,9 +136,15 @@ class SimulationEventsResource(Resource):
         if not is_owned:
             return yaptide_response(message=error_message, code=res_code)
         simulation_id = fetch_simulation_id_by_job_id(job_id=job_id)
+        user_id = user.id
         db.session.remove()
-        return Response(
+        if not subscribers.admit(user_id):
+            return yaptide_response(message="Too many open streams", code=429)
+        response = Response(
             stream_with_context(simulation_events(simulation_id)),
             mimetype="text/event-stream",
             headers={"Cache-Control": "no-cache"},
         )
+        # the server closes every response, also one whose stream never started
+        response.call_on_close(lambda: subscribers.release(user_id))
+        return response

@@ -99,7 +99,7 @@ class SimulationModel(db.Model):
         doc="Simulation state (i.e. 'pending', 'running', 'completed', 'failed')",
     )
     partial_primaries: Column[int] = db.Column(
-        db.Integer, nullable=True, doc="Primaries the stored results cover while the simulation runs"
+        db.BigInteger, nullable=True, doc="Primaries the stored results cover while the simulation runs"
     )
     partial_time: Column[datetime] = db.Column(
         db.DateTime(timezone=True), nullable=True, doc="When the partial results were stored"

@@ -51,7 +51,8 @@ from yaptide.persistence.models import (
     TaskModel,
 )
 from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
-from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.enums import EntityState, PlatformType, SimulationType
+from yaptide.utils.sim_utils import set_shieldhit_save_step
 
 # SSH connections to the clusters at once; they ban accounts that log in often
 CLUSTER_CONNECTIONS = 4
@@ -108,6 +109,8 @@ OVERDUE_CHECK_SECONDS = 60
 GIVE_UP_SECONDS = 60
 # partial results are merged again once the saves of the tasks cover this much more of the requested primaries
 PARTIAL_GROWTH = 0.05
+# partial merges at once over all simulations: each holds every task's results in memory, next to the simulators
+MAX_PARTIAL_MERGES = 2
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
 
 
@@ -201,7 +204,9 @@ class Running:
     # the latest results of every task, saved while running or final: task id -> (directory, primaries)
     saves: dict[int, tuple[str, int]] = field(default_factory=dict)
     partial: Optional[ray.ObjectRef] = None
+    # primaries of the stored partial results, and of the ones being merged
     partial_primaries: int = 0
+    merging_primaries: int = 0
 
     def refs(self) -> list:
         """What the engine waits for"""
@@ -459,7 +464,11 @@ class Engine:
 
     def start(self, simulation: CelerySimulationModel) -> None:
         """Submits the tasks of a simulation"""
-        files_ref = ray.put(simulation.inputs[0].data["input_files"])
+        files = dict(simulation.inputs[0].data["input_files"])
+        if simulation.sim_type == SimulationType.SHIELDHIT.value:
+            # saves along the way for partial results, in the tasks' copy only: the stored input stays the user's
+            set_shieldhit_save_step(files, max(task.requested_primaries or 0 for task in simulation.tasks))
+        files_ref = ray.put(files)
         task_ids = sorted(task.task_id for task in simulation.tasks)
         work_dirs = {task_id: get_tmp_dir() / f"{WORK_DIR_PREFIX}{simulation.id}_{task_id}" for task_id in task_ids}
         tasks = {
@@ -495,16 +504,22 @@ class Engine:
         grown = primaries - running.partial_primaries
         if running.partial or running.merge or grown <= 0 or grown < PARTIAL_GROWTH * running.requested_primaries:
             return
+        # with every task finished the final merge is next
+        if not running.tasks or sum(1 for other in self.running.values() if other.partial) >= MAX_PARTIAL_MERGES:
+            return
         snapshot_dirs = [snapshot_dir for snapshot_dir, _ in running.saves.values()]
         running.partial = partial_merge_task.remote(simulation_id, snapshot_dirs, primaries)
-        running.partial_primaries = primaries
+        running.merging_primaries = primaries
         self.watch(running.partial, simulation_id, "PARTIAL")
 
     @staticmethod
     def partial_merged(simulation_id: int, running: Running) -> None:
-        """Partial results that could not be merged are skipped, the simulation goes on"""
+        """Partial results that could not be merged are skipped, the simulation goes on; the next ones are due
+        from the last stored ones
+        """
         try:
-            ray.get(running.partial)
+            if ray.get(running.partial):
+                running.partial_primaries = running.merging_primaries
         except Exception as error:  # skipcq: PYL-W0703
             logging.warning("Partial results of simulation %d failed: %s", simulation_id, error)
         running.partial = None

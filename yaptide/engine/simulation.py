@@ -176,8 +176,15 @@ def take_snapshot(work_dir: Path, primaries: int, saved: Callable[[str, int], No
         partial = work_dir / "snapshot_tmp"
         shutil.rmtree(partial, ignore_errors=True)
         partial.mkdir()
-        for result_file in work_dir.glob("*.bdo"):
+        result_files = list(work_dir.glob("*.bdo"))
+        before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]
+        for result_file in result_files:
             shutil.copy(result_file, partial)
+        # the next save may have begun meanwhile (the log is read up to a second late), leaving a torn copy
+        if before != [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]:
+            shutil.rmtree(partial, ignore_errors=True)
+            logging.info("Snapshot of %s at %d primaries skipped, a save was under way", work_dir, primaries)
+            return
         partial.rename(snapshot)
         for old in sorted(work_dir.glob("snapshot_[0-9]*"))[:-SNAPSHOTS_KEPT]:
             shutil.rmtree(old, ignore_errors=True)

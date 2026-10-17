@@ -57,7 +57,8 @@ def test_every_migration_goes_up_and_down(app):
     flask_migrate.upgrade()
     created = tables()
     assert "PageObject" in created and "Simulation" in created
-    assert query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal") == [("simulation_engine_events",)]
+    triggers = query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal ORDER BY tgname")
+    assert triggers == [("simulation_engine_events",), ("simulation_stream_events",)]
 
     flask_migrate.downgrade(revision="base")
     assert tables() == []
