@@ -1,5 +1,6 @@
 """The engine on a local Ray cluster: simulations stored by Flask run, report, merge, fail, cancel and recover"""
 
+import inspect
 import os
 import platform
 import queue
@@ -718,8 +719,11 @@ def test_saves_of_hpc_tasks_become_partial_results_at_most_once_a_minute(client,
     monkeypatch.setattr(engine_module.result_storage, "read_report", lambda key: {"update": reports[key][1]})
     monkeypatch.setattr(engine_module.result_storage, "stored_sizes", lambda prefix: sizes)
     merges, deleted = [], []
+    merge = inspect.signature(engine_module.partial_merge_task._function)  # skipcq: PYL-W0212
     monkeypatch.setattr(
-        engine_module, "partial_merge_task", mock.Mock(remote=lambda *args: merges.append(args) or ray.put(True))
+        engine_module,
+        "partial_merge_task",
+        mock.Mock(remote=lambda *args: merge.bind(*args) and merges.append(args) or ray.put(True)),
     )
     monkeypatch.setattr(engine_module, "delete_task_results", mock.Mock(remote=deleted.append))
     monkeypatch.setattr(engine, "watch", lambda *args: None)

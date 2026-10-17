@@ -172,9 +172,11 @@ def merge_task(simulation_id: int, keys: list[str]) -> bool:
 
 # like the merge; one that fails is skipped, the next saves bring the next partial results
 @ray.remote(num_cpus=0, max_retries=0)
-def partial_merge_task(simulation_id: int, keys: list[str], primaries: int) -> bool:
-    """Merges the latest saves of the tasks of a running simulation and stores them as its partial results"""
-    return merge_and_store_partial(simulation_id, keys, primaries)
+def partial_merge_task(simulation_id: int, keys: list[str], primaries: int, max_bytes: float = float("inf")) -> bool:
+    """Merges the latest saves of the tasks of a running simulation, at most max_bytes of result files, and stores
+    them as its partial results
+    """
+    return merge_and_store_partial(simulation_id, keys, primaries, max_bytes)
 
 
 # a task cancelled meanwhile may still store its save, and removes it itself
@@ -436,8 +438,11 @@ class Engine:
             if simulation_id in running:
                 try:
                     self.merge_hpc_partial(simulation_id, partial)
-                except (BotoCoreError, ClientError):
-                    logging.exception("Listing the saves of simulation %d failed", simulation_id)
+                except DATABASE_FAILURES:
+                    raise
+                # partial results are skipped, e.g. with the storage out of reach; the simulation goes on
+                except Exception:  # skipcq: PYL-W0703
+                    logging.exception("Partial results of simulation %d not started", simulation_id)
             elif partial.partial is None:
                 del self.hpc_partials[simulation_id]
                 delete_task_results.remote(simulation_id)
