@@ -5,7 +5,7 @@ module load shieldhit
 ROOT_DIR={root_dir}
 cd $ROOT_DIR
 mkdir -p $ROOT_DIR/workspaces/task_{{0001..{n_tasks}}}
-mkdir -p $ROOT_DIR/input
+mkdir -p $ROOT_DIR/input $ROOT_DIR/done
 
 
 INPUT_DIR=$ROOT_DIR/input
@@ -48,6 +48,11 @@ fi
 COLLECT_SHIELDHIT_BASH: str = """#!/bin/bash
 {collect_header}
 ROOT_DIR={root_dir}
+# the last array task runs this script already (as "inline"); this job, started after the whole array, collects only
+# when that did not succeed: a task that did not end, a failure, or the task's time or memory limit
+if [ -e $ROOT_DIR/collected ] ; then
+    exit 0
+fi
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
       --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
@@ -60,21 +65,26 @@ cd $OUTPUT_DIRECTORY
 
 if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
     # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
-    # with empty results; task outputs are kept for a manual look
-    python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
-          --backend_url={backend_url} --simulation_state=FAILED
+    # with empty results; task outputs are kept for a manual look. A failure inline may be the task's memory limit,
+    # this job tries again and reports it
+    if [ "$1" != inline ] ; then
+        python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
+              --backend_url={backend_url} --simulation_state=FAILED
+    fi
     exit 1
-fi
-
-CLEAR_BDOS={remove_output_from_workspace}
-
-if $CLEAR_BDOS; then
-    rm $INPUT_WILDCARD
 fi
 
 # the pages go straight to the storage of the backend; a failed upload fails the job, the reporter job reports it
 python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} || exit 1
+touch $ROOT_DIR/collected
+
+CLEAR_BDOS={remove_output_from_workspace}
+
+# find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect
+if $CLEAR_BDOS; then
+    find $ROOT_DIR/workspaces -name "*.bdo" -delete || true
+fi
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash
@@ -114,4 +124,11 @@ python3 $ROOT_DIR/watcher.py --simulator=shieldhit --filepath=$FILE_TO_WATCH --p
     1>watcher_$SLURM_ARRAY_TASK_ID.stdout 2>watcher_$SLURM_ARRAY_TASK_ID.stderr &
 
 wait
+
+# the last task to end merges and uploads the results at once: the collect job, queued after the whole array, waits
+# minutes for a node; it collects only when this did not happen or failed
+touch $ROOT_DIR/done/task_$SLURM_ARRAY_TASK_ID
+if [ `ls $ROOT_DIR/done | wc -l` -eq {n_tasks} ] && mkdir $ROOT_DIR/collect.lock 2>/dev/null ; then
+    bash $ROOT_DIR/collect_script.sh inline || echo "Collect left to the collect job"
+fi
 """  # skipcq: FLK-E501

@@ -59,6 +59,8 @@ from yaptide.utils.sim_utils import set_shieldhit_save_step
 CLUSTER_CONNECTIONS = 4
 # how often the progress HPC tasks put into storage is read
 HPC_PROGRESS_SECONDS = 10
+# how long after an HPC simulation ended its tasks' reports are still read
+ENDED_READ_SECONDS = 600
 # what a task's report may set
 REPORTED_STATES = {
     EntityState.RUNNING.value,
@@ -335,8 +337,9 @@ class Engine:
         """
         if not result_storage.configured():
             return
-        # one completed since the last look still has the last reports of its tasks to read
-        recently = datetime.now(timezone.utc) - timedelta(seconds=3 * HPC_PROGRESS_SECONDS)
+        # one that ended recently may still have the last reports of its tasks to read: the last task completes it
+        # seconds after its report, and the engine may be restarting or the storage out of reach meanwhile
+        recently = datetime.now(timezone.utc) - timedelta(seconds=ENDED_READ_SECONDS)
         active = db.session.query(BatchSimulationModel.id).filter(
             BatchSimulationModel.array_id.isnot(None),
             or_(BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES), BatchSimulationModel.end_time >= recently),
