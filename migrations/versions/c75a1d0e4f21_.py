@@ -29,5 +29,11 @@ def upgrade():
 
 
 def downgrade():
-    """Drops the PageObject table"""
+    """Drops the PageObject table - only without pages kept in object storage, it is their only record"""
+    stored = op.get_bind().execute(sa.text('SELECT count(*) FROM "PageObject"')).scalar()
+    if stored:
+        raise RuntimeError(
+            f"{stored} result pages are kept in object storage; copy them back into the database first, "
+            "dropping the table would lose them"
+        )
     op.drop_table('PageObject')
