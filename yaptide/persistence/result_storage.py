@@ -77,7 +77,8 @@ def put_page(key: str, page: dict) -> int:
 
 def body_md5(body: bytes) -> str:
     """MD5 of an object's body in base64, as the Content-MD5 header carries it"""
-    return base64.b64encode(hashlib.md5(body).digest()).decode()
+    # the checksum S3 asks for, not a security measure
+    return base64.b64encode(hashlib.md5(body, usedforsecurity=False).digest()).decode()  # skipcq: PTC-W1003
 
 
 def put_gzipped_page(key: str, body: bytes) -> None:
