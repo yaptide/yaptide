@@ -617,6 +617,29 @@ def test_failed_hpc_cancel_is_repeated_every_few_minutes(client, engine, monkeyp
     assert not engine.cancel_tried
 
 
+def test_cleanup_of_a_failed_submit_is_repeated_but_not_at_each_restart(client, engine, monkeypatch):
+    """A submit that failed after reaching the cluster keeps its directory until the cancel succeeds; a simulation
+    that ran and failed keeps it for good. A restarted engine does not log in at once for what it tried before.
+    """
+    failed_submit = hpc_simulation(EntityState.FAILED.value, job_id="submit")
+    ran = hpc_simulation(EntityState.FAILED.value, job_id="ran")
+    simulation = db.session.get(BatchSimulationModel, failed_submit)
+    simulation.array_id = simulation.collect_id = None
+    for simulation_id in (failed_submit, ran):
+        db.session.get(BatchSimulationModel, simulation_id).job_dir = f"/scratch/yaptide_runs/{simulation_id}_1"
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    engine.cluster.cancel.remote.side_effect = lambda sim_id: ray.put(None)
+
+    engine.recover()
+    engine.retry_cancels()
+    assert engine.cluster.cancel.remote.call_count == 0
+
+    monkeypatch.setattr(engine_module, "CANCEL_RETRY_SECONDS", 0)
+    engine.retry_cancels()
+    engine.cluster.cancel.remote.assert_called_once_with(failed_submit)
+
+
 def test_bad_reports_are_left_out_and_others_still_saved(client, engine, monkeypatch):
     """A report with a huge task number or nonsense values does not stop the reports of other simulations"""
     simulation_id = hpc_simulation()

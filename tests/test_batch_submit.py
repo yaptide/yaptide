@@ -323,6 +323,24 @@ def test_delete_waits_for_the_cancel_on_the_cluster(client, cluster_connection):
     assert client.delete("/user/simulations", query_string={"job_id": simulation.job_id}).status_code == 200
 
 
+def test_delete_waits_for_the_cleanup_of_a_failed_submit(client, cluster_connection):
+    """A submit failing half way may have left jobs on the cluster, cancelled by the engine before a delete"""
+    simulation = submit(client)
+    run = cluster_connection.run.side_effect
+
+    def hang_after_the_claim(command: str, **kwargs) -> Result:
+        """The login node stops answering once the job directory is recorded, also to the cancel"""
+        if command == "echo $SCRATCH":
+            return run(command, **kwargs)
+        raise TimeoutError("the login node hangs")
+
+    cluster_connection.run.side_effect = hang_after_the_claim
+    batch_methods.submit_simulation(simulation.id)
+    assert db.session.get(BatchSimulationModel, simulation.id).job_state == EntityState.FAILED.value
+
+    assert client.delete("/user/simulations", query_string={"job_id": simulation.job_id}).status_code == 409
+
+
 def test_jobs_get_new_links_while_running(client, cluster_connection, monkeypatch):
     """A job running past the links' week gets new ones with its update key; not once the simulation is final"""
     simulation = submit(client)

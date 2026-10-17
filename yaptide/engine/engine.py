@@ -24,7 +24,7 @@ from typing import Optional
 
 import ray
 from botocore.exceptions import BotoCoreError, ClientError
-from sqlalchemy import or_
+from sqlalchemy import and_, or_
 
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
@@ -339,16 +339,23 @@ class Engine:
         self.cancelling.add(simulation_id)
         self.watch(self.cluster.cancel.remote(simulation_id), simulation_id, "CANCELLED_ON_CLUSTER")
 
-    def retry_cancels(self) -> None:
-        """Repeats the cancels whose event was lost, or that could not reach the cluster: the job directory is still
-        recorded
+    @staticmethod
+    def cancels_left() -> set[int]:
+        """HPC simulations with jobs still to cancel on the cluster: the job directory is still recorded - cancelled
+        ones, and failed submits (no array id: a simulation that ran keeps its directory)
         """
-        to_cancel = {
-            simulation_id
-            for (simulation_id,) in db.session.query(BatchSimulationModel.id).filter(
-                BatchSimulationModel.job_state == EntityState.CANCELED.value, BatchSimulationModel.job_dir.isnot(None)
-            )
-        }
+        failed_submit = and_(
+            BatchSimulationModel.job_state == EntityState.FAILED.value, BatchSimulationModel.array_id.is_(None)
+        )
+        query = db.session.query(BatchSimulationModel.id).filter(
+            BatchSimulationModel.job_dir.isnot(None),
+            or_(BatchSimulationModel.job_state == EntityState.CANCELED.value, failed_submit),
+        )
+        return {simulation_id for (simulation_id,) in query}
+
+    def retry_cancels(self) -> None:
+        """Repeats the cancels whose event was lost, or that could not reach the cluster"""
+        to_cancel = self.cancels_left()
         # the ones done are forgotten
         self.cancel_tried = {key: value for key, value in self.cancel_tried.items() if key in to_cancel}
         for simulation_id in sorted(to_cancel):
@@ -455,6 +462,8 @@ class Engine:
                 result_storage.expire_work_objects()
         except Exception:  # skipcq: PYL-W0703
             logging.exception("Setting the expiry of what tasks leave in storage failed")
+        # cancels tried before the restart wait their turn: a restarting engine must not log in again each time
+        self.cancel_tried = dict.fromkeys(self.cancels_left(), time.monotonic())
         lost = db.session.query(CelerySimulationModel).filter(CelerySimulationModel.job_state.in_(RUNNING_STATES)).all()
         for simulation in lost:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
