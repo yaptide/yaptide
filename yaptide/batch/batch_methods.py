@@ -225,8 +225,9 @@ def cancel_simulation(simulation_id: int) -> None:
 
     The jobs are found by the ids the submit wrote into the job directory, so a submit interrupted before its ids
     reached the database is cleaned up too. A directory left in the database means the cancel is still to be done
-    (the engine's sweep repeats it). With the user's certificate expired, the jobs still stop by themselves, as they
-    find the cancel the engine put into storage (yaptide/batch/watcher.py); the directory stays on the cluster.
+    (the engine repeats it every few minutes). With the user's certificate expired, the jobs still stop by
+    themselves, as they find the cancel the engine put into storage (yaptide/batch/watcher.py); the directory stays
+    on the cluster.
     """
     simulation = db.session.get(BatchSimulationModel, simulation_id)
     if simulation is None or not simulation.job_dir:

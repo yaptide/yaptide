@@ -588,6 +588,35 @@ def test_hpc_cancel_goes_into_storage(client, engine, monkeypatch):
     engine.cluster.cancel.remote.assert_called_once_with(simulation_id)
 
 
+def test_failed_hpc_cancel_is_repeated_every_few_minutes(client, engine, monkeypatch):
+    """A cancel that did not reach the cluster is repeated by the engine, not more often than allowed, until the job
+    directory is forgotten
+    """
+    simulation_id = hpc_simulation(EntityState.CANCELED.value)
+    db.session.get(BatchSimulationModel, simulation_id).job_dir = f"/scratch/yaptide_runs/{simulation_id}_1"
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    engine.cluster.cancel.remote.side_effect = lambda sim_id: ray.put(None)
+
+    engine.handle(EntityState.CANCELED.value, simulation_id, "BATCH")
+    # the cancel failed on the cluster, the job directory stays recorded
+    engine.handle("CANCELLED_ON_CLUSTER", simulation_id)
+    engine.retry_cancels()
+    engine.sweep()
+    assert engine.cluster.cancel.remote.call_count == 1  # tried a moment ago
+
+    monkeypatch.setattr(engine_module, "CANCEL_RETRY_SECONDS", 0)
+    engine.retry_cancels()
+    assert engine.cluster.cancel.remote.call_count == 2
+    engine.handle("CANCELLED_ON_CLUSTER", simulation_id)
+
+    db.session.get(BatchSimulationModel, simulation_id).job_dir = None  # done
+    db.session.commit()
+    engine.retry_cancels()
+    assert engine.cluster.cancel.remote.call_count == 2
+    assert not engine.cancel_tried
+
+
 def test_bad_reports_are_left_out_and_others_still_saved(client, engine, monkeypatch):
     """A report with a huge task number or nonsense values does not stop the reports of other simulations"""
     simulation_id = hpc_simulation()
