@@ -293,7 +293,7 @@ def _signed_get(key: Optional[str] = None, query: Optional[dict] = None) -> byte
     """
     signer, http = _report_reader()
     url = f"{os.environ['RESULTS_S3_ENDPOINT']}/{os.environ['RESULTS_S3_BUCKET']}" + (f"/{quote(key)}" if key else "")
-    request = AWSRequest("GET", url + (f"?{urlencode(query)}" if query else ""))
+    request = AWSRequest("GET", url + (f"?{urlencode(query, quote_via=quote)}" if query else ""))
     signer.add_auth(request)
     try:
         response = http.request("GET", request.url, headers=dict(request.headers))
