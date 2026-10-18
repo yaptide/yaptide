@@ -16,7 +16,7 @@ from flask_restful import Resource
 from sqlalchemy import or_
 
 from yaptide.persistence.database import db, listen_to
-from yaptide.persistence.db_methods import fetch_task_summaries
+from yaptide.persistence.db_methods import fetch_task_summaries, note_watching
 from yaptide.persistence.models import SIMULATION_CHANNEL, SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -139,6 +139,8 @@ def simulations_events(user_id: int) -> Iterator[str]:
         finished: set[int] = set()
         changed: Optional[set[int]] = None
         while True:
+            # also with no news, at every keepalive: the progress of the user's simulations is read often
+            note_watching(user_id)
             for simulation_id, content in statuses(user_id, changed, list(sent)):
                 if simulation_id in finished or content == sent.get(simulation_id):
                     continue

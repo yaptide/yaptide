@@ -56,7 +56,7 @@ def test_every_migration_goes_up_and_down(app):
     """From an empty database to the latest revision, back to nothing, and up again"""
     flask_migrate.upgrade()
     created = tables()
-    assert "PageObject" in created and "Simulation" in created
+    assert {"PageObject", "Simulation", "UserActivity"} <= set(created)
     triggers = query("SELECT tgname FROM pg_trigger WHERE NOT tgisinternal ORDER BY tgname")
     assert triggers == [("simulation_engine_events",), ("simulation_stream_events",)]
 

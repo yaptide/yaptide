@@ -30,6 +30,7 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
     TaskModel,
+    UserActivityModel,
     YaptideUserModel,
 )
 from yaptide.routes.utils.tokens import encode_auth_token
@@ -472,9 +473,11 @@ def test_hpc_events_submit_once_and_a_crashed_submit_fails(client, engine):
     engine.cluster.cancel.remote.assert_called_once_with(simulation.id)
 
 
-def hpc_simulation(state: str = EntityState.PENDING.value, job_id: str = "hpc") -> int:
-    """A submitted HPC simulation with two tasks"""
+def hpc_simulation(state: str = EntityState.PENDING.value, job_id: str = "hpc", watched: bool = True) -> int:
+    """A submitted HPC simulation with two tasks, of a user following their simulations unless not watched"""
     user = db.session.query(YaptideUserModel).one()
+    if watched:
+        db.session.merge(UserActivityModel(user_id=user.id, seen_at=datetime.now(timezone.utc)))
     cluster = ClusterModel(cluster_name="ares")
     db.session.add(cluster)
     db.session.commit()
@@ -495,6 +498,30 @@ def hpc_simulation(state: str = EntityState.PENDING.value, job_id: str = "hpc") 
     return simulation.id
 
 
+@ray.remote
+def raising(error: Exception) -> None:
+    """A reader that failed"""
+    raise error
+
+
+def hpc_round(engine: Engine, readers: int = 2) -> None:
+    """A round of reading HPC progress to its end, its readers here in the test: storage is patched in this process"""
+
+    def read(etags: dict) -> ray.ObjectRef:
+        """One reader's part of the round"""
+        try:
+            return ray.put(engine_module.read_reports(etags))
+        except Exception as error:  # skipcq: PYL-W0703
+            return raising.remote(error)
+
+    engine.hpc_readers = [mock.Mock(read=mock.Mock(remote=read)) for _ in range(readers)]
+    engine.read_hpc_progress()
+    if engine.hpc_reading:
+        ray.wait(engine.hpc_reading, num_returns=len(engine.hpc_reading))
+        engine.handle("HPC_PROGRESS", None)
+    assert not engine.hpc_reading
+
+
 def test_last_reports_are_read_after_the_simulation_completed(client, engine, monkeypatch):
     """The collect job may complete a simulation before the engine read its tasks' last reports"""
     simulation_id = hpc_simulation(EntityState.COMPLETED.value)
@@ -513,7 +540,7 @@ def test_last_reports_are_read_after_the_simulation_completed(client, engine, mo
         engine_module.result_storage, "read_report", lambda key: {"update": {"task_state": "COMPLETED"}}
     )
 
-    engine.read_hpc_progress()
+    hpc_round(engine)
 
     assert listed == [simulation_id]
     db.session.remove()
@@ -540,7 +567,7 @@ def test_hpc_progress_is_read_from_storage(client, engine, monkeypatch):
         lambda key: reads.append(key) or {"task_id": 99, "update": reports[key][1]},
     )
 
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert state(simulation_id) == EntityState.RUNNING.value
     db.session.remove()
     first = db.session.query(TaskModel).filter_by(simulation_id=simulation_id, task_id=1).one()
@@ -549,7 +576,7 @@ def test_hpc_progress_is_read_from_storage(client, engine, monkeypatch):
     reports[prefix + "task_0001.json"] = ("e3", {"task_state": "COMPLETED"})
     reports[prefix + "task_0002.json"] = ("e2", {"task_state": "RUNNING"})
     reads.clear()
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert reads == [prefix + "task_0001.json"]
 
 
@@ -558,29 +585,99 @@ def test_hpc_progress_is_read_only_while_hpc_simulations_may_report(client, engi
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
     monkeypatch.setattr(engine_module.result_storage, "progress_reports", lambda sim_id: {})
 
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert not engine.hpc_active
 
     simulation_id = hpc_simulation()
     engine.submitting[simulation_id] = ray.put(None)
     engine.submitted(simulation_id)
     assert engine.hpc_active
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert engine.hpc_active
 
 
 def test_unreachable_storage_skips_a_round(client, engine, monkeypatch):
-    """Progress that cannot be read now is read next time; the engine keeps going"""
-    hpc_simulation()
+    """Progress that cannot be read now is read next time, by the simulations of the reader that failed; the others
+    keep what they read, and the engine keeps going
+    """
+    simulation_ids = [hpc_simulation(), hpc_simulation(job_id="other")]
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    reachable = set(simulation_ids)
+    reads = []
 
-    def unreachable(sim_id: int) -> dict:
-        """Storage restarting"""
-        raise ConnectionError(f"storage unreachable for {sim_id}")
+    def listing(sim_id: int) -> dict:
+        """One report a simulation, its storage restarting for the ones out of reach"""
+        if sim_id not in reachable:
+            raise ConnectionError(f"storage unreachable for {sim_id}")
+        return {f"hpc/{sim_id}/progress/task_0001.json": "e1"}
 
-    monkeypatch.setattr(engine_module.result_storage, "progress_reports", unreachable)
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", listing)
+    monkeypatch.setattr(
+        engine_module.result_storage,
+        "read_report",
+        lambda key: reads.append(key) or {"update": {"task_state": "RUNNING"}},
+    )
 
-    engine.read_hpc_progress()
+    reachable.discard(simulation_ids[0])
+    hpc_round(engine)  # each simulation with a reader of its own
+    assert reads == [f"hpc/{simulation_ids[1]}/progress/task_0001.json"]
+    assert set(engine.report_etags) == {simulation_ids[1]}
+    assert task_states(simulation_ids[1])[0] == EntityState.RUNNING.value
+
+    reachable.add(simulation_ids[0])
+    reads.clear()
+    hpc_round(engine)
+    assert reads == [f"hpc/{simulation_ids[0]}/progress/task_0001.json"]
+    assert set(engine.report_etags) == set(simulation_ids)
+
+
+def test_simulations_nobody_follows_are_read_in_turns(client, engine, monkeypatch):
+    """Simulations of users who neither have a status stream open nor asked for a status lately are read a share in
+    every round, the longest unread first; their saves stay for the partial merges meanwhile. Once the user follows
+    them again, every round reads them.
+    """
+    simulation_ids = [hpc_simulation(EntityState.RUNNING.value, job_id=job_id, watched=False) for job_id in "abc"]
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    # one simulation of the three in each round
+    monkeypatch.setattr(engine_module, "UNWATCHED_PROGRESS_SECONDS", 3 * engine_module.HPC_PROGRESS_SECONDS)
+    listed = []
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", lambda sim_id: listed.append(sim_id) or {})
+    monkeypatch.setattr(engine_module, "delete_task_results", mock.Mock(remote=lambda sim_id: None))
+    engine.hpc_partials[simulation_ids[2]] = engine_module.HpcPartial()
+
+    for _ in range(4):
+        hpc_round(engine)
+    assert listed == [*simulation_ids, simulation_ids[0]]
+    assert simulation_ids[2] in engine.hpc_partials
+
+    user_id = db.session.query(YaptideUserModel.id).scalar()
+    seen = UserActivityModel(user_id=user_id, seen_at=datetime.now(timezone.utc) - timedelta(hours=1))
+    db.session.add(seen)
+    db.session.commit()
+    listed.clear()
+    hpc_round(engine)
+    assert listed == [simulation_ids[1]]  # seen too long ago
+
+    seen.seen_at = datetime.now(timezone.utc)
+    db.session.commit()
+    listed.clear()
+    hpc_round(engine)
+    assert sorted(listed) == simulation_ids
+
+    # one that ended lately is read every round, whoever follows it: its last reports come within minutes
+    seen.seen_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    ended = hpc_simulation(EntityState.COMPLETED.value, job_id="ended", watched=False)
+    db.session.get(BatchSimulationModel, ended).end_time = datetime.now(timezone.utc)
+    db.session.commit()
+    for _ in range(2):
+        listed.clear()
+        hpc_round(engine)
+        assert ended in listed and len(listed) == 2
+
+
+def test_hpc_progress_is_read_in_a_process_of_its_own(client, engine):
+    """A reader runs in a Ray worker with a database session of its own"""
+    assert ray.get(engine_module.HpcReader.remote().read.remote({})) == {}
 
 
 def too_deep(key: str) -> dict:
@@ -619,7 +716,7 @@ def test_malformed_report_does_not_stop_the_round(client, engine, monkeypatch, b
     monkeypatch.setattr(engine_module.result_storage, "progress_reports", listing)
     monkeypatch.setattr(engine_module.result_storage, "read_report", read)
 
-    engine.read_hpc_progress()
+    hpc_round(engine)
 
     assert sorted(reads) == sorted(
         f"hpc/{sim_id}/progress/task_000{task}.json" for sim_id in simulation_ids for task in (1, 2)
@@ -631,7 +728,7 @@ def test_malformed_report_does_not_stop_the_round(client, engine, monkeypatch, b
         assert (tasks[2].task_state, tasks[2].simulated_primaries) == (EntityState.RUNNING.value, 700)
 
     reads.clear()
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert not reads
 
 
@@ -722,7 +819,7 @@ def test_bad_reports_are_left_out_and_others_still_saved(client, engine, monkeyp
         engine_module.result_storage, "read_report", lambda key: reads.append(key) or {"update": reports[key][1]}
     )
 
-    engine.read_hpc_progress()
+    hpc_round(engine)
 
     assert "hpc/1/progress/task_99999999999999999999.json" not in reads  # left out by its name, never fetched
     db.session.remove()
@@ -731,7 +828,7 @@ def test_bad_reports_are_left_out_and_others_still_saved(client, engine, monkeyp
     assert (tasks[2].task_state, tasks[2].simulated_primaries) == (EntityState.RUNNING.value, 700)
 
     reads.clear()
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert not reads  # unchanged reports, also the unusable ones, are not read again
 
 
@@ -792,10 +889,10 @@ def test_saves_of_hpc_tasks_become_partial_results_at_most_once_a_minute(client,
     def report(etag: str, task: str, primaries: int) -> list:
         """A task reports a new save; the merges started so far"""
         reports[task] = (etag, {"saved_primaries": primaries})
-        engine.read_hpc_progress()
+        hpc_round(engine)
         return merges
 
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert merges == [(simulation_id, saves[:1], 100, result_storage.HPC_SAVES_MAX_BYTES)]
     engine.handle("PARTIAL", simulation_id)
     assert engine.hpc_partials[simulation_id].partial_primaries == 100
@@ -804,7 +901,7 @@ def test_saves_of_hpc_tasks_become_partial_results_at_most_once_a_minute(client,
 
     assert len(report("e3", second, 200)) == 1  # within the minute
     monkeypatch.setattr(engine_module, "HPC_PARTIAL_SECONDS", 0)
-    engine.read_hpc_progress()
+    hpc_round(engine)
     assert merges[-1][1:3] == (saves, 300)
     engine.handle("PARTIAL", simulation_id)
     assert len(report("e4", first, 150)) == 2  # 50 more of 2000 requested is too few

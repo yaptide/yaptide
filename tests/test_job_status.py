@@ -3,12 +3,14 @@
 import pytest
 
 from yaptide.application import create_app
+from yaptide.persistence import db_methods
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     CelerySimulationModel,
     CeleryTaskModel,
     SimulationModel,
     TaskModel,
+    UserActivityModel,
     YaptideUserModel,
 )
 from yaptide.routes.utils import utils
@@ -104,6 +106,28 @@ def test_status_has_totals_and_the_task_list_only_when_asked(client, simulation,
     assert short["job_tasks_summary"] == summary
     assert "job_tasks_status" not in short
     assert [task["simulated_primaries"] for task in full["job_tasks_status"]] == [400, 1000, 0]
+
+
+def test_polled_status_tells_that_the_user_follows_their_simulations(client, simulation, monkeypatch):
+    """Written down at most every 30 s by each process; a failed write does not fail the status"""
+    monkeypatch.setattr(db_methods, "_watching_written", {})
+    user_id = simulation.user_id
+
+    def seen_at():
+        """When the user was last seen following their simulations"""
+        db.session.remove()
+        return db.session.get(UserActivityModel, user_id).seen_at
+
+    assert client.get("/jobs", query_string={"job_id": "statusjob"}).status_code == 200
+    first = seen_at()
+    assert client.get("/jobs", query_string={"job_id": "statusjob"}).status_code == 200
+    assert seen_at() == first
+    monkeypatch.setattr(db_methods, "WATCHING_WRITE_SECONDS", 0)
+    assert client.get("/jobs", query_string={"job_id": "statusjob"}).status_code == 200
+    assert seen_at() > first
+
+    UserActivityModel.__table__.drop(db.engine)
+    assert client.get("/jobs", query_string={"job_id": "statusjob"}).status_code == 200
 
 
 def test_status_read_does_not_change_the_state(client, simulation):

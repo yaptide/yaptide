@@ -231,3 +231,45 @@ def test_job_links_let_each_task_put_only_its_own_save(monkeypatch):
     for task, url in urls.items():
         assert url.startswith(f"https://yaptide.test/results/work/5/task_{task}.tar.gz?")
         assert f"X-Amz-Expires={result_storage.JOB_LINK_SECONDS}" in url
+
+
+def listing_page(keys: list[str], token: str = "") -> bytes:
+    """A ListObjectsV2 answer of the storage"""
+    items = "".join(f"<Contents><Key>{key}</Key><ETag>&quot;{key[-6]}&quot;</ETag></Contents>" for key in keys)
+    next_token = f"<NextContinuationToken>{token}</NextContinuationToken>" if token else ""
+    xmlns = "http://s3.amazonaws.com/doc/2006-03-01/"
+    return f'<ListBucketResult xmlns="{xmlns}">{items}{next_token}</ListBucketResult>'.encode()
+
+
+def test_progress_reports_are_listed_and_read_with_signed_gets(monkeypatch):
+    """The reports are listed page by page and read with plain signed GETs; storage answering an error raises
+    ConnectionError, which ends the engine's round
+    """
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setenv("RESULTS_S3_ENDPOINT", "http://garage:3900")
+    monkeypatch.setenv("RESULTS_S3_ACCESS_KEY", "GK1")
+    monkeypatch.setenv("RESULTS_S3_SECRET_KEY", "secret")
+    result_storage._report_reader.cache_clear()  # skipcq: PYL-W0212
+    pages = [listing_page(["hpc/7/progress/task_0001.json"], "next"), listing_page(["hpc/7/progress/task_0002.json"])]
+    answers = [mock.Mock(status=200, data=page) for page in pages]
+    answers.append(mock.Mock(status=200, data=b'{"update": {"task_state": "RUNNING"}}'))
+    answers.append(mock.Mock(status=503, data=b""))
+    request = mock.Mock(side_effect=answers)
+    monkeypatch.setattr(result_storage._report_reader()[1], "request", request)  # skipcq: PYL-W0212
+
+    assert result_storage.progress_reports(7) == {
+        "hpc/7/progress/task_0001.json": '"1"',
+        "hpc/7/progress/task_0002.json": '"2"',
+    }
+    assert result_storage.read_report("hpc/7/progress/task_0001.json") == {"update": {"task_state": "RUNNING"}}
+    with pytest.raises(ConnectionError):
+        result_storage.read_report("hpc/7/progress/task_0002.json")
+
+    urls = [call.args[1] for call in request.call_args_list]
+    assert urls[0] == "http://garage:3900/results?list-type=2&prefix=hpc%2F7%2Fprogress%2F"
+    assert urls[1].endswith("&continuation-token=next")
+    assert urls[2] == "http://garage:3900/results/hpc/7/progress/task_0001.json"
+    assert all(
+        "AWS4-HMAC-SHA256 Credential=GK1/" in call.kwargs["headers"]["Authorization"] for call in request.call_args_list
+    )
+    result_storage._report_reader.cache_clear()  # skipcq: PYL-W0212

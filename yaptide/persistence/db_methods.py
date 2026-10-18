@@ -1,8 +1,11 @@
 import logging
+import time
+from datetime import datetime, timezone
 from typing import Optional, Union
 
-from sqlalchemy import and_, func
+from sqlalchemy import DateTime, Integer, String, and_, bindparam, case, func, update
 from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
@@ -19,9 +22,11 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
     TaskModel,
+    UserActivityModel,
     UserModel,
     YaptideUserModel,
 )
+from yaptide.utils.enums import EntityState
 
 
 def add_object_to_db(obj: db.Model, make_commit: bool = True) -> None:
@@ -197,6 +202,78 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
     return len(tasks)
 
 
+FINAL_TASK_STATES = (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value)
+TASK = TaskModel.__table__.c
+
+
+def _reported_update():
+    """TaskModel.update_state as one UPDATE of a task, for update_reported_tasks"""
+    # each new_* parameter is a reported field, NULL when the report has no such field
+    state, end = bindparam("new_task_state", type_=String), bindparam("new_end_time", type_=DateTime(timezone=True))
+    requested = func.coalesce(  # skipcq: PYL-E1111
+        func.nullif(bindparam("new_requested_primaries", type_=Integer), 0), TASK.requested_primaries
+    )
+    estimated = bindparam("new_estimated_time", type_=Integer)
+    return (
+        update(TaskModel.__table__)
+        .where(
+            TASK.simulation_id == bindparam("sim_id"),
+            TASK.task_id == bindparam("new_task_id"),
+            # a final state is kept, e.g. a cancel committed meanwhile; the row is locked and checked again
+            # (no NOT IN: its list is expanded per run, which a statement run for many rows cannot do)
+            *(TASK.task_state != final for final in FINAL_TASK_STATES),
+        )
+        .values(
+            requested_primaries=requested,
+            simulated_primaries=case(
+                (state == EntityState.COMPLETED.value, requested),
+                else_=func.coalesce(
+                    func.nullif(bindparam("new_simulated_primaries", type_=Integer), 0), TASK.simulated_primaries
+                ),
+            ),
+            task_state=func.coalesce(state, TASK.task_state),
+            estimated_time=case(
+                (and_(TASK.end_time.is_(None), end.isnot(None)), None),
+                (and_(TASK.end_time.is_(None), estimated.isnot(None)), estimated),
+                else_=TASK.estimated_time,
+            ),
+            start_time=func.coalesce(TASK.start_time, bindparam("new_start_time", type_=DateTime(timezone=True))),
+            end_time=func.coalesce(TASK.end_time, end),
+            last_update_time=func.now(),
+        )
+    )
+
+
+REPORTED_FIELDS = (
+    "task_state",
+    "requested_primaries",
+    "simulated_primaries",
+    "estimated_time",
+    "start_time",
+    "end_time",
+)
+
+
+def update_reported_tasks(sim_id: int, task_updates: list[dict]) -> None:
+    """bulk_update_task_states for updates already checked (yaptide/engine/engine.py clean_report), without the ORM:
+    one statement run for all tasks at once (20k tasks in 0.6 s instead of 4.2 s, M4 and Postgres), in the order of
+    their ids like the other locking updates; no commit
+
+    Changes a task as TaskModel.update_state does; times come as its strings.
+    """
+    rows = []
+    for task_update in sorted(task_updates, key=lambda item: item["task_id"]):
+        row = {"sim_id": sim_id, "new_task_id": task_update["task_id"]}
+        for name in REPORTED_FIELDS:
+            value = task_update["update_dict"].get(name)
+            if name in ("start_time", "end_time") and value is not None:
+                value = datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
+            row[f"new_{name}"] = value
+        rows.append(row)
+    if rows:
+        db.session.execute(_reported_update(), rows)
+
+
 def _apply_task_update(task: Union[BatchTaskModel, CeleryTaskModel], update_dict: dict, sim_id: int) -> None:
     """Applies a single task update, a malformed one leaves the task untouched"""
     task_id = task.task_id
@@ -335,3 +412,28 @@ def update_simulation_state(simulation: Union[BatchSimulationModel, CelerySimula
     if not simulation.update_state(update_dict):
         logging.warning("Simulation state not updated")
     db.session.commit()
+
+
+# a user following their simulations is written down at most this often by each process
+WATCHING_WRITE_SECONDS = 30
+# when this process last wrote each user down (time.monotonic)
+_watching_written: dict[int, float] = {}
+
+
+def note_watching(user_id: int) -> None:
+    """Writes down that the user follows the status of their simulations now (UserActivityModel), at most every
+    WATCHING_WRITE_SECONDS in this process; commits. A failed write is only logged: the status is still answered.
+    """
+    if time.monotonic() - _watching_written.get(user_id, float("-inf")) < WATCHING_WRITE_SECONDS:
+        return
+    _watching_written[user_id] = time.monotonic()
+    insert = postgresql.insert if db.engine.dialect.name == "postgresql" else sqlite.insert
+    seen = {"user_id": user_id, "seen_at": datetime.now(timezone.utc)}
+    try:
+        db.session.execute(
+            insert(UserActivityModel).values(seen).on_conflict_do_update(index_elements=["user_id"], set_=seen)
+        )
+        db.session.commit()
+    except Exception:  # skipcq: PYL-W0703
+        db.session.rollback()
+        logging.exception("Writing down that user %d follows their simulations failed", user_id)

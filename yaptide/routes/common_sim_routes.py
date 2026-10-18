@@ -20,6 +20,7 @@ from yaptide.persistence.db_methods import (
     fetch_simulation_by_job_id,
     fetch_simulation_by_sim_id,
     fetch_simulation_id_by_job_id,
+    note_watching,
     make_commit_to_db,
     update_simulation_state,
 )
@@ -74,7 +75,10 @@ class JobsResource(Resource):
 
         # a read only: the state follows the tasks when they report, not when someone looks
         content = job_status_content(simulation, with_tasks=param_dict["tasks"])
-        return yaptide_response(message=f"Job state: {simulation.job_state}", code=200, content=content)
+        message = f"Job state: {simulation.job_state}"
+        # the UI asks while it cannot open the status stream: the progress of the user's simulations is read often
+        note_watching(user.id)
+        return yaptide_response(message=message, code=200, content=content)
 
     @staticmethod
     def post():
