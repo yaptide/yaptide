@@ -183,13 +183,23 @@ def test_refused_connection_fails_the_simulation(client, monkeypatch):
     assert stored(simulation_id).job_state == EntityState.FAILED.value
 
 
-def test_login_node_not_answering_leaves_the_simulation_waiting(client, monkeypatch):
-    """A login node that does not answer in time is tried again later: the simulation stays PENDING"""
+@pytest.mark.parametrize(
+    "error",
+    [
+        TimeoutError("connection timed out"),
+        # the admins closed logins (/etc/nologin): the key is accepted, then the connection is closed
+        AuthenticationException("Authentication failed: transport shut down or saw EOF"),
+    ],
+)
+def test_login_node_not_answering_leaves_the_simulation_waiting(client, monkeypatch, error):
+    """A login node that does not answer in time, or does not let anyone in for now, is tried again later: the
+    simulation stays PENDING
+    """
     simulation_id = submit(client).id
 
     def unreachable(**_):
         """The login node does not answer"""
-        raise TimeoutError("connection timed out")
+        raise error
 
     monkeypatch.setattr(batch_methods, "get_connection", unreachable)
     assert batch_methods.submit_simulation(simulation_id) is False
@@ -217,12 +227,16 @@ def frozen_login_node() -> Exception:
         (RuntimeError("slurm_load_jobs error: Socket timed out on send/recv operation"), True),
         (RuntimeError("sbatch: error: Unable to contact slurm controller (connect failure)"), True),
         (AuthenticationException("timed out certificate"), False),
+        (AuthenticationException("Authentication failed."), False),
+        (AuthenticationException("Authentication failed: transport shut down or saw EOF"), True),
         (EOFError("connection closed"), False),
         (RuntimeError("sbatch: error: invalid account"), False),
     ],
 )
 def test_only_a_cluster_not_answering_in_time_counts_as_stuck(error, stuck):
-    """Waiting helps a SLURM or login node that does not answer in time, not a refused login or bad input"""
+    """Waiting helps a SLURM or login node that does not answer in time or closed logins, not a refused login or bad
+    input
+    """
     assert batch_methods.slurm_stuck(error) is stuck
 
 
@@ -286,6 +300,21 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
     assert cancelled == ["reporter", "collect", "array", "aggregator"]  # the aggregator of jobs submitted before
     assert f'"{batch_methods.job_tag(job_dir)}"' in tagged and tagged.endswith(f"&& rm -rf {job_dir}")
     assert stored(simulation.id).job_dir is None  # nothing left to cancel
+
+
+def test_cancel_is_repeated_while_the_cluster_closed_logins(client, cluster_connection, monkeypatch):
+    """Closed logins are not an expired certificate: the cancel is tried again later and the directory is kept"""
+    simulation = submit(client)
+    batch_methods.submit_simulation(simulation.id)
+    job_dir = stored(simulation.id).job_dir
+
+    def closed(**_):
+        """The login node accepts the key, then closes the connection"""
+        raise AuthenticationException("Authentication failed: transport shut down or saw EOF")
+
+    monkeypatch.setattr(batch_methods, "get_connection", closed)
+    assert batch_methods.cancel_simulation(simulation.id) is False
+    assert stored(simulation.id).job_dir == job_dir
 
 
 def test_cancel_during_submit_cancels_the_jobs_right_after(client, cluster_connection):
