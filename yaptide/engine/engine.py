@@ -18,6 +18,7 @@ import re
 import shutil
 import threading
 import time
+from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -28,7 +29,7 @@ import ray
 from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy import and_, func, or_, text
 
-from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
+from yaptide.batch.batch_methods import SUBMIT_SECONDS, cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
 from yaptide.engine.simulation import (
     WORK_DIR_PREFIX,
@@ -51,6 +52,7 @@ from yaptide.persistence.models import (
     ENGINE_CHANNEL,
     BatchSimulationModel,
     CelerySimulationModel,
+    ClusterModel,
     LogfilesModel,
     SimulationModel,
     TaskModel,
@@ -218,6 +220,14 @@ HPC_PARTIAL_SECONDS = 60
 # the database: deletes made while it was not listening, removals that failed (their pages stay: storage cost only)
 ORPHAN_SWEEP_SECONDS = 3600
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
+# a cluster whose SLURM did not answer this many submits and cancels in a row gets none for a while (longer each time
+# it still does not answer), then one to try it; its simulations wait PENDING meanwhile
+BREAKER_FAILURES = int(os.environ.get("CLUSTER_BREAKER_FAILURES", "3"))
+BREAKER_SECONDS = [int(seconds) for seconds in os.environ.get("CLUSTER_BREAKER_SECONDS", "180,300,600").split(",")]
+# another call tries the cluster if the answer to the one trying it never comes (the simulation was deleted meanwhile)
+TRIAL_SECONDS = 2 * SUBMIT_SECONDS
+# a simulation not submitted this long after it was sent (its cluster did not answer) fails, the user tries later
+CLUSTER_WAIT_HOURS = float(os.environ.get("CLUSTER_WAIT_HOURS", "24"))
 
 
 # restarted when it dies: only progress not saved yet is lost, final states come with the task results;
@@ -339,20 +349,24 @@ class ClusterGateway:
     """Submits and cancels HPC simulations over SSH with the users' certificates, a few connections at a time"""
 
     @staticmethod
-    def submit(simulation_id: int) -> None:
-        """Submits a stored HPC simulation; it ends FAILED itself when it cannot be submitted"""
+    def submit(simulation_id: int) -> Optional[bool]:
+        """Submits a stored HPC simulation; it ends FAILED itself when it cannot be submitted. Returns whether the
+        cluster's SLURM answered, None when it was not asked.
+        """
         with backend_app().app_context():
             try:
-                submit_simulation(simulation_id)
+                return submit_simulation(simulation_id)
             finally:
                 db.session.remove()
 
     @staticmethod
-    def cancel(simulation_id: int) -> None:
-        """Cancels the jobs of a cancelled HPC simulation on its cluster"""
+    def cancel(simulation_id: int) -> Optional[bool]:
+        """Cancels the jobs of a cancelled HPC simulation on its cluster; returns whether the cluster's SLURM
+        answered, None when it was not asked
+        """
         with backend_app().app_context():
             try:
-                cancel_simulation(simulation_id)
+                return cancel_simulation(simulation_id)
             finally:
                 db.session.remove()
 
@@ -370,6 +384,55 @@ class HpcReader:
                 return read_reports(etags)
             finally:
                 db.session.remove()
+
+
+@dataclass
+class Breaker:
+    """Whether the engine calls a cluster (a circuit breaker): closed, every submit and cancel goes; open after
+    BREAKER_FAILURES calls in a row met a SLURM that did not answer, none goes until the cool-down ends; then one goes
+    to try it (half-open), and its answer closes the breaker or opens it for longer
+    """
+
+    failures: int = 0
+    # times opened in a row, which picks the cool-down
+    opened: int = 0
+    # time.monotonic() when the cool-down or the trial ends, 0 while closed
+    until: float = 0.0
+    # the call trying the cluster: ("submit" or "cancel", simulation id)
+    trial: Optional[tuple[str, int]] = None
+
+    def allows(self, call: tuple[str, int]) -> bool:
+        """Whether the call may go to the cluster now"""
+        if not self.until:
+            return True
+        if time.monotonic() < self.until:
+            return False
+        self.trial, self.until = call, time.monotonic() + TRIAL_SECONDS
+        return True
+
+    def record(self, call: tuple[str, int], answered: Optional[bool]) -> Optional[bool]:
+        """Counts the answer of a call: whether SLURM answered, None when the call did not ask it; returns True when
+        this closed the breaker, False when it opened it
+        """
+        if answered:
+            closed = bool(self.until)
+            self.failures, self.opened, self.until, self.trial = 0, 0, 0.0, None
+            return True if closed else None
+        if self.until and call != self.trial:
+            # sent before the breaker opened: the cool-down already counts it
+            return None
+        if answered is None:
+            if call == self.trial:
+                # nothing learnt, another call tries
+                self.until = time.monotonic()
+            return None
+        self.failures += 1
+        if self.failures < BREAKER_FAILURES:
+            return None
+        self.until = time.monotonic() + BREAKER_SECONDS[min(self.opened, len(BREAKER_SECONDS) - 1)]
+        self.opened += 1
+        self.trial = None
+        return False
 
 
 @dataclass
@@ -437,9 +500,12 @@ class Engine:
         self.hpc_active = True
         # HPC simulations whose tasks put saves into storage
         self.hpc_partials: dict[int, HpcPartial] = {}
-        # HPC simulations being submitted (simulation id -> the submit's ref) and cancelled on their cluster
+        # HPC simulations being submitted and cancelled on their cluster: simulation id -> the call's ref
         self.submitting: dict[int, ray.ObjectRef] = {}
-        self.cancelling: set[int] = set()
+        self.cancelling: dict[int, ray.ObjectRef] = {}
+        # whether the SLURM of each cluster answers (cluster id -> its breaker), and the cluster of each call on its way
+        self.breakers: dict[int, Breaker] = defaultdict(Breaker)
+        self.calling: dict[tuple[str, int], int] = {}
         # when the jobs of a simulation were last cancelled on its cluster (time.monotonic())
         self.cancel_tried: dict[int, float] = {}
         self.running: dict[int, Running] = {}
@@ -487,6 +553,7 @@ class Engine:
                     last_overdue_check = time.monotonic()
                     self.stop_overdue()
                     self.retry_cancels()
+                    self.submit_waiting()
                 if time.monotonic() - last_orphan_sweep >= ORPHAN_SWEEP_SECONDS:
                     last_orphan_sweep = time.monotonic()
                     self.delete_orphans()
@@ -523,8 +590,7 @@ class Engine:
             finally:
                 self.watch_inbox()
         elif event == "CANCELLED_ON_CLUSTER":
-            # done, or repeated within minutes (retry_cancels): the job directory stays in the database until it is done
-            self.cancelling.discard(simulation_id)
+            self.cancelled_on_cluster(simulation_id)
         elif event == EntityState.PENDING.value:
             simulation = db.session.get(CelerySimulationModel, simulation_id)
             if simulation and simulation.job_state == EntityState.PENDING.value and simulation_id not in self.running:
@@ -584,7 +650,8 @@ class Engine:
 
     def cancel(self, simulation_id: int) -> None:
         """Cancels an HPC simulation: its tasks find the cancel in storage, and while the user's certificate lasts
-        the cluster gateway also cancels the jobs at once (and removes the job directory)
+        the cluster gateway also cancels the jobs at once (and removes the job directory) - later, when the cluster's
+        SLURM answers again, if it does not now
         """
         try:
             if result_storage.configured():
@@ -595,9 +662,77 @@ class Engine:
         tried = self.cancel_tried.get(simulation_id)
         if simulation_id in self.cancelling or (tried is not None and time.monotonic() - tried < CANCEL_RETRY_SECONDS):
             return
+        if not self.may_call("cancel", simulation_id):
+            return
         self.cancel_tried[simulation_id] = time.monotonic()
-        self.cancelling.add(simulation_id)
-        self.watch(self.cluster.cancel.remote(simulation_id), simulation_id, "CANCELLED_ON_CLUSTER")
+        self.cancelling[simulation_id] = self.cluster.cancel.remote(simulation_id)
+        self.watch(self.cancelling[simulation_id], simulation_id, "CANCELLED_ON_CLUSTER")
+
+    def cancelled_on_cluster(self, simulation_id: int) -> None:
+        """A cancel on the cluster ended: done, or repeated within minutes (retry_cancels), or once the cluster's SLURM
+        answers if it did not - the job directory stays in the database until it is done
+        """
+        ref = self.cancelling.pop(simulation_id, None)
+        try:
+            answered = ray.get(ref) if ref else None
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Cancelling simulation %d on its cluster crashed", simulation_id)
+            answered = None
+        if answered is False:
+            # paced by the cluster's breaker instead: it goes again as soon as SLURM answers
+            self.cancel_tried.pop(simulation_id, None)
+        self.answered(("cancel", simulation_id), answered)
+
+    def may_call(self, kind: str, simulation_id: int) -> bool:
+        """Whether a submit or cancel of the simulation may go to its cluster now: not while the cluster's SLURM does
+        not answer (its breaker is open); remembers the cluster of the call
+        """
+        cluster_id = db.session.query(BatchSimulationModel.cluster_id).filter_by(id=simulation_id).scalar()
+        if cluster_id is None or not self.breakers[cluster_id].allows((kind, simulation_id)):
+            return False
+        self.calling[(kind, simulation_id)] = cluster_id
+        return True
+
+    def answered(self, call: tuple[str, int], answered: Optional[bool]) -> None:
+        """Counts whether the cluster's SLURM answered a call. When the cluster's breaker opens, the users see when it
+        is tried again; when it closes, what waited for it goes at once.
+        """
+        cluster_id = self.calling.pop(call, None)
+        if cluster_id is None:
+            return
+        breaker = self.breakers[cluster_id]
+        closed = breaker.record(call, answered)
+        if closed is None:
+            return
+        if closed:
+            logging.info("SLURM of cluster %d answers again", cluster_id)
+            self.show_busy(cluster_id, None)
+            self.submit_waiting()
+            self.retry_cancels()
+        else:
+            seconds = breaker.until - time.monotonic()
+            logging.warning(
+                "SLURM of cluster %d did not answer %d calls in a row, its submits and cancels wait %d s",
+                cluster_id,
+                breaker.failures,
+                seconds,
+            )
+            self.show_busy(cluster_id, datetime.now(timezone.utc) + timedelta(seconds=seconds))
+
+    @staticmethod
+    def show_busy(cluster_id: int, until: Optional[datetime]) -> None:
+        """Stores when the cluster is tried again (None: it answers) and wakes the status streams of the simulations
+        waiting for it
+        """
+        db.session.query(ClusterModel).filter(ClusterModel.id == cluster_id).update(
+            {ClusterModel.busy_until: until}, synchronize_session=False
+        )
+        batch = BatchSimulationModel.__table__
+        waiting = db.select(batch.c.id).where(batch.c.cluster_id == cluster_id, batch.c.array_id.is_(None))
+        db.session.query(SimulationModel).filter(
+            SimulationModel.id.in_(waiting), SimulationModel.job_state == EntityState.PENDING.value
+        ).update({SimulationModel.progress_revision: SimulationModel.progress_revision + 1}, synchronize_session=False)
+        db.session.commit()
 
     @staticmethod
     def cancels_left() -> set[int]:
@@ -750,21 +885,51 @@ class Engine:
         return sum(1 for merged in [*self.running.values(), *self.hpc_partials.values()] if merged.partial)
 
     def submit(self, simulation_id: int) -> None:
-        """Hands a stored HPC simulation to the cluster gateway, once"""
-        if simulation_id not in self.submitting:
+        """Hands a stored HPC simulation to the cluster gateway, once at a time; not while its cluster's SLURM does
+        not answer - it then waits PENDING for submit_waiting
+        """
+        if simulation_id not in self.submitting and self.may_call("submit", simulation_id):
             self.submitting[simulation_id] = self.cluster.submit.remote(simulation_id)
             self.watch(self.submitting[simulation_id], simulation_id, "SUBMITTED")
 
+    def submit_waiting(self) -> None:
+        """Submits the HPC simulations waiting for it: stored, or left PENDING by a cluster that did not answer (their
+        submit first cancels what the attempt left on the cluster); the ones waiting longer than CLUSTER_WAIT_HOURS
+        fail instead
+        """
+        waiting = (
+            db.session.query(BatchSimulationModel)
+            .filter(
+                BatchSimulationModel.job_state == EntityState.PENDING.value, BatchSimulationModel.array_id.is_(None)
+            )
+            .order_by(BatchSimulationModel.id)
+            .all()
+        )
+        given_up = datetime.now(timezone.utc) - timedelta(hours=CLUSTER_WAIT_HOURS)
+        for simulation in waiting:
+            # SQLite drops the time zone of the UTC time stored
+            sent = simulation.start_time.replace(tzinfo=simulation.start_time.tzinfo or timezone.utc)
+            if sent >= given_up or simulation.id in self.submitting:
+                self.submit(simulation.id)
+                continue
+            error = f"The cluster did not answer for {CLUSTER_WAIT_HOURS:g} h, submit the simulation again later"
+            fail_submit(simulation, {"error": error})
+            if simulation.job_dir:
+                # what an attempt left on the cluster
+                self.cancel(simulation.id)
+
     def submitted(self, simulation_id: int) -> None:
-        """A submit ended; it reports its own failures. One that crashed (the gateway died) is repeated if it had
-        not started yet; otherwise the simulation fails and whatever reached the cluster is cancelled.
+        """A submit ended; it reports its own failures and leaves PENDING a simulation whose cluster did not answer.
+        One that crashed (the gateway died) is repeated if it had not started yet; otherwise the simulation fails and
+        whatever reached the cluster is cancelled.
         """
         ref = self.submitting.pop(simulation_id, None)
         # its jobs report from now on (read only while some HPC simulation may report)
         self.hpc_active = True
         try:
-            ray.get(ref)
+            answered = ray.get(ref)
         except Exception as error:  # skipcq: PYL-W0703
+            self.answered(("submit", simulation_id), None)
             simulation = db.session.get(BatchSimulationModel, simulation_id)
             if simulation is None or simulation.job_state != EntityState.PENDING.value:
                 return
@@ -773,6 +938,8 @@ class Engine:
                 return
             fail_submit(simulation, {"error": f"Submitting crashed: {error}"})
             self.cancel(simulation_id)
+            return
+        self.answered(("submit", simulation_id), answered)
 
     def watch(self, ref, simulation_id: Optional[int], event: str = "FINISHED") -> None:
         """Ray puts an event into the queue when the task, merge or submit finishes"""
@@ -785,7 +952,9 @@ class Engine:
         self.watch(self.inbox.state_changed.remote(), None, "NEW_STATE")
 
     def recover(self) -> None:
-        """Simulations running when the engine stopped lost their tasks with it; pending ones are started again"""
+        """Simulations running when the engine stopped lost their tasks with it; pending ones are started again (HPC
+        ones too, after what an interrupted submit left on the cluster is cancelled)
+        """
         try:
             if result_storage.configured():
                 result_storage.expire_objects()
@@ -793,6 +962,9 @@ class Engine:
             logging.exception("Setting the expiry of what tasks leave in storage failed")
         # cancels tried before the restart wait their turn: a restarting engine must not log in again each time
         self.cancel_tried = dict.fromkeys(self.cancels_left(), time.monotonic())
+        # the breakers start closed: the clusters are tried again
+        db.session.query(ClusterModel).update({ClusterModel.busy_until: None}, synchronize_session=False)
+        db.session.commit()
         lost = db.session.query(CelerySimulationModel).filter(CelerySimulationModel.job_state.in_(RUNNING_STATES)).all()
         for simulation in lost:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
@@ -803,19 +975,6 @@ class Engine:
                 result_storage.delete_objects(result_storage.work_prefix(simulation.id))
             except Exception:  # skipcq: PYL-W0703
                 logging.exception("Removing the results stored by the lost tasks of %d failed", simulation.id)
-        # an HPC submit stopped half way: the jobs may or may not be on the cluster, so it is not repeated
-        interrupted = (
-            db.session.query(BatchSimulationModel)
-            .filter(
-                BatchSimulationModel.job_state == EntityState.PENDING.value,
-                BatchSimulationModel.job_dir.isnot(None),
-                BatchSimulationModel.array_id.is_(None),
-            )
-            .all()
-        )
-        for simulation in interrupted:
-            fail_submit(simulation, {"error": "Submitting was interrupted, its jobs are cancelled"})
-            self.cancel(simulation.id)
 
     def sweep(self) -> None:
         """Brings the engine in line with the database: stops what was cancelled, starts what waits, takes results"""
@@ -836,11 +995,9 @@ class Engine:
         )
         for simulation in pending:
             self.start_guarded(simulation)
-        waiting = db.session.query(BatchSimulationModel.id).filter(
-            BatchSimulationModel.job_state == EntityState.PENDING.value, BatchSimulationModel.job_dir.is_(None)
-        )
-        for (simulation_id,) in waiting:
-            self.submit(simulation_id)
+        # an HPC submit the engine's restart stopped half way is repeated too:
+        # its jobs are cancelled by their comment first
+        self.submit_waiting()
         self.retry_cancels()
 
     def start_guarded(self, simulation: CelerySimulationModel) -> None:

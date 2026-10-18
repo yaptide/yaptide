@@ -40,6 +40,8 @@ CONTEXT.check_hostname = False
 CONTEXT.verify_mode = ssl.CERT_NONE  # skipcq: PTC-W6001 # see above
 # how long the simulator gets to stop before it is killed
 STOP_SECONDS = 10
+# where the simulator's process, started by srun, writes its PID, in the task's directory (see the array scripts)
+SIMULATOR_PID_FILE = "simulator.pid"
 # new links are asked for a day before they expire, and not more often than this
 RENEW_BEFORE_SECONDS = 24 * 3600
 RENEW_INTERVAL_SECONDS = 600
@@ -359,10 +361,10 @@ class Saver:
             return self.reporter.send(url, "PUT", body, headers)
 
 
-def running(pid: int) -> bool:
-    """Whether the simulator still runs"""
+def running(pid: int, kill: Callable[[int, int], None] = os.kill) -> bool:
+    """Whether the simulator (or with os.killpg, its process group) still runs"""
     try:
-        os.kill(pid, 0)
+        kill(pid, 0)
     except ProcessLookupError:
         return False
     except PermissionError:
@@ -370,17 +372,36 @@ def running(pid: int) -> bool:
     return True
 
 
-def stop(pid: int) -> None:
-    """Stops the simulator: politely first, then for good"""
+def stop(pid: int, kill: Callable[[int, int], None] = os.kill) -> None:
+    """Stops the simulator (or with os.killpg, its process group): politely first, then for good"""
     try:
-        os.kill(pid, signal.SIGTERM)
+        kill(pid, signal.SIGTERM)
         for _ in range(STOP_SECONDS):
-            if not running(pid):
+            if not running(pid, kill):
                 return
             time.sleep(1)
-        os.kill(pid, signal.SIGKILL)
+        kill(pid, signal.SIGKILL)
     except ProcessLookupError:
         return
+
+
+def stop_task(work_dir: Path) -> None:
+    """Stops the simulator of this task on this node without SLURM: srun passes its signals on through the SLURM
+    controller, which may not answer for minutes. Only the process group the simulator leads (SLURM starts each task
+    in one), and only while that process runs in this task's directory: a PID recorded on another node, reused, or
+    of another user (its /proc entry cannot be read) is left alone.
+    """
+    try:
+        pid = int((work_dir / SIMULATOR_PID_FILE).read_text())
+        cwd = Path(os.readlink(f"/proc/{pid}/cwd"))
+        if os.getpgid(pid) != pid or pid == os.getpgrp():
+            return
+    except (OSError, ValueError):
+        return
+    work_dir = work_dir.resolve()
+    # FLUKA runs in a directory of its own inside the task's
+    if cwd == work_dir or work_dir in cwd.parents:
+        stop(pid, os.killpg)
 
 
 def find_log(find: Callable[[], Optional[Path]], pid: int, poll_seconds: float) -> Optional[Path]:
@@ -401,9 +422,11 @@ def watch(  # skipcq: PY-R1000
     reporter: Reporter,
     poll_seconds: float = 1,
     saved: Optional[Callable[[], None]] = None,
+    work_dir: Optional[Path] = None,
 ) -> None:
     """Follows the simulator's log until it ends or the simulation is cancelled, reporting the task's state;
-    saved is called when SHIELD-HIT12A has saved all its result files
+    saved is called when SHIELD-HIT12A has saved all its result files. A cancel stops the simulator in the task's
+    directory itself, then srun.
     """
     path = find_log(find, pid, poll_seconds)
     if path is None:
@@ -422,6 +445,8 @@ def watch(  # skipcq: PY-R1000
                         return
                 continue
             if reporter.cancelled():
+                if work_dir:
+                    stop_task(work_dir)
                 stop(pid)
                 reporter.update({"task_state": "CANCELED", "end_time": now()})
                 return
@@ -455,11 +480,18 @@ def main(args) -> None:
         {"sim_id": args.sim_id, "update_key": args.update_key, "backend_url": args.backend_url},
     )
     if args.simulator == "fluka":
-        watch(fluka_log(Path(args.work_dir)), FlukaParser(), args.pid, reporter)
+        watch(fluka_log(Path(args.work_dir)), FlukaParser(), args.pid, reporter, work_dir=Path(args.work_dir))
     else:
         log_path = Path(args.filepath)
         saver = Saver(log_path.parent, reporter)
-        watch(lambda: log_path if log_path.exists() else None, shieldhit_update, args.pid, reporter, saved=saver.saved)
+        watch(
+            lambda: log_path if log_path.exists() else None,
+            shieldhit_update,
+            args.pid,
+            reporter,
+            saved=saver.saved,
+            work_dir=log_path.parent,
+        )
     reporter.report_final()
 
 

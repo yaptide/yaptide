@@ -77,6 +77,11 @@ class ClusterModel(db.Model):
     __tablename__ = "Cluster"
     id: Column[int] = db.Column(db.Integer, primary_key=True)
     cluster_name: Column[str] = db.Column(db.String, nullable=False)
+    busy_until: Column[datetime] = db.Column(
+        db.DateTime(timezone=True),
+        nullable=True,
+        doc="Set while the cluster's SLURM does not answer: the engine tries to submit to it again then",
+    )
     simulations = relationship("BatchSimulationModel")
 
 

@@ -979,3 +979,161 @@ def test_failed_listing_of_stored_simulations_does_not_stop_the_engine(client, e
     engine.delete_orphans()
 
     engine.cleaner.delete.remote.assert_not_called()
+
+
+def test_breaker_opens_after_failures_in_a_row_and_lets_one_call_try(monkeypatch):
+    """Closed it lets every call go; after BREAKER_FAILURES stuck answers none until the cool-down ends, then one; its
+    failure opens it for longer, its success closes it. Late answers of calls sent before do not count.
+    """
+    clock = [1000.0]
+    monkeypatch.setattr(engine_module.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(engine_module, "BREAKER_FAILURES", 2)
+    monkeypatch.setattr(engine_module, "BREAKER_SECONDS", [180, 300])
+    breaker = engine_module.Breaker()
+
+    assert breaker.allows(("submit", 1)) and breaker.allows(("submit", 2)) and breaker.allows(("cancel", 3))
+    assert breaker.record(("submit", 1), False) is None
+    assert breaker.record(("cancel", 9), None) is None  # not asked: no count
+    assert breaker.record(("submit", 2), False) is False  # opened
+    assert breaker.record(("cancel", 3), False) is None  # sent before it opened
+    assert not breaker.allows(("submit", 1))
+
+    clock[0] += 180
+    assert breaker.allows(("submit", 1))  # the trial
+    assert not breaker.allows(("submit", 2))
+    assert breaker.record(("submit", 1), False) is False  # opened again, for longer
+    clock[0] += 299
+    assert not breaker.allows(("submit", 1))
+    clock[0] += 1
+    assert breaker.allows(("submit", 2))
+    assert breaker.record(("submit", 2), None) is None  # the trial learnt nothing: another call tries at once
+    assert breaker.allows(("cancel", 3))
+    clock[0] += 300
+    assert breaker.record(("cancel", 3), True) is True  # closed
+    assert breaker.allows(("submit", 1)) and breaker.allows(("submit", 2))
+    assert breaker.record(("submit", 1), False) is None  # counting from zero again
+
+
+def test_hpc_simulations_wait_for_a_stuck_cluster_and_go_when_it_answers(client, engine, monkeypatch):
+    """Submits meeting a stuck SLURM leave the simulations PENDING; the breaker opens, the users see when the cluster
+    is tried again and a cancel waits too; one trial after the cool-down, and once it went through, the rest go
+    """
+    monkeypatch.setattr(engine_module, "BREAKER_FAILURES", 2)
+    user = db.session.query(YaptideUserModel).one()
+    cluster = ClusterModel(cluster_name="ares")
+    db.session.add(cluster)
+    db.session.commit()
+    cluster_id = cluster.id
+    simulations = [
+        BatchSimulationModel(
+            job_id=f"hpc{index}",
+            user_id=user.id,
+            cluster_id=cluster_id,
+            title="hpc",
+            input_type=InputType.FILES.value,
+            sim_type=SimulationType.SHIELDHIT.value,
+            job_state=EntityState.PENDING.value,
+        )
+        for index in range(3)
+    ]
+    db.session.add_all(simulations)
+    db.session.commit()
+    waiting, cancelled = [simulation.id for simulation in simulations[:2]], simulations[2].id
+    answers = {"submit": False, "cancel": True}
+    engine.cluster = mock.Mock()
+    engine.cluster.submit.remote.side_effect = lambda simulation_id: ray.put(answers["submit"])
+    engine.cluster.cancel.remote.side_effect = lambda simulation_id: ray.put(answers["cancel"])
+
+    def revisions() -> list[int]:
+        """Status saves of the simulations: each wakes their streams"""
+        db.session.remove()
+        return [db.session.get(SimulationModel, simulation_id).progress_revision for simulation_id in waiting]
+
+    for simulation_id in waiting:
+        engine.handle(EntityState.PENDING.value, simulation_id, "BATCH")
+    run_events_until(engine, lambda: not engine.submitting)
+    assert [state(simulation_id) for simulation_id in waiting] == [EntityState.PENDING.value] * 2
+    assert db.session.get(ClusterModel, cluster_id).busy_until is not None
+    assert revisions() == [1, 1]
+
+    stuck_cancel = hpc_simulation(EntityState.CANCELED.value, job_id="stuck cancel")
+    db.session.get(BatchSimulationModel, stuck_cancel).cluster_id = cluster_id
+    db.session.get(BatchSimulationModel, stuck_cancel).job_dir = f"/scratch/yaptide_runs/{stuck_cancel}_1"
+    db.session.commit()
+    engine.cancel_tried[stuck_cancel] = time.monotonic()  # its cancel met the stuck SLURM, as the submits did
+    engine.calling[("cancel", stuck_cancel)] = cluster_id
+    engine.cancelling[stuck_cancel] = ray.put(False)
+    engine.cancelled_on_cluster(stuck_cancel)
+    assert stuck_cancel not in engine.cancel_tried
+
+    db.session.get(BatchSimulationModel, cancelled).job_state = EntityState.CANCELED.value
+    db.session.get(BatchSimulationModel, cancelled).job_dir = f"/scratch/yaptide_runs/{cancelled}_1"
+    db.session.commit()
+    engine.handle(EntityState.CANCELED.value, cancelled, "BATCH")
+    engine.submit_waiting()
+    assert engine.cluster.submit.remote.call_count == 2 and engine.cluster.cancel.remote.call_count == 0
+
+    engine.breakers[cluster_id].until = time.monotonic()  # the cool-down ended
+    answers["submit"] = True
+    engine.submit_waiting()
+    assert engine.cluster.submit.remote.call_count == 3  # one trial
+    engine.submit_waiting()
+    assert engine.cluster.submit.remote.call_count == 3
+    run_events_until(engine, lambda: engine.cluster.submit.remote.call_count > 3)
+    trial = engine.cluster.submit.remote.call_args_list[2].args[0]
+    assert {call.args[0] for call in engine.cluster.submit.remote.call_args_list[3:]} >= set(waiting) - {trial}
+    assert {call.args[0] for call in engine.cluster.cancel.remote.call_args_list} == {cancelled, stuck_cancel}
+    db.session.remove()
+    assert db.session.get(ClusterModel, cluster_id).busy_until is None
+    assert revisions() == [2, 2]
+
+
+def test_a_submit_interrupted_by_a_restart_is_repeated(client, engine):
+    """A restart in the middle of a submit leaves the simulation PENDING: it is submitted again (the submit cancels
+    what the interrupted one left on the cluster first)
+    """
+    simulation_id = hpc_simulation()
+    simulation = db.session.get(BatchSimulationModel, simulation_id)
+    simulation.array_id = simulation.collect_id = None
+    simulation.job_dir = f"/scratch/yaptide_runs/{simulation_id}_1"
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    engine.cluster.submit.remote.side_effect = lambda sim_id: ray.put(None)
+
+    engine.recover()
+    engine.sweep()
+
+    assert state(simulation_id) == EntityState.PENDING.value
+    engine.cluster.submit.remote.assert_called_once_with(simulation_id)
+
+
+def test_cluster_gateway_hands_over_whether_slurm_answered(client, monkeypatch):
+    """The breaker counts what the submits and cancels learnt about SLURM, so the gateway passes it on"""
+    gateway = engine_module.ClusterGateway.__ray_metadata__.modified_class
+    monkeypatch.setattr(engine_module, "submit_simulation", lambda simulation_id: False)
+    monkeypatch.setattr(engine_module, "cancel_simulation", lambda simulation_id: True)
+
+    assert gateway.submit(1) is False
+    assert gateway.cancel(1) is True
+
+
+def test_an_hpc_simulation_waiting_too_long_for_its_cluster_fails(client, engine):
+    """One not submitted CLUSTER_WAIT_HOURS after it was sent fails with the reason, and what its attempt left on the
+    cluster is cancelled; a newer one is still submitted
+    """
+    old, new = hpc_simulation(job_id="old"), hpc_simulation(job_id="new")
+    for simulation_id in (old, new):
+        db.session.get(BatchSimulationModel, simulation_id).array_id = None
+    db.session.get(BatchSimulationModel, old).job_dir = f"/scratch/yaptide_runs/{old}_1"
+    db.session.get(BatchSimulationModel, old).start_time = datetime.now(timezone.utc) - timedelta(hours=25)
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    engine.cluster.submit.remote.side_effect = lambda simulation_id: ray.put(True)
+    engine.cluster.cancel.remote.side_effect = lambda simulation_id: ray.put(True)
+
+    engine.submit_waiting()
+
+    assert state(old) == EntityState.FAILED.value
+    assert "did not answer for 24 h" in db.session.query(LogfilesModel).filter_by(simulation_id=old).one().data["error"]
+    engine.cluster.cancel.remote.assert_called_once_with(old)
+    engine.cluster.submit.remote.assert_called_once_with(new)

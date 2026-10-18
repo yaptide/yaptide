@@ -1,5 +1,12 @@
 SUBMIT_FLUKA: str = """#!/bin/bash
 OUT=`mktemp`
+# sbatch waiting on a stuck SLURM controller is given up, so this script never outlives the backend's wait for it
+sbatch() {{
+    timeout {sbatch_seconds} sbatch "$@" && return 0
+    STATUS=$?
+    [ $STATUS -eq 124 ] && echo "sbatch timed out after {sbatch_seconds} s" >&2
+    return $STATUS
+}}
 module load fluka
 
 ROOT_DIR={root_dir}
@@ -14,7 +21,9 @@ COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
 
-FLUKA_CMD="sbatch --array=1-{n_tasks} {array_options} --parsable $ARRAY_SCRIPT > $OUT"
+# every job of this submit has its comment, after the options as it wins: a cancel finds them by it, also the ones
+# whose id was never written
+FLUKA_CMD="sbatch --array=1-{n_tasks} {array_options} --comment={job_tag} --parsable $ARRAY_SCRIPT > $OUT"
 eval $FLUKA_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
@@ -22,7 +31,8 @@ echo "Job id: $JOB_ID"
 echo "$JOB_ID" > $ROOT_DIR/array_job_id
 
 if [ -n "$JOB_ID" ] ; then
-    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --parsable $COLLECT_SCRIPT > $OUT"
+    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --comment={job_tag} --parsable $COLLECT_SCRIPT"
+    COLLECT_CMD="$COLLECT_CMD > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
     echo "Collect id: $COLLECT_ID"
@@ -127,7 +137,8 @@ sig_handler()
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun rfluka -N0 -M1 $WORK_DIR/*.inp &
+# the simulator records its PID: a cancel stops it on this node also while the SLURM controller does not answer
+srun sh -c 'echo $$ > simulator.pid && exec "$@"' sh rfluka -N0 -M1 $WORK_DIR/*.inp &
 SIMULATOR_PID=$!
 
 # reports the progress into storage and stops the simulator when the simulation is cancelled

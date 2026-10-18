@@ -8,11 +8,13 @@ import tempfile
 import time
 from datetime import datetime
 from pathlib import Path
+from typing import Optional
 from zipfile import ZipFile
 
 import pymchelper
 from cryptography.hazmat.primitives.serialization import SSHCertificate, load_ssh_public_identity
 from fabric import Connection, Result
+from invoke.exceptions import CommandTimedOut
 from paramiko import AuthenticationException, RSAKey
 
 from yaptide.batch.shieldhit_string_templates import (
@@ -46,6 +48,30 @@ from yaptide.utils.sim_utils import set_shieldhit_save_step, write_simulation_in
 # the engine's few connections forever); the submit script waits for sbatch several times
 COMMAND_SECONDS = 60
 SUBMIT_SECONDS = 300
+# one sbatch waiting on a stuck SLURM controller is given up on the login node itself, so the submit script ends before
+# the backend stops waiting for it (three of them, well within SUBMIT_SECONDS)
+SBATCH_SECONDS = 60
+# the cancel command gives up on the login node before the backend stops waiting for it
+CANCEL_SECONDS = COMMAND_SECONDS - 10
+# what sbatch and scancel say when the SLURM controller does not answer in time (it froze for minutes on the
+# clusters: "Socket timed out on send/recv operation", "Unable to contact slurm controller (connect failure)"),
+# and what the submit script says when it gave sbatch up; a login node not answering in time looks the same
+SLURM_STUCK = re.compile(r"timed out|Unable to contact slurm controller|temporarily unable", re.IGNORECASE)
+
+
+def slurm_stuck(error: Exception) -> bool:
+    """Whether a failed command on the cluster met a SLURM (or login node) that did not answer in time - worth
+    trying again later, unlike a certificate the cluster refused or input sbatch rejected
+    """
+    if isinstance(error, AuthenticationException):
+        return False
+    # also an error raised while handling a timeout: paramiko's "Error reading SSH protocol banner" of a frozen node
+    cause = error
+    while cause is not None:
+        if isinstance(cause, (TimeoutError, CommandTimedOut)):
+            return True
+        cause = cause.__cause__ or cause.__context__
+    return bool(SLURM_STUCK.search(str(error)))
 
 
 def certificate_expired(cert: str) -> bool:
@@ -110,29 +136,43 @@ def claim_job_dir(simulation_id: int, job_dir: str) -> bool:
     return claimed == 1
 
 
-def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
-    """Submits a stored HPC simulation to its cluster with the user's certificate; failures end it FAILED"""
+def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
+    """Submits a stored HPC simulation to its cluster with the user's certificate
+
+    Returns whether the cluster's SLURM answered, None when it was not asked. A SLURM that did not answer in time
+    leaves the simulation PENDING, with the job directory of the attempt recorded: the next submit first cancels
+    what that attempt left on the cluster. Other failures end it FAILED.
+    """
     simulation = db.session.get(BatchSimulationModel, simulation_id)
-    if simulation is None or simulation.job_state != EntityState.PENDING.value or simulation.job_dir:
-        return
+    if simulation is None or simulation.job_state != EntityState.PENDING.value or simulation.array_id is not None:
+        return None
+    if simulation.job_dir:
+        # an attempt that met a stuck SLURM, or a restart of the engine; its script on the login node ends by itself
+        # (SBATCH_SECONDS), only then nothing more of it can reach SLURM
+        if time.time() - submitted_at(simulation.job_dir) < SUBMIT_SECONDS:
+            return None
+        answered = cancel_simulation(simulation_id)
+        db.session.refresh(simulation)
+        if simulation.job_dir or simulation.job_state != EntityState.PENDING.value:
+            return answered
     user = db.session.get(KeycloakUserModel, simulation.user_id)
     cluster = db.session.get(ClusterModel, simulation.cluster_id)
     if user is None or user.cert is None or user.private_key is None:
         fail_submit(simulation, {"error": "The user has no certificate for the cluster, log in again"})
-        return
+        return None
     if not result_storage.configured():
         # the jobs report progress and send results through it
         fail_submit(simulation, {"error": "HPC simulations need the results storage, which is not configured"})
-        return
+        return None
     if not os.environ.get("BACKEND_EXTERNAL_URL"):
         fail_submit(simulation, {"error": "BACKEND_EXTERNAL_URL is not set, the cluster's jobs could not report"})
-        return
+        return None
     if not os.environ.get("YAPTIDE_TOKEN_SECRET"):
         # the update key would be signed with a secret only this process knows, the backend would reject the reports
         fail_submit(
             simulation, {"error": "YAPTIDE_TOKEN_SECRET is not set, the cluster's reports could not be accepted"}
         )
-        return
+        return None
     input_dict = simulation.inputs[0].data
     payload_dict = {
         "sim_type": simulation.sim_type,
@@ -143,9 +183,9 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
     try:
         with get_connection(user=user, cluster=cluster) as con:
             scratch = con.run("echo $SCRATCH", hide=True, timeout=COMMAND_SECONDS).stdout.split()[0]
-            job_dir = f"{scratch}/yaptide_runs/{simulation.id}_{int(datetime.utcnow().timestamp() * 1e6)}"
+            job_dir = f"{scratch}/yaptide_runs/{simulation.id}_{int(time.time() * 1e6)}"
             if not claim_job_dir(simulation.id, job_dir):
-                return
+                return None
             # readable by the user only: the signed links and the update key are in there
             con.run(f"mkdir -p -m 700 {job_dir}", timeout=COMMAND_SECONDS)
             # uploads to a hung login node are given up too
@@ -166,20 +206,26 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
             result: Result = con.run(f"sh {submit_file}", hide=True, warn=True, timeout=SUBMIT_SECONDS)
     except Exception as e:  # skipcq: PYL-W0703
         db.session.rollback()
+        if slurm_stuck(e):
+            logging.warning("Submitting simulation %d met a stuck cluster, to be repeated: %s", simulation_id, e)
+            return False
         fail_submit(db.session.get(BatchSimulationModel, simulation_id), {"error": str(e)})
         # whatever reached the cluster before the error (some jobs, the directory) is cancelled and removed
         cancel_simulation(simulation_id)
-        return
+        return None
 
     job_ids = dict(line.split(" id: ") for line in result.stdout.splitlines() if " id: " in line)
     array_id, collect_id = job_ids.get("Job"), job_ids.get("Collect")
     simulation = db.session.get(BatchSimulationModel, simulation_id)
     if not (array_id and collect_id and array_id.isdigit() and collect_id.isdigit()):
+        if SLURM_STUCK.search(result.stderr):
+            logging.warning("SLURM did not answer the submit of simulation %d, to be repeated", simulation_id)
+            return False
         log = {"message": "Job submission failed", "submit_stdout": result.stdout, "submit_stderr": result.stderr}
         fail_submit(simulation, {**log, "sh_files": sh_files})
         # the array may have been submitted before the rest failed: it would run for nothing
         cancel_simulation(simulation_id)
-        return
+        return True
     # stored whatever the state: a simulation cancelled while submitting still needs its ids to cancel the jobs
     db.session.execute(
         BatchSimulationModel.__table__.update()
@@ -191,6 +237,7 @@ def submit_simulation(simulation_id: int) -> None:  # skipcq: PY-R1000
     # a cancel stored while submitting found nothing to stop on the cluster yet
     if simulation.job_state == EntityState.CANCELED.value:
         cancel_simulation(simulation_id)
+    return True
 
 
 def saving_tasks(simulation: SimulationModel) -> int:
@@ -213,7 +260,25 @@ def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
 
 
 # a job directory as submit_simulation creates it: $SCRATCH/yaptide_runs/<simulation id>_<microseconds>
-JOB_DIR_PATTERN = re.compile(r"/[\w./-]+/yaptide_runs/(\d+)_\d+")
+JOB_DIR_PATTERN = re.compile(r"/[\w./-]+/yaptide_runs/(\d+)_(\d+)")
+
+
+def submitted_at(job_dir: str) -> float:
+    """When the submit that created the job directory started (seconds since the epoch), 0 for a directory this
+    backend did not create
+    """
+    match = JOB_DIR_PATTERN.fullmatch(job_dir)
+    return int(match.group(2)) / 1e6 if match else 0.0
+
+
+def job_tag(job_dir: str) -> str:
+    """The comment of every SLURM job of one submit, unique to it like its directory: a cancel finds them by it even
+    when sbatch was given up before it told the job id - SLURM may still have taken the job. A comment, not the name:
+    the users name their jobs in the batch options.
+    """
+    return "yaptide_" + job_dir.rsplit("/", 1)[-1]
+
+
 # the jobs of a simulation, in the order they are cancelled: the reporter first - a cancelled collect would start
 # it (it reports a collect that did not succeed); then the collect - cancelling the array first lets SLURM start
 # the collect, which then reports FAILED. The submit script writes their ids into the job directory.
@@ -231,43 +296,66 @@ def forget_job_dir(simulation_id: int) -> None:
     db.session.commit()
 
 
-def cancel_simulation(simulation_id: int) -> None:
-    """Cancels the SLURM jobs of a simulation and removes its directory on the cluster, then forgets the directory
+def cancel_command(job_dir: str) -> str:
+    """The command that cancels the jobs of one submit and then removes its directory, bounded on the login node
 
-    The jobs are found by the ids the submit wrote into the job directory, so a submit interrupted before its ids
-    reached the database is cleaned up too. A directory left in the database means the cancel is still to be done
-    (the engine repeats it every few minutes). With the user's certificate expired, the jobs still stop by
-    themselves, as they find the cancel the engine put into storage (yaptide/batch/watcher.py); the directory stays
-    on the cluster.
+    One command, as every command is a round trip. The jobs go by the ids the submit wrote next to them (a job already
+    gone from SLURM makes its scancel fail, the rest are still cancelled), then by the submit's comment, which squeue
+    shows (scancel filters by name only): the jobs whose id was never written. The directory goes only when squeue
+    and that scancel answered.
+    """
+    quoted = shlex.quote(job_dir)
+    cancels = [f"test -s {quoted}/{job}_job_id && scancel `cat {quoted}/{job}_job_id`" for job in SIMULATION_JOBS]
+    # %F: the array's job id (of a job not in an array, its own), %k: the comment
+    listed = 'JOBS=`squeue -h -u $USER -o "%F %k"`'
+    tagged = f"""IDS=`echo "$JOBS" | awk '$2 == "{job_tag(job_dir)}" {{print $1}}' | sort -u`"""
+    script = "; ".join([*cancels, f'{listed} && {tagged} && {{ [ -z "$IDS" ] || scancel $IDS; }} && rm -rf {quoted}'])
+    return f"timeout {CANCEL_SECONDS} sh -c {shlex.quote(script)}"
+
+
+def cancel_simulation(simulation_id: int) -> Optional[bool]:
+    """Cancels the SLURM jobs of a simulation and removes its directory on the cluster, then forgets the directory;
+    returns whether the cluster's SLURM answered, None when it was not asked
+
+    The jobs are found by the ids the submit wrote into the job directory and by the submit's comment, so a submit
+    interrupted before its ids reached the database (or before sbatch told them) is cleaned up too. A directory left in
+    the database means the cancel is still to be done (the engine repeats it every few minutes). With the user's
+    certificate expired, the jobs still stop by themselves, as they find the cancel the engine put into storage
+    (yaptide/batch/watcher.py); the directory stays on the cluster.
     """
     simulation = db.session.get(BatchSimulationModel, simulation_id)
     if simulation is None or not simulation.job_dir:
-        return
+        return None
     match = JOB_DIR_PATTERN.fullmatch(simulation.job_dir)
     if not match or int(match.group(1)) != simulation.id:
         # only a directory this backend created goes into a command on the cluster
         logging.error("Simulation %d has an unexpected job directory, nothing is cancelled", simulation.id)
         forget_job_dir(simulation.id)
-        return
-    job_dir = shlex.quote(simulation.job_dir)
+        return None
     user = db.session.get(KeycloakUserModel, simulation.user_id)
     cluster = db.session.get(ClusterModel, simulation.cluster_id)
     try:
         with get_connection(user=user, cluster=cluster) as con:
-            # one command, as every command is a round trip; a job already gone from SLURM makes its scancel fail,
-            # the rest are still cancelled
-            cancels = "; ".join(
-                f"test -s {job_dir}/{job}_job_id && scancel `cat {job_dir}/{job}_job_id`" for job in SIMULATION_JOBS
-            )
-            con.run(f"{cancels}; rm -rf {job_dir}", warn=True, timeout=COMMAND_SECONDS)
+            result = con.run(cancel_command(simulation.job_dir), hide=True, warn=True, timeout=COMMAND_SECONDS)
     except AuthenticationException:
         logging.warning("Certificate of simulation %d expired, its jobs stop through storage", simulation.id)
+        forget_job_dir(simulation.id)
+        return None
     except Exception as e:  # skipcq: PYL-W0703
         logging.error(
             "Cancelling the jobs of simulation %d on the cluster failed, to be repeated: %s", simulation_id, e
         )
-        return
+        return False if slurm_stuck(e) else None
+    if result.exited:
+        logging.error(
+            "Cancelling the jobs of simulation %d on the cluster failed, to be repeated: %s",
+            simulation_id,
+            result.stderr.strip()[-500:] or f"exit status {result.exited}",
+        )
+        # 124: the timeout around the command ended it
+        return False if result.exited == 124 or SLURM_STUCK.search(result.stderr) else None
     forget_job_dir(simulation.id)
+    return True
 
 
 def prepare_script_files(
@@ -279,7 +367,9 @@ def prepare_script_files(
     collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
     # the reporter has no script header: the queue placement typed into the array header goes on its command line
-    reporter_options = helper_job_sbatch_options(payload_dict=payload_dict, sim_id=sim_id, job_dir=job_dir)
+    reporter_options = helper_job_sbatch_options(
+        payload_dict=payload_dict, sim_id=sim_id, job_dir=job_dir, job_tag=job_tag(job_dir)
+    )
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
@@ -294,6 +384,8 @@ def prepare_script_files(
             n_tasks=str(payload_dict["ntasks"]),
             convertmc_version=pymchelper.__version__,
             reporter_options=reporter_options,
+            job_tag=job_tag(job_dir),
+            sbatch_seconds=SBATCH_SECONDS,
             **common,
         ),
         "array": templates["array"].format(array_header=array_header, n_tasks=str(payload_dict["ntasks"]), **common),
