@@ -48,6 +48,14 @@ if [ -z "$RAY_AUTH_TOKEN" ]; then
     ray get-auth-token --generate > /dev/null
 fi
 
+# an idle Ray worker process costs CPU all the time (it wakes 100 times a second), so after 5 minutes without a
+# task all but one are stopped; a later simulation starts the others again (.env may set other values)
+export RAY_num_workers_soft_limit="${RAY_num_workers_soft_limit:-1}"
+export RAY_idle_worker_killing_time_threshold_ms="${RAY_idle_worker_killing_time_threshold_ms:-300000}"
+# the log monitor, which hands the tasks' output to the engine's log, looks for new log files every 5 s instead
+# of 10 times a second; a new file is still read from its start
+export RAY_LOG_MONITOR_MANY_FILES_THRESHOLD=0 LOG_NAME_UPDATE_INTERVAL_S=5
+
 # Ray runs in the background, the engine in the foreground: when the engine stops, the container restarts
 # with everything that ran on it
 ray start --head --port=6379 --num-cpus="$NUM_CPUS" --object-store-memory=$((768 * 1024 * 1024)) \

@@ -341,6 +341,41 @@ def test_events_alone_run_a_simulation(client, engine):
     assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
 
 
+@ray.remote(num_cpus=0)
+def report_many(inbox, count: int) -> dict:
+    """Reports of one task, one after another as a simulator's log brings them, then what the inbox holds"""
+    for primaries in range(count):
+        inbox.report.remote(1, 0, {"simulated_primaries": primaries})
+    return ray.get(inbox.drain.remote())[0]
+
+
+def test_inbox_keeps_the_order_of_a_tasks_reports(cluster):
+    """The latest report of a task wins, also with a call waiting for a new state (an async inbox mixed them up)"""
+    inbox = engine_module.ProgressInbox.remote()
+    waiting = inbox.state_changed.remote()
+    assert ray.get(report_many.remote(inbox, 3000)) == {(1, 0): {"simulated_primaries": 2999}}
+    assert not ray.wait([waiting], timeout=0)[0]
+    ray.kill(inbox)
+
+
+def test_new_task_state_is_saved_without_waiting_for_the_progress_round(client, engine):
+    """A task starting sends an event through the inbox, and the event alone saves RUNNING"""
+    simulation_id = submit(client, "FAKE_SLEEP", ntasks=1)
+    engine.watch_inbox()
+    engine.handle(EntityState.PENDING.value, simulation_id)
+
+    event = engine.events.get(timeout=60)
+    assert event == ("NEW_STATE", None)
+    engine.handle(*event)
+
+    assert task_states(simulation_id) == [EntityState.RUNNING.value]
+    assert state(simulation_id) == EntityState.RUNNING.value
+    # the next test's simulation gets the same id, so the same directories: the task must be gone first
+    refs = list(engine.running[simulation_id].tasks)
+    engine.stop(simulation_id)
+    ray.wait(refs, timeout=60)
+
+
 def test_cancel_event_stops_the_simulation(client, engine, cluster):
     """The event Postgres sends on cancel stops the tasks at once"""
     simulation_id = submit(client, "FAKE_SLEEP")
@@ -516,6 +551,22 @@ def test_hpc_progress_is_read_from_storage(client, engine, monkeypatch):
     reads.clear()
     engine.read_hpc_progress()
     assert reads == [prefix + "task_0001.json"]
+
+
+def test_hpc_progress_is_read_only_while_hpc_simulations_may_report(client, engine, monkeypatch):
+    """Without HPC simulations the engine stops looking for their reports, a submitted one starts it again"""
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", lambda sim_id: {})
+
+    engine.read_hpc_progress()
+    assert not engine.hpc_active
+
+    simulation_id = hpc_simulation()
+    engine.submitting[simulation_id] = ray.put(None)
+    engine.submitted(simulation_id)
+    assert engine.hpc_active
+    engine.read_hpc_progress()
+    assert engine.hpc_active
 
 
 def test_unreachable_storage_skips_a_round(client, engine, monkeypatch):
@@ -765,3 +816,16 @@ def test_saves_of_hpc_tasks_become_partial_results_at_most_once_a_minute(client,
     db.session.commit()
     assert len(report("e6", first, 900)) == 2
     assert deleted == [simulation_id] and simulation_id not in engine.hpc_partials
+
+
+def test_new_task_states_save_the_progress_at_most_twice_a_second(engine, monkeypatch):
+    """Many short tasks change states often; each save notifies the status streams"""
+    saves = []
+    monkeypatch.setattr(engine, "save_progress", lambda: saves.append(1))
+    monkeypatch.setattr(engine, "watch_inbox", lambda: None)
+    engine.progress_saved = time.monotonic()
+    engine.handle("NEW_STATE", None)
+    assert not saves
+    engine.progress_saved = time.monotonic() - engine_module.NEW_STATE_SAVE_SECONDS
+    engine.handle("NEW_STATE", None)
+    assert saves == [1]
