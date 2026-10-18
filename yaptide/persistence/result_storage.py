@@ -72,9 +72,13 @@ def _patient():
     return _client(os.environ["RESULTS_S3_ENDPOINT"], read_timeout=120, attempts=5)
 
 
+# result pages, the only copy of the results: see delete_simulation
+PAGE_PREFIX = "simulations/"
+
+
 def page_key(sim_id: int, estimator_file_name: str, page_number: int) -> str:
     """Object key of a result page; the same page always gets the same key, so a repeated upload replaces it"""
-    return f"simulations/{sim_id}/{estimator_file_name}/{page_number}.json"
+    return f"{PAGE_PREFIX}{sim_id}/{estimator_file_name}/{page_number}.json"
 
 
 def put_page(key: str, page: dict) -> int:
@@ -114,22 +118,30 @@ def page_url(key: str) -> str:
     )
 
 
-# the directories holding a simulation's objects: its pages, what its HPC jobs report and what its tasks leave
-SIMULATION_PREFIXES = ("simulations/", "hpc/", "work/")
+# result files of direct simulation tasks on their way to the merges, removed after the final merge; the saves of
+# HPC tasks on their way to the partial merges, removed once the simulation stops running
+WORK_PREFIX = "work/"
+# what HPC jobs report and tasks leave, of no use once their simulation is gone: the engine's look for orphans removes
+# these; never the result pages (PAGE_PREFIX), only a delete of their simulation removes them
+EPHEMERAL_PREFIXES = ("hpc/", WORK_PREFIX)
 # keys removed in one request: with S3's maximum of 1000 a busy storage took longer than the client waits
 DELETE_BATCH = 500
 
 
-def delete_simulation(sim_id: int) -> None:
-    """Removes every stored object of a simulation; slow for a large one, so the engine does it in the background"""
-    for prefix in SIMULATION_PREFIXES:
-        _delete_listed(f"{prefix}{sim_id}/")
+def delete_simulation(sim_id: int, pages: bool) -> None:
+    """Removes the stored objects of a deleted simulation, its result pages too only when pages is set; slow for a
+    large one, so the engine does it in the background
+    """
+    for prefix in (PAGE_PREFIX, *EPHEMERAL_PREFIXES) if pages else EPHEMERAL_PREFIXES:
+        _delete_listed(_patient(), f"{prefix}{sim_id}/")
 
 
 def stored_simulations() -> set[int]:
-    """Ids of the simulations with objects in storage, from the directories' names (a request per 1000 of them)"""
+    """Ids of the simulations with objects under EPHEMERAL_PREFIXES, from the directories' names (a request per 1000
+    of them)
+    """
     ids = set()
-    for prefix in SIMULATION_PREFIXES:
+    for prefix in EPHEMERAL_PREFIXES:
         listings = (
             _internal()
             .get_paginator("list_objects_v2")
@@ -144,9 +156,8 @@ def stored_simulations() -> set[int]:
     return ids
 
 
-def _delete_listed(prefix: str) -> None:
+def _delete_listed(client, prefix: str) -> None:
     """Removes every object under the prefix in the bucket, DELETE_BATCH at a time, each batch as it is listed"""
-    client = _patient()
     bucket = os.environ["RESULTS_S3_BUCKET"]
     listings = client.get_paginator("list_objects_v2").paginate(
         Bucket=bucket, Prefix=prefix, PaginationConfig={"PageSize": DELETE_BATCH}
@@ -268,9 +279,6 @@ def put_cancel(sim_id: int) -> None:
     _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")
 
 
-# result files of direct simulation tasks on their way to the merges, removed after the final merge; the saves of
-# HPC tasks on their way to the partial merges, removed once the simulation stops running
-WORK_PREFIX = "work/"
 # the saves of an HPC simulation's tasks merged into partial results at once, in bytes, packed and unpacked, which
 # bounds one task's save too: a simulation with larger results gets them only at the end
 HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 128 << 20))
@@ -354,7 +362,8 @@ def stored_sizes(prefix: str) -> dict[str, int]:
 def delete_objects(prefix: str) -> None:
     """Removes the objects whose keys start with the prefix (a whole directory or one object without a bucket)"""
     if configured():
-        _delete_listed(prefix)
+        # fast-failing: a cancelled task waits for it
+        _delete_listed(_internal(), prefix)
         return
     local = _local(prefix)
     if local.is_dir():

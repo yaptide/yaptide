@@ -157,7 +157,7 @@ def remove_user(name, auth_provider):
         click.echo(f"Aborting, user {name} does not exist")
         raise click.Abort()
 
-    # the user's simulations go by cascade; the engine removes what they stored (yaptide/engine/engine.py)
+    # fails while the user has simulations (no cascade): remove-simulation them first, the engine removes their objects
     query = db.delete(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     con.execute(query)
     con.commit()

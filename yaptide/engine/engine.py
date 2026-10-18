@@ -24,7 +24,7 @@ from typing import Optional, Union
 
 import ray
 from botocore.exceptions import BotoCoreError, ClientError
-from sqlalchemy import and_, func, or_
+from sqlalchemy import and_, func, or_, text
 
 from yaptide.batch.batch_methods import cancel_simulation, fail_submit, submit_simulation
 from yaptide.engine.pymc import get_tmp_dir
@@ -123,8 +123,8 @@ PARTIAL_GROWTH = 0.05
 MAX_PARTIAL_MERGES = 2
 # an HPC simulation's partial results are merged at most this often: its saves come from many tasks
 HPC_PARTIAL_SECONDS = 60
-# besides the delete events, the engine looks this often for objects of simulations no longer in the database: deletes
-# made while it was not listening, removals that failed
+# besides the delete events, the engine looks this often for objects under hpc/ and work/ of simulations no longer in
+# the database: deletes made while it was not listening, removals that failed (their pages stay: storage cost only)
 ORPHAN_SWEEP_SECONDS = 3600
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
 
@@ -203,16 +203,44 @@ def delete_task_results(simulation_id: int) -> None:
     result_storage.delete_objects(result_storage.work_prefix(simulation_id))
 
 
+def deleted_for_good(simulation_id: int) -> bool:
+    """Whether the simulation is gone from the database and no new simulation can get its id: a database restored
+    from an older backup hands out again the ids of the simulations made after that backup, and the new simulations
+    store their pages under the same keys. Any doubt (no sequence, a failed query) keeps the objects.
+    """
+    if db.session.query(SimulationModel.id).filter_by(id=simulation_id).first():
+        return False
+    if db.engine.dialect.name == "postgresql":
+        # the id last handed out, NULL before the first; later ones are higher
+        last = db.session.execute(
+            text("""SELECT pg_sequence_last_value(pg_get_serial_sequence('"Simulation"', 'id')::regclass)""")
+        ).scalar()
+    else:
+        # SQLite gives the highest id + 1
+        last = db.session.query(func.max(SimulationModel.id)).scalar()
+    return last is not None and simulation_id <= last
+
+
 # one removal at a time: a large simulation has tens of thousands of objects, removing many at once would swamp the
-# storage; calls lost with the actor are made again by the engine's next look for orphans
+# storage. A call lost with the actor (a restart, the engine's) loses nothing: what is under hpc/ and work/ the engine's
+# next look for orphans removes, the pages stay as orphans - only a delete event removes pages, never a guess
 @ray.remote(num_cpus=0, max_restarts=-1)
 class StorageCleaner:
     """Removes the stored objects of deleted simulations, so the user's delete does not wait for them"""
 
     @staticmethod
-    def delete(simulation_id: int) -> None:
-        """Removes every object of a deleted simulation"""
-        result_storage.delete_simulation(simulation_id)
+    def delete(simulation_id: int, pages: bool) -> None:
+        """Removes the objects of a deleted simulation, its result pages too when pages is set; checks the database
+        again first, the call may have waited long behind others
+        """
+        with backend_app().app_context():
+            try:
+                if not deleted_for_good(simulation_id):
+                    logging.warning("Simulation %d is in the database or its id may come again, kept", simulation_id)
+                    return
+            finally:
+                db.session.remove()
+        result_storage.delete_simulation(simulation_id, pages)
 
 
 @ray.remote(num_cpus=0, max_concurrency=CLUSTER_CONNECTIONS, max_restarts=-1)
@@ -286,8 +314,8 @@ class Engine:
         self.inbox = ProgressInbox.remote()
         self.cluster = ClusterGateway.remote()
         self.cleaner = StorageCleaner.remote()
-        # deleted simulations whose objects the cleaner removes: simulation id -> the removal's ref
-        self.removing: dict[int, ray.ObjectRef] = {}
+        # deleted simulations whose objects the cleaner removes: (simulation id, with pages) -> the removal's ref
+        self.removing: dict[tuple[int, bool], ray.ObjectRef] = {}
         # ETags of the progress reports HPC tasks put into storage, as last read
         self.report_etags: dict[str, str] = {}
         # whether HPC simulations may have reports to read: at start, after a submit, until a read finds none
@@ -358,8 +386,6 @@ class Engine:
         self, event: str, simulation_id: Optional[int], platform: Optional[str] = None
     ) -> None:
         """Acts on one event"""
-        if event == "DELETED" and result_storage.configured():
-            self.delete_stored({simulation_id})
         if platform == PlatformType.BATCH.value:
             self.handle_batch(event, simulation_id)
         elif event == "SWEEP":
@@ -389,28 +415,33 @@ class Engine:
             running = self.running[simulation_id]
             ready, _ = ray.wait(running.refs(), num_returns=len(running.refs()), timeout=0)
             self.collect_guarded(simulation_id, running, set(ready))
+        # after its tasks were stopped above
+        if event == "DELETED" and result_storage.configured():
+            self.delete_stored({simulation_id}, pages=True)
 
-    def delete_stored(self, simulation_ids: set[int]) -> None:
-        """Has the cleaner remove the objects of the simulations not in the database (ids are never used again), each
-        simulation once at a time; reports the removals that ended with an error
+    def delete_stored(self, simulation_ids: set[int], pages: bool) -> None:
+        """Has the cleaner remove the objects of the simulations not in the database, their result pages too when
+        pages is set (a delete event, never a guess), each simulation once at a time; reports the removals that ended
+        with an error
         """
-        for simulation_id, ref in list(self.removing.items()):
+        for removal, ref in list(self.removing.items()):
             if ray.wait([ref], timeout=0)[0]:
-                del self.removing[simulation_id]
+                del self.removing[removal]
                 try:
                     ray.get(ref)
                 except Exception:  # skipcq: PYL-W0703
-                    logging.exception("Removing the objects of deleted simulation %d failed", simulation_id)
-        wanted = simulation_ids - set(self.removing)
+                    logging.exception("Removing the objects of deleted simulation %d failed", removal[0])
+        wanted = {simulation_id for simulation_id in simulation_ids if (simulation_id, pages) not in self.removing}
         existing = db.session.query(SimulationModel.id).filter(SimulationModel.id.in_(wanted))
         for simulation_id in sorted(wanted - {simulation_id for (simulation_id,) in existing}):
-            self.removing[simulation_id] = self.cleaner.delete.remote(simulation_id)
+            self.removing[(simulation_id, pages)] = self.cleaner.delete.remote(simulation_id, pages)
 
     def delete_orphans(self) -> None:
-        """Removes the objects of simulations no longer in the database, which their delete events missed
+        """Removes what HPC jobs and tasks left in storage (never result pages) of simulations no longer in the
+        database, which their delete events missed
 
         Only of ids below the newest simulation's: an engine given an empty database, or one restored from an older
-        backup, must not empty the storage.
+        backup, must not empty the storage (the cleaner checks again).
         """
         if not result_storage.configured():
             return
@@ -420,7 +451,7 @@ class Engine:
             logging.exception("Looking for objects of deleted simulations failed, trying again later")
             return
         newest = db.session.query(func.max(SimulationModel.id)).scalar() or 0
-        self.delete_stored({simulation_id for simulation_id in stored if simulation_id < newest})
+        self.delete_stored({simulation_id for simulation_id in stored if simulation_id < newest}, pages=False)
 
     def handle_batch(self, event: str, simulation_id: int) -> None:
         """HPC simulations: the engine submits the stored ones and cancels the cancelled ones on their cluster"""

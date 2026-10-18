@@ -112,7 +112,9 @@ def test_deleting_a_simulation_does_not_wait_for_the_storage(client, storage, si
 
 
 def test_objects_are_removed_in_batches_as_they_are_listed(monkeypatch):
-    """Each listed batch of a simulation's directories goes in one request, with the client given time and retries"""
+    """Each listed batch of a simulation's directories goes in one request, with the client given time and retries;
+    the result pages only when asked for
+    """
     client = mock.Mock()
     listings = {
         "simulations/7/": [{"Contents": [{"Key": "simulations/7/a/0.json"}]}],
@@ -121,37 +123,58 @@ def test_objects_are_removed_in_batches_as_they_are_listed(monkeypatch):
     }
     client.get_paginator.return_value.paginate.side_effect = lambda **kwargs: listings[kwargs["Prefix"]]
     client.delete_objects.return_value = {}
+    clients = []
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
     monkeypatch.setenv("RESULTS_S3_ENDPOINT", "http://garage:3900")
-    monkeypatch.setattr(result_storage, "_client", lambda *args, **kwargs: client)
+    monkeypatch.setattr(result_storage, "_client", lambda *args, **kwargs: clients.append(kwargs) or client)
 
-    result_storage.delete_simulation(7)
+    result_storage.delete_simulation(7, pages=False)
+    assert "simulations/7/" not in str(client.get_paginator.return_value.paginate.call_args_list)
+    result_storage.delete_simulation(7, pages=True)
 
+    assert {"read_timeout": 120, "attempts": 5} in clients
     for call in client.get_paginator.return_value.paginate.call_args_list:
         assert call.kwargs["PaginationConfig"] == {"PageSize": result_storage.DELETE_BATCH}
+    progress = [{"Key": f"hpc/7/progress/task_{i}.json"} for i in range(3)]
     assert [call.kwargs["Delete"]["Objects"] for call in client.delete_objects.call_args_list] == [
+        progress,
         [{"Key": "simulations/7/a/0.json"}],
-        [{"Key": f"hpc/7/progress/task_{i}.json"} for i in range(3)],
+        progress,
     ]
 
     client.delete_objects.return_value = {"Errors": [{"Key": "hpc/7/progress/task_0.json"}]}
     with pytest.raises(RuntimeError):
-        result_storage.delete_simulation(7)
+        result_storage.delete_simulation(7, pages=False)
 
 
-def test_stored_simulations_come_from_the_directory_names(monkeypatch):
-    """Only directories named by a simulation id count"""
+def test_a_task_removes_its_save_with_the_fast_client(monkeypatch):
+    """A cancelled task does not wait minutes for a busy storage"""
+    clients = []
+    client = mock.Mock()
+    client.get_paginator.return_value.paginate.return_value = [{}]
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setenv("RESULTS_S3_ENDPOINT", "http://garage:3900")
+    monkeypatch.setattr(result_storage, "_client", lambda *args, **kwargs: clients.append(kwargs) or client)
+
+    result_storage.delete_objects(result_storage.work_key(7, 1))
+
+    assert clients == [{}]
+
+
+def test_stored_simulations_come_from_the_directory_names_never_of_pages(monkeypatch):
+    """Only directories named by a simulation id count, and only where nothing is the only copy of results"""
     client = mock.Mock()
     listings = {
-        "simulations/": [{"CommonPrefixes": [{"Prefix": "simulations/12/"}, {"Prefix": "simulations/x/"}]}],
-        "hpc/": [{"CommonPrefixes": [{"Prefix": "hpc/12/"}, {"Prefix": "hpc/3/"}]}],
-        "work/": [{}],
+        "hpc/": [{"CommonPrefixes": [{"Prefix": "hpc/12/"}, {"Prefix": "hpc/3/"}, {"Prefix": "hpc/x/"}]}],
+        "work/": [{"CommonPrefixes": [{"Prefix": "work/5/"}]}],
     }
     client.get_paginator.return_value.paginate.side_effect = lambda **kwargs: listings[kwargs["Prefix"]]
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
     monkeypatch.setattr(result_storage, "_internal", lambda: client)
 
-    assert result_storage.stored_simulations() == {3, 12}
+    assert result_storage.stored_simulations() == {3, 5, 12}
+    assert result_storage.page_key(3, "dose", 0).startswith(result_storage.PAGE_PREFIX)
+    assert result_storage.PAGE_PREFIX not in result_storage.EPHEMERAL_PREFIXES
 
 
 def test_pages_go_to_the_database_when_storage_fails(client, storage, sim_id, monkeypatch):
