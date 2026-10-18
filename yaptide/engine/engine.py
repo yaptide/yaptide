@@ -9,7 +9,6 @@ A sweep through the database catches what came while the engine was not listenin
 the connection to the database and after a failed event.
 """
 
-import asyncio
 import json
 import logging
 import os
@@ -125,8 +124,9 @@ RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, E
 
 
 # restarted when it dies: only progress not saved yet is lost, final states come with the task results;
-# async, so a call waiting in state_changed does not block the others (all run in one event loop)
-@ray.remote(num_cpus=0, max_restarts=-1, max_task_retries=-1)
+# state_changed waits in a thread of its own, the other calls run one at a time in the order each task made them
+# (an async actor would run a task's reports out of order, an older update over a newer one)
+@ray.remote(num_cpus=0, max_restarts=-1, max_task_retries=-1, concurrency_groups={"wait": 1})
 class ProgressInbox:
     """Keeps the latest progress and the latest save of every task until the engine takes them"""
 
@@ -134,27 +134,28 @@ class ProgressInbox:
         """Empty inbox"""
         self.updates: dict[tuple[int, int], dict] = {}
         self.saves: dict[tuple[int, int], tuple[str, int]] = {}
-        self.new_state = asyncio.Event()
+        self.new_state = threading.Event()
 
-    async def report(self, simulation_id: int, task_id: int, update_dict: dict) -> None:
+    def report(self, simulation_id: int, task_id: int, update_dict: dict) -> None:
         """Merges a task's update into the one waiting to be saved"""
         self.updates.setdefault((simulation_id, task_id), {}).update(update_dict)
         if "task_state" in update_dict:
             self.new_state.set()
 
-    async def saved(self, simulation_id: int, task_id: int, key: str, primaries: int) -> None:
+    def saved(self, simulation_id: int, task_id: int, key: str, primaries: int) -> None:
         """Replaces a task's save waiting to be taken"""
         self.saves[(simulation_id, task_id)] = (key, primaries)
 
-    async def drain(self) -> tuple[dict[tuple[int, int], dict], dict[tuple[int, int], tuple[str, int]]]:
+    def drain(self) -> tuple[dict[tuple[int, int], dict], dict[tuple[int, int], tuple[str, int]]]:
         """Hands over the waiting updates and saves"""
         self.new_state.clear()
         updates, saves, self.updates, self.saves = self.updates, self.saves, {}, {}
         return updates, saves
 
-    async def state_changed(self) -> None:
+    @ray.method(concurrency_group="wait")
+    def state_changed(self) -> None:
         """Returns once a waiting update changes a task's state, e.g. to RUNNING"""
-        await self.new_state.wait()
+        self.new_state.wait()
 
 
 @ray.remote(num_cpus=1, max_retries=0)

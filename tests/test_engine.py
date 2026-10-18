@@ -341,6 +341,23 @@ def test_events_alone_run_a_simulation(client, engine):
     assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
 
 
+@ray.remote(num_cpus=0)
+def report_many(inbox, count: int) -> dict:
+    """Reports of one task, one after another as a simulator's log brings them, then what the inbox holds"""
+    for primaries in range(count):
+        inbox.report.remote(1, 0, {"simulated_primaries": primaries})
+    return ray.get(inbox.drain.remote())[0]
+
+
+def test_inbox_keeps_the_order_of_a_tasks_reports(cluster):
+    """The latest report of a task wins, also with a call waiting for a new state (an async inbox mixed them up)"""
+    inbox = engine_module.ProgressInbox.remote()
+    waiting = inbox.state_changed.remote()
+    assert ray.get(report_many.remote(inbox, 3000)) == {(1, 0): {"simulated_primaries": 2999}}
+    assert not ray.wait([waiting], timeout=0)[0]
+    ray.kill(inbox)
+
+
 def test_new_task_state_is_saved_without_waiting_for_the_progress_round(client, engine):
     """A task starting sends an event through the inbox, and the event alone saves RUNNING"""
     simulation_id = submit(client, "FAKE_SLEEP", ntasks=1)
