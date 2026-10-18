@@ -16,13 +16,14 @@ from flask import current_app
 from yaptide.application import create_app
 from yaptide.batch import watcher
 from yaptide.engine import simulation as simulation_module
-from yaptide.persistence import result_storage
+from yaptide.persistence import db_methods, result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     CelerySimulationModel,
     EstimatorModel,
     PageModel,
     SimulationModel,
+    UserActivityModel,
     YaptideUserModel,
 )
 from yaptide.routes import events_routes
@@ -187,6 +188,19 @@ def test_stream_sends_the_status_of_the_users_simulations_when_they_change(clien
 
     running_simulation(user_id, "nextjob")
     assert read_event(lines)["job_id"] == "nextjob"
+    response.close()
+
+
+def test_an_open_stream_tells_that_the_user_follows_their_simulations(client, monkeypatch):
+    """The engine then reads the progress of the user's HPC simulations often"""
+    monkeypatch.setattr(events_routes, "subscribers", events_routes.Subscribers())
+    monkeypatch.setattr(db_methods, "_watching_written", {})
+    user_id = simulation().user_id
+    response = client.get("/events/simulations", buffered=False)
+    read_event(line for chunk in response.iter_encoded() for line in chunk.splitlines())
+
+    db.session.remove()
+    assert db.session.get(UserActivityModel, user_id) is not None
     response.close()
 
 

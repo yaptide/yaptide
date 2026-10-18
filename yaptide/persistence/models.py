@@ -61,6 +61,16 @@ class KeycloakUserModel(UserModel, db.Model):
     __mapper_args__ = {"polymorphic_identity": "KeycloakUser", "polymorphic_load": "inline"}
 
 
+class UserActivityModel(db.Model):
+    """When a user last followed the status of their simulations: a stream open or a status asked for; the engine
+    reads the progress of the others' HPC simulations less often
+    """
+
+    __tablename__ = "UserActivity"
+    user_id: Column[int] = db.Column(db.Integer, db.ForeignKey("User.id", ondelete="CASCADE"), primary_key=True)
+    seen_at: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=False)
+
+
 class ClusterModel(db.Model):
     """Cluster info for specific user"""
 

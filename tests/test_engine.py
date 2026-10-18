@@ -30,6 +30,7 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
     TaskModel,
+    UserActivityModel,
     YaptideUserModel,
 )
 from yaptide.routes.utils.tokens import encode_auth_token
@@ -472,9 +473,11 @@ def test_hpc_events_submit_once_and_a_crashed_submit_fails(client, engine):
     engine.cluster.cancel.remote.assert_called_once_with(simulation.id)
 
 
-def hpc_simulation(state: str = EntityState.PENDING.value, job_id: str = "hpc") -> int:
-    """A submitted HPC simulation with two tasks"""
+def hpc_simulation(state: str = EntityState.PENDING.value, job_id: str = "hpc", watched: bool = True) -> int:
+    """A submitted HPC simulation with two tasks, of a user following their simulations unless not watched"""
     user = db.session.query(YaptideUserModel).one()
+    if watched:
+        db.session.merge(UserActivityModel(user_id=user.id, seen_at=datetime.now(timezone.utc)))
     cluster = ClusterModel(cluster_name="ares")
     db.session.add(cluster)
     db.session.commit()
@@ -514,7 +517,7 @@ def hpc_round(engine: Engine, readers: int = 2) -> None:
     engine.hpc_readers = [mock.Mock(read=mock.Mock(remote=read)) for _ in range(readers)]
     engine.read_hpc_progress()
     if engine.hpc_reading:
-        ray.wait(list(engine.hpc_reading), num_returns=len(engine.hpc_reading))
+        ray.wait(engine.hpc_reading, num_returns=len(engine.hpc_reading))
         engine.handle("HPC_PROGRESS", None)
     assert not engine.hpc_reading
 
@@ -626,6 +629,40 @@ def test_unreachable_storage_skips_a_round(client, engine, monkeypatch):
     hpc_round(engine)
     assert reads == [f"hpc/{simulation_ids[0]}/progress/task_0001.json"]
     assert set(engine.report_etags) == set(simulation_ids)
+
+
+def test_simulations_nobody_follows_are_read_in_turns(client, engine, monkeypatch):
+    """Simulations of users who neither have a status stream open nor asked for a status lately are read a share in
+    every round, the longest unread first; their saves stay for the partial merges meanwhile. Once the user follows
+    them again, every round reads them.
+    """
+    simulation_ids = [hpc_simulation(EntityState.RUNNING.value, job_id=job_id, watched=False) for job_id in "abc"]
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    # one simulation of the three in each round
+    monkeypatch.setattr(engine_module, "UNWATCHED_PROGRESS_SECONDS", 3 * engine_module.HPC_PROGRESS_SECONDS)
+    listed = []
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", lambda sim_id: listed.append(sim_id) or {})
+    monkeypatch.setattr(engine_module, "delete_task_results", mock.Mock(remote=lambda sim_id: None))
+    engine.hpc_partials[simulation_ids[2]] = engine_module.HpcPartial()
+
+    for _ in range(4):
+        hpc_round(engine)
+    assert listed == [*simulation_ids, simulation_ids[0]]
+    assert simulation_ids[2] in engine.hpc_partials
+
+    user_id = db.session.query(YaptideUserModel.id).scalar()
+    seen = UserActivityModel(user_id=user_id, seen_at=datetime.now(timezone.utc) - timedelta(hours=1))
+    db.session.add(seen)
+    db.session.commit()
+    listed.clear()
+    hpc_round(engine)
+    assert listed == [simulation_ids[1]]  # seen too long ago
+
+    seen.seen_at = datetime.now(timezone.utc)
+    db.session.commit()
+    listed.clear()
+    hpc_round(engine)
+    assert sorted(listed) == simulation_ids
 
 
 def test_hpc_progress_is_read_in_a_process_of_its_own(client, engine):

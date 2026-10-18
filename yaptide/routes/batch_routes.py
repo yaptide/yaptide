@@ -10,6 +10,7 @@ from yaptide.persistence.db_methods import (
     fetch_all_clusters,
     fetch_batch_simulation_by_job_id,
     fetch_batch_tasks_by_sim_id,
+    note_watching,
     update_simulation_state,
     update_task_state,
 )
@@ -127,11 +128,10 @@ class JobsBatch(Resource):
         simulation = fetch_batch_simulation_by_job_id(job_id=job_id)
 
         # a read only: the states come from what the cluster's jobs report
-        return yaptide_response(
-            message=f"Job state: {simulation.job_state}",
-            code=200,
-            content=job_status_content(simulation, with_tasks=params_dict["tasks"]),
-        )
+        message, content = f"Job state: {simulation.job_state}", job_status_content(simulation, params_dict["tasks"])
+        # the UI asks while it cannot open the status stream: the progress of the user's simulations is read often
+        note_watching(user.id)
+        return yaptide_response(message=message, code=200, content=content)
 
     @staticmethod
     @requires_auth()

@@ -1,9 +1,11 @@
 import logging
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 from typing import Optional, Union
 
 from sqlalchemy import DateTime, Integer, String, and_, bindparam, case, func, update
 from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
+from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import with_polymorphic
 
 from yaptide.persistence.database import db
@@ -20,6 +22,7 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
     TaskModel,
+    UserActivityModel,
     UserModel,
     YaptideUserModel,
 )
@@ -411,3 +414,28 @@ def update_simulation_state(simulation: Union[BatchSimulationModel, CelerySimula
     if not simulation.update_state(update_dict):
         logging.warning("Simulation state not updated")
     db.session.commit()
+
+
+# a user following their simulations is written down at most this often by each process
+WATCHING_WRITE_SECONDS = 30
+# when this process last wrote each user down (time.monotonic)
+_watching_written: dict[int, float] = {}
+
+
+def note_watching(user_id: int) -> None:
+    """Writes down that the user follows the status of their simulations now (UserActivityModel), at most every
+    WATCHING_WRITE_SECONDS in this process; commits. A failed write is only logged: the status is still answered.
+    """
+    if time.monotonic() - _watching_written.get(user_id, float("-inf")) < WATCHING_WRITE_SECONDS:
+        return
+    _watching_written[user_id] = time.monotonic()
+    insert = postgresql.insert if db.engine.dialect.name == "postgresql" else sqlite.insert
+    seen = {"user_id": user_id, "seen_at": datetime.now(timezone.utc)}
+    try:
+        db.session.execute(
+            insert(UserActivityModel).values(seen).on_conflict_do_update(index_elements=["user_id"], set_=seen)
+        )
+        db.session.commit()
+    except Exception:  # skipcq: PYL-W0703
+        db.session.rollback()
+        logging.exception("Writing down that user %d follows their simulations failed", user_id)

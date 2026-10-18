@@ -11,6 +11,7 @@ the connection to the database and after a failed event.
 
 import json
 import logging
+import math
 import os
 import queue
 import re
@@ -53,6 +54,7 @@ from yaptide.persistence.models import (
     LogfilesModel,
     SimulationModel,
     TaskModel,
+    UserActivityModel,
 )
 from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
 from yaptide.utils.enums import EntityState, PlatformType, SimulationType
@@ -67,6 +69,11 @@ ENDED_READ_SECONDS = 600
 # processes reading the reports of a round, each the reports of some of the simulations: one reads about 5000 a
 # second on an M4 (its CPU, under the GIL), two as many as Garage serves; more only burn Garage's CPU
 HPC_READERS = 2
+# a user follows their simulations this long after a status stream of theirs or a status they asked for wrote it down
+# (db_methods.note_watching: at most every 30 s, while an open stream wakes at least every 25 s)
+WATCHED_SECONDS = 120
+# the progress of the HPC simulations of the other users is read this rarely, to spare the storage reads
+UNWATCHED_PROGRESS_SECONDS = int(os.environ.get("HPC_UNWATCHED_PROGRESS_SECONDS", 300))
 # what a task's report may set
 REPORTED_STATES = {
     EntityState.RUNNING.value,
@@ -419,9 +426,13 @@ class Engine:
         self.hpc_readers: list = []
         # ETags of the progress reports HPC tasks put into storage, as last read: simulation id -> key -> ETag
         self.report_etags: dict[int, dict[str, str]] = {}
-        # the round reading them: what each reader reads (its ref -> its simulations), the simulations' states
-        self.hpc_reading: dict[ray.ObjectRef, list[int]] = {}
-        self.hpc_round: list[tuple[int, str]] = []
+        # the round reading them: the ref of each reader
+        self.hpc_reading: list[ray.ObjectRef] = []
+        # the simulations of the round (id, state, whether their user follows them) and when it started
+        self.hpc_round: list[tuple[int, str, bool]] = []
+        self.hpc_round_started = 0.0
+        # when the reports of each simulation were last read (time.monotonic(), when that round started)
+        self.hpc_read_at: dict[int, float] = {}
         # whether HPC simulations may have reports to read: at start, after a submit, until a read finds none
         self.hpc_active = True
         # HPC simulations whose tasks put saves into storage
@@ -619,12 +630,27 @@ class Engine:
         # one that ended recently may still have the last reports of its tasks to read: the last task completes it
         # seconds after its report, and the engine may be restarting or the storage out of reach meanwhile
         recently = datetime.now(timezone.utc) - timedelta(seconds=ENDED_READ_SECONDS)
-        active = db.session.query(BatchSimulationModel.id, BatchSimulationModel.job_state).filter(
-            BatchSimulationModel.array_id.isnot(None),
-            or_(BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES), BatchSimulationModel.end_time >= recently),
+        watched_since = datetime.now(timezone.utc) - timedelta(seconds=WATCHED_SECONDS)
+        active = (
+            db.session.query(
+                BatchSimulationModel.id, BatchSimulationModel.job_state, UserActivityModel.seen_at >= watched_since
+            )
+            .outerjoin(UserActivityModel, UserActivityModel.user_id == BatchSimulationModel.user_id)
+            .filter(
+                BatchSimulationModel.array_id.isnot(None),
+                or_(BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES), BatchSimulationModel.end_time >= recently),
+            )
         )
         self.hpc_round = active.order_by(BatchSimulationModel.id).all()
-        simulation_ids = [simulation_id for simulation_id, _ in self.hpc_round]
+        self.hpc_round_started = time.monotonic()
+        # the ones nobody follows a share each round, the longest unread first: each about every
+        # UNWATCHED_PROGRESS_SECONDS (later while rounds take longer than HPC_PROGRESS_SECONDS)
+        unwatched = sorted(
+            (simulation_id for simulation_id, _, watched in self.hpc_round if not watched),
+            key=lambda simulation_id: self.hpc_read_at.get(simulation_id, float("-inf")),
+        )
+        due = unwatched[: math.ceil(len(unwatched) * HPC_PROGRESS_SECONDS / UNWATCHED_PROGRESS_SECONDS)]
+        simulation_ids = sorted(due + [simulation_id for simulation_id, _, watched in self.hpc_round if watched])
         if simulation_ids and not self.hpc_readers:
             self.hpc_readers = [HpcReader.remote() for _ in range(HPC_READERS)]
         # ponytail: simulations dealt out in turn, even while they have about as many tasks; by tasks if not
@@ -632,7 +658,7 @@ class Engine:
             group = simulation_ids[number :: len(self.hpc_readers)]
             if group:
                 ref = reader.read.remote({sim_id: self.report_etags.get(sim_id, {}) for sim_id in group})
-                self.hpc_reading[ref] = group
+                self.hpc_reading.append(ref)
                 self.watch(ref, None, "HPC_PROGRESS")
         if not self.hpc_reading:
             self.hpc_progress_read()
@@ -641,28 +667,29 @@ class Engine:
         """Ends the round once every reader is done: keeps what was read, merges partial results when they are due
 
         A reader that failed, e.g. with storage out of reach, leaves its simulations to the next round, which reads
-        their reports again; it is not a reason to stop the engine.
+        their reports again (the unwatched ones first); it is not a reason to stop the engine.
         """
-        refs = list(self.hpc_reading)
+        refs = self.hpc_reading
         if refs and len(ray.wait(refs, num_returns=len(refs), timeout=0)[0]) < len(refs):
             return
-        etags: dict[int, dict[str, str]] = {}
-        for ref, group in self.hpc_reading.items():
+        # finished simulations are forgotten, the ones not read this round keep what was read before
+        active = {simulation_id for simulation_id, _, _ in self.hpc_round}
+        self.report_etags = {sim_id: etags for sim_id, etags in self.report_etags.items() if sim_id in active}
+        self.hpc_read_at = {sim_id: read_at for sim_id, read_at in self.hpc_read_at.items() if sim_id in active}
+        for ref in self.hpc_reading:
             try:
                 read = ray.get(ref)
             except Exception:  # skipcq: PYL-W0703
                 logging.exception("Reading HPC progress failed, trying again in %d s", HPC_PROGRESS_SECONDS)
-                etags.update((sim_id, self.report_etags[sim_id]) for sim_id in group if sim_id in self.report_etags)
                 continue
             for simulation_id, (reports, saved) in read.items():
-                etags[simulation_id] = reports
+                self.report_etags[simulation_id] = reports
+                self.hpc_read_at[simulation_id] = self.hpc_round_started
                 if saved:
                     self.hpc_partials.setdefault(simulation_id, HpcPartial()).saved.update(saved)
-        self.hpc_reading = {}
-        # finished simulations are forgotten
-        self.report_etags = etags
+        self.hpc_reading = []
         self.merge_hpc_partials(
-            {sim_id for sim_id, job_state in self.hpc_round if job_state == EntityState.RUNNING.value}
+            {sim_id for sim_id, job_state, _ in self.hpc_round if job_state == EntityState.RUNNING.value}
         )
         self.hpc_active = bool(self.hpc_round or self.hpc_partials)
 
