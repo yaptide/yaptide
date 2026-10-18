@@ -16,9 +16,16 @@ import tempfile
 import time
 from functools import lru_cache
 from pathlib import Path
+from typing import Optional
+from urllib.parse import quote, urlencode
+from xml.etree import ElementTree  # skipcq: BAN-B405
 
 import boto3
+import urllib3
+from botocore.auth import S3SigV4Auth
+from botocore.awsrequest import AWSRequest
 from botocore.config import Config
+from botocore.credentials import Credentials
 from botocore.exceptions import ClientError
 
 # the page JSON the UI reads, gzipped; a format kept per page lets other formats (binary, chunked) live alongside
@@ -259,19 +266,60 @@ def job_links(sim_id: int, saving_tasks: int = 0) -> dict:
     }
 
 
+# reports read at once by one process; a report takes about 0.2 ms of CPU to read (on an M4, under the GIL), so
+# a process reads at most a few thousand a second whatever the threads, and the engine spreads them over processes
+REPORT_CONNECTIONS = 16
+# the ListObjectsV2 answer
+S3_XML = "{http://s3.amazonaws.com/doc/2006-03-01/}"
+
+
+@lru_cache(maxsize=1)
+def _report_reader() -> tuple[S3SigV4Auth, urllib3.PoolManager]:
+    """Signer and connections for the progress reports: plain signed GETs take a fraction of the CPU of a boto3
+    request (0.2 ms instead of 0.5 ms a report, a sixth of it for a listing), which bounds the reports read a second
+    """
+    credentials = Credentials(os.environ.get("RESULTS_S3_ACCESS_KEY"), os.environ.get("RESULTS_S3_SECRET_KEY"))
+    signer = S3SigV4Auth(credentials, "s3", os.environ.get("RESULTS_S3_REGION", "garage"))
+    # as the boto3 client: fail fast, two attempts in total
+    http = urllib3.PoolManager(
+        maxsize=REPORT_CONNECTIONS, timeout=urllib3.Timeout(connect=2, read=10), retries=urllib3.Retry(total=1)
+    )
+    return signer, http
+
+
+def _signed_get(key: Optional[str] = None, query: Optional[dict] = None) -> bytes:
+    """Body of a GET of an object, or of the bucket without a key; storage out of reach or answering anything but
+    200 raises ConnectionError (an OSError)
+    """
+    signer, http = _report_reader()
+    url = f"{os.environ['RESULTS_S3_ENDPOINT']}/{os.environ['RESULTS_S3_BUCKET']}" + (f"/{quote(key)}" if key else "")
+    request = AWSRequest("GET", url + (f"?{urlencode(query)}" if query else ""))
+    signer.add_auth(request)
+    try:
+        response = http.request("GET", request.url, headers=dict(request.headers))
+    except urllib3.exceptions.HTTPError as error:
+        raise ConnectionError(f"storage out of reach: {error}") from error
+    if response.status != 200:
+        raise ConnectionError(f"storage answered {response.status} for {key or query}")
+    return response.data
+
+
 def progress_reports(sim_id: int) -> dict[str, str]:
     """The progress objects of an HPC simulation: key -> ETag, which changes with every new report"""
-    bucket = os.environ["RESULTS_S3_BUCKET"]
-    reports = {}
-    for listing in _internal().get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=progress_prefix(sim_id)):
-        for item in listing.get("Contents", []):
-            reports[item["Key"]] = item["ETag"]
-    return reports
+    reports, query = {}, {"list-type": "2", "prefix": progress_prefix(sim_id)}
+    while True:
+        # the storage's own answer, not the jobs'
+        listing = ElementTree.fromstring(_signed_get(query=query))  # skipcq: BAN-B314
+        for item in listing.iter(S3_XML + "Contents"):
+            reports[item.findtext(S3_XML + "Key")] = item.findtext(S3_XML + "ETag")
+        query["continuation-token"] = listing.findtext(S3_XML + "NextContinuationToken")
+        if not query["continuation-token"]:
+            return reports
 
 
 def read_report(key: str) -> dict:
     """A task's progress report"""
-    return json.load(_internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"])
+    return json.loads(_signed_get(key))
 
 
 def put_cancel(sim_id: int) -> None:
