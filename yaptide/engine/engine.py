@@ -17,6 +17,7 @@ import re
 import shutil
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -42,6 +43,7 @@ from yaptide.persistence.db_methods import (
     add_object_to_db,
     bulk_update_task_states,
     fetch_task_summary,
+    update_reported_tasks,
     update_simulation_state,
 )
 from yaptide.persistence.models import (
@@ -62,6 +64,9 @@ CLUSTER_CONNECTIONS = 4
 HPC_PROGRESS_SECONDS = 10
 # how long after an HPC simulation ended its tasks' reports are still read
 ENDED_READ_SECONDS = 600
+# processes reading the reports of a round, each the reports of some of the simulations: one reads about 5000 a
+# second on an M4 (its CPU, under the GIL), two as many as Garage serves; more only burn Garage's CPU
+HPC_READERS = 2
 # what a task's report may set
 REPORTED_STATES = {
     EntityState.RUNNING.value,
@@ -95,6 +100,85 @@ def clean_report(update: dict) -> dict:
                 continue
             clean[name] = value
     return clean
+
+
+def read_report(simulation_id: int, key: str) -> Optional[dict]:
+    """A task's report as a task update: the task comes from the object's name, only valid fields count;
+    the primaries of the task's latest save in storage come as saved_primaries
+
+    A report that cannot be used gives None; storage out of reach is raised and ends the round.
+    """
+    match = re.fullmatch(result_storage.progress_prefix(simulation_id) + r"task_(\d{1,6})\.json", key)
+    if not match:
+        return None
+    try:
+        report = result_storage.read_report(key)
+        if not isinstance(report, dict) or not isinstance(report.get("update"), dict):
+            raise ValueError("not a report")
+        update = {"task_id": int(match.group(1)), "update_dict": clean_report(report["update"])}
+        saved = report["update"].get("saved_primaries")
+    except (BotoCoreError, ClientError, OSError):
+        raise
+    # anything the job wrote, also JSON too deep to parse (RecursionError)
+    except Exception:  # skipcq: PYL-W0703
+        logging.warning("Unreadable progress report %s", key)
+        return None
+    if type(saved) is int and 0 <= saved <= MAX_REPORTED_NUMBER:
+        update["saved_primaries"] = saved
+    return update if update["update_dict"] or "saved_primaries" in update else None
+
+
+def read_reports(etags: dict[int, dict[str, str]]) -> dict[int, tuple[dict[str, str], dict[int, int]]]:
+    """Saves what the tasks of HPC simulations (simulation id -> ETags of the reports as last read) put into storage
+    since; for each simulation its reports (key -> ETag) and the primaries of its tasks' latest saves in storage
+
+    Many reports are read at once, and a simulation's updates are saved while the next ones are read: one statement
+    for its tasks and one event for its streams. A report that cannot be used is skipped (and not read again until
+    it changes), a simulation whose progress is refused too; storage or database out of reach raises.
+    """
+    # one listing at a time and none while reports are read: Garage otherwise burns several times the CPU (SQLite
+    # or LMDB metadata alike) and serves no faster
+    listings = {simulation_id: result_storage.progress_reports(simulation_id) for simulation_id in etags}
+    saved = {}
+    pool = ThreadPoolExecutor(result_storage.REPORT_CONNECTIONS)
+    # reads not started yet are dropped when one fails: the round ends at once, also with storage out of reach
+    try:
+        reads = {
+            simulation_id: [
+                pool.submit(read_report, simulation_id, key)
+                for key, etag in listings[simulation_id].items()
+                if last.get(key) != etag
+            ]
+            for simulation_id, last in etags.items()
+        }
+        for simulation_id, futures in reads.items():
+            updates = [update for update in (future.result() for future in futures) if update]
+            saved[simulation_id] = {
+                update["task_id"]: update.pop("saved_primaries") for update in updates if "saved_primaries" in update
+            }
+            save_reports(simulation_id, [update for update in updates if update["update_dict"]])
+    finally:
+        pool.shutdown(cancel_futures=True)
+    return {simulation_id: (listings[simulation_id], saved[simulation_id]) for simulation_id in etags}
+
+
+def save_reports(simulation_id: int, updates: list[dict]) -> None:
+    """Saves the checked updates of a simulation's tasks and moves the simulation's state when a task's state
+    changed, in one transaction; progress the database refuses is left out, the database out of reach raises
+    """
+    if not updates:
+        return
+    try:
+        update_reported_tasks(simulation_id, updates)
+        simulation = db.session.get(SimulationModel, simulation_id)
+        if simulation:
+            update_state_from_tasks(simulation, any("task_state" in update["update_dict"] for update in updates))
+        db.session.commit()
+    except DATABASE_FAILURES:
+        raise
+    except Exception:  # skipcq: PYL-W0703
+        db.session.rollback()
+        logging.exception("Progress of simulation %d refused", simulation_id)
 
 
 HPC_ACTIVE_STATES = (
@@ -266,6 +350,21 @@ class ClusterGateway:
                 db.session.remove()
 
 
+# a process of its own, so the reports of a round are read on several cores; no CPU slot, like the merges
+@ray.remote(num_cpus=0, max_restarts=-1)
+class HpcReader:
+    """Reads and saves the progress HPC tasks put into storage, for some of the simulations of a round"""
+
+    @staticmethod
+    def read(etags: dict[int, dict[str, str]]) -> dict[int, tuple[dict[str, str], dict[int, int]]]:
+        """read_reports with a database session of its own"""
+        with backend_app().app_context():
+            try:
+                return read_reports(etags)
+            finally:
+                db.session.remove()
+
+
 @dataclass
 class Running:
     """A simulation the engine runs: its tasks still running, then its merge"""
@@ -316,8 +415,13 @@ class Engine:
         self.cleaner = StorageCleaner.remote()
         # deleted simulations whose objects the cleaner removes: (simulation id, with pages) -> the removal's ref
         self.removing: dict[tuple[int, bool], ray.ObjectRef] = {}
-        # ETags of the progress reports HPC tasks put into storage, as last read
-        self.report_etags: dict[str, str] = {}
+        # started with the first round: processes of their own
+        self.hpc_readers: list = []
+        # ETags of the progress reports HPC tasks put into storage, as last read: simulation id -> key -> ETag
+        self.report_etags: dict[int, dict[str, str]] = {}
+        # the round reading them: what each reader reads (its ref -> its simulations), the simulations' states
+        self.hpc_reading: dict[ray.ObjectRef, list[int]] = {}
+        self.hpc_round: list[tuple[int, str]] = []
         # whether HPC simulations may have reports to read: at start, after a submit, until a read finds none
         self.hpc_active = True
         # HPC simulations whose tasks put saves into storage
@@ -360,7 +464,12 @@ class Engine:
                     # what tasks of stopped simulations report is dropped anyway, so it can wait in the inbox
                     if self.running:
                         self.save_progress()
-                if self.hpc_active and time.monotonic() - last_hpc_progress >= HPC_PROGRESS_SECONDS:
+                # a round starts after the last one ended
+                if (
+                    self.hpc_active
+                    and not self.hpc_reading
+                    and time.monotonic() - last_hpc_progress >= HPC_PROGRESS_SECONDS
+                ):
                     last_hpc_progress = time.monotonic()
                     self.read_hpc_progress()
                 if time.monotonic() - last_overdue_check >= OVERDUE_CHECK_SECONDS:
@@ -392,6 +501,8 @@ class Engine:
             self.sweep()
         elif event == "SUBMITTED":
             self.submitted(simulation_id)
+        elif event == "HPC_PROGRESS":
+            self.hpc_progress_read()
         elif event == "NEW_STATE":
             # watched again after the drain, which resets the notice; also when the save fails
             try:
@@ -499,11 +610,9 @@ class Engine:
         for simulation_id in sorted(to_cancel):
             self.cancel(simulation_id)
 
-    def read_hpc_progress(self) -> None:  # skipcq: PY-R1000
-        """Saves what the tasks of running HPC simulations put into storage since the last look
-
-        A report that cannot be used is skipped (and not read again until it changes); storage out of reach ends
-        the round - it is not a reason to stop the engine, and the next round tries again.
+    def read_hpc_progress(self) -> None:
+        """Starts a round saving what the tasks of running HPC simulations put into storage since the last look,
+        spread over the readers; each reader's end comes as an event, the last one ends the round (hpc_progress_read)
         """
         if not result_storage.configured():
             return
@@ -514,41 +623,48 @@ class Engine:
             BatchSimulationModel.array_id.isnot(None),
             or_(BatchSimulationModel.job_state.in_(HPC_ACTIVE_STATES), BatchSimulationModel.end_time >= recently),
         )
-        seen: dict[str, str] = {}
-        running = set()
-        active = active.all()
-        for simulation_id, job_state in active:
+        self.hpc_round = active.order_by(BatchSimulationModel.id).all()
+        simulation_ids = [simulation_id for simulation_id, _ in self.hpc_round]
+        if simulation_ids and not self.hpc_readers:
+            self.hpc_readers = [HpcReader.remote() for _ in range(HPC_READERS)]
+        # ponytail: simulations dealt out in turn, even while they have about as many tasks; by tasks if not
+        for number, reader in enumerate(self.hpc_readers):
+            group = simulation_ids[number :: len(self.hpc_readers)]
+            if group:
+                ref = reader.read.remote({sim_id: self.report_etags.get(sim_id, {}) for sim_id in group})
+                self.hpc_reading[ref] = group
+                self.watch(ref, None, "HPC_PROGRESS")
+        if not self.hpc_reading:
+            self.hpc_progress_read()
+
+    def hpc_progress_read(self) -> None:
+        """Ends the round once every reader is done: keeps what was read, merges partial results when they are due
+
+        A reader that failed, e.g. with storage out of reach, leaves its simulations to the next round, which reads
+        their reports again; it is not a reason to stop the engine.
+        """
+        refs = list(self.hpc_reading)
+        if refs and len(ray.wait(refs, num_returns=len(refs), timeout=0)[0]) < len(refs):
+            return
+        etags: dict[int, dict[str, str]] = {}
+        for ref, group in self.hpc_reading.items():
             try:
-                reports = result_storage.progress_reports(simulation_id)
-                read = [
-                    update
-                    for key, etag in reports.items()
-                    if self.report_etags.get(key) != etag
-                    for update in [self.read_report(simulation_id, key)]
-                    if update
-                ]
+                read = ray.get(ref)
             except Exception:  # skipcq: PYL-W0703
                 logging.exception("Reading HPC progress failed, trying again in %d s", HPC_PROGRESS_SECONDS)
-                return
-            for update in read:
-                if "saved_primaries" in update:
-                    partial = self.hpc_partials.setdefault(simulation_id, HpcPartial())
-                    partial.saved[update["task_id"]] = update.pop("saved_primaries")
-            try:
-                updates = [update for update in read if update["update_dict"]]
-                if updates:
-                    self.save_task_updates(simulation_id, updates)
-            except DATABASE_FAILURES:
-                raise
-            except Exception:  # skipcq: PYL-W0703
-                logging.exception("Progress of simulation %d refused", simulation_id)
-            seen.update(reports)
-            if job_state == EntityState.RUNNING.value:
-                running.add(simulation_id)
+                etags.update((sim_id, self.report_etags[sim_id]) for sim_id in group if sim_id in self.report_etags)
+                continue
+            for simulation_id, (reports, saved) in read.items():
+                etags[simulation_id] = reports
+                if saved:
+                    self.hpc_partials.setdefault(simulation_id, HpcPartial()).saved.update(saved)
+        self.hpc_reading = {}
         # finished simulations are forgotten
-        self.report_etags = seen
-        self.merge_hpc_partials(running)
-        self.hpc_active = bool(active or self.hpc_partials)
+        self.report_etags = etags
+        self.merge_hpc_partials(
+            {sim_id for sim_id, job_state in self.hpc_round if job_state == EntityState.RUNNING.value}
+        )
+        self.hpc_active = bool(self.hpc_round or self.hpc_partials)
 
     def merge_hpc_partials(self, running: set[int]) -> None:
         """Merges the saves of running HPC simulations into partial results when they are due; removes the saves of
@@ -600,32 +716,6 @@ class Engine:
     def partial_merges(self) -> int:
         """Partial merges running, of direct and HPC simulations"""
         return sum(1 for merged in [*self.running.values(), *self.hpc_partials.values()] if merged.partial)
-
-    @staticmethod
-    def read_report(simulation_id: int, key: str) -> Optional[dict]:
-        """A task's report as a task update: the task comes from the object's name, only valid fields count;
-        the primaries of the task's latest save in storage come as saved_primaries
-
-        A report that cannot be used gives None; storage out of reach is raised and ends the round.
-        """
-        match = re.fullmatch(result_storage.progress_prefix(simulation_id) + r"task_(\d{1,6})\.json", key)
-        if not match:
-            return None
-        try:
-            report = result_storage.read_report(key)
-            if not isinstance(report, dict) or not isinstance(report.get("update"), dict):
-                raise ValueError("not a report")
-            update = {"task_id": int(match.group(1)), "update_dict": clean_report(report["update"])}
-            saved = report["update"].get("saved_primaries")
-        except (BotoCoreError, ClientError, OSError):
-            raise
-        # anything the job wrote, also JSON too deep to parse (RecursionError)
-        except Exception:  # skipcq: PYL-W0703
-            logging.warning("Unreadable progress report %s", key)
-            return None
-        if type(saved) is int and 0 <= saved <= MAX_REPORTED_NUMBER:
-            update["saved_primaries"] = saved
-        return update if update["update_dict"] or "saved_primaries" in update else None
 
     def submit(self, simulation_id: int) -> None:
         """Hands a stored HPC simulation to the cluster gateway, once"""
