@@ -448,7 +448,7 @@ class Engine:
         # from Ray, SWEEP
         self.events: queue.Queue = queue.Queue()
 
-    def run(self, listener: Optional[threading.Thread] = None) -> None:
+    def run(self, listener: Optional[threading.Thread] = None) -> None:  # skipcq: PY-R1000
         """Handles events as they come, saves progress every second while simulations run and at once when a task
         changes its state, until failing for a minute
 

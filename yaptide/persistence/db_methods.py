@@ -213,7 +213,7 @@ def _reported(name: str, type_):
 
 def _reported_update():
     """TaskModel.update_state as one UPDATE of a task, for update_reported_tasks"""
-    state, end = _reported("task_state", String), _reported("end_time", DateTime(timezone=True))
+    state, end = _reported("task_state", String), _reported("end_time", DateTime(timezone=True))  # skipcq: PYL-E1111
     requested = func.coalesce(func.nullif(_reported("requested_primaries", Integer), 0), TASK.requested_primaries)
     estimated = _reported("estimated_time", Integer)
     return (
