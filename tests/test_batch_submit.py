@@ -369,6 +369,56 @@ def test_status_says_when_a_busy_cluster_is_tried_again(client, cluster_connecti
     assert "cluster_busy_until" not in response.get_json()
 
 
+def test_status_of_a_simulation_waiting_for_closed_logins_shows_the_admins_notice(client):
+    """While the cluster is busy, the notice its login node sent when it closed the connection is shown with it"""
+    simulation = submit(client)
+    cluster = db.session.get(ClusterModel, simulation.cluster_id)
+    cluster.notice = "Access to the login nodes has been temporarily restricted"
+    db.session.commit()
+    response = client.get("/jobs/batch", query_string={"job_id": simulation.job_id, "tasks": "false"})
+    assert "cluster_notice" not in response.get_json()  # an old notice of a cluster that is not busy
+
+    cluster.busy_until = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+    db.session.commit()
+    response = client.get("/jobs/batch", query_string={"job_id": simulation.job_id, "tasks": "false"})
+    assert response.get_json()["cluster_notice"] == "Access to the login nodes has been temporarily restricted"
+
+
+def test_a_login_node_that_closed_logins_leaves_its_notice_until_it_lets_the_user_in(client, monkeypatch):
+    """The admins' notice paramiko kept from the closed connection is stored for the cluster; the next login that
+    succeeds clears it, a refused certificate leaves it
+    """
+    simulation = submit(client)
+    user = db.session.get(KeycloakUserModel, simulation.user_id)
+    cluster = db.session.get(ClusterModel, simulation.cluster_id)
+    monkeypatch.setattr(batch_methods, "certificate_expired", lambda _: False)
+    monkeypatch.setattr(batch_methods, "RSAKey", mock.MagicMock())
+    login = mock.MagicMock()
+    monkeypatch.setattr(batch_methods.Connection, "open", login)
+    connection = batch_methods.get_connection(user=user, cluster=cluster)
+    connection.client = mock.MagicMock()
+    connection.client.get_transport.return_value.auth_handler.banner = b"Notice from the System Administrators\n\n"
+
+    def notice() -> str:
+        """The notice stored for the cluster"""
+        db.session.remove()
+        return db.session.get(ClusterModel, cluster.id).notice
+
+    login.side_effect = AuthenticationException("Authentication failed: transport shut down or saw EOF")
+    with pytest.raises(AuthenticationException):
+        connection.open()
+    assert notice() == "Notice from the System Administrators"
+
+    login.side_effect = AuthenticationException("Authentication failed.")
+    with pytest.raises(AuthenticationException):
+        connection.open()
+    assert notice() == "Notice from the System Administrators"
+
+    login.side_effect = None
+    connection.open()
+    assert notice() is None
+
+
 @pytest.mark.parametrize(
     "task_states, before, expected",
     [

@@ -55,6 +55,8 @@ SBATCH_SECONDS = 60
 CANCEL_SECONDS = COMMAND_SECONDS - 10
 # what paramiko says when the server closes the connection while logging in, e.g. after accepting the key
 LOGIN_CLOSED = "transport shut down or saw EOF"
+# the most of a login node's notice shown to the users
+NOTICE_CHARS = 2000
 
 # what sbatch and scancel say when the SLURM controller does not answer in time (it froze for minutes on the
 # clusters: "Socket timed out on send/recv operation", "Unable to contact slurm controller (connect failure)"),
@@ -96,13 +98,57 @@ def get_connection(user: KeycloakUserModel, cluster: ClusterModel) -> Connection
     pkey = RSAKey.from_private_key(io.StringIO(user.private_key))
     pkey.load_certificate(user.cert)
 
-    con = Connection(
+    con = ClusterConnection(
         host=f"{user.username}@{cluster.cluster_name}",
         connect_kwargs={"pkey": pkey, "allow_agent": False, "look_for_keys": False},
         # an unreachable login node must not block the engine's submits for long
         connect_timeout=30,
     )
+    con.cluster_id = cluster.id
     return con
+
+
+class ClusterConnection(Connection):
+    """Connection to a cluster's login node that keeps what the cluster's admins said when it closed the connection
+    (/etc/nologin), for the users waiting for the cluster; a login that succeeds clears it
+    """
+
+    # a real attribute: fabric turns the unknown ones into config
+    cluster_id: Optional[int] = None
+
+    def open(self):
+        """Logs in, unless connected already"""
+        if self.is_connected:
+            return super().open()
+        try:
+            opened = super().open()
+        except AuthenticationException as e:
+            if LOGIN_CLOSED in str(e):
+                show_notice(self.cluster_id, login_notice(self))
+            raise
+        show_notice(self.cluster_id, None)
+        return opened
+
+
+def login_notice(con: Connection) -> Optional[str]:
+    """What the login node said before it closed the connection: the admins' notice (/etc/nologin) it sends as the
+    login banner; paramiko keeps it in the auth handler (get_banner() answers None once the connection is closed)
+    """
+    banner = getattr(getattr(con.client.get_transport(), "auth_handler", None), "banner", None)
+    if not banner:
+        return None
+    return banner.decode(errors="replace").strip()[:NOTICE_CHARS] or None
+
+
+def show_notice(cluster_id: int, notice: Optional[str]) -> None:
+    """Stores the notice of the cluster's login node (None: it lets the users in), in its own transaction"""
+    cluster = ClusterModel.__table__
+    with db.engine.begin() as connection:
+        connection.execute(
+            cluster.update()
+            .where(cluster.c.id == cluster_id, cluster.c.notice.is_distinct_from(notice))
+            .values(notice=notice)
+        )
 
 
 def fail_submit(simulation: BatchSimulationModel, log: dict) -> None:

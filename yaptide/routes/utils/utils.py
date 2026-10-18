@@ -75,25 +75,29 @@ def job_status_content(simulation: SimulationModel, with_tasks: bool, summary: O
             # SQLite drops the time zone of the UTC time stored
             "time": simulation.partial_time.replace(tzinfo=simulation.partial_time.tzinfo or timezone.utc).isoformat(),
         }
-    busy_until = cluster_busy_until(simulation)
-    if busy_until:
+    cluster = busy_cluster(simulation)
+    if cluster:
         # it waits for its cluster, which the engine tries again then
+        busy_until = cluster.busy_until
         content["cluster_busy_until"] = busy_until.replace(tzinfo=busy_until.tzinfo or timezone.utc).isoformat()
+        if cluster.notice:
+            # e.g. its admins closed the logins: what they said about it
+            content["cluster_notice"] = cluster.notice
     if with_tasks:
         content["job_tasks_status"] = [task.get_status_dict() for task in fetch_tasks_by_sim_id(sim_id=simulation.id)]
     return content
 
 
-def cluster_busy_until(simulation: SimulationModel) -> Optional[datetime]:
-    """When the engine tries again the cluster of an HPC simulation still to be submitted, while its SLURM does not
-    answer; None otherwise
+def busy_cluster(simulation: SimulationModel) -> Optional[ClusterModel]:
+    """The cluster of an HPC simulation still to be submitted, while its SLURM does not answer (the engine tries it
+    again at busy_until); None otherwise
     """
     if not isinstance(simulation, BatchSimulationModel):
         return None
     if simulation.job_state != EntityState.PENDING.value or simulation.array_id is not None:
         return None
     cluster = db.session.get(ClusterModel, simulation.cluster_id)
-    return cluster.busy_until if cluster else None
+    return cluster if cluster and cluster.busy_until else None
 
 
 def update_state_from_tasks(simulation: SimulationModel, states_changed: bool = True) -> None:

@@ -82,6 +82,9 @@ class ClusterModel(db.Model):
         nullable=True,
         doc="Set while the cluster's SLURM does not answer: the engine tries to submit to it again then",
     )
+    notice: Column[str] = db.Column(
+        db.Text, nullable=True, doc="What the cluster's admins said when its login node last closed the connection"
+    )
     simulations = relationship("BatchSimulationModel")
 
 
