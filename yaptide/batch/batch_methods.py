@@ -53,6 +53,9 @@ SUBMIT_SECONDS = 300
 SBATCH_SECONDS = 60
 # the cancel command gives up on the login node before the backend stops waiting for it
 CANCEL_SECONDS = COMMAND_SECONDS - 10
+# what paramiko says when the server closes the connection while logging in, e.g. after accepting the key
+LOGIN_CLOSED = "transport shut down or saw EOF"
+
 # what sbatch and scancel say when the SLURM controller does not answer in time (it froze for minutes on the
 # clusters: "Socket timed out on send/recv operation", "Unable to contact slurm controller (connect failure)"),
 # and what the submit script says when it gave sbatch up; a login node not answering in time looks the same
@@ -60,11 +63,13 @@ SLURM_STUCK = re.compile(r"timed out|Unable to contact slurm controller|temporar
 
 
 def slurm_stuck(error: Exception) -> bool:
-    """Whether a failed command on the cluster met a SLURM (or login node) that did not answer in time - worth
-    trying again later, unlike a certificate the cluster refused or input sbatch rejected
+    """Whether a failed command on the cluster met a SLURM (or login node) that did not answer in time, or logins
+    the admins closed - worth trying again later, unlike a certificate the cluster refused or input sbatch rejected
     """
     if isinstance(error, AuthenticationException):
-        return False
+        # the key was accepted, then the login node hung up: logins closed by the admins (/etc/nologin), unlike a
+        # refused certificate ("Authentication failed.")
+        return LOGIN_CLOSED in str(error)
     # also an error raised while handling a timeout: paramiko's "Error reading SSH protocol banner" of a frozen node
     cause = error
     while cause is not None:
@@ -337,7 +342,10 @@ def cancel_simulation(simulation_id: int) -> Optional[bool]:
     try:
         with get_connection(user=user, cluster=cluster) as con:
             result = con.run(cancel_command(simulation.job_dir), hide=True, warn=True, timeout=COMMAND_SECONDS)
-    except AuthenticationException:
+    except AuthenticationException as e:
+        if slurm_stuck(e):
+            logging.warning("The cluster closed logins, cancelling simulation %d is to be repeated", simulation_id)
+            return False
         logging.warning("Certificate of simulation %d expired, its jobs stop through storage", simulation.id)
         forget_job_dir(simulation.id)
         return None
