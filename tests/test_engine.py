@@ -1115,3 +1115,25 @@ def test_cluster_gateway_hands_over_whether_slurm_answered(client, monkeypatch):
 
     assert gateway.submit(1) is False
     assert gateway.cancel(1) is True
+
+
+def test_an_hpc_simulation_waiting_too_long_for_its_cluster_fails(client, engine):
+    """One not submitted CLUSTER_WAIT_HOURS after it was sent fails with the reason, and what its attempt left on the
+    cluster is cancelled; a newer one is still submitted
+    """
+    old, new = hpc_simulation(job_id="old"), hpc_simulation(job_id="new")
+    for simulation_id in (old, new):
+        db.session.get(BatchSimulationModel, simulation_id).array_id = None
+    db.session.get(BatchSimulationModel, old).job_dir = f"/scratch/yaptide_runs/{old}_1"
+    db.session.get(BatchSimulationModel, old).start_time = datetime.now(timezone.utc) - timedelta(hours=25)
+    db.session.commit()
+    engine.cluster = mock.Mock()
+    engine.cluster.submit.remote.side_effect = lambda simulation_id: ray.put(True)
+    engine.cluster.cancel.remote.side_effect = lambda simulation_id: ray.put(True)
+
+    engine.submit_waiting()
+
+    assert state(old) == EntityState.FAILED.value
+    assert "did not answer for 24 h" in db.session.query(LogfilesModel).filter_by(simulation_id=old).one().data["error"]
+    engine.cluster.cancel.remote.assert_called_once_with(old)
+    engine.cluster.submit.remote.assert_called_once_with(new)

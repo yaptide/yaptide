@@ -226,6 +226,8 @@ BREAKER_FAILURES = int(os.environ.get("CLUSTER_BREAKER_FAILURES", "3"))
 BREAKER_SECONDS = [int(seconds) for seconds in os.environ.get("CLUSTER_BREAKER_SECONDS", "180,300,600").split(",")]
 # another call tries the cluster if the answer to the one trying it never comes (the simulation was deleted meanwhile)
 TRIAL_SECONDS = 2 * SUBMIT_SECONDS
+# a simulation not submitted this long after it was sent (its cluster did not answer) fails, the user tries later
+CLUSTER_WAIT_HOURS = float(os.environ.get("CLUSTER_WAIT_HOURS", "24"))
 
 
 # restarted when it dies: only progress not saved yet is lost, final states come with the task results;
@@ -892,17 +894,29 @@ class Engine:
 
     def submit_waiting(self) -> None:
         """Submits the HPC simulations waiting for it: stored, or left PENDING by a cluster that did not answer (their
-        submit first cancels what the attempt left on the cluster)
+        submit first cancels what the attempt left on the cluster); the ones waiting longer than CLUSTER_WAIT_HOURS
+        fail instead
         """
         waiting = (
-            db.session.query(BatchSimulationModel.id)
+            db.session.query(BatchSimulationModel)
             .filter(
                 BatchSimulationModel.job_state == EntityState.PENDING.value, BatchSimulationModel.array_id.is_(None)
             )
             .order_by(BatchSimulationModel.id)
+            .all()
         )
-        for (simulation_id,) in waiting:
-            self.submit(simulation_id)
+        given_up = datetime.now(timezone.utc) - timedelta(hours=CLUSTER_WAIT_HOURS)
+        for simulation in waiting:
+            # SQLite drops the time zone of the UTC time stored
+            sent = simulation.start_time.replace(tzinfo=simulation.start_time.tzinfo or timezone.utc)
+            if sent >= given_up or simulation.id in self.submitting:
+                self.submit(simulation.id)
+                continue
+            error = f"The cluster did not answer for {CLUSTER_WAIT_HOURS:g} h, submit the simulation again later"
+            fail_submit(simulation, {"error": error})
+            if simulation.job_dir:
+                # what an attempt left on the cluster
+                self.cancel(simulation.id)
 
     def submitted(self, simulation_id: int) -> None:
         """A submit ended; it reports its own failures and leaves PENDING a simulation whose cluster did not answer.
