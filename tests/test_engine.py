@@ -829,3 +829,38 @@ def test_new_task_states_save_the_progress_at_most_twice_a_second(engine, monkey
     engine.progress_saved = time.monotonic() - engine_module.NEW_STATE_SAVE_SECONDS
     engine.handle("NEW_STATE", None)
     assert saves == [1]
+
+
+def test_objects_of_deleted_simulations_are_removed_in_the_background(client, engine, monkeypatch):
+    """A delete event and the look for orphans hand the cleaner only simulations gone from the database, below the
+    newest one, each once while its removal runs
+    """
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    kept, deleted, newest = (hpc_simulation(job_id=job_id) for job_id in ("kept", "deleted", "newest"))
+    db.session.delete(db.session.get(SimulationModel, deleted))
+    db.session.commit()
+    engine.cleaner = mock.Mock()
+    engine.cleaner.delete.remote.side_effect = lambda sim_id: ray.put(None)
+    monkeypatch.setattr(engine_module.result_storage, "stored_simulations", lambda: {kept, deleted, newest + 1})
+    finished = []
+    monkeypatch.setattr(engine_module.ray, "wait", lambda refs, timeout: (refs, []) if finished else ([], refs))
+
+    engine.handle("DELETED", deleted, "BATCH")
+    engine.handle("DELETED", kept, "BATCH")
+    engine.delete_orphans()
+    engine.cleaner.delete.remote.assert_called_once_with(deleted)
+
+    finished.append(deleted)
+    engine.delete_orphans()  # the storage still lists it: removed again
+    assert engine.cleaner.delete.remote.call_count == 2
+
+
+def test_failed_listing_of_stored_simulations_does_not_stop_the_engine(client, engine, monkeypatch):
+    """Storage out of reach skips the look for orphans until the next one"""
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setattr(engine_module.result_storage, "_internal", mock.Mock(side_effect=ConnectionError("down")))
+    engine.cleaner = mock.Mock()
+
+    engine.delete_orphans()
+
+    engine.cleaner.delete.remote.assert_not_called()

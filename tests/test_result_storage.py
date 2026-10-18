@@ -95,29 +95,63 @@ def test_pages_stay_in_the_database_without_storage(client, sim_id):
     assert content["pages"][0] == first["pages"][0]
 
 
-def test_deleting_a_simulation_removes_its_objects(client, storage, sim_id, monkeypatch):
-    """Objects go first; if the storage fails, the simulation stays so the delete can be repeated"""
+def test_deleting_a_simulation_does_not_wait_for_the_storage(client, storage, sim_id, monkeypatch):
+    """The simulation goes at once, also with the storage down; the engine removes its objects afterwards"""
     upload_results(client, sim_id)
-    removed = []
-    monkeypatch.setattr(result_storage, "delete_simulation", removed.append)
+    db.session.get(SimulationModel, sim_id).job_state = EntityState.COMPLETED.value
+    db.session.commit()
+
+    def unreachable(*args):
+        """Storage not answering"""
+        raise ConnectionError(f"storage unreachable for {args}")
+
+    monkeypatch.setattr(result_storage, "_client", unreachable)
 
     assert client.delete("/user/simulations", query_string={"job_id": "storagejob"}).status_code == 200
-    assert removed == [sim_id]
     assert db.session.get(SimulationModel, sim_id) is None
 
 
-def test_failing_storage_keeps_the_simulation(client, storage, sim_id, monkeypatch):
-    """A delete that cannot remove the objects leaves the simulation in place"""
-    upload_results(client, sim_id)
+def test_objects_are_removed_in_batches_as_they_are_listed(monkeypatch):
+    """Each listed batch of a simulation's directories goes in one request, with the client given time and retries"""
+    client = mock.Mock()
+    listings = {
+        "simulations/7/": [{"Contents": [{"Key": "simulations/7/a/0.json"}]}],
+        "hpc/7/": [{"Contents": [{"Key": f"hpc/7/progress/task_{i}.json"} for i in range(3)]}, {"Contents": []}],
+        "work/7/": [{}],
+    }
+    client.get_paginator.return_value.paginate.side_effect = lambda **kwargs: listings[kwargs["Prefix"]]
+    client.delete_objects.return_value = {}
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setenv("RESULTS_S3_ENDPOINT", "http://garage:3900")
+    monkeypatch.setattr(result_storage, "_client", lambda *args, **kwargs: client)
 
-    def unreachable(simulation_id):
-        """Storage not answering"""
-        raise ConnectionError(f"storage unreachable for {simulation_id}")
+    result_storage.delete_simulation(7)
 
-    monkeypatch.setattr(result_storage, "delete_simulation", unreachable)
+    for call in client.get_paginator.return_value.paginate.call_args_list:
+        assert call.kwargs["PaginationConfig"] == {"PageSize": result_storage.DELETE_BATCH}
+    assert [call.kwargs["Delete"]["Objects"] for call in client.delete_objects.call_args_list] == [
+        [{"Key": "simulations/7/a/0.json"}],
+        [{"Key": f"hpc/7/progress/task_{i}.json"} for i in range(3)],
+    ]
 
-    assert client.delete("/user/simulations", query_string={"job_id": "storagejob"}).status_code == 503
-    assert db.session.get(SimulationModel, sim_id) is not None
+    client.delete_objects.return_value = {"Errors": [{"Key": "hpc/7/progress/task_0.json"}]}
+    with pytest.raises(RuntimeError):
+        result_storage.delete_simulation(7)
+
+
+def test_stored_simulations_come_from_the_directory_names(monkeypatch):
+    """Only directories named by a simulation id count"""
+    client = mock.Mock()
+    listings = {
+        "simulations/": [{"CommonPrefixes": [{"Prefix": "simulations/12/"}, {"Prefix": "simulations/x/"}]}],
+        "hpc/": [{"CommonPrefixes": [{"Prefix": "hpc/12/"}, {"Prefix": "hpc/3/"}]}],
+        "work/": [{}],
+    }
+    client.get_paginator.return_value.paginate.side_effect = lambda **kwargs: listings[kwargs["Prefix"]]
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setattr(result_storage, "_internal", lambda: client)
+
+    assert result_storage.stored_simulations() == {3, 12}
 
 
 def test_pages_go_to_the_database_when_storage_fails(client, storage, sim_id, monkeypatch):
@@ -139,16 +173,21 @@ def test_pages_go_to_the_database_when_storage_fails(client, storage, sim_id, mo
     assert client.delete("/user/simulations", query_string={"job_id": "storagejob"}).status_code == 200
 
 
-def test_what_tasks_leave_in_storage_expires(monkeypatch):
-    """The bucket removes objects under work/ itself, in case the engine's deletes miss some"""
+def test_what_tasks_and_hpc_jobs_leave_in_storage_expires(monkeypatch):
+    """The bucket removes objects under work/ and hpc/ itself, in case the engine's deletes miss some; one call sets
+    all the rules
+    """
     client = mock.Mock()
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
     monkeypatch.setattr(result_storage, "_internal", lambda: client)
-    result_storage.expire_work_objects()
+    result_storage.expire_objects()
     client.put_bucket_lifecycle_configuration.assert_called_once_with(
         Bucket="results",
         LifecycleConfiguration={
-            "Rules": [{"ID": "work", "Filter": {"Prefix": "work/"}, "Expiration": {"Days": 2}, "Status": "Enabled"}]
+            "Rules": [
+                {"ID": "work", "Filter": {"Prefix": "work/"}, "Expiration": {"Days": 2}, "Status": "Enabled"},
+                {"ID": "hpc", "Filter": {"Prefix": "hpc/"}, "Expiration": {"Days": 14}, "Status": "Enabled"},
+            ]
         },
     )
 
