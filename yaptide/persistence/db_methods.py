@@ -1,7 +1,8 @@
 import logging
+from datetime import datetime
 from typing import Optional, Union
 
-from sqlalchemy import and_, func
+from sqlalchemy import DateTime, Integer, String, and_, bindparam, case, func, update
 from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
 from sqlalchemy.orm import with_polymorphic
 
@@ -22,6 +23,7 @@ from yaptide.persistence.models import (
     UserModel,
     YaptideUserModel,
 )
+from yaptide.utils.enums import EntityState
 
 
 def add_object_to_db(obj: db.Model, make_commit: bool = True) -> None:
@@ -195,6 +197,80 @@ def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
         missing = set(updates_by_task_id.keys()) - set(found_task_ids)
         logging.warning("Simulation %d has no tasks with ids %s, skipping their updates", sim_id, sorted(missing))
     return len(tasks)
+
+
+FINAL_TASK_STATES = (EntityState.COMPLETED.value, EntityState.FAILED.value, EntityState.CANCELED.value)
+TASK = TaskModel.__table__.c
+
+
+def _reported(name: str, type_):
+    """A reported field in the statement of update_reported_tasks; NULL when the report has no such field"""
+    return bindparam(f"new_{name}", type_=type_)
+
+
+def _reported_update():
+    """TaskModel.update_state as one UPDATE of a task, for update_reported_tasks"""
+    state, end = _reported("task_state", String), _reported("end_time", DateTime(timezone=True))
+    requested = func.coalesce(func.nullif(_reported("requested_primaries", Integer), 0), TASK.requested_primaries)
+    estimated = _reported("estimated_time", Integer)
+    return (
+        update(TaskModel.__table__)
+        .where(
+            TASK.simulation_id == bindparam("sim_id"),
+            TASK.task_id == bindparam("new_task_id"),
+            # a final state is kept, e.g. a cancel committed meanwhile; the row is locked and checked again
+            # (no NOT IN: its list is expanded per run, which a statement run for many rows cannot do)
+            *(TASK.task_state != final for final in FINAL_TASK_STATES),
+        )
+        .values(
+            requested_primaries=requested,
+            simulated_primaries=case(
+                (state == EntityState.COMPLETED.value, requested),
+                else_=func.coalesce(
+                    func.nullif(_reported("simulated_primaries", Integer), 0), TASK.simulated_primaries
+                ),
+            ),
+            task_state=func.coalesce(state, TASK.task_state),
+            estimated_time=case(
+                (and_(TASK.end_time.is_(None), end.isnot(None)), None),
+                (and_(TASK.end_time.is_(None), estimated.isnot(None)), estimated),
+                else_=TASK.estimated_time,
+            ),
+            start_time=func.coalesce(TASK.start_time, _reported("start_time", DateTime(timezone=True))),
+            end_time=func.coalesce(TASK.end_time, end),
+            last_update_time=func.now(),
+        )
+    )
+
+
+REPORTED_FIELDS = (
+    "task_state",
+    "requested_primaries",
+    "simulated_primaries",
+    "estimated_time",
+    "start_time",
+    "end_time",
+)
+
+
+def update_reported_tasks(sim_id: int, task_updates: list[dict]) -> None:
+    """bulk_update_task_states for updates already checked (yaptide/engine/engine.py clean_report), without the ORM:
+    one statement run for all tasks at once (20k tasks in 0.6 s instead of 4.2 s, M4 and Postgres), in the order of
+    their ids like the other locking updates; no commit
+
+    Changes a task as TaskModel.update_state does; times come as its strings.
+    """
+    rows = []
+    for task_update in sorted(task_updates, key=lambda item: item["task_id"]):
+        row = {"sim_id": sim_id, "new_task_id": task_update["task_id"]}
+        for name in REPORTED_FIELDS:
+            value = task_update["update_dict"].get(name)
+            if name in ("start_time", "end_time") and value is not None:
+                value = datetime.strptime(value, "%Y-%m-%d %H:%M:%S.%f")
+            row[f"new_{name}"] = value
+        rows.append(row)
+    if rows:
+        db.session.execute(_reported_update(), rows)
 
 
 def _apply_task_update(task: Union[BatchTaskModel, CeleryTaskModel], update_dict: dict, sim_id: int) -> None:

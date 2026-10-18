@@ -2,7 +2,8 @@ import pytest
 from sqlalchemy.exc import DataError, OperationalError
 from yaptide.application import create_app
 from yaptide.persistence.database import db
-from yaptide.persistence.models import CelerySimulationModel, CeleryTaskModel, YaptideUserModel
+from yaptide.persistence.db_methods import bulk_update_task_states, update_reported_tasks
+from yaptide.persistence.models import CelerySimulationModel, CeleryTaskModel, TaskModel, YaptideUserModel
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
@@ -200,3 +201,42 @@ def test_task_routes_reject_a_simulation_id_that_is_not_an_integer(app, simulati
     if path == "/tasks":
         payload.update(task_id=1, update_dict={"simulated_primaries": 5})
     assert app.test_client().post(path, json=payload).status_code == 400
+
+
+REPORTED_STEPS = [
+    {"simulated_primaries": 0, "estimated_time": 50},
+    {"task_state": "RUNNING", "simulated_primaries": 300, "start_time": "2026-10-18 10:00:00.000001"},
+    {"start_time": "2026-10-18 11:00:00.000001", "requested_primaries": 2000, "estimated_time": 0},
+    {"requested_primaries": 0, "simulated_primaries": 500, "estimated_time": 40},
+    {"end_time": "2026-10-18 12:00:00.000001", "estimated_time": 30},
+    {"end_time": "2026-10-18 13:00:00.000001", "estimated_time": 20, "simulated_primaries": 900},
+    {"task_state": "COMPLETED", "simulated_primaries": 1000},
+    {"task_state": "RUNNING", "simulated_primaries": 5},
+]
+
+
+@pytest.mark.parametrize("final", [None, EntityState.FAILED.value, EntityState.CANCELED.value])
+def test_reported_updates_match_update_state(app, simulation_with_tasks: CelerySimulationModel, final):
+    """The one statement for checked reports changes a task as TaskModel.update_state does, step by step"""
+    if final:
+        db.session.query(TaskModel).update({"task_state": final})
+        db.session.commit()
+    fields = (
+        "task_state",
+        "requested_primaries",
+        "simulated_primaries",
+        "estimated_time",
+        "start_time",
+        "end_time",
+    )
+    for step in REPORTED_STEPS:
+        bulk_update_task_states(simulation_with_tasks.id, [{"task_id": 1, "update_dict": step}])
+        update_reported_tasks(simulation_with_tasks.id, [{"task_id": 2, "update_dict": step}])
+        db.session.commit()
+        db.session.expire_all()
+        by_orm, by_statement = (
+            CeleryTaskModel.query.filter_by(simulation_id=simulation_with_tasks.id, task_id=task_id).one()
+            for task_id in (1, 2)
+        )
+        assert [getattr(by_statement, name) for name in fields] == [getattr(by_orm, name) for name in fields], step
+    assert by_statement.task_state == (final or EntityState.COMPLETED.value)
