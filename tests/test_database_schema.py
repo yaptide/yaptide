@@ -48,6 +48,7 @@ def test_database_under_migrations_is_migrated(app):
     """A table added by a migration is created by that migration, without clashing with the models"""
     db.create_all()
     db.session.execute(text('DROP TABLE "PageObject"'))
+    db.session.execute(text('DROP TABLE "UserActivity"'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_primaries'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_time'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN progress_revision'))
@@ -64,6 +65,7 @@ def test_database_under_migrations_is_migrated(app):
     assert {"partial_primaries", "partial_time"} <= {
         column["name"] for column in inspect(db.engine).get_columns("Simulation")
     }
+    assert inspect(db.engine).has_table("UserActivity")
     assert "busy_until" in {column["name"] for column in inspect(db.engine).get_columns("Cluster")}
     assert version() == head()
 
