@@ -10,7 +10,13 @@ from yaptide.persistence.db_methods import (
     fetch_task_summary,
     fetch_tasks_by_sim_id,
 )
-from yaptide.persistence.models import SimulationModel, UserModel, YaptideUserModel
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    ClusterModel,
+    SimulationModel,
+    UserModel,
+    YaptideUserModel,
+)
 from yaptide.utils.enums import EntityState, InputType, PlatformType
 from yaptide.utils.sim_utils import files_dict_with_adjusted_primaries, get_total_number_of_primaries
 
@@ -69,9 +75,25 @@ def job_status_content(simulation: SimulationModel, with_tasks: bool, summary: O
             # SQLite drops the time zone of the UTC time stored
             "time": simulation.partial_time.replace(tzinfo=simulation.partial_time.tzinfo or timezone.utc).isoformat(),
         }
+    busy_until = cluster_busy_until(simulation)
+    if busy_until:
+        # it waits for its cluster, which the engine tries again then
+        content["cluster_busy_until"] = busy_until.replace(tzinfo=busy_until.tzinfo or timezone.utc).isoformat()
     if with_tasks:
         content["job_tasks_status"] = [task.get_status_dict() for task in fetch_tasks_by_sim_id(sim_id=simulation.id)]
     return content
+
+
+def cluster_busy_until(simulation: SimulationModel) -> Optional[datetime]:
+    """When the engine tries again the cluster of an HPC simulation still to be submitted, while its SLURM does not
+    answer; None otherwise
+    """
+    if not isinstance(simulation, BatchSimulationModel):
+        return None
+    if simulation.job_state != EntityState.PENDING.value or simulation.array_id is not None:
+        return None
+    cluster = db.session.get(ClusterModel, simulation.cluster_id)
+    return cluster.busy_until if cluster else None
 
 
 def update_state_from_tasks(simulation: SimulationModel, states_changed: bool = True) -> None:

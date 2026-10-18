@@ -51,11 +51,12 @@ def queue_placement_options(array_header: str) -> list[str]:
     return options
 
 
-def helper_job_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str, role: str = "reporter") -> str:
+def helper_job_sbatch_options(payload_dict: dict, job_dir: str, job_name: str, role: str = "reporter") -> str:
     """sbatch command line options of a small helper job (the reporter of a failed collect)
 
     It keeps whatever the array job needs to be accepted by the queue (account, partition, qos, reservation, time),
-    from the array's header and options - the options last, as they win - and asks for a single cheap cpu.
+    from the array's header and options - the options last, as they win - and asks for a single cheap cpu. It is
+    named like the other jobs of the submit, which a cancel finds by name.
     """
     array_header = extract_sbatch_header(payload_dict=payload_dict, target_key="array_header")
     options_dict = {"time": "00:59:59"}
@@ -66,7 +67,7 @@ def helper_job_sbatch_options(payload_dict: dict, sim_id: int, job_dir: str, rol
             "ntasks": "1",
             "cpus-per-task": "1",
             "mem": "1G",
-            "job-name": f"yaptide_{role}_{sim_id}",
+            "job-name": job_name,
             "output": f"{job_dir}/{role}.log",
         }
     )

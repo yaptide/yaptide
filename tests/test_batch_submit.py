@@ -1,8 +1,10 @@
 """HPC simulations: Flask only stores and flags them, the engine submits and cancels them over SSH"""
 
 import json
+import shlex
 import subprocess
 import time
+from datetime import datetime, timezone
 from unittest import mock
 
 import pytest
@@ -15,12 +17,12 @@ from cryptography.hazmat.primitives.serialization import (
     SSHCertificateType,
 )
 from fabric import Result
-from paramiko import AuthenticationException
+from paramiko import AuthenticationException, SSHException
 
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
 from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH
-from yaptide.batch.shieldhit_string_templates import ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH
+from yaptide.batch.shieldhit_string_templates import ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
@@ -167,8 +169,22 @@ def test_failed_sbatch_fails_the_simulation_with_its_output(client, cluster_conn
     assert log["submit_stderr"] == "sbatch: error: invalid account"
 
 
-def test_unreachable_cluster_fails_the_simulation(client, monkeypatch):
-    """An SSH error ends the submit with FAILED instead of a simulation pending forever"""
+def test_refused_connection_fails_the_simulation(client, monkeypatch):
+    """An SSH error that waiting would not fix ends the submit with FAILED instead of a simulation pending forever"""
+    simulation_id = submit(client).id
+
+    def refused(**_):
+        """The cluster refuses the login"""
+        raise AuthenticationException("certificate refused")
+
+    monkeypatch.setattr(batch_methods, "get_connection", refused)
+    assert batch_methods.submit_simulation(simulation_id) is None
+
+    assert stored(simulation_id).job_state == EntityState.FAILED.value
+
+
+def test_login_node_not_answering_leaves_the_simulation_waiting(client, monkeypatch):
+    """A login node that does not answer in time is tried again later: the simulation stays PENDING"""
     simulation_id = submit(client).id
 
     def unreachable(**_):
@@ -176,9 +192,77 @@ def test_unreachable_cluster_fails_the_simulation(client, monkeypatch):
         raise TimeoutError("connection timed out")
 
     monkeypatch.setattr(batch_methods, "get_connection", unreachable)
-    batch_methods.submit_simulation(simulation_id)
+    assert batch_methods.submit_simulation(simulation_id) is False
 
-    assert stored(simulation_id).job_state == EntityState.FAILED.value
+    assert stored(simulation_id).job_state == EntityState.PENDING.value
+    assert stored(simulation_id).job_dir is None
+
+
+def frozen_login_node() -> Exception:
+    """What paramiko raises when the login node accepts the connection but never sends its banner"""
+    try:
+        try:
+            raise TimeoutError()
+        except TimeoutError:
+            raise SSHException("Error reading SSH protocol banner")
+    except SSHException as error:
+        return error
+
+
+@pytest.mark.parametrize(
+    "error, stuck",
+    [
+        (TimeoutError("connection timed out"), True),
+        (frozen_login_node(), True),
+        (RuntimeError("slurm_load_jobs error: Socket timed out on send/recv operation"), True),
+        (RuntimeError("sbatch: error: Unable to contact slurm controller (connect failure)"), True),
+        (AuthenticationException("timed out certificate"), False),
+        (EOFError("connection closed"), False),
+        (RuntimeError("sbatch: error: invalid account"), False),
+    ],
+)
+def test_only_a_cluster_not_answering_in_time_counts_as_stuck(error, stuck):
+    """Waiting helps a SLURM or login node that does not answer in time, not a refused login or bad input"""
+    assert batch_methods.slurm_stuck(error) is stuck
+
+
+def test_stuck_slurm_leaves_the_simulation_waiting_and_its_jobs_are_cancelled_before_the_next_submit(
+    client, cluster_connection, monkeypatch
+):
+    """sbatch timing out may still leave jobs in SLURM: the simulation stays PENDING with the attempt's directory,
+    and the next submit (once the attempt surely ended) first cancels its jobs by id and name, then submits anew
+    """
+    simulation_id = submit(client).id
+    run = cluster_connection.run.side_effect
+    stuck = Result(
+        stdout="Job id: \n",
+        stderr="sbatch: error: Batch job submission failed: Socket timed out on send/recv operation",
+        command="sh",
+        exited=0,
+        connection=None,
+    )
+    cluster_connection.run.side_effect = lambda command, **kwargs: (
+        stuck if command.startswith("sh ") else run(command, **kwargs)
+    )
+
+    assert batch_methods.submit_simulation(simulation_id) is False
+    first_dir = stored(simulation_id).job_dir
+    assert stored(simulation_id).job_state == EntityState.PENDING.value and first_dir
+    assert not any("scancel" in command for command in commands(cluster_connection))
+
+    cluster_connection.run.reset_mock()
+    cluster_connection.run.side_effect = run
+    # the script of the attempt may still run on the login node
+    assert batch_methods.submit_simulation(simulation_id) is None
+    cluster_connection.run.assert_not_called()
+
+    monkeypatch.setattr(batch_methods, "SUBMIT_SECONDS", 0)
+    assert batch_methods.submit_simulation(simulation_id) is True
+    sent = commands(cluster_connection)
+    assert f"--name={batch_methods.job_name(first_dir)}" in sent[0]
+    assert sum(command.startswith("sh ") for command in sent) == 1
+    simulation = stored(simulation_id)
+    assert simulation.job_dir != first_dir and (simulation.array_id, simulation.collect_id) == (101, 103)
 
 
 def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_connection):
@@ -191,12 +275,16 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
     cluster_connection.run.assert_not_called()
     assert stored(simulation.id).job_state == EntityState.CANCELED.value
 
-    batch_methods.cancel_simulation(simulation.id)
-    (sent,) = commands(cluster_connection)  # one round trip
-    # every job by the id the submit wrote next to it, the reporter first; then the directory goes
-    cancelled = [part.split("/")[-1].split("_job_id")[0] for part in sent.split("; ")[:-1]]
+    job_dir = stored(simulation.id).job_dir
+    assert batch_methods.cancel_simulation(simulation.id) is True
+    (sent,) = commands(cluster_connection)  # one round trip, bounded on the login node
+    timeout, seconds, shell, flag, script = shlex.split(sent)
+    assert (timeout, int(seconds), shell, flag) == ("timeout", batch_methods.CANCEL_SECONDS, "sh", "-c")
+    # every job by the id the submit wrote next to it, the reporter first; then by the submit's name, the directory
+    cancelled = [part.split("/")[-1].split("_job_id")[0] for part in script.split("; ")[:-1]]
     assert cancelled == ["reporter", "collect", "array", "aggregator"]  # the aggregator of jobs submitted before
-    assert sent.split("; ")[-1].startswith("rm -rf /scratch/plgtest/yaptide_runs/")
+    name = batch_methods.job_name(job_dir)
+    assert script.split("; ")[-1] == f"scancel --name={name} --user=$USER && rm -rf {job_dir}"
     assert stored(simulation.id).job_dir is None  # nothing left to cancel
 
 
@@ -219,8 +307,8 @@ def test_cancel_during_submit_cancels_the_jobs_right_after(client, cluster_conne
     cluster_connection.run.side_effect = cancel_meanwhile
     batch_methods.submit_simulation(simulation.id)
 
-    cancels = [command for command in commands(cluster_connection) if command.startswith("test -s")]
-    assert len(cancels) == 1 and cancels[0].count("scancel") == len(batch_methods.SIMULATION_JOBS)
+    cancels = [command for command in commands(cluster_connection) if "scancel" in command]
+    assert len(cancels) == 1 and cancels[0].count("scancel") == len(batch_methods.SIMULATION_JOBS) + 1
     assert stored(simulation.id).job_state == EntityState.CANCELED.value
 
 
@@ -234,6 +322,22 @@ def test_status_is_read_from_the_database_only(client, cluster_connection):
 
     assert response.get_json()["job_state"] == EntityState.PENDING.value
     cluster_connection.run.assert_not_called()
+
+
+def test_status_says_when_a_busy_cluster_is_tried_again(client, cluster_connection):
+    """A simulation waiting for a cluster whose SLURM does not answer says when it is tried again; once submitted,
+    its jobs wait in SLURM and the cluster's state is not its own any more
+    """
+    simulation = submit(client)
+    db.session.get(ClusterModel, simulation.cluster_id).busy_until = datetime(2026, 10, 18, 12, tzinfo=timezone.utc)
+    db.session.commit()
+
+    response = client.get("/jobs/batch", query_string={"job_id": simulation.job_id, "tasks": "false"})
+    assert response.get_json()["cluster_busy_until"] == "2026-10-18T12:00:00+00:00"
+
+    batch_methods.submit_simulation(simulation.id)
+    response = client.get("/jobs/batch", query_string={"job_id": simulation.job_id, "tasks": "false"})
+    assert "cluster_busy_until" not in response.get_json()
 
 
 @pytest.mark.parametrize(
@@ -332,13 +436,13 @@ def test_delete_waits_for_the_cleanup_of_a_failed_submit(client, cluster_connect
     simulation = submit(client)
     run = cluster_connection.run.side_effect
 
-    def hang_after_the_claim(command: str, **kwargs) -> Result:
-        """The login node stops answering once the job directory is recorded, also to the cancel"""
+    def drop_after_the_claim(command: str, **kwargs) -> Result:
+        """The login node drops the connection once the job directory is recorded, also the cancel's"""
         if command == "echo $SCRATCH":
             return run(command, **kwargs)
-        raise TimeoutError("the login node hangs")
+        raise EOFError("the login node closed the connection")
 
-    cluster_connection.run.side_effect = hang_after_the_claim
+    cluster_connection.run.side_effect = drop_after_the_claim
     batch_methods.submit_simulation(simulation.id)
     assert db.session.get(BatchSimulationModel, simulation.id).job_state == EntityState.FAILED.value
 
@@ -553,3 +657,77 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
     reports.unlink()
     assert collect() == 0
     assert not reports.exists()  # collected already: no report at all
+
+
+@pytest.mark.parametrize("stuck", [False, True], ids=["answers", "stuck"])
+def test_the_submit_script_names_every_job_and_gives_a_stuck_sbatch_up(tmp_path, stuck):
+    """All three jobs carry the submit's name; an sbatch the timeout ended says so, and nothing after it is
+    submitted
+    """
+    (tmp_path / "input.zip").write_text("")
+    script = tmp_path / "yaptide_submitter.sh"
+    script.write_text(
+        SUBMIT_SHIELDHIT.format(
+            root_dir=tmp_path,
+            n_tasks=2,
+            array_options="--account=grant",
+            collect_options="",
+            reporter_options="--job-name=yaptide_1_2",
+            convertmc_version="1",
+            job_name="yaptide_1_2",
+            sbatch_seconds=5,
+            sim_id=1,
+            update_key="key",
+            backend_url="https://yaptide.test",
+        )
+    )
+    calls = tmp_path / "sbatch_calls"
+    env = stub_commands(
+        tmp_path / "bin",
+        module="true",
+        unzip="true",
+        sbatch=f'echo "$@" >> {calls}; echo 7',
+        # the real one runs the command, or ends it after the given seconds with 124
+        timeout="exit 124" if stuck else 'shift; exec "$@"',
+    )
+
+    done = subprocess.run(["bash", str(script)], env=env, capture_output=True, text=True, check=False)
+
+    if stuck:
+        assert "sbatch timed out after 5 s" in done.stderr and batch_methods.SLURM_STUCK.search(done.stderr)
+        assert "Job id: \n" in done.stdout and "Collect id" not in done.stdout
+        assert not calls.exists()
+    else:
+        assert done.stdout.splitlines() == ["Job id: 7", "Collect id: 7", "Reporter id: 7"]
+        names = [line.count("--job-name=yaptide_1_2") for line in calls.read_text().splitlines()]
+        assert names == [1, 1, 1]
+
+
+@pytest.mark.parametrize("slurm_answers", [True, False], ids=["answers", "stuck"])
+def test_the_cancel_command_cancels_by_name_and_keeps_the_directory_while_slurm_is_stuck(tmp_path, slurm_answers):
+    """The jobs go by their ids, then by the submit's name (a job whose id was never written); the directory goes
+    only once SLURM answered
+    """
+    job_dir = tmp_path / "scratch" / "yaptide_runs" / "5_1700000000000000"
+    job_dir.mkdir(parents=True)
+    (job_dir / "array_job_id").write_text("11\n")
+    (job_dir / "collect_job_id").write_text("")  # sbatch given up: no id
+    calls = tmp_path / "scancel_calls"
+    env = stub_commands(
+        tmp_path / "bin",
+        scancel=f'echo "$@" >> {calls}' + ("" if slurm_answers else "; echo Socket timed out >&2; exit 1"),
+        timeout='shift; exec "$@"',
+    )
+
+    done = subprocess.run(
+        batch_methods.cancel_command(str(job_dir)),
+        shell=True,
+        env={**env, "USER": "plgtest"},
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert calls.read_text().splitlines() == ["11", "--name=yaptide_5_1700000000000000 --user=plgtest"]
+    assert (done.returncode == 0) == slurm_answers
+    assert job_dir.exists() != slurm_answers

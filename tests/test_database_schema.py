@@ -12,7 +12,8 @@ from yaptide.application import create_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import prepare_database
 
-PREVIOUS = "5003b9acb1f4"  # the revision before the PageObject table and the partial results columns
+# the revision before the PageObject table, the partial results columns and Cluster.busy_until
+PREVIOUS = "5003b9acb1f4"
 
 
 @pytest.fixture
@@ -50,6 +51,7 @@ def test_database_under_migrations_is_migrated(app):
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_primaries'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_time'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN progress_revision'))
+    db.session.execute(text('ALTER TABLE "Cluster" DROP COLUMN busy_until'))
     db.session.commit()
     flask_migrate.stamp(revision=PREVIOUS)
 
@@ -62,6 +64,7 @@ def test_database_under_migrations_is_migrated(app):
     assert {"partial_primaries", "partial_time"} <= {
         column["name"] for column in inspect(db.engine).get_columns("Simulation")
     }
+    assert "busy_until" in {column["name"] for column in inspect(db.engine).get_columns("Cluster")}
     assert version() == head()
 
 
