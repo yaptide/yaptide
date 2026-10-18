@@ -9,6 +9,7 @@ A sweep through the database catches what came while the engine was not listenin
 the connection to the database and after a failed event.
 """
 
+import asyncio
 import json
 import logging
 import os
@@ -123,7 +124,8 @@ HPC_PARTIAL_SECONDS = 60
 RUNNING_STATES = (EntityState.RUNNING.value, EntityState.MERGING_QUEUED.value, EntityState.MERGING_RUNNING.value)
 
 
-# restarted when it dies: only progress not saved yet is lost, final states come with the task results
+# restarted when it dies: only progress not saved yet is lost, final states come with the task results;
+# async, so a call waiting in state_changed does not block the others (all run in one event loop)
 @ray.remote(num_cpus=0, max_restarts=-1, max_task_retries=-1)
 class ProgressInbox:
     """Keeps the latest progress and the latest save of every task until the engine takes them"""
@@ -132,19 +134,27 @@ class ProgressInbox:
         """Empty inbox"""
         self.updates: dict[tuple[int, int], dict] = {}
         self.saves: dict[tuple[int, int], tuple[str, int]] = {}
+        self.new_state = asyncio.Event()
 
-    def report(self, simulation_id: int, task_id: int, update_dict: dict) -> None:
+    async def report(self, simulation_id: int, task_id: int, update_dict: dict) -> None:
         """Merges a task's update into the one waiting to be saved"""
         self.updates.setdefault((simulation_id, task_id), {}).update(update_dict)
+        if "task_state" in update_dict:
+            self.new_state.set()
 
-    def saved(self, simulation_id: int, task_id: int, key: str, primaries: int) -> None:
+    async def saved(self, simulation_id: int, task_id: int, key: str, primaries: int) -> None:
         """Replaces a task's save waiting to be taken"""
         self.saves[(simulation_id, task_id)] = (key, primaries)
 
-    def drain(self) -> tuple[dict[tuple[int, int], dict], dict[tuple[int, int], tuple[str, int]]]:
+    async def drain(self) -> tuple[dict[tuple[int, int], dict], dict[tuple[int, int], tuple[str, int]]]:
         """Hands over the waiting updates and saves"""
+        self.new_state.clear()
         updates, saves, self.updates, self.saves = self.updates, self.saves, {}, {}
         return updates, saves
+
+    async def state_changed(self) -> None:
+        """Returns once a waiting update changes a task's state, e.g. to RUNNING"""
+        await self.new_state.wait()
 
 
 @ray.remote(num_cpus=1, max_retries=0)
@@ -258,6 +268,8 @@ class Engine:
         self.cluster = ClusterGateway.remote()
         # ETags of the progress reports HPC tasks put into storage, as last read
         self.report_etags: dict[str, str] = {}
+        # whether HPC simulations may have reports to read: at start, after a submit, until a read finds none
+        self.hpc_active = True
         # HPC simulations whose tasks put saves into storage
         self.hpc_partials: dict[int, HpcPartial] = {}
         # HPC simulations being submitted (simulation id -> the submit's ref) and cancelled on their cluster
@@ -271,11 +283,13 @@ class Engine:
         self.events: queue.Queue = queue.Queue()
 
     def run(self, listener: Optional[threading.Thread] = None) -> None:
-        """Handles events as they come, saves progress every second, until failing for a minute
+        """Handles events as they come, saves progress every second while simulations run and at once when a task
+        changes its state, until failing for a minute
 
         A listener thread that died would leave the engine without events, so the engine stops with it.
         """
         self.recover()
+        self.watch_inbox()
         self.events.put(("SWEEP", None))
         last_progress = last_overdue_check = last_hpc_progress = time.monotonic()
         failing_since = None
@@ -291,8 +305,10 @@ class Engine:
                     last_progress = time.monotonic()
                     if listener and not listener.is_alive():
                         raise SystemExit("the thread listening for database events died")
-                    self.save_progress()
-                if time.monotonic() - last_hpc_progress >= HPC_PROGRESS_SECONDS:
+                    # what tasks of stopped simulations report is dropped anyway, so it can wait in the inbox
+                    if self.running:
+                        self.save_progress()
+                if self.hpc_active and time.monotonic() - last_hpc_progress >= HPC_PROGRESS_SECONDS:
                     last_hpc_progress = time.monotonic()
                     self.read_hpc_progress()
                 if time.monotonic() - last_overdue_check >= OVERDUE_CHECK_SECONDS:
@@ -321,6 +337,12 @@ class Engine:
             self.sweep()
         elif event == "SUBMITTED":
             self.submitted(simulation_id)
+        elif event == "NEW_STATE":
+            # watched again after the drain, which resets the notice; also when the save fails
+            try:
+                self.save_progress()
+            finally:
+                self.watch_inbox()
         elif event == "CANCELLED_ON_CLUSTER":
             # done, or repeated within minutes (retry_cancels): the job directory stays in the database until it is done
             self.cancelling.discard(simulation_id)
@@ -400,7 +422,8 @@ class Engine:
         )
         seen: dict[str, str] = {}
         running = set()
-        for simulation_id, job_state in active.all():
+        active = active.all()
+        for simulation_id, job_state in active:
             try:
                 reports = result_storage.progress_reports(simulation_id)
                 read = [
@@ -431,6 +454,7 @@ class Engine:
         # finished simulations are forgotten
         self.report_etags = seen
         self.merge_hpc_partials(running)
+        self.hpc_active = bool(active or self.hpc_partials)
 
     def merge_hpc_partials(self, running: set[int]) -> None:
         """Merges the saves of running HPC simulations into partial results when they are due; removes the saves of
@@ -520,6 +544,8 @@ class Engine:
         not started yet; otherwise the simulation fails and whatever reached the cluster is cancelled.
         """
         ref = self.submitting.pop(simulation_id, None)
+        # its jobs report from now on (read only while some HPC simulation may report)
+        self.hpc_active = True
         try:
             ray.get(ref)
         except Exception as error:  # skipcq: PYL-W0703
@@ -532,9 +558,15 @@ class Engine:
             fail_submit(simulation, {"error": f"Submitting crashed: {error}"})
             self.cancel(simulation_id)
 
-    def watch(self, ref, simulation_id: int, event: str = "FINISHED") -> None:
+    def watch(self, ref, simulation_id: Optional[int], event: str = "FINISHED") -> None:
         """Ray puts an event into the queue when the task, merge or submit finishes"""
         ref.future().add_done_callback(lambda _: self.events.put((event, simulation_id)))
+
+    def watch_inbox(self) -> None:
+        """An event comes when a task reports a new state, so e.g. RUNNING is saved without waiting for the next
+        round of progress
+        """
+        self.watch(self.inbox.state_changed.remote(), None, "NEW_STATE")
 
     def recover(self) -> None:
         """Simulations running when the engine stopped lost their tasks with it; pending ones are started again"""

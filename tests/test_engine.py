@@ -341,6 +341,24 @@ def test_events_alone_run_a_simulation(client, engine):
     assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
 
 
+def test_new_task_state_is_saved_without_waiting_for_the_progress_round(client, engine):
+    """A task starting sends an event through the inbox, and the event alone saves RUNNING"""
+    simulation_id = submit(client, "FAKE_SLEEP", ntasks=1)
+    engine.watch_inbox()
+    engine.handle(EntityState.PENDING.value, simulation_id)
+
+    event = engine.events.get(timeout=60)
+    assert event == ("NEW_STATE", None)
+    engine.handle(*event)
+
+    assert task_states(simulation_id) == [EntityState.RUNNING.value]
+    assert state(simulation_id) == EntityState.RUNNING.value
+    # the next test's simulation gets the same id, so the same directories: the task must be gone first
+    refs = list(engine.running[simulation_id].tasks)
+    engine.stop(simulation_id)
+    ray.wait(refs, timeout=60)
+
+
 def test_cancel_event_stops_the_simulation(client, engine, cluster):
     """The event Postgres sends on cancel stops the tasks at once"""
     simulation_id = submit(client, "FAKE_SLEEP")
@@ -516,6 +534,22 @@ def test_hpc_progress_is_read_from_storage(client, engine, monkeypatch):
     reads.clear()
     engine.read_hpc_progress()
     assert reads == [prefix + "task_0001.json"]
+
+
+def test_hpc_progress_is_read_only_while_hpc_simulations_may_report(client, engine, monkeypatch):
+    """Without HPC simulations the engine stops looking for their reports, a submitted one starts it again"""
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    monkeypatch.setattr(engine_module.result_storage, "progress_reports", lambda sim_id: {})
+
+    engine.read_hpc_progress()
+    assert not engine.hpc_active
+
+    simulation_id = hpc_simulation()
+    engine.submitting[simulation_id] = ray.put(None)
+    engine.submitted(simulation_id)
+    assert engine.hpc_active
+    engine.read_hpc_progress()
+    assert engine.hpc_active
 
 
 def test_unreachable_storage_skips_a_round(client, engine, monkeypatch):
