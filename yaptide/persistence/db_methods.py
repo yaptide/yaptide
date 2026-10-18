@@ -210,7 +210,7 @@ def _reported_update():
     """TaskModel.update_state as one UPDATE of a task, for update_reported_tasks"""
     # each new_* parameter is a reported field, NULL when the report has no such field
     state, end = bindparam("new_task_state", type_=String), bindparam("new_end_time", type_=DateTime(timezone=True))
-    requested = func.coalesce(
+    requested = func.coalesce(  # skipcq: PYL-E1111
         func.nullif(bindparam("new_requested_primaries", type_=Integer), 0), TASK.requested_primaries
     )
     estimated = bindparam("new_estimated_time", type_=Integer)
