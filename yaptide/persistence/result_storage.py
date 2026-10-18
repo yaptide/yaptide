@@ -10,6 +10,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import shutil
 import tempfile
 import time
@@ -34,9 +35,11 @@ def configured() -> bool:
     return bool(os.environ.get("RESULTS_S3_BUCKET"))
 
 
-@lru_cache(maxsize=2)
-def _client(endpoint: str):
-    """S3 client for the given endpoint: the internal one for reads and writes, the public one for browser links"""
+@lru_cache(maxsize=3)
+def _client(endpoint: str, read_timeout: int = 10, attempts: int = 2):
+    """S3 client for the given endpoint: the internal one for reads and writes, the public one for browser links;
+    the defaults fail fast, for a web request waiting on the storage
+    """
     return boto3.client(
         "s3",
         endpoint_url=endpoint,
@@ -49,11 +52,10 @@ def _client(endpoint: str):
             # over https boto3 >= 1.36 sends streaming checksums (aws-chunked), which clash with Content-Encoding: gzip
             request_checksum_calculation="when_required",
             response_checksum_validation="when_required",
-            # the results upload waits for the storage within a web request: fail fast instead of ~9 s per page
             connect_timeout=2,
-            read_timeout=10,
-            # two attempts in total ("max_attempts" would count retries only, three attempts)
-            retries={"total_max_attempts": 2},
+            read_timeout=read_timeout,
+            # attempts in total ("max_attempts" would count retries only, one more)
+            retries={"total_max_attempts": attempts},
         ),
     )
 
@@ -63,9 +65,20 @@ def _internal():
     return _client(os.environ["RESULTS_S3_ENDPOINT"])
 
 
+def _patient():
+    """Like _internal, for removals nobody waits for: a busy storage gets time and more attempts (removing again what
+    is gone already is harmless)
+    """
+    return _client(os.environ["RESULTS_S3_ENDPOINT"], read_timeout=120, attempts=5)
+
+
+# result pages, the only copy of the results: see delete_simulation
+PAGE_PREFIX = "simulations/"
+
+
 def page_key(sim_id: int, estimator_file_name: str, page_number: int) -> str:
     """Object key of a result page; the same page always gets the same key, so a repeated upload replaces it"""
-    return f"simulations/{sim_id}/{estimator_file_name}/{page_number}.json"
+    return f"{PAGE_PREFIX}{sim_id}/{estimator_file_name}/{page_number}.json"
 
 
 def put_page(key: str, page: dict) -> int:
@@ -105,26 +118,56 @@ def page_url(key: str) -> str:
     )
 
 
-def delete_simulation(sim_id: int) -> None:
-    """Removes every stored object of a simulation: its pages, what its HPC jobs reported and its tasks left"""
-    _delete_listed(
-        _internal(), os.environ["RESULTS_S3_BUCKET"], f"simulations/{sim_id}/", f"hpc/{sim_id}/", work_prefix(sim_id)
+# result files of direct simulation tasks on their way to the merges, removed after the final merge; the saves of
+# HPC tasks on their way to the partial merges, removed once the simulation stops running
+WORK_PREFIX = "work/"
+# what HPC jobs report and tasks leave, of no use once their simulation is gone: the engine's look for orphans removes
+# these; never the result pages (PAGE_PREFIX), only a delete of their simulation removes them
+EPHEMERAL_PREFIXES = ("hpc/", WORK_PREFIX)
+# keys removed in one request: with S3's maximum of 1000 a busy storage took longer than the client waits
+DELETE_BATCH = 500
+
+
+def delete_simulation(sim_id: int, pages: bool) -> None:
+    """Removes the stored objects of a deleted simulation, its result pages too only when pages is set; slow for a
+    large one, so the engine does it in the background
+    """
+    for prefix in (PAGE_PREFIX, *EPHEMERAL_PREFIXES) if pages else EPHEMERAL_PREFIXES:
+        _delete_listed(_patient(), f"{prefix}{sim_id}/")
+
+
+def stored_simulations() -> set[int]:
+    """Ids of the simulations with objects under EPHEMERAL_PREFIXES, from the directories' names (a request per 1000
+    of them)
+    """
+    ids = set()
+    for prefix in EPHEMERAL_PREFIXES:
+        listings = (
+            _internal()
+            .get_paginator("list_objects_v2")
+            .paginate(Bucket=os.environ["RESULTS_S3_BUCKET"], Prefix=prefix, Delimiter="/")
+        )
+        for listing in listings:
+            for directory in listing.get("CommonPrefixes", []):
+                # anything else there is no simulation's
+                match = re.fullmatch(re.escape(prefix) + r"(\d{1,10})/", directory["Prefix"])
+                if match:
+                    ids.add(int(match.group(1)))
+    return ids
+
+
+def _delete_listed(client, prefix: str) -> None:
+    """Removes every object under the prefix in the bucket, DELETE_BATCH at a time, each batch as it is listed"""
+    bucket = os.environ["RESULTS_S3_BUCKET"]
+    listings = client.get_paginator("list_objects_v2").paginate(
+        Bucket=bucket, Prefix=prefix, PaginationConfig={"PageSize": DELETE_BATCH}
     )
-
-
-def _delete_listed(client, bucket: str, *prefixes: str) -> None:
-    """Removes every object under the prefixes, all listed before the first is removed"""
-    listings = [
-        listing
-        for prefix in prefixes
-        for listing in client.get_paginator("list_objects_v2").paginate(Bucket=bucket, Prefix=prefix)
-    ]
     for listing in listings:
         keys = [{"Key": item["Key"]} for item in listing.get("Contents", [])]
         if keys:
             errors = client.delete_objects(Bucket=bucket, Delete={"Objects": keys, "Quiet": True}).get("Errors")
             if errors:
-                raise RuntimeError(f"storage kept {len(errors)} objects under {', '.join(prefixes)}: {errors[0]}")
+                raise RuntimeError(f"storage kept {len(errors)} objects under {prefix}: {errors[0]}")
 
 
 def public_client():
@@ -236,9 +279,6 @@ def put_cancel(sim_id: int) -> None:
     _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")
 
 
-# result files of direct simulation tasks on their way to the merges, removed after the final merge; the saves of
-# HPC tasks on their way to the partial merges, removed once the simulation stops running
-WORK_PREFIX = "work/"
 # the saves of an HPC simulation's tasks merged into partial results at once, in bytes, packed and unpacked, which
 # bounds one task's save too: a simulation with larger results gets them only at the end
 HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 128 << 20))
@@ -247,20 +287,22 @@ HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 128 << 2
 # objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; direct tasks run at most 10 hours,
 # an HPC task replaces its save at every save (one expiring first only leaves the partial results without it)
 WORK_EXPIRY_DAYS = 2
+# objects under hpc/ (progress reports, cancels) expire after this long: the engine reads the last reports within
+# minutes after the simulation ended and puts the cancel again while its jobs may still run; a report expiring under
+# a task that ran this long without news only goes unread again, its next report brings it back
+HPC_EXPIRY_DAYS = 14
 
 
-def expire_work_objects() -> None:
-    """Has the storage itself remove what is left under WORK_PREFIX, as a backstop to the engine's deletes;
-    replaces any other lifecycle rules of the bucket (there are none)
+def expire_objects() -> None:
+    """Has the storage itself remove what is left under WORK_PREFIX and hpc/, as a backstop to the engine's deletes;
+    sets every lifecycle rule of the bucket at once (a call replaces them all), so repeating it changes nothing
     """
-    rule = {
-        "ID": "work",
-        "Filter": {"Prefix": WORK_PREFIX},
-        "Expiration": {"Days": WORK_EXPIRY_DAYS},
-        "Status": "Enabled",
-    }
+    rules = [
+        {"ID": name, "Filter": {"Prefix": prefix}, "Expiration": {"Days": days}, "Status": "Enabled"}
+        for name, prefix, days in (("work", WORK_PREFIX, WORK_EXPIRY_DAYS), ("hpc", "hpc/", HPC_EXPIRY_DAYS))
+    ]
     _internal().put_bucket_lifecycle_configuration(
-        Bucket=os.environ["RESULTS_S3_BUCKET"], LifecycleConfiguration={"Rules": [rule]}
+        Bucket=os.environ["RESULTS_S3_BUCKET"], LifecycleConfiguration={"Rules": rules}
     )
 
 
@@ -320,7 +362,8 @@ def stored_sizes(prefix: str) -> dict[str, int]:
 def delete_objects(prefix: str) -> None:
     """Removes the objects whose keys start with the prefix (a whole directory or one object without a bucket)"""
     if configured():
-        _delete_listed(_internal(), os.environ["RESULTS_S3_BUCKET"], prefix)
+        # fast-failing: a cancelled task waits for it
+        _delete_listed(_internal(), prefix)
         return
     local = _local(prefix)
     if local.is_dir():

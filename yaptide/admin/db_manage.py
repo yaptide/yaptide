@@ -157,15 +157,7 @@ def remove_user(name, auth_provider):
         click.echo(f"Aborting, user {name} does not exist")
         raise click.Abort()
 
-    if os.environ.get("RESULTS_S3_BUCKET"):
-        # the database removes the user's simulations by cascade, their stored result pages have to go first
-        from yaptide.persistence import result_storage
-
-        simulations = metadata.tables[TableTypes.Simulation.name]
-        user_ids = db.select(users.c.id).where(users.c.username == name, users.c.auth_provider == auth_provider)
-        for (simulation_id,) in con.execute(db.select(simulations.c.id).where(simulations.c.user_id.in_(user_ids))):
-            result_storage.delete_simulation(simulation_id)
-
+    # fails while the user has simulations (no cascade): remove-simulation them first, the engine removes their objects
     query = db.delete(users).where(users.c.username == name, users.c.auth_provider == auth_provider)
     con.execute(query)
     con.commit()
@@ -304,12 +296,7 @@ def remove_simulation(simulation_id, verbose):
         click.echo(f"Aborting, simulation {simulation_id} does not exist")
         raise click.Abort()
 
-    if os.environ.get("RESULTS_S3_BUCKET"):
-        # result pages in object storage go first, like in the user's delete; imported only where results live there
-        from yaptide.persistence import result_storage
-
-        result_storage.delete_simulation(simulation_id)
-
+    # the engine removes what it stored (yaptide/engine/engine.py)
     query = db.delete(simulations).where(simulations.c.id == simulation_id)
 
     con.execute(query)
