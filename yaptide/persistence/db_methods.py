@@ -206,18 +206,14 @@ FINAL_TASK_STATES = (EntityState.COMPLETED.value, EntityState.FAILED.value, Enti
 TASK = TaskModel.__table__.c
 
 
-def _reported(name: str, type_):
-    """A reported field in the statement of update_reported_tasks; NULL when the report has no such field"""
-    return bindparam(f"new_{name}", type_=type_)
-
-
 def _reported_update():
     """TaskModel.update_state as one UPDATE of a task, for update_reported_tasks"""
-    state, end = _reported("task_state", String), _reported("end_time", DateTime(timezone=True))  # skipcq: PYL-E1111
+    # each new_* parameter is a reported field, NULL when the report has no such field
+    state, end = bindparam("new_task_state", type_=String), bindparam("new_end_time", type_=DateTime(timezone=True))
     requested = func.coalesce(
-        func.nullif(_reported("requested_primaries", Integer), 0), TASK.requested_primaries
-    )  # skipcq: PYL-E1111
-    estimated = _reported("estimated_time", Integer)  # skipcq: PYL-E1111
+        func.nullif(bindparam("new_requested_primaries", type_=Integer), 0), TASK.requested_primaries
+    )
+    estimated = bindparam("new_estimated_time", type_=Integer)
     return (
         update(TaskModel.__table__)
         .where(
@@ -232,7 +228,7 @@ def _reported_update():
             simulated_primaries=case(
                 (state == EntityState.COMPLETED.value, requested),
                 else_=func.coalesce(
-                    func.nullif(_reported("simulated_primaries", Integer), 0), TASK.simulated_primaries
+                    func.nullif(bindparam("new_simulated_primaries", type_=Integer), 0), TASK.simulated_primaries
                 ),
             ),
             task_state=func.coalesce(state, TASK.task_state),
@@ -241,7 +237,7 @@ def _reported_update():
                 (and_(TASK.end_time.is_(None), estimated.isnot(None)), estimated),
                 else_=TASK.estimated_time,
             ),
-            start_time=func.coalesce(TASK.start_time, _reported("start_time", DateTime(timezone=True))),
+            start_time=func.coalesce(TASK.start_time, bindparam("new_start_time", type_=DateTime(timezone=True))),
             end_time=func.coalesce(TASK.end_time, end),
             last_update_time=func.now(),
         )
