@@ -105,6 +105,9 @@ HPC_ACTIVE_STATES = (
 )
 # progress is saved in batches, not for every line the simulators log
 PROGRESS_SECONDS = 1
+# a new task state saves the progress at once, but not more often than this: many short tasks change states often,
+# and every save notifies the users' status streams
+NEW_STATE_SAVE_SECONDS = 0.5
 # a task running longer is stopped, as the Celery workers did; checked once a minute
 TASK_SECONDS_LIMIT = 10 * 3600
 OVERDUE_CHECK_SECONDS = 60
@@ -279,6 +282,7 @@ class Engine:
         # when the jobs of a simulation were last cancelled on its cluster (time.monotonic())
         self.cancel_tried: dict[int, float] = {}
         self.running: dict[int, Running] = {}
+        self.progress_saved = 0.0
         # (event, simulation id, platform): PENDING, CANCELED, DELETED from Postgres, FINISHED and SUBMITTED
         # from Ray, SWEEP
         self.events: queue.Queue = queue.Queue()
@@ -341,7 +345,9 @@ class Engine:
         elif event == "NEW_STATE":
             # watched again after the drain, which resets the notice; also when the save fails
             try:
-                self.save_progress()
+                # otherwise the next round of progress saves it, within a second
+                if time.monotonic() - self.progress_saved >= NEW_STATE_SAVE_SECONDS:
+                    self.save_progress()
             finally:
                 self.watch_inbox()
         elif event == "CANCELLED_ON_CLUSTER":
@@ -660,6 +666,7 @@ class Engine:
 
     def save_progress(self) -> None:
         """Saves the progress the tasks reported since the last save, merges partial results when they are due"""
+        self.progress_saved = time.monotonic()
         task_updates, saves = ray.get(self.inbox.drain.remote())
         by_simulation: dict[int, list[dict]] = {}
         for (simulation_id, task_id), update_dict in task_updates.items():

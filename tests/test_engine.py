@@ -816,3 +816,16 @@ def test_saves_of_hpc_tasks_become_partial_results_at_most_once_a_minute(client,
     db.session.commit()
     assert len(report("e6", first, 900)) == 2
     assert deleted == [simulation_id] and simulation_id not in engine.hpc_partials
+
+
+def test_new_task_states_save_the_progress_at_most_twice_a_second(engine, monkeypatch):
+    """Many short tasks change states often; each save notifies the status streams"""
+    saves = []
+    monkeypatch.setattr(engine, "save_progress", lambda: saves.append(1))
+    monkeypatch.setattr(engine, "watch_inbox", lambda: None)
+    engine.progress_saved = time.monotonic()
+    engine.handle("NEW_STATE", None)
+    assert not saves
+    engine.progress_saved = time.monotonic() - engine_module.NEW_STATE_SAVE_SECONDS
+    engine.handle("NEW_STATE", None)
+    assert saves == [1]
