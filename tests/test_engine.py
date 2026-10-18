@@ -664,6 +664,16 @@ def test_simulations_nobody_follows_are_read_in_turns(client, engine, monkeypatc
     hpc_round(engine)
     assert sorted(listed) == simulation_ids
 
+    # one that ended lately is read every round, whoever follows it: its last reports come within minutes
+    seen.seen_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    ended = hpc_simulation(EntityState.COMPLETED.value, job_id="ended", watched=False)
+    db.session.get(BatchSimulationModel, ended).end_time = datetime.now(timezone.utc)
+    db.session.commit()
+    for _ in range(2):
+        listed.clear()
+        hpc_round(engine)
+        assert ended in listed and len(listed) == 2
+
 
 def test_hpc_progress_is_read_in_a_process_of_its_own(client, engine):
     """A reader runs in a Ray worker with a database session of its own"""

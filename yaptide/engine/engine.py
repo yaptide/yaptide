@@ -643,14 +643,19 @@ class Engine:
         )
         self.hpc_round = active.order_by(BatchSimulationModel.id).all()
         self.hpc_round_started = time.monotonic()
-        # the ones nobody follows a share each round, the longest unread first: each about every
-        # UNWATCHED_PROGRESS_SECONDS (later while rounds take longer than HPC_PROGRESS_SECONDS)
+        # followed or ended lately: every round, so the last reports are read within ENDED_READ_SECONDS however
+        # long rounds take
+        often = {
+            sim_id for sim_id, job_state, watched in self.hpc_round if watched or job_state not in HPC_ACTIVE_STATES
+        }
+        # the others a share each round, the longest unread first: each about every UNWATCHED_PROGRESS_SECONDS
+        # (later while rounds take longer than HPC_PROGRESS_SECONDS)
         unwatched = sorted(
-            (simulation_id for simulation_id, _, watched in self.hpc_round if not watched),
+            (simulation_id for simulation_id, _, _ in self.hpc_round if simulation_id not in often),
             key=lambda simulation_id: self.hpc_read_at.get(simulation_id, float("-inf")),
         )
         due = unwatched[: math.ceil(len(unwatched) * HPC_PROGRESS_SECONDS / UNWATCHED_PROGRESS_SECONDS)]
-        simulation_ids = sorted(due + [simulation_id for simulation_id, _, watched in self.hpc_round if watched])
+        simulation_ids = sorted([*due, *often])
         if simulation_ids and not self.hpc_readers:
             self.hpc_readers = [HpcReader.remote() for _ in range(HPC_READERS)]
         # ponytail: simulations dealt out in turn, even while they have about as many tasks; by tasks if not
