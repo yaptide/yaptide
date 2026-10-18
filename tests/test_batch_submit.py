@@ -230,7 +230,7 @@ def test_stuck_slurm_leaves_the_simulation_waiting_and_its_jobs_are_cancelled_be
     client, cluster_connection, monkeypatch
 ):
     """sbatch timing out may still leave jobs in SLURM: the simulation stays PENDING with the attempt's directory,
-    and the next submit (once the attempt surely ended) first cancels its jobs by id and name, then submits anew
+    and the next submit (once the attempt surely ended) first cancels its jobs by id and comment, then submits anew
     """
     simulation_id = submit(client).id
     run = cluster_connection.run.side_effect
@@ -259,7 +259,7 @@ def test_stuck_slurm_leaves_the_simulation_waiting_and_its_jobs_are_cancelled_be
     monkeypatch.setattr(batch_methods, "SUBMIT_SECONDS", 0)
     assert batch_methods.submit_simulation(simulation_id) is True
     sent = commands(cluster_connection)
-    assert f"--name={batch_methods.job_name(first_dir)}" in sent[0]
+    assert f'"{batch_methods.job_tag(first_dir)}"' in sent[0]
     assert sum(command.startswith("sh ") for command in sent) == 1
     simulation = stored(simulation_id)
     assert simulation.job_dir != first_dir and (simulation.array_id, simulation.collect_id) == (101, 103)
@@ -280,11 +280,11 @@ def test_cancel_only_flags_and_the_engine_cancels_the_jobs(client, cluster_conne
     (sent,) = commands(cluster_connection)  # one round trip, bounded on the login node
     timeout, seconds, shell, flag, script = shlex.split(sent)
     assert (timeout, int(seconds), shell, flag) == ("timeout", batch_methods.CANCEL_SECONDS, "sh", "-c")
-    # every job by the id the submit wrote next to it, the reporter first; then by the submit's name, the directory
-    cancelled = [part.split("/")[-1].split("_job_id")[0] for part in script.split("; ")[:-1]]
+    # every job by the id the submit wrote next to it, the reporter first; then by the submit's comment, the directory
+    *by_id, tagged = script.split("; ", len(batch_methods.SIMULATION_JOBS))
+    cancelled = [part.split("/")[-1].split("_job_id")[0] for part in by_id]
     assert cancelled == ["reporter", "collect", "array", "aggregator"]  # the aggregator of jobs submitted before
-    name = batch_methods.job_name(job_dir)
-    assert script.split("; ")[-1] == f"scancel --name={name} --user=$USER && rm -rf {job_dir}"
+    assert f'"{batch_methods.job_tag(job_dir)}"' in tagged and tagged.endswith(f"&& rm -rf {job_dir}")
     assert stored(simulation.id).job_dir is None  # nothing left to cancel
 
 
@@ -660,9 +660,9 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
 
 
 @pytest.mark.parametrize("stuck", [False, True], ids=["answers", "stuck"])
-def test_the_submit_script_names_every_job_and_gives_a_stuck_sbatch_up(tmp_path, stuck):
-    """All three jobs carry the submit's name; an sbatch the timeout ended says so, and nothing after it is
-    submitted
+def test_the_submit_script_tags_every_job_and_gives_a_stuck_sbatch_up(tmp_path, stuck):
+    """All three jobs carry the submit's comment, after the user's options (a job name of theirs stays); an sbatch
+    the timeout ended says so, and nothing after it is submitted
     """
     (tmp_path / "input.zip").write_text("")
     script = tmp_path / "yaptide_submitter.sh"
@@ -670,11 +670,11 @@ def test_the_submit_script_names_every_job_and_gives_a_stuck_sbatch_up(tmp_path,
         SUBMIT_SHIELDHIT.format(
             root_dir=tmp_path,
             n_tasks=2,
-            array_options="--account=grant",
+            array_options="--account=grant --job-name=mine --comment=theirs",
             collect_options="",
-            reporter_options="--job-name=yaptide_1_2",
+            reporter_options="--comment=yaptide_1_2",
             convertmc_version="1",
-            job_name="yaptide_1_2",
+            job_tag="yaptide_1_2",
             sbatch_seconds=5,
             sim_id=1,
             update_key="key",
@@ -699,23 +699,32 @@ def test_the_submit_script_names_every_job_and_gives_a_stuck_sbatch_up(tmp_path,
         assert not calls.exists()
     else:
         assert done.stdout.splitlines() == ["Job id: 7", "Collect id: 7", "Reporter id: 7"]
-        names = [line.count("--job-name=yaptide_1_2") for line in calls.read_text().splitlines()]
-        assert names == [1, 1, 1]
+        lines = calls.read_text().splitlines()
+        assert [line.split(" --parsable")[0].endswith("--comment=yaptide_1_2") for line in lines] == [True] * 3
+        assert "--job-name=mine" in lines[0] and "--job-name" not in lines[1]
 
 
-@pytest.mark.parametrize("slurm_answers", [True, False], ids=["answers", "stuck"])
-def test_the_cancel_command_cancels_by_name_and_keeps_the_directory_while_slurm_is_stuck(tmp_path, slurm_answers):
-    """The jobs go by their ids, then by the submit's name (a job whose id was never written); the directory goes
-    only once SLURM answered
+@pytest.mark.parametrize("squeue", ["listed", "none", "stuck"])
+def test_the_cancel_command_cancels_by_comment_and_keeps_the_directory_while_slurm_is_stuck(tmp_path, squeue):
+    """The jobs go by their ids, then the ones squeue lists with the submit's comment (a job whose id was never
+    written); the directory goes only once SLURM answered
     """
     job_dir = tmp_path / "scratch" / "yaptide_runs" / "5_1700000000000000"
     job_dir.mkdir(parents=True)
     (job_dir / "array_job_id").write_text("11\n")
     (job_dir / "collect_job_id").write_text("")  # sbatch given up: no id
-    calls = tmp_path / "scancel_calls"
+    calls = tmp_path / "calls"
+    listed = {
+        # the array (its tasks share the array's id), the collect, a job of the user's own, another submit's
+        "listed": "11 yaptide_5_1700000000000000\n11 yaptide_5_1700000000000000\n12 yaptide_5_1700000000000000\n"
+        "13 (null)\n14 yaptide_5_17000000000000001",
+        "none": "",
+        "stuck": "echo slurm_load_jobs error: Socket timed out on send/recv operation >&2; exit 1",
+    }[squeue]
     env = stub_commands(
         tmp_path / "bin",
-        scancel=f'echo "$@" >> {calls}' + ("" if slurm_answers else "; echo Socket timed out >&2; exit 1"),
+        scancel=f'echo scancel "$@" >> {calls}',
+        squeue=f'echo squeue "$@" >> {calls}; ' + (listed if squeue == "stuck" else f'printf "{listed}"'),
         timeout='shift; exec "$@"',
     )
 
@@ -728,6 +737,7 @@ def test_the_cancel_command_cancels_by_name_and_keeps_the_directory_while_slurm_
         check=False,
     )
 
-    assert calls.read_text().splitlines() == ["11", "--name=yaptide_5_1700000000000000 --user=plgtest"]
-    assert (done.returncode == 0) == slurm_answers
-    assert job_dir.exists() != slurm_answers
+    expected = ["scancel 11", "squeue -h -u plgtest -o %F %k"] + (["scancel 11 12"] if squeue == "listed" else [])
+    assert calls.read_text().splitlines() == expected
+    assert (done.returncode == 0) == (squeue != "stuck")
+    assert job_dir.exists() == (squeue == "stuck")

@@ -271,9 +271,10 @@ def submitted_at(job_dir: str) -> float:
     return int(match.group(2)) / 1e6 if match else 0.0
 
 
-def job_name(job_dir: str) -> str:
-    """The name of every SLURM job of one submit, unique to it like its directory: a cancel finds them by it even
-    when sbatch was given up before it told the job id - SLURM may still have taken the job
+def job_tag(job_dir: str) -> str:
+    """The comment of every SLURM job of one submit, unique to it like its directory: a cancel finds them by it even
+    when sbatch was given up before it told the job id - SLURM may still have taken the job. A comment, not the name:
+    the users name their jobs in the batch options.
     """
     return "yaptide_" + job_dir.rsplit("/", 1)[-1]
 
@@ -299,12 +300,16 @@ def cancel_command(job_dir: str) -> str:
     """The command that cancels the jobs of one submit and then removes its directory, bounded on the login node
 
     One command, as every command is a round trip. The jobs go by the ids the submit wrote next to them (a job already
-    gone from SLURM makes its scancel fail, the rest are still cancelled), then by the submit's job name: the jobs
-    whose id was never written. That last scancel fails only when SLURM does not answer, and the directory then stays.
+    gone from SLURM makes its scancel fail, the rest are still cancelled), then by the submit's comment, which squeue
+    shows (scancel filters by name only): the jobs whose id was never written. The directory goes only when squeue
+    and that scancel answered.
     """
     quoted = shlex.quote(job_dir)
     cancels = [f"test -s {quoted}/{job}_job_id && scancel `cat {quoted}/{job}_job_id`" for job in SIMULATION_JOBS]
-    script = "; ".join([*cancels, f"scancel --name={job_name(job_dir)} --user=$USER && rm -rf {quoted}"])
+    # %F: the array's job id (of a job not in an array, its own), %k: the comment
+    listed = 'JOBS=`squeue -h -u $USER -o "%F %k"`'
+    tagged = f"""IDS=`echo "$JOBS" | awk '$2 == "{job_tag(job_dir)}" {{print $1}}' | sort -u`"""
+    script = "; ".join([*cancels, f'{listed} && {tagged} && {{ [ -z "$IDS" ] || scancel $IDS; }} && rm -rf {quoted}'])
     return f"timeout {CANCEL_SECONDS} sh -c {shlex.quote(script)}"
 
 
@@ -312,7 +317,7 @@ def cancel_simulation(simulation_id: int) -> Optional[bool]:
     """Cancels the SLURM jobs of a simulation and removes its directory on the cluster, then forgets the directory;
     returns whether the cluster's SLURM answered, None when it was not asked
 
-    The jobs are found by the ids the submit wrote into the job directory and by the submit's job name, so a submit
+    The jobs are found by the ids the submit wrote into the job directory and by the submit's comment, so a submit
     interrupted before its ids reached the database (or before sbatch told them) is cleaned up too. A directory left in
     the database means the cancel is still to be done (the engine repeats it every few minutes). With the user's
     certificate expired, the jobs still stop by themselves, as they find the cancel the engine put into storage
@@ -362,7 +367,9 @@ def prepare_script_files(
     collect_options = convert_dict_to_sbatch_options(payload_dict=payload_dict, target_key="collect_options")
     collect_header = extract_sbatch_header(payload_dict=payload_dict, target_key="collect_header")
     # the reporter has no script header: the queue placement typed into the array header goes on its command line
-    reporter_options = helper_job_sbatch_options(payload_dict=payload_dict, job_dir=job_dir, job_name=job_name(job_dir))
+    reporter_options = helper_job_sbatch_options(
+        payload_dict=payload_dict, sim_id=sim_id, job_dir=job_dir, job_tag=job_tag(job_dir)
+    )
     backend_url = os.environ.get("BACKEND_EXTERNAL_URL", "")
 
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
@@ -377,7 +384,7 @@ def prepare_script_files(
             n_tasks=str(payload_dict["ntasks"]),
             convertmc_version=pymchelper.__version__,
             reporter_options=reporter_options,
-            job_name=job_name(job_dir),
+            job_tag=job_tag(job_dir),
             sbatch_seconds=SBATCH_SECONDS,
             **common,
         ),

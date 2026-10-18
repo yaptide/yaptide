@@ -995,7 +995,7 @@ class Engine:
         )
         for simulation in pending:
             self.start_guarded(simulation)
-        # an HPC submit the engine's restart stopped half way is repeated too: its jobs are cancelled by name first
+        # an HPC submit the engine's restart stopped half way is repeated too: its jobs are cancelled by their comment first
         self.submit_waiting()
         self.retry_cancels()
 

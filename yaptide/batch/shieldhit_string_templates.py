@@ -22,8 +22,9 @@ COLLECT_SCRIPT=$ROOT_DIR/collect_script.sh
 unzip -d $INPUT_DIR $ROOT_DIR/input.zip
 rm $ROOT_DIR/input.zip
 
-# every job of this submit has its name: a cancel finds them by it, also the ones whose id was never written
-SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --job-name={job_name} --parsable $ARRAY_SCRIPT > $OUT"
+# every job of this submit has its comment, after the options as it wins: a cancel finds them by it, also the ones
+# whose id was never written
+SHIELDHIT_CMD="sbatch --array=1-{n_tasks} {array_options} --comment={job_tag} --parsable $ARRAY_SCRIPT > $OUT"
 eval $SHIELDHIT_CMD
 JOB_ID=`cat $OUT | cut -d ";" -f 1`
 echo "Job id: $JOB_ID"
@@ -31,7 +32,7 @@ echo "Job id: $JOB_ID"
 echo "$JOB_ID" > $ROOT_DIR/array_job_id
 
 if [ -n "$JOB_ID" ] ; then
-    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --job-name={job_name} --parsable $COLLECT_SCRIPT"
+    COLLECT_CMD="sbatch --dependency=afterany:$JOB_ID {collect_options} --comment={job_tag} --parsable $COLLECT_SCRIPT"
     COLLECT_CMD="$COLLECT_CMD > $OUT"
     eval $COLLECT_CMD
     COLLECT_ID=`cat $OUT | cut -d ";" -f 1`
