@@ -137,7 +137,8 @@ sig_handler()
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun rfluka -N0 -M1 $WORK_DIR/*.inp &
+# the simulator records its PID: a cancel stops it on this node also while the SLURM controller does not answer
+srun sh -c 'echo $$ > simulator.pid && exec "$@"' sh rfluka -N0 -M1 $WORK_DIR/*.inp &
 SIMULATOR_PID=$!
 
 # reports the progress into storage and stops the simulator when the simulation is cancelled

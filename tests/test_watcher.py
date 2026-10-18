@@ -3,6 +3,7 @@
 import email
 import io
 import json
+import signal
 import subprocess
 import sys
 import tarfile
@@ -384,3 +385,42 @@ def test_expired_save_link_is_renewed(storage):
     saver(tmp_path, backend_url, 100).saved()
 
     assert FakeStorage.renewals == 1 and saved_files() == {"dose.bdo": b"dose"}
+
+
+def started_task(work_dir: Path, own_group: bool = True) -> subprocess.Popen:
+    """A simulator started as the array script does through srun: it records its PID; SLURM makes it lead a process
+    group of its own
+    """
+    work_dir.mkdir(parents=True, exist_ok=True)
+    process = subprocess.Popen(
+        ["sh", "-c", 'echo $$ > simulator.pid && exec "$@"', "sh", "sleep", "600"],
+        cwd=work_dir,
+        start_new_session=own_group,
+    )
+    pid_file = work_dir / watcher.SIMULATOR_PID_FILE
+    while not pid_file.exists() or not pid_file.read_text().strip():
+        time.sleep(0.01)
+    return process
+
+
+@pytest.mark.skipif(not Path("/proc/self/cwd").exists(), reason="reads /proc, as on the cluster's Linux nodes")
+def test_a_cancel_stops_the_simulator_without_slurm_only_in_the_tasks_own_directory(tmp_path):
+    """The simulator of the task stops; one whose PID file sits in another task's directory, or that does not lead a
+    process group of its own, is left alone
+    """
+    task = started_task(tmp_path / "task_0001")
+    other = started_task(tmp_path / "task_0002")
+    (tmp_path / "task_0003").mkdir()
+    (tmp_path / "task_0003" / watcher.SIMULATOR_PID_FILE).write_text(str(other.pid))
+    shared_group = started_task(tmp_path / "task_0004", own_group=False)
+    try:
+        watcher.stop_task(tmp_path / "task_0003")
+        watcher.stop_task(tmp_path / "task_0004")
+        assert other.poll() is None and shared_group.poll() is None
+
+        watcher.stop_task(tmp_path / "task_0001")
+        assert task.wait(timeout=5) == -signal.SIGTERM
+        assert other.poll() is None
+    finally:
+        for process in (task, other, shared_group):
+            process.kill()
