@@ -704,8 +704,10 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
     script.write_text(render(collect_template, tmp_path).replace("*.bdo", "*.bdo_fort.1"))
     (tmp_path / "collect.lock").mkdir()  # left by the task that tried
     reports = tmp_path / "reports"
-    # the merge fails until the file $HOME/merges exists
-    merge = '[[ "$1" == *merge_results.py ]] && { [ -f "$HOME/merges" ] || exit 1; }'
+    # the merge fails until the file $HOME/merges exists; with $HOME/oom in it, it is killed
+    merge = (
+        '[[ "$1" == *merge_results.py ]] && { [ -f "$HOME/merges" ] || exit `cat $HOME/oom 2>/dev/null || echo 1`; }'
+    )
     env = stub_commands(tmp_path / "bin", python3=f'{merge}\necho "$@" >> {reports}', module="true")
 
     def collect(*args) -> int:
@@ -716,7 +718,10 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
     assert collect("inline") == 1
     assert "FAILED" not in reports.read_text() and task_output.exists()
     assert collect() == 1
-    assert "--simulation_state=FAILED" in reports.read_text()
+    assert "--simulation_state=FAILED" in reports.read_text() and "--reason" not in reports.read_text()
+    (tmp_path / "oom").write_text("137")
+    assert collect() == 1
+    assert "--simulation_state=FAILED --reason=out_of_memory" in reports.read_text()
 
     (tmp_path / "merges").write_text("")
     reports.unlink()

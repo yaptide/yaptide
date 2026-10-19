@@ -44,6 +44,8 @@ if [ -n "$JOB_ID" ] ; then
         REPORTER_OPTS="--dependency=afternotok:$COLLECT_ID --kill-on-invalid-dep=yes {reporter_options} --parsable"
         REPORTER_SEND="python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key}"
         REPORTER_SEND="$REPORTER_SEND --backend_url={backend_url} --simulation_state=FAILED"
+        # the collect job's state in SLURM tells why it failed, e.g. its memory limit
+        REPORTER_SEND="$REPORTER_SEND --collect_job_id=$COLLECT_ID"
         REPORTER_CMD="sbatch $REPORTER_OPTS --wrap=\\"$REPORTER_SEND\\" > $OUT"
         eval $REPORTER_CMD
         REPORTER_ID=`cat $OUT | cut -d ";" -f 1`
@@ -83,8 +85,11 @@ if [ $MERGED -ne 0 ] ; then
     # with empty results; task outputs are kept for a manual look. A failure inline may be the task's memory limit,
     # this job tries again and reports it
     if [ "$1" != inline ] ; then
+        # 137: killed (SIGKILL), as by the memory limit of the job
+        REASON=""
+        [ $MERGED -eq 137 ] && REASON="--reason=out_of_memory"
         python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
-              --backend_url={backend_url} --simulation_state=FAILED
+              --backend_url={backend_url} --simulation_state=FAILED $REASON
     fi
     exit 1
 fi

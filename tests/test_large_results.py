@@ -14,7 +14,7 @@ from pymchelper.input_output import fromfile
 from pymchelper.writers.json import JsonWriter
 
 from yaptide.application import create_app
-from yaptide.batch import merge_results
+from yaptide.batch import merge_results, simulation_data_sender
 from yaptide.batch.batch_methods import with_merge_memory
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
@@ -326,3 +326,57 @@ def test_hpc_jobs_ask_for_the_memory_of_the_merge():
 
     small = {"array_options": {"account": "grant"}}
     assert with_merge_memory(small, {"detect.dat": DETECT_2089.replace("10000", "100")}) == small
+
+
+@pytest.mark.parametrize(
+    "state, reason", [("OUT_OF_MEMORY", "out_of_memory"), ("FAILED", None), ("TIMEOUT", None), ("", None)]
+)
+def test_reporter_tells_a_merge_out_of_memory(monkeypatch, state, reason):
+    """The reporter job reads the collect job's state from SLURM's accounting"""
+    calls = []
+
+    def sacct(command, **_):
+        """sacct's answer"""
+        calls.append(command)
+        return subprocess.CompletedProcess(command, 0, stdout=state + "\n")
+
+    monkeypatch.setattr(simulation_data_sender.subprocess, "run", sacct)
+    monkeypatch.setattr(simulation_data_sender, "SACCT_RETRY_SECONDS", 0)
+
+    assert simulation_data_sender.collect_failure_reason("123") == reason
+    assert calls[0] == ["sacct", "-n", "-P", "-X", "-j", "123", "-o", "State"]
+
+
+class Accepted:
+    """The backend's answer to a state report"""
+
+    def __enter__(self):
+        """The answer itself"""
+        return self
+
+    def __exit__(self, *_):
+        """Nothing to close"""
+
+    @staticmethod
+    def getcode() -> int:
+        """Accepted"""
+        return 202
+
+
+def test_failure_reason_goes_with_the_failed_state(monkeypatch):
+    """The reason is a log the backend stores with the FAILED state (POST /jobs)"""
+    sent = []
+    monkeypatch.setattr(
+        simulation_data_sender.request, "urlopen", lambda req, **_: sent.append(json.loads(req.data)) or Accepted()
+    )
+
+    simulation_data_sender.send_simulation_state_update(1, "key", "https://backend", "FAILED", "out_of_memory")
+
+    assert sent == [
+        {
+            "sim_id": 1,
+            "job_state": "FAILED",
+            "update_key": "key",
+            "log": {"error": "Merging the results ran out of memory"},
+        }
+    ]
