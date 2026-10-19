@@ -1,8 +1,9 @@
 """Uploads the merged results of an HPC simulation from the cluster straight to the backend's object storage.
 
 Runs at the end of the collect job, with the standard library only. For every page of every estimator in the
-output directory (convertmc's JSON files) it asks the backend for a signed upload link, uploads the gzipped page,
-then tells the backend what it uploaded; the backend checks the pages are in storage and lists any missing one,
+output directory (merge_results.py's JSON files) it asks the backend for a signed upload link, uploads the gzipped
+page, and likewise the full resolution file of an estimator whose pages were downsampled, then tells the backend
+what it uploaded; the backend checks the pages are in storage and lists any missing one,
 which is uploaded again. A backend without object storage gets the results the old way, in one request.
 """
 
@@ -17,7 +18,7 @@ import ssl
 import sys
 import time
 from pathlib import Path
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union
 from http.client import HTTPException
 from urllib import error, request
 
@@ -28,6 +29,13 @@ RETRY_SECONDS = 5
 MAX_PAUSE_SECONDS = 120
 # rounds of new links (when they expired), and of uploading again what the storage is missing
 ROUNDS = 6
+# the most a signed link may upload: nginx's limit for the storage (client_max_body_size); a larger full resolution
+# file is not uploaded, the results are kept without it
+MAX_FULL_RESOLUTION_BYTES = 2 << 30
+# the full resolution file of an estimator among the wanted uploads, in place of a page number
+FULL = "full_resolution"
+# bytes read at once from a full resolution file
+READ_CHUNK = 1 << 20
 # the TLS certificate chain of the backend is not always complete for the cluster's OpenSSL, so it is not verified,
 # as in the other scripts sending to the backend
 CONTEXT = ssl.create_default_context()
@@ -45,7 +53,7 @@ def page_body(page: dict) -> bytes:
 
 
 def read_estimators(output_dir: Path) -> List[dict]:
-    """Estimators as convertmc wrote them, one JSON file each, named by the file"""
+    """Estimators as merge_results.py wrote them, one JSON file each, named by the file"""
     estimators = []
     for path in sorted(output_dir.glob("*.json")):
         estimator = json.loads(path.read_text())
@@ -54,8 +62,35 @@ def read_estimators(output_dir: Path) -> List[dict]:
     return estimators
 
 
-def manifest(estimators: List[dict]) -> List[dict]:
-    """What will be uploaded: every page with its size and MD5, without the page data"""
+def file_md5(path: Path) -> str:
+    """The base64 MD5 of a file, read a part at a time"""
+    digest = hashlib.md5()  # skipcq: PTC-W1003 # the Content-MD5 S3 checks the upload with
+    with open(path, "rb") as file:
+        for chunk in iter(lambda: file.read(READ_CHUNK), b""):
+            digest.update(chunk)
+    return base64.b64encode(digest.digest()).decode()
+
+
+def full_resolution_files(output_dir: Path, estimators: List[dict]) -> Dict[str, dict]:
+    """The full resolution files next to the estimators (<name>.bdo): estimator name -> path, size and MD5"""
+    files = {}
+    for estimator in estimators:
+        path = output_dir / (estimator["name"] + ".bdo")
+        if not path.exists():
+            continue
+        size = path.stat().st_size
+        if size > MAX_FULL_RESOLUTION_BYTES:
+            logging.warning("%s takes %d bytes, more than a link uploads; not uploaded", path, size)
+            continue
+        files[estimator["name"]] = {"path": path, "size": size, "md5": file_md5(path)}
+    return files
+
+
+def manifest(estimators: List[dict], full_files: Dict[str, dict] = None) -> List[dict]:
+    """What will be uploaded: every page with its size and MD5, without the page data, and the size and MD5 of the
+    full resolution file of an estimator with one
+    """
+    full_files = full_files or {}
     result = []
     for estimator in estimators:
         pages = []
@@ -71,7 +106,10 @@ def manifest(estimators: List[dict]) -> List[dict]:
                     "md5": base64.b64encode(hashlib.md5(body).digest()).decode(),  # skipcq: PTC-W1003
                 }
             )
-        result.append({"name": estimator["name"], "metadata": estimator["metadata"], "pages": pages})
+        entry = {"name": estimator["name"], "metadata": estimator["metadata"], "pages": pages}
+        if estimator["name"] in full_files:
+            entry[FULL] = {key: full_files[estimator["name"]][key] for key in ("size", "md5")}
+        result.append(entry)
     return result
 
 
@@ -111,12 +149,20 @@ def post(url: str, payload: dict) -> Tuple[int, dict]:
 STORED, LINK_EXPIRED, REFUSED = "stored", "link expired", "refused"
 
 
-def put(url: str, body: bytes, md5: str) -> str:
-    """Uploads one page to its signed link, retrying when the storage cannot be reached"""
-    headers = {"Content-MD5": md5, "Content-Type": "application/json", "Content-Encoding": "gzip"}
+def put(url: str, body: Union[bytes, Path], md5: str) -> str:
+    """Uploads one gzipped page, or a full resolution file read as it goes, to its signed link, retrying when the
+    storage cannot be reached
+    """
+    if isinstance(body, Path):
+        headers = {"Content-MD5": md5, "Content-Type": "application/octet-stream"}
+        headers["Content-Length"] = str(body.stat().st_size)
+    else:
+        headers = {"Content-MD5": md5, "Content-Type": "application/json", "Content-Encoding": "gzip"}
     for attempt in range(ATTEMPTS):
-        req = request.Request(url, body, headers, method="PUT")
+        # a file is read as it is sent, opened again for every attempt
+        data = open(body, "rb") if isinstance(body, Path) else body  # skipcq: PTC-W6004
         try:
+            req = request.Request(url, data, headers, method="PUT")
             with request.urlopen(req, context=CONTEXT, timeout=300) as response:  # skipcq: BAN-B310
                 return STORED if response.status == 200 else REFUSED
         except error.HTTPError as http_error:
@@ -129,6 +175,9 @@ def put(url: str, body: bytes, md5: str) -> str:
             logging.warning("Upload answered %d", http_error.code)
         except (OSError, HTTPException) as connection_error:
             logging.warning("Upload failed: %s", connection_error)
+        finally:
+            if data is not body:
+                data.close()
         if attempt < ATTEMPTS - 1:
             pause(attempt)
     return REFUSED
@@ -138,8 +187,14 @@ def put(url: str, body: bytes, md5: str) -> str:
 UPLOADED, NO_STORAGE, FAILED, AGAIN = "uploaded", "no storage", "failed", "again"
 
 
-def upload(estimators: List[dict], listed: List[dict], wanted: set, args) -> str:
-    """Uploads the wanted pages ((estimator, page number) pairs)"""
+def upload(estimators: List[dict], listed: List[dict], wanted: set, args, full_files: Dict[str, dict] = None) -> str:
+    """Uploads the wanted pages ((estimator, page number) pairs) and full resolution files ((estimator, FULL))"""
+    full_files = full_files or {}
+    full_entries = [
+        {"estimator": name, "size": file["size"], "md5": file["md5"]}
+        for name, file in full_files.items()
+        if (name, FULL) in wanted
+    ]
     entries = [
         {"estimator": estimator["name"], **{key: page[key] for key in ("page_number", "size", "md5")}}
         for estimator in listed
@@ -148,7 +203,7 @@ def upload(estimators: List[dict], listed: List[dict], wanted: set, args) -> str
     ]
     status, answer = post(
         f"{args.backend_url}/results/uploads",
-        {"simulation_id": args.sim_id, "update_key": args.update_key, "pages": entries},
+        {"simulation_id": args.sim_id, "update_key": args.update_key, "pages": entries, FULL: full_entries},
     )
     if status == 501:
         return NO_STORAGE
@@ -168,6 +223,14 @@ def upload(estimators: List[dict], listed: List[dict], wanted: set, args) -> str
             if stored == REFUSED:
                 return FAILED
             wanted.discard(page_id)
+    for link in answer.get("full_resolution_uploads", []):
+        name = link["estimator"]
+        stored = put(link["url"], full_files[name]["path"], full_files[name]["md5"])
+        if stored == LINK_EXPIRED:
+            return AGAIN
+        if stored == REFUSED:
+            return FAILED
+        wanted.discard((name, FULL))
     return UPLOADED
 
 
@@ -186,15 +249,17 @@ def main(args) -> int:
     if not estimators:
         logging.error("No results in %s", args.output_dir)
         return 1
-    listed = manifest(estimators)
+    full_files = full_resolution_files(Path(args.output_dir), estimators)
+    listed = manifest(estimators, full_files)
     wanted = {(estimator["name"], page["page_number"]) for estimator in listed for page in estimator["pages"]}
+    wanted |= {(name, FULL) for name in full_files}
     for _ in range(ROUNDS):
-        uploaded = upload(estimators, listed, wanted, args)
+        uploaded = upload(estimators, listed, wanted, args, full_files)
         for _ in range(ROUNDS):
             if uploaded != AGAIN:
                 break
             # what is left of wanted, with new links
-            uploaded = upload(estimators, listed, wanted, args)
+            uploaded = upload(estimators, listed, wanted, args, full_files)
         if uploaded == AGAIN:
             # every new link refused too (e.g. a clock far off on this node)
             return 1
@@ -211,8 +276,8 @@ def main(args) -> int:
         if status != 409 or "missing" not in answer:
             logging.error("Results refused: %d %s", status, answer)
             return 1
-        # pages the storage does not have: uploaded again
-        wanted = {(page["estimator"], page["page_number"]) for page in answer["missing"]}
+        # pages (and full resolution files) the storage does not have: uploaded again
+        wanted = {(entry["estimator"], entry.get("page_number", FULL)) for entry in answer["missing"]}
     return 1
 
 

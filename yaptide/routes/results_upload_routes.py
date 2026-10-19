@@ -1,8 +1,9 @@
 """Results of HPC jobs go straight from the cluster to object storage; the backend hands out links and checks them
 
-The collect job asks for one signed upload link per page (POST /results/uploads), uploads the gzipped pages, then
-reports what it uploaded (POST /results/done). The backend checks every page is in storage before it stores the
-results and marks the simulation completed; a page missing is listed in the answer, for the job to upload again.
+The collect job asks for one signed upload link per page (POST /results/uploads), and per full resolution file of an
+estimator whose pages were downsampled, uploads them, then reports what it uploaded (POST /results/done). The backend
+checks every page (and file) is in storage before it stores the results and marks the simulation completed; one
+missing is listed in the answer, for the job to upload again.
 """
 
 import base64
@@ -10,6 +11,7 @@ import base64
 from flask import request
 from flask_restful import Resource
 
+from yaptide.batch.results_uploader import MAX_FULL_RESOLUTION_BYTES
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import fetch_simulation_by_sim_id, update_simulation_state
@@ -70,18 +72,38 @@ def valid_page(page: dict) -> bool:
     )
 
 
+def valid_full_resolution(entry: dict) -> bool:
+    """A full resolution entry: its estimator's name, size (within what a link may upload) and MD5"""
+    return (
+        isinstance(entry, dict)
+        and valid_name(entry.get("estimator"))
+        and type(entry.get("size")) is int
+        and 0 < entry["size"] <= MAX_FULL_RESOLUTION_BYTES
+        and valid_md5(entry.get("md5"))
+    )
+
+
 class ResultsUploadsResource(Resource):
     """Signed upload links for the pages of an HPC simulation's results"""
 
     @staticmethod
     def post():
-        """Body: simulation_id, update_key and pages - estimator, page_number, size and md5 (base64) of each"""
+        """Body: simulation_id, update_key and pages - estimator, page_number, size and md5 (base64) of each; and
+        full_resolution - estimator, size and md5 of each full resolution file (optional)
+        """
         payload = request.get_json(force=True)
         simulation, error = authorized_simulation(payload)
         if error:
             return error
         pages = payload.get("pages")
-        if not isinstance(pages, list) or not 0 < len(pages) <= MAX_PAGES or not all(valid_page(p) for p in pages):
+        full = payload.get("full_resolution", [])
+        if (
+            not isinstance(pages, list)
+            or not isinstance(full, list)
+            or not 0 < len(pages) + len(full) <= MAX_PAGES
+            or not all(valid_page(p) for p in pages)
+            or not all(valid_full_resolution(f) for f in full)
+        ):
             return yaptide_response(message="pages: estimator, page_number, size and md5 of each", code=400)
         # partial results the engine merges go to the same pages: one being stored is waited for, and none is stored
         # after this (it takes a RUNNING simulation), so it cannot replace a page uploaded with these links
@@ -101,7 +123,20 @@ class ResultsUploadsResource(Resource):
             }
             for page in pages
         ]
-        return yaptide_response(message="Upload links", code=200, content={"uploads": uploads})
+        full_uploads = [
+            {
+                "estimator": entry["estimator"],
+                "url": result_storage.upload_url(
+                    result_storage.full_resolution_key(simulation.id, entry["estimator"]),
+                    entry["size"],
+                    entry["md5"],
+                    page=False,
+                ),
+            }
+            for entry in full
+        ]
+        content = {"uploads": uploads, "full_resolution_uploads": full_uploads}
+        return yaptide_response(message="Upload links", code=200, content=content)
 
 
 def valid_estimators(estimators) -> bool:
@@ -146,7 +181,7 @@ class ResultsDoneResource(Resource):
     @staticmethod
     def post():
         """Body: simulation_id, update_key and estimators - name, metadata and pages (page_number, name,
-        dimensions, size, md5) of each, as the job uploaded them
+        dimensions, size, md5) of each, and full_resolution (size, md5) of one with it, as the job uploaded them
         """
         payload = request.get_json(force=True)
         simulation, error = authorized_simulation(payload)
@@ -162,7 +197,18 @@ class ResultsDoneResource(Resource):
             except ValueError as invalid:
                 return yaptide_response(message=str(invalid), code=400)
             missing.extend(missing_pages)
-            results.append({"name": estimator["name"], "metadata": estimator.get("metadata", {}), "pages": pages})
+            result = {"name": estimator["name"], "metadata": estimator.get("metadata", {}), "pages": pages}
+            full = estimator.get("full_resolution")
+            if full is not None:
+                entry = {**full, "estimator": estimator["name"]} if isinstance(full, dict) else None
+                if not valid_full_resolution(entry):
+                    return yaptide_response(message="Invalid full resolution entry", code=400)
+                key = result_storage.full_resolution_key(simulation.id, estimator["name"])
+                if result_storage.stored_matches(key, entry["size"], entry["md5"]):
+                    result["full_resolution"] = {"key": key, "size": entry["size"]}
+                else:
+                    missing.append({"estimator": estimator["name"], "full_resolution": True})
+            results.append(result)
         if missing:
             return yaptide_response(message="Pages missing in storage", code=409, content={"missing": missing})
         store_results(simulation, results)

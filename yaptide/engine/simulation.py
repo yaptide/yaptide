@@ -292,8 +292,12 @@ def check_bdo(path: Path) -> None:
             file.seek(count * itemsize, 1)
 
 
-def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]:
-    """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises"""
+def merge_stored(keys: list[str], max_bytes: float = float("inf"), simulation_id: Optional[int] = None) -> list[dict]:
+    """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises
+
+    With the simulation's id (the final results) and object storage, the full resolution of an estimator whose pages
+    were downsampled for the UI goes to storage, the estimator says where ("full_resolution").
+    """
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
         task_dirs = []
         for number, key in enumerate(keys):
@@ -303,7 +307,19 @@ def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]
             max_bytes -= extract_results(archive, task_dir, max_bytes)
             archive.unlink()
             task_dirs.append(task_dir)
-        return merge_simulation_outputs(task_dirs)
+        full_dir = None
+        if simulation_id is not None and result_storage.configured():
+            full_dir = Path(merge_dir) / "full_resolution"
+            full_dir.mkdir()
+        estimators = merge_simulation_outputs(task_dirs, full_dir)
+        for estimator in estimators:
+            path = full_dir / f"{estimator['name']}.bdo" if full_dir else None
+            if path and path.exists():
+                key = result_storage.full_resolution_key(simulation_id, estimator["name"])
+                size = path.stat().st_size
+                result_storage.put_file(key, path)
+                estimator["full_resolution"] = {"key": key, "size": size}
+        return estimators
 
 
 def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
@@ -317,7 +333,7 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
             if simulation is None:
                 return False
             update_simulation_state(simulation, {"job_state": EntityState.MERGING_RUNNING.value})
-            estimators = merge_stored(keys)
+            estimators = merge_stored(keys, simulation_id=simulation_id)
             if estimators:
                 store_results(simulation, estimators)
             return bool(estimators)

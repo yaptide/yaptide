@@ -10,7 +10,6 @@ from marshmallow import Schema, fields
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_estimator_by_sim_id_and_est_name,
-    fetch_estimator_id_by_sim_id_and_est_name,
     fetch_estimators_by_sim_id,
     fetch_input_by_sim_id,
     fetch_logfiles_by_sim_id,
@@ -128,6 +127,24 @@ def page_content(page: PageModel) -> dict:
     return page.data
 
 
+def estimator_content(estimator: EstimatorModel, pages: list[PageModel]) -> dict:
+    """An estimator as the UI gets it; one whose pages were downsampled for the UI has a signed link to its full
+    resolution too
+    """
+    metadata = dict(estimator.data)
+    metadata.pop("full_resolution", None)
+    content = {"metadata": metadata, "name": estimator.name, "pages": [page_content(page) for page in pages]}
+    return with_full_resolution_url(content, estimator)
+
+
+def with_full_resolution_url(content: dict, estimator: EstimatorModel) -> dict:
+    """The content with a signed link to the estimator's full resolution, when it has one"""
+    full_resolution = estimator.data.get("full_resolution")
+    if full_resolution and result_storage.configured():
+        content["full_resolution_url"] = result_storage.page_url(full_resolution["key"])
+    return content
+
+
 def get_single_estimator(sim_id: int, estimator_name: str):
     """Retrieve a single estimator by simulation ID and estimator name"""
     estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
@@ -135,12 +152,7 @@ def get_single_estimator(sim_id: int, estimator_name: str):
     if not estimator:
         return yaptide_response(message="Estimator not found", code=404)
 
-    pages = fetch_pages_by_estimator_id(est_id=estimator.id)
-    estimator_dict = {
-        "metadata": estimator.data,
-        "name": estimator.name,
-        "pages": [page_content(page) for page in pages],
-    }
+    estimator_dict = estimator_content(estimator, fetch_pages_by_estimator_id(est_id=estimator.id))
     return yaptide_response(
         message=f"Estimator '{estimator_name}' for simulation: {sim_id}", code=200, content=estimator_dict
     )
@@ -158,11 +170,7 @@ def get_all_estimators(sim_id: int):
     outputs = editor_outputs_by_file(fetch_simulation_by_sim_id(sim_id=sim_id))
     result_estimators = []
     for estimator in estimators:
-        estimator_dict = {
-            "metadata": estimator.data,
-            "name": estimator.name,
-            "pages": [page_content(page) for page in estimator.pages],
-        }
+        estimator_dict = estimator_content(estimator, estimator.pages)
         output = outputs.get(estimator_key(estimator.file_name))
         if output and output.get("uuid"):
             estimator_dict["output_uuid"] = output["uuid"]
@@ -288,6 +296,9 @@ def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[d
         estimator.name = name
         estimator.file_name = estimator_dict["name"]
         estimator.data = estimator_dict["metadata"]
+        if estimator_dict.get("full_resolution"):
+            # stored next to the pages (result_storage.full_resolution_key); kept with the metadata, no column for it
+            estimator.data = {**estimator_dict["metadata"], "full_resolution": estimator_dict["full_resolution"]}
         # the id for the pages
         db.session.flush()
         use_storage = prepare_create_or_update_pages_in_db(
@@ -420,16 +431,18 @@ class ResultsResource(Resource):
         if page_number is None and page_numbers is None:
             return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
-        estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
+        estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
+        if estimator is None:
+            return yaptide_response(message="Estimator not found", code=404)
         if page_number is not None:
-            page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=page_number)
-            result = {"page": page_content(page)}
+            page = fetch_page_by_est_id_and_page_number(est_id=estimator.id, page_number=page_number)
+            result = with_full_resolution_url({"page": page_content(page)}, estimator)
             return yaptide_response(message="Page retrieved successfully", code=200, content=result)
 
         if page_numbers is not None:
             parsed_page_numbers = parse_page_numbers(page_numbers)
-            pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator_id, page_numbers=parsed_page_numbers)
-            result = {"pages": [page_content(page) for page in pages]}
+            pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator.id, page_numbers=parsed_page_numbers)
+            result = with_full_resolution_url({"pages": [page_content(page) for page in pages]}, estimator)
             return yaptide_response(message="Pages retrieved successfully", code=200, content=result)
         return yaptide_response(message="Wrong parameters", code=400, content=errors)
 

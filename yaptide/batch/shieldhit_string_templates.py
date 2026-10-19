@@ -73,7 +73,12 @@ mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
 
-if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
+# one task's file at a time; pages too large to show are downsampled, the full resolution is kept next to them.
+# The pymchelper module, as for FLUKA: a python3 that imports pymchelper (shieldhit's module brings convertmc)
+module load pymchelper
+python3 $ROOT_DIR/merge_results.py --output_dir=$OUTPUT_DIRECTORY "$INPUT_WILDCARD"
+MERGED=$?
+if [ $MERGED -ne 0 ] ; then
     # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
     # with empty results; task outputs are kept for a manual look. A failure inline may be the task's memory limit,
     # this job tries again and reports it

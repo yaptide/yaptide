@@ -88,6 +88,13 @@ def page_key(sim_id: int, estimator_file_name: str, page_number: int) -> str:
     return f"{PAGE_PREFIX}{sim_id}/{estimator_file_name}/{page_number}.json"
 
 
+def full_resolution_key(sim_id: int, estimator_file_name: str) -> str:
+    """Object key of an estimator's full resolution (a .bdo file), kept when its pages were downsampled for the UI;
+    with the result pages, removed with them. Named after the estimator, the name a download gets.
+    """
+    return f"{PAGE_PREFIX}{sim_id}/{estimator_file_name}/{estimator_file_name.rstrip('_')}.bdo"
+
+
 def put_page(key: str, page: dict) -> int:
     """Stores a page as gzipped JSON the browser decompresses itself; returns the stored size in bytes"""
     body = gzip.compress(json.dumps(page).encode())
@@ -182,19 +189,17 @@ def public_client():
     return _client(os.environ.get("RESULTS_S3_PUBLIC_ENDPOINT") or os.environ["BACKEND_EXTERNAL_URL"])
 
 
-def upload_url(key: str, size: int, md5: str) -> str:
-    """Signed link a cluster job uploads one gzipped page with; the storage rejects any other size or content
+def upload_url(key: str, size: int, md5: str, page: bool = True) -> str:
+    """Signed link a cluster job uploads one gzipped page (or, not a page, a binary file) with; the storage rejects
+    any other size or content
 
     md5 is the base64 MD5 of the body, as the Content-MD5 header carries it.
     """
-    params = {
-        "Bucket": os.environ["RESULTS_S3_BUCKET"],
-        "Key": key,
-        "ContentLength": size,
-        "ContentMD5": md5,
-        "ContentType": "application/json",
-        "ContentEncoding": "gzip",
-    }
+    params = {"Bucket": os.environ["RESULTS_S3_BUCKET"], "Key": key, "ContentLength": size, "ContentMD5": md5}
+    if page:
+        params.update(ContentType="application/json", ContentEncoding="gzip")
+    else:
+        params["ContentType"] = "application/octet-stream"
     return public_client().generate_presigned_url("put_object", Params=params, ExpiresIn=UPLOAD_URL_SECONDS)
 
 

@@ -704,18 +704,15 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
     script.write_text(render(collect_template, tmp_path).replace("*.bdo", "*.bdo_fort.1"))
     (tmp_path / "collect.lock").mkdir()  # left by the task that tried
     reports = tmp_path / "reports"
-    env = stub_commands(
-        tmp_path / "bin",
-        python3=f'echo "$@" >> {reports}',
-        module="true",
-        convertmc='[ -f "$HOME/merges" ] && touch out.json',
-    )
+    # the merge fails until the file $HOME/merges exists
+    merge = '[[ "$1" == *merge_results.py ]] && { [ -f "$HOME/merges" ] || exit 1; }'
+    env = stub_commands(tmp_path / "bin", python3=f'{merge}\necho "$@" >> {reports}', module="true")
 
     def collect(*args) -> int:
         """Runs the collect script; its exit code"""
         return subprocess.run(["bash", str(script), *args], env=env, capture_output=True, check=False).returncode
 
-    env["HOME"] = str(tmp_path)  # convertmc fails until the file $HOME/merges exists
+    env["HOME"] = str(tmp_path)
     assert collect("inline") == 1
     assert "FAILED" not in reports.read_text() and task_output.exists()
     assert collect() == 1
