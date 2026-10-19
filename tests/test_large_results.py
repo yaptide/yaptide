@@ -1,5 +1,5 @@
 """Large SHIELD-HIT12A meshes: the merge one task file at a time, pages downsampled for the UI with the full
-resolution kept for download
+resolution kept for download, the size limit at submit and the memory the HPC jobs ask for
 """
 
 import json
@@ -15,16 +15,64 @@ from pymchelper.writers.json import JsonWriter
 
 from yaptide.application import create_app
 from yaptide.batch import merge_results
+from yaptide.batch.batch_methods import with_merge_memory
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import CelerySimulationModel, YaptideUserModel
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
-from yaptide.utils.sim_utils import merge_simulation_outputs
+from yaptide.utils.sim_utils import detect_outputs, merge_memory_bytes, merge_simulation_outputs, output_size_error
 
 BDO_DIR = Path(__file__).resolve().parent / "res" / "bdo"
 # a mesh of 1 x 4 x 10 bins, 3 pages (dose and two fluences)
 TEMPLATE = BDO_DIR / "task_1" / "yz_profile_0001.bdo"
+
+# the detect.dat of simulation 2089, whose merge ran out of memory on Ares
+DETECT_2089 = """Geometry Mesh
+    Name XZ_map
+    X -5 5 10000
+    Y -0.5 0.5 1
+    Z 0 10 10000
+
+Geometry Mesh
+    Name XY_map
+    X -3 3 300
+    Y -3 3 300
+    Z 4 5 1
+
+Geometry Mesh
+    Name Z_narrow
+    X -0.1 0.1 1
+    Y -0.1 0.1 1
+    Z 0 20 200
+
+Output
+    Filename XZ_map.bdo
+    Geo XZ_map
+    Quantity Dose
+
+Output
+    Filename XY_map.bdo
+    Geo XY_map
+    Quantity Dose
+
+Output
+    Filename z_profile.bdo
+    Geo Z_narrow
+    Quantity Dose
+    Quantity Fluence
+    Quantity AvgEnergy
+    Quantity dLET
+
+Output
+    Filename z_more.bdo
+    Geo Z_narrow
+    Quantity Dose
+    Quantity Fluence
+    Quantity AvgEnergy
+    Quantity dLET
+    Quantity tLET
+"""
 
 
 def make_bdo(path: Path, bins: tuple, primaries: int, seed: int) -> None:
@@ -151,6 +199,48 @@ def test_merge_script_writes_the_files_of_the_collect_job(task_dirs, tmp_path, m
     assert subprocess.run([*run, str(tmp_path / "none_*" / "*.bdo")], check=False).returncode == 1
 
 
+def test_size_of_simulation_2089():
+    """XZ_map 10000 x 1 x 10000 with one quantity takes 800 MB a task: 100 tasks are over the limit, 50 are not"""
+    outputs = {output.name: output for output in detect_outputs(DETECT_2089)}
+
+    assert outputs["XZ_map"].bins == [10000, 1, 10000] and outputs["XZ_map"].values == 10**8
+    assert outputs["XY_map"].values == 300 * 300
+    assert outputs["z_profile"].values == 200 * 4 and outputs["z_more"].values == 200 * 5
+    assert output_size_error({"detect.dat": DETECT_2089}, 100) == (
+        "The outputs would take 80 GB (XZ_map: 10000 × 1 × 10000 bins × 100 tasks); the limit is 50 GB. "
+        "Use fewer bins or tasks."
+    )
+    assert output_size_error({"detect.dat": DETECT_2089}, 50) is None
+    assert output_size_error({"input.inp": "FLUKA"}, 1000) is None
+
+
+def test_cylinders_and_differential_bins_count():
+    """Cyl: R x PHI x Z; a Diff1/Diff2 multiplies the bins of the quantity before it; a Zone is one bin"""
+    detect = """Geometry Cyl
+    Name Cyl
+    R 0 5 10
+    PHI 0 360 4
+    Z 0 20 100
+Geometry Zone
+    Name Slab
+    Zone 1 3
+Output
+    Filename cyl.bdo
+    Geo Cyl
+    Quantity Dose
+    Quantity Fluence Protons
+    Diff1 0 160 640
+    Diff1Type E
+Output
+    Geo Slab
+    Quantity Dose ! a comment
+"""
+    cyl, slab = detect_outputs(detect)
+
+    assert (cyl.name, cyl.bins, cyl.values, cyl.pages) == ("cyl", [10, 4, 100], 4000 * 641, 2)
+    assert (slab.name, slab.bins, slab.values) == ("Slab", [1], 1)
+
+
 @pytest.fixture
 def client(monkeypatch):
     """Test client of a logged in user, its direct simulation with results stored, and the storage's links"""
@@ -169,6 +259,23 @@ def client(monkeypatch):
         yield client
         db.session.remove()
         db.drop_all()
+
+
+def test_submit_over_the_limit_is_refused(client):
+    """400 with the reason, nothing stored"""
+    payload = {
+        "input_type": "files",
+        "sim_type": "shieldhit",
+        "ntasks": 100,
+        "input_files": {"beam.dat": "NSTAT 10000 0\n", "geo.dat": "", "mat.dat": "", "detect.dat": DETECT_2089},
+    }
+
+    response = client.post("/jobs/direct", json=payload)
+
+    assert response.status_code == 400
+    assert response.get_json()["message"].startswith("The outputs would take 80 GB (XZ_map")
+    assert db.session.query(CelerySimulationModel).count() == 0
+    assert client.post("/jobs/direct", json={**payload, "ntasks": 50}).status_code == 202
 
 
 def test_results_link_the_full_resolution(client, task_dirs, monkeypatch):
@@ -201,3 +308,21 @@ def test_results_link_the_full_resolution(client, task_dirs, monkeypatch):
     )
     assert client.get("/results", query_string={**query, "page_number": 0}).get_json()["full_resolution_url"] == url
     assert key == f"simulations/{simulation.id}/mesh/mesh.bdo"
+
+
+def test_hpc_jobs_ask_for_the_memory_of_the_merge():
+    """3 copies of the largest output, its pages' JSON and a base; never below the cluster's default nor in place of
+    the user's own memory options
+    """
+    files = {"detect.dat": DETECT_2089}
+    assert merge_memory_bytes(files) == 3 * 800_000_000 + 64 * 2**20 + 2 * 2**30
+
+    options = with_merge_memory({"array_options": {"account": "grant"}}, files)
+    assert options["array_options"] == {"account": "grant", "mem": "5G"}
+    assert options["collect_options"] == {"mem": "5G"}
+
+    own = with_merge_memory({"array_header": "#SBATCH --mem-per-cpu=8G", "collect_options": {"mem": "9G"}}, files)
+    assert "array_options" not in own and own["collect_options"] == {"mem": "9G"}
+
+    small = {"array_options": {"account": "grant"}}
+    assert with_merge_memory(small, {"detect.dat": DETECT_2089.replace("10000", "100")}) == small

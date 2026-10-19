@@ -41,8 +41,14 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, SimulationType
-from yaptide.utils.sim_utils import set_shieldhit_save_step, write_simulation_input_files
+from yaptide.utils.sim_utils import merge_memory_bytes, set_shieldhit_save_step, write_simulation_input_files
 
+
+# the memory a job gets on the clusters unless it asks for some (Ares: 3850 MB per CPU); a merge of the results that
+# needs more asks for it, one that needs less keeps this
+DEFAULT_JOB_MEMORY_BYTES = 3850 << 20
+# sbatch options that set a job's memory
+MEMORY_OPTIONS = ("mem", "mem-per-cpu", "mem-per-gpu")
 
 # a command on the login node that does not end in this time is given up (a hung login node must not hold one of
 # the engine's few connections forever); the submit script waits for sbatch several times
@@ -228,7 +234,7 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
     payload_dict = {
         "sim_type": simulation.sim_type,
         "ntasks": len(simulation.tasks),
-        "batch_options": input_dict.get("batch_options") or {},
+        "batch_options": with_merge_memory(input_dict.get("batch_options") or {}, input_dict["input_files"]),
     }
     update_key = encode_simulation_auth_token(simulation.id)
     try:
@@ -289,6 +295,22 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
     if simulation.job_state == EntityState.CANCELED.value:
         cancel_simulation(simulation_id)
     return True
+
+
+def with_merge_memory(batch_options: dict, files: dict) -> dict:
+    """The batch options with the memory merging the results takes (the last array task merges, the collect job
+    when that failed), for the jobs whose memory the user did not set and only above what the cluster gives anyway
+    """
+    needed = merge_memory_bytes(files)
+    if needed <= DEFAULT_JOB_MEMORY_BYTES:
+        return batch_options
+    options = dict(batch_options)
+    for job in ("array", "collect"):
+        own = options.get(f"{job}_options") or {}
+        if any(key in own for key in MEMORY_OPTIONS) or "--mem" in options.get(f"{job}_header", ""):
+            continue
+        options[f"{job}_options"] = {**own, "mem": f"{-(-needed // (1 << 30))}G"}
+    return options
 
 
 def saving_tasks(simulation: SimulationModel) -> int:

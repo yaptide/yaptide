@@ -31,6 +31,7 @@ from yaptide.routes.utils.utils import (
     job_status_content,
 )
 from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.sim_utils import output_size_error
 
 
 class JobsBatch(Resource):
@@ -74,6 +75,9 @@ class JobsBatch(Resource):
         # the simulation, its tasks and input in one commit: the engine submits what it finds PENDING
         job_id = datetime.now().strftime("%Y%m%d-%H%M%S-") + str(uuid.uuid4()) + PlatformType.BATCH.value
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+        too_large = output_size_error(input_dict["input_files"], payload_dict["ntasks"])
+        if too_large:
+            return yaptide_response(message=too_large, code=400)
         # what the engine needs to write the sbatch scripts
         input_dict["batch_options"] = payload_dict.get("batch_options") or {}
         requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]

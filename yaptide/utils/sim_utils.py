@@ -1,13 +1,15 @@
 import copy
 import logging
+import math
 import re
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
 from pymchelper.input_output import group_input_files
 from pymchelper.flair.Input import Card
 from converter.api import get_parser_from_str, run_parser
-from yaptide.batch.merge_results import merge_group
+from yaptide.batch.merge_results import MAX_OUTPUT_BYTES, merge_group
 from yaptide.utils.enums import InputType, SimulationType
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
@@ -37,6 +39,93 @@ def merge_simulation_outputs(output_dirs: list[Path], full_resolution_dir: Optio
         if estimator:
             merged.append({**estimator, "name": corename})
     return sorted(merged, key=lambda estimator: estimator["name"])
+
+
+# the lines of a detect.dat geometry giving its bins along an axis: "X -5 5 100" (Mesh), "R 0 5 10" (Cyl), ...
+BINNED_AXES = ("x", "y", "z", "r", "phi")
+# bytes a value takes in a result file
+VALUE_BYTES = 8
+# what a merge of the results takes besides 3 copies of the largest estimator (the merged one, and a task's file as
+# pymchelper reads it: the values and a list of as many items), measured on Linux: Python with numpy and pymchelper,
+# the JSON of each downsampled page, the cluster's tools - generous
+MERGE_BASE_BYTES = 2 << 30
+PAGE_JSON_BYTES = 64 << 20
+
+
+@dataclass
+class OutputSize:
+    """One output of a SHIELD-HIT12A detect.dat: its name, the bins of its geometry and the values it scores"""
+
+    name: str
+    bins: list[int]
+    values: int
+    pages: int
+
+
+def detect_outputs(detect_dat: str) -> list[OutputSize]:
+    """The outputs a SHIELD-HIT12A detect.dat scores: each geometry's bins (Mesh X x Y x Z, Cyl R x PHI x Z; one bin
+    for the others, e.g. Zone), times every Quantity of the output, times its differential bins (Diff1, Diff2 after
+    the Quantity they belong to)
+    """
+    geometries, outputs, block = {}, [], None
+    for line in detect_dat.splitlines():
+        words = re.split(r"[!#]", line, maxsplit=1)[0].split()
+        if not words:
+            continue
+        key = words[0].lower()
+        if key in ("geometry", "output", "filter"):
+            block = {"kind": key, "name": "", "geo": "", "bins": [], "quantities": []}
+            if key == "output":
+                outputs.append(block)
+        elif block is None or len(words) < 2:
+            continue
+        elif key == "name" and block["kind"] == "geometry":
+            block["name"] = words[1]
+            geometries[words[1]] = block["bins"]
+        elif key in BINNED_AXES and block["kind"] == "geometry" and len(words) >= 4:
+            block["bins"].append(abs(int(float(words[3]))))
+        elif key == "geo" and block["kind"] == "output":
+            block["geo"] = words[1]
+        elif key == "filename" and block["kind"] == "output":
+            block["name"] = re.sub(r"\.bdo$", "", words[1])
+        elif key == "quantity" and block["kind"] == "output":
+            block["quantities"].append(1)
+        elif key in ("diff1", "diff2") and block["kind"] == "output" and block["quantities"] and len(words) >= 4:
+            block["quantities"][-1] *= max(abs(int(float(words[3]))), 1)
+    sizes = []
+    for output in outputs:
+        bins = geometries.get(output["geo"]) or [1]
+        sizes.append(
+            OutputSize(
+                name=output["name"] or output["geo"],
+                bins=bins,
+                values=math.prod(bins) * sum(output["quantities"]),
+                pages=len(output["quantities"]),
+            )
+        )
+    return sizes
+
+
+def output_size_error(files_dict: dict, ntasks: int) -> Optional[str]:
+    """Why a simulation is refused for the size of its result files (all tasks', SHIELD-HIT12A only), None if not"""
+    outputs = detect_outputs(files_dict.get("detect.dat", ""))
+    total = sum(output.values for output in outputs) * VALUE_BYTES * ntasks
+    if total <= MAX_OUTPUT_BYTES:
+        return None
+    largest = max(outputs, key=lambda output: output.values)
+    return (
+        f"The outputs would take {round(total / 1e9)} GB ({largest.name}: {' × '.join(map(str, largest.bins))} bins"
+        f" × {ntasks} tasks); the limit is {round(MAX_OUTPUT_BYTES / 1e9)} GB. Use fewer bins or tasks."
+    )
+
+
+def merge_memory_bytes(files_dict: dict) -> int:
+    """Memory merging the results of a SHIELD-HIT12A simulation takes (yaptide/batch/merge_results.py): 3 copies
+    of the largest output, the JSON of its pages and a base
+    """
+    outputs = detect_outputs(files_dict.get("detect.dat", ""))
+    largest = max(outputs, key=lambda output: output.values, default=OutputSize("", [], 0, 0))
+    return 3 * largest.values * VALUE_BYTES + largest.pages * PAGE_JSON_BYTES + MERGE_BASE_BYTES
 
 
 def get_json_type(payload_dict: dict) -> InputType:
