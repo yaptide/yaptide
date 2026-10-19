@@ -109,6 +109,8 @@ CLEAR_BDOS={remove_output_from_workspace}
 # find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect
 if $CLEAR_BDOS; then
     find $ROOT_DIR/workspaces -name "*.bdo" -delete || true
+    # the merged results are in the backend's storage now, the full resolution files among them
+    rm -rf $OUTPUT_DIRECTORY || true
 fi
 """  # skipcq: FLK-E501
 

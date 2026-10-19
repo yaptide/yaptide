@@ -23,7 +23,7 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
 )
-from yaptide.routes.common_sim_routes import store_partial_results
+from yaptide.routes.common_sim_routes import estimator_content, store_partial_results
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
@@ -399,7 +399,23 @@ def test_full_resolution_link_check_and_store(client, storage):
     assert client.post("/results/done", json=body(estimators=estimators)).status_code == 202
     db.session.remove()
     stored = db.session.query(EstimatorModel).filter_by(file_name=name).one()
-    assert stored.data["full_resolution"] == {"key": key, "size": 5000}
+    assert stored.data["full_resolution"] is True
+
+
+def test_metadata_cannot_claim_a_full_resolution(client, storage, monkeypatch):
+    """A full resolution in a job's metadata, here pointing at another simulation's page, is dropped"""
+    monkeypatch.setattr(result_storage, "page_url", lambda key: f"https://storage.test/{key}?signed")
+    store_all(storage)
+    estimators = listed()
+    forged = {"key": "simulations/999/secret/0.json", "size": 1}
+    estimators[0]["metadata"] = {**estimators[0]["metadata"], "full_resolution": forged}
+
+    assert client.post("/results/done", json=body(estimators=estimators)).status_code == 202
+
+    db.session.remove()
+    stored = db.session.query(EstimatorModel).filter_by(file_name=estimators[0]["name"]).one()
+    assert "full_resolution" not in stored.data
+    assert "full_resolution" not in estimator_content(stored, stored.pages)
 
 
 def test_full_resolution_entries_are_checked(client, storage):

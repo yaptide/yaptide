@@ -31,8 +31,8 @@ MAX_OUTPUT_BYTES = 50 * 10**9
 NO_AGGREGATION, SUM, AVERAGING_CUMULATIVE, CONCATENATION = 0, 1, 2, 4
 # formats whose page data pymchelper reshapes in Fortran order (pymchelper.page.Page._reshape)
 FORTRAN_ORDER = ("bdo2016", "bdo2019", "fluka_binary")
-# .bdo tags (pymchelper.readers.shieldhit.binary_spec.SHBDOTagID): simulated primaries, a page's data
-BDO_NSTAT, BDO_DATA = 0xAA00, 0xDDBB
+# .bdo tags (pymchelper.readers.shieldhit.binary_spec.SHBDOTagID): simulated primaries, a page's data, the file name
+BDO_NSTAT, BDO_DATA, BDO_FILENAME = 0xAA00, 0xDDBB, 0xEE00
 # values written to a .bdo file at once
 WRITE_CHUNK = 1 << 20
 
@@ -178,8 +178,9 @@ def estimator_dict(estimator) -> dict:
 
 def write_bdo(estimator, template: str, path: str) -> None:
     """Writes the merged estimator as a SHIELD-HIT12A .bdo file: the template (a task's file of it) with the merged
-    data and the primaries of all tasks; pymchelper reads it as the merged estimator
+    data, the primaries of all tasks and its own file name; pymchelper reads it as the merged estimator
     """
+    name = os.path.basename(path).encode()
     pages = iter(estimator.pages)
     with open(template, "rb") as source, open(path, "wb") as target:
         # magic number, byte order and version, then entries: id, numpy type and number of items, the items
@@ -190,10 +191,13 @@ def write_bdo(estimator, template: str, path: str) -> None:
                 break
             tag, kind, count = struct.unpack("<Q8sQ", header)
             dtype = np.dtype(kind.rstrip(b"\0").decode("ascii"))
-            if tag not in (BDO_NSTAT, BDO_DATA):
+            if tag not in (BDO_NSTAT, BDO_DATA, BDO_FILENAME):
                 target.write(header + source.read(count * dtype.itemsize))
                 continue
             source.seek(count * dtype.itemsize, 1)
+            if tag == BDO_FILENAME:
+                target.write(struct.pack("<Q8sQ", tag, f"S{len(name)}".encode(), 1) + name)
+                continue
             if tag == BDO_NSTAT:
                 target.write(header + np.array([estimator.number_of_primaries], dtype=dtype).tobytes())
                 continue
@@ -219,6 +223,9 @@ def merge_group(corename: str, files: List[str], full_resolution: Optional[str] 
     downsampled = any("downsampled" in page["metadata"] for page in result["pages"])
     if full_resolution and downsampled and estimator.file_format == "bdo2019":
         write_bdo(estimator, files[0], full_resolution)
+    # pymchelper's estimator and its pages refer to each other: freed now, not while the next group is read
+    estimator = None
+    gc.collect()
     return result
 
 

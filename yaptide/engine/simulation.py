@@ -296,7 +296,7 @@ def merge_stored(keys: list[str], max_bytes: float = float("inf"), simulation_id
     """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises
 
     With the simulation's id (the final results) and object storage, the full resolution of an estimator whose pages
-    were downsampled for the UI goes to storage, the estimator says where ("full_resolution").
+    were downsampled for the UI goes to storage, the estimator says so ("full_resolution").
     """
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
         task_dirs = []
@@ -316,9 +316,8 @@ def merge_stored(keys: list[str], max_bytes: float = float("inf"), simulation_id
             path = full_dir / f"{estimator['name']}.bdo" if full_dir else None
             if path and path.exists():
                 key = result_storage.full_resolution_key(simulation_id, estimator["name"])
-                size = path.stat().st_size
                 result_storage.put_file(key, path)
-                estimator["full_resolution"] = {"key": key, "size": size}
+                estimator["full_resolution"] = True
         return estimators
 
 
@@ -335,7 +334,8 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
             update_simulation_state(simulation, {"job_state": EntityState.MERGING_RUNNING.value})
             estimators = merge_stored(keys, simulation_id=simulation_id)
             if estimators:
-                store_results(simulation, estimators)
+                full_resolution = frozenset(e["name"] for e in estimators if e.pop("full_resolution", False))
+                store_results(simulation, estimators, full_resolution)
             return bool(estimators)
         finally:
             db.session.remove()

@@ -108,6 +108,8 @@ CLEAR_FORTS={remove_output_from_workspace}
 # find, as thousands of task outputs pass the argument limit of rm
 if $CLEAR_FORTS; then
     find $ROOT_DIR/workspaces -name "*_fort.*" -delete || true
+    # the merged results are in the backend's storage now, the full resolution files among them
+    rm -rf $OUTPUT_DIRECTORY || true
 fi
 
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\

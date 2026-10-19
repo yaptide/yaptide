@@ -50,6 +50,9 @@ VALUE_BYTES = 8
 # the JSON of each downsampled page, the cluster's tools - generous
 MERGE_BASE_BYTES = 2 << 30
 PAGE_JSON_BYTES = 64 << 20
+# the memory of a node of the clusters (Ares, plgrid partition: 184800 MB per node of 48 CPUs, sinfo 2026-10-20);
+# a merge needing more cannot run there, SLURM would refuse the job
+CLUSTER_NODE_MEMORY_BYTES = 184800 << 20
 
 
 @dataclass
@@ -62,39 +65,54 @@ class OutputSize:
     pages: int
 
 
+def bin_count(word: str) -> Optional[int]:
+    """A number of bins as detect.dat gives it ("100", "1e3"); None for anything else, e.g. a typo"""
+    try:
+        return abs(int(float(word)))
+    except (ValueError, OverflowError):
+        return None
+
+
 def detect_outputs(detect_dat: str) -> list[OutputSize]:
     """The outputs a SHIELD-HIT12A detect.dat scores: each geometry's bins (Mesh X x Y x Z, Cyl R x PHI x Z; one bin
     for the others, e.g. Zone), times every Quantity of the output, times its differential bins (Diff1, Diff2 after
-    the Quantity they belong to)
+    the Quantity they belong to). An output with a number that cannot be read is left out: SHIELD-HIT12A reports it.
     """
     geometries, outputs, block = {}, [], None
     for line in detect_dat.splitlines():
         words = re.split(r"[!#]", line, maxsplit=1)[0].split()
         if not words:
             continue
-        key = words[0].lower()
+        key, value = words[0].lower(), " ".join(words[1:])
         if key in ("geometry", "output", "filter"):
-            block = {"kind": key, "name": "", "geo": "", "bins": [], "quantities": []}
+            block = {"kind": key, "name": "", "geo": "", "bins": [], "quantities": [], "unreadable": False}
             if key == "output":
                 outputs.append(block)
-        elif block is None or len(words) < 2:
+        elif block is None or not value:
             continue
         elif key == "name" and block["kind"] == "geometry":
-            block["name"] = words[1]
-            geometries[words[1]] = block["bins"]
+            block["name"] = value
+            geometries[value] = block
         elif key in BINNED_AXES and block["kind"] == "geometry" and len(words) >= 4:
-            block["bins"].append(abs(int(float(words[3]))))
+            count = bin_count(words[3])
+            block["bins"].append(count or 1)
+            block["unreadable"] |= count is None
         elif key == "geo" and block["kind"] == "output":
-            block["geo"] = words[1]
+            block["geo"] = value
         elif key == "filename" and block["kind"] == "output":
-            block["name"] = re.sub(r"\.bdo$", "", words[1])
+            block["name"] = re.sub(r"\.bdo$", "", value)
         elif key == "quantity" and block["kind"] == "output":
             block["quantities"].append(1)
         elif key in ("diff1", "diff2") and block["kind"] == "output" and block["quantities"] and len(words) >= 4:
-            block["quantities"][-1] *= max(abs(int(float(words[3]))), 1)
+            count = bin_count(words[3])
+            block["quantities"][-1] *= max(count or 1, 1)
+            block["unreadable"] |= count is None
     sizes = []
     for output in outputs:
-        bins = geometries.get(output["geo"]) or [1]
+        geometry = geometries.get(output["geo"], {"bins": [], "unreadable": False})
+        if output["unreadable"] or geometry["unreadable"]:
+            continue
+        bins = geometry["bins"] or [1]
         sizes.append(
             OutputSize(
                 name=output["name"] or output["geo"],
@@ -106,6 +124,11 @@ def detect_outputs(detect_dat: str) -> list[OutputSize]:
     return sizes
 
 
+def gigabytes(size: float) -> int:
+    """Bytes in GB (1e9), rounded half up as the UI does (Math.round)"""
+    return math.floor(size / 1e9 + 0.5)
+
+
 def output_size_error(files_dict: dict, ntasks: int) -> Optional[str]:
     """Why a simulation is refused for the size of its result files (all tasks', SHIELD-HIT12A only), None if not"""
     outputs = detect_outputs(files_dict.get("detect.dat", ""))
@@ -114,18 +137,30 @@ def output_size_error(files_dict: dict, ntasks: int) -> Optional[str]:
         return None
     largest = max(outputs, key=lambda output: output.values)
     return (
-        f"The outputs would take {round(total / 1e9)} GB ({largest.name}: {' × '.join(map(str, largest.bins))} bins"
-        f" × {ntasks} tasks); the limit is {round(MAX_OUTPUT_BYTES / 1e9)} GB. Use fewer bins or tasks."
+        f"The outputs would take {gigabytes(total)} GB ({largest.name}: {' × '.join(map(str, largest.bins))} bins"
+        f" × {ntasks} tasks); the limit is {gigabytes(MAX_OUTPUT_BYTES)} GB. Use fewer bins or tasks."
     )
 
 
-def merge_memory_bytes(files_dict: dict) -> int:
-    """Memory merging the results of a SHIELD-HIT12A simulation takes (yaptide/batch/merge_results.py): 3 copies
-    of the largest output, the JSON of its pages and a base
+def merge_memory_gb(files_dict: dict) -> int:
+    """Memory merging the results of a SHIELD-HIT12A simulation takes (yaptide/batch/merge_results.py), in GiB
+    rounded up: 3 copies of the largest output, the JSON of its pages and a base
     """
     outputs = detect_outputs(files_dict.get("detect.dat", ""))
     largest = max(outputs, key=lambda output: output.values, default=OutputSize("", [], 0, 0))
-    return 3 * largest.values * VALUE_BYTES + largest.pages * PAGE_JSON_BYTES + MERGE_BASE_BYTES
+    needed = 3 * largest.values * VALUE_BYTES + largest.pages * PAGE_JSON_BYTES + MERGE_BASE_BYTES
+    return -(-needed // (1 << 30))
+
+
+def merge_memory_error(files_dict: dict) -> Optional[str]:
+    """Why an HPC simulation is refused for the memory merging its results takes, None if a node has it"""
+    needed = merge_memory_gb(files_dict)
+    if needed << 30 <= CLUSTER_NODE_MEMORY_BYTES:
+        return None
+    return (
+        f"Merging the results would need {needed} GB of memory, more than a node of the cluster has "
+        f"({CLUSTER_NODE_MEMORY_BYTES >> 30} GB). Use fewer bins."
+    )
 
 
 def get_json_type(payload_dict: dict) -> InputType:

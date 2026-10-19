@@ -190,7 +190,7 @@ class ResultsDoneResource(Resource):
         estimators = payload.get("estimators")
         if not valid_estimators(estimators):
             return yaptide_response(message="estimators: name and pages of each", code=400)
-        missing, results = [], []
+        missing, results, full_resolution = [], [], set()
         for estimator in sorted(estimators, key=lambda estimator: estimator["name"]):
             try:
                 pages, missing_pages = check_pages(simulation.id, estimator)
@@ -205,11 +205,11 @@ class ResultsDoneResource(Resource):
                     return yaptide_response(message="Invalid full resolution entry", code=400)
                 key = result_storage.full_resolution_key(simulation.id, estimator["name"])
                 if result_storage.stored_matches(key, entry["size"], entry["md5"]):
-                    result["full_resolution"] = {"key": key, "size": entry["size"]}
+                    full_resolution.add(estimator["name"])
                 else:
                     missing.append({"estimator": estimator["name"], "full_resolution": True})
             results.append(result)
         if missing:
             return yaptide_response(message="Pages missing in storage", code=409, content={"missing": missing})
-        store_results(simulation, results)
+        store_results(simulation, results, frozenset(full_resolution))
         return yaptide_response(message="Results saved", code=202)

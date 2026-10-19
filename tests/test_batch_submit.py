@@ -34,6 +34,7 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.routes.utils.utils import update_state_from_tasks
+from yaptide.utils import sim_utils
 from yaptide.utils.enums import EntityState
 
 SUBMIT_OUTPUT = "Job id: 101\nAggregator id: 102\nCollect id: 103\nReporter id: 104\n"
@@ -822,3 +823,21 @@ def test_the_cancel_command_cancels_by_comment_and_keeps_the_directory_while_slu
     assert calls.read_text().splitlines() == expected
     assert (done.returncode == 0) == (squeue != "stuck")
     assert job_dir.exists() == (squeue == "stuck")
+
+
+def test_a_merge_larger_than_a_node_is_refused(client, monkeypatch):
+    """SLURM would refuse the jobs: the submit is refused at once, with the reason"""
+    monkeypatch.setattr(sim_utils, "CLUSTER_NODE_MEMORY_BYTES", 4 << 30)
+    detect = "Geometry Mesh\n Name M\n X 0 1 10000\n Y 0 1 1\n Z 0 1 10000\nOutput\n Geo M\n Quantity Dose\n"
+    payload = {
+        "input_type": "files",
+        "sim_type": "shieldhit",
+        "ntasks": 2,
+        "input_files": {"beam.dat": "NSTAT 100 0\n", "geo.dat": "", "mat.dat": "", "detect.dat": detect},
+    }
+
+    response = client.post("/jobs/batch", json=payload)
+
+    assert response.status_code == 400
+    assert response.get_json()["message"].startswith("Merging the results would need 5 GB of memory")
+    assert db.session.query(BatchSimulationModel).count() == 0

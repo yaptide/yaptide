@@ -18,10 +18,17 @@ from yaptide.batch import merge_results, simulation_data_sender
 from yaptide.batch.batch_methods import with_merge_memory
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
-from yaptide.persistence.models import CelerySimulationModel, YaptideUserModel
+from yaptide.persistence.models import CelerySimulationModel, LogfilesModel, SimulationModel, YaptideUserModel
+from yaptide.routes.common_sim_routes import store_results
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
-from yaptide.utils.sim_utils import detect_outputs, merge_memory_bytes, merge_simulation_outputs, output_size_error
+from yaptide.utils.sim_utils import (
+    detect_outputs,
+    merge_memory_error,
+    merge_memory_gb,
+    merge_simulation_outputs,
+    output_size_error,
+)
 
 BDO_DIR = Path(__file__).resolve().parent / "res" / "bdo"
 # a mesh of 1 x 4 x 10 bins, 3 pages (dose and two fluences)
@@ -171,6 +178,7 @@ def test_large_pages_are_downsampled_and_kept_in_full(task_dirs, tmp_path, monke
             page["axis_dim2"]["values"], [z[0:2].mean(), z[2:4].mean(), z[4:6].mean(), z[6:8].mean(), z[8]]
         )
 
+    assert b"mesh.bdo" in (full_dir / "mesh.bdo").read_bytes()  # its own name, not the first task's
     full = fromfile(str(full_dir / f"{estimator['name']}.bdo"))
     assert full.number_of_primaries == 600
     for page, merged_page in zip(full.pages, merged.pages, strict=True):
@@ -241,6 +249,26 @@ Output
     assert (slab.name, slab.bins, slab.values) == ("Slab", [1], 1)
 
 
+def test_names_with_spaces_and_rounding_as_the_ui():
+    """The whole Filename names the output; GB are rounded half up (52.5 GB: 53)"""
+    detect = "Geometry Mesh\n Name M\n X 0 1 25000\n Y 0 1 1\n Z 0 1 2625\n"
+    detect += "Output\n Filename Profile XZ.bdo\n Geo M\n Quantity Dose\n"  # 52.5 GB in 100 tasks
+
+    assert output_size_error({"detect.dat": detect}, 100) == (
+        "The outputs would take 53 GB (Profile XZ: 25000 × 1 × 2625 bins × 100 tasks); the limit is 50 GB. "
+        "Use fewer bins or tasks."
+    )
+
+
+def test_unreadable_numbers_leave_the_output_out():
+    """A typo in a number of bins is SHIELD-HIT12A's to report: that output is not estimated, nothing fails"""
+    detect = "Geometry Mesh\n Name A\n X -5 5 1O\nGeometry Mesh\n Name B\n X -5 5 inf\nGeometry Mesh\n Name C\n"
+    detect += " X 0 1 10\nOutput\n Geo A\n Quantity Dose\nOutput\n Geo B\n Quantity Dose\n"
+    detect += "Output\n Geo C\n Quantity Dose\n Diff1 0 1 nan\nOutput\n Geo C\n Quantity Dose\n"
+
+    assert [(output.name, output.values) for output in detect_outputs(detect)] == [("C", 10)]
+
+
 @pytest.fixture
 def client(monkeypatch):
     """Test client of a logged in user, its direct simulation with results stored, and the storage's links"""
@@ -278,8 +306,18 @@ def test_submit_over_the_limit_is_refused(client):
     assert client.post("/jobs/direct", json={**payload, "ntasks": 50}).status_code == 202
 
 
-def test_results_link_the_full_resolution(client, task_dirs, monkeypatch):
-    """An estimator with its full resolution stored has a signed link to it, with all estimators and with pages"""
+def test_submit_with_an_unreadable_detect_dat_is_taken(client):
+    """No estimate for what cannot be read, the simulation is stored as before"""
+    detect = "Geometry Mesh\n Name A\n X -5 5 1O\nOutput\n Geo A\n Quantity Dose\n"
+    files = {"beam.dat": "NSTAT 10 0\n", "geo.dat": "", "mat.dat": "", "detect.dat": detect}
+    payload = {"input_type": "files", "sim_type": "shieldhit", "ntasks": 1, "input_files": files}
+
+    assert client.post("/jobs/direct", json=payload).status_code == 202
+    assert db.session.query(CelerySimulationModel).count() == 1
+
+
+def large_simulation(client, task_dirs, monkeypatch, forged: bool = False) -> tuple[int, dict]:
+    """A direct simulation with a downsampled estimator; forged: its job claims a full resolution in the results"""
     monkeypatch.setattr(merge_results, "DISPLAY_MAX_BINS", 20)
     simulation = CelerySimulationModel(
         job_id="large",
@@ -292,30 +330,66 @@ def test_results_link_the_full_resolution(client, task_dirs, monkeypatch):
     db.session.add(simulation)
     db.session.commit()
     (estimator,) = merge_simulation_outputs(task_dirs)
-    key = result_storage.full_resolution_key(simulation.id, estimator["name"])
-    estimator["full_resolution"] = {"key": key, "size": 1000}
-    payload = {"simulation_id": simulation.id, "update_key": encode_simulation_auth_token(simulation.id)}
-    assert client.post("/results", json={**payload, "estimators": [estimator]}).status_code == 202
+    if forged:
+        claim = {"key": "simulations/999/secret/0.json", "size": 1}
+        estimator = {
+            **estimator,
+            "full_resolution": claim,
+            "metadata": {**estimator["metadata"], "full_resolution": claim},
+        }
+    return simulation.id, estimator
 
-    url = f"https://storage.test/{key}?signature"
+
+def test_results_tell_of_the_full_resolution(client, task_dirs, monkeypatch):
+    """An estimator the server stored the full resolution of says so, with all estimators and with pages"""
+    sim_id, estimator = large_simulation(client, task_dirs, monkeypatch)
+    store_results(db.session.get(SimulationModel, sim_id), [estimator], frozenset({estimator["name"]}))
+
     everything = client.get("/results", query_string={"job_id": "large"}).get_json()
-    assert everything["estimators"][0]["full_resolution_url"] == url
+    assert everything["estimators"][0]["full_resolution"] is True
     assert "full_resolution" not in everything["estimators"][0]["metadata"]
     query = {"job_id": "large", "estimator_name": estimator["name"]}
-    assert client.get("/results", query_string=query).get_json()["full_resolution_url"] == url
-    assert (
-        client.get("/results", query_string={**query, "page_numbers": "0-2"}).get_json()["full_resolution_url"] == url
-    )
-    assert client.get("/results", query_string={**query, "page_number": 0}).get_json()["full_resolution_url"] == url
-    assert key == f"simulations/{simulation.id}/mesh/mesh.bdo"
+    for extra in ({}, {"page_numbers": "0-2"}, {"page_number": 0}):
+        assert client.get("/results", query_string={**query, **extra}).get_json()["full_resolution"] is True
+
+
+def test_full_resolution_download_redirects_to_a_signed_link(client, task_dirs, monkeypatch):
+    """The owner is sent to a fresh signed link of the estimator's own object; no file, or another user: none"""
+    sim_id, estimator = large_simulation(client, task_dirs, monkeypatch)
+    store_results(db.session.get(SimulationModel, sim_id), [estimator], frozenset({estimator["name"]}))
+    query = {"job_id": "large", "estimator_name": estimator["name"]}
+
+    response = client.get("/results/full_resolution", query_string=query)
+
+    assert response.status_code == 302
+    assert response.headers["Location"] == f"https://storage.test/simulations/{sim_id}/mesh/mesh.bdo?signature"
+    assert client.get("/results/full_resolution", query_string={**query, "estimator_name": "mesh_"}).status_code == 404
+    other = YaptideUserModel(username="Saruman")
+    other.set_password("Orthanc")
+    db.session.add(other)
+    db.session.commit()
+    client.set_cookie("access_token", encode_auth_token(other.id)[0], domain="127.0.0.1")
+    assert client.get("/results/full_resolution", query_string=query).status_code == 403
+
+
+def test_a_job_cannot_claim_a_full_resolution(client, task_dirs, monkeypatch):
+    """A full resolution in the results a job sends (in the metadata or beside it) is ignored: no link to any key"""
+    sim_id, estimator = large_simulation(client, task_dirs, monkeypatch, forged=True)
+    payload = {"simulation_id": sim_id, "update_key": encode_simulation_auth_token(sim_id)}
+    assert client.post("/results", json={**payload, "estimators": [estimator]}).status_code == 202
+
+    content = client.get("/results", query_string={"job_id": "large"}).get_json()["estimators"][0]
+    assert "full_resolution" not in content and "full_resolution" not in content["metadata"]
+    query = {"job_id": "large", "estimator_name": estimator["name"]}
+    assert client.get("/results/full_resolution", query_string=query).status_code == 404
 
 
 def test_hpc_jobs_ask_for_the_memory_of_the_merge():
-    """3 copies of the largest output, its pages' JSON and a base; never below the cluster's default nor in place of
-    the user's own memory options
+    """3 copies of the largest output, its pages' JSON and a base; never below the cluster's default for the job's
+    CPUs, nor in place of the user's own memory options
     """
     files = {"detect.dat": DETECT_2089}
-    assert merge_memory_bytes(files) == 3 * 800_000_000 + 64 * 2**20 + 2 * 2**30
+    assert merge_memory_gb(files) == 5  # 3 * 800 MB + 64 MiB + 2 GiB, rounded up
 
     options = with_merge_memory({"array_options": {"account": "grant"}}, files)
     assert options["array_options"] == {"account": "grant", "mem": "5G"}
@@ -323,9 +397,27 @@ def test_hpc_jobs_ask_for_the_memory_of_the_merge():
 
     own = with_merge_memory({"array_header": "#SBATCH --mem-per-cpu=8G", "collect_options": {"mem": "9G"}}, files)
     assert "array_options" not in own and own["collect_options"] == {"mem": "9G"}
+    bind = with_merge_memory({"array_header": "#SBATCH --mem-bind=local"}, files)
+    assert bind["array_options"] == {"mem": "5G"}
+
+    # 2 CPUs get 7700 MB anyway: more than the 5 GB the merge takes
+    cpus = with_merge_memory({"array_options": {"cpus-per-task": "2"}, "collect_header": "#SBATCH -c 2"}, files)
+    assert cpus == {"array_options": {"cpus-per-task": "2"}, "collect_header": "#SBATCH -c 2"}
 
     small = {"array_options": {"account": "grant"}}
     assert with_merge_memory(small, {"detect.dat": DETECT_2089.replace("10000", "100")}) == small
+
+
+def test_merges_larger_than_a_node_are_refused():
+    """More memory than a node has: refused at submit, never asked of SLURM"""
+    huge = {"detect.dat": DETECT_2089.replace("Z 0 10 10000", "Z 0 10 900000")}  # 9e9 bins
+
+    assert merge_memory_error({"detect.dat": DETECT_2089}) is None
+    assert merge_memory_error(huge) == (
+        "Merging the results would need 204 GB of memory, more than a node of the cluster has (180 GB). Use fewer bins."
+    )
+    # a simulation stored before the check never asks for more than a node has
+    assert with_merge_memory({}, huge)["array_options"] == {"mem": "180G"}
 
 
 @pytest.mark.parametrize(
@@ -380,3 +472,24 @@ def test_failure_reason_goes_with_the_failed_state(monkeypatch):
             "log": {"error": "Merging the results ran out of memory"},
         }
     ]
+
+
+def test_a_failure_keeps_its_first_reason(client):
+    """The collect job and the reporter job may both report the out of memory: one log"""
+    simulation = CelerySimulationModel(
+        job_id="oom",
+        user_id=db.session.query(YaptideUserModel.id).scalar(),
+        input_type=InputType.FILES.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        title="oom",
+        job_state=EntityState.MERGING_RUNNING.value,
+    )
+    db.session.add(simulation)
+    db.session.commit()
+    report = {"sim_id": simulation.id, "update_key": encode_simulation_auth_token(simulation.id), "job_state": "FAILED"}
+    log = {"error": simulation_data_sender.REASONS["out_of_memory"]}
+
+    for _ in range(2):
+        assert client.post("/jobs", json={**report, "log": log}).status_code == 202
+
+    assert db.session.query(LogfilesModel).filter_by(simulation_id=simulation.id).count() == 1
