@@ -2,7 +2,7 @@ import logging
 from datetime import datetime, timezone
 from typing import List
 
-from flask import request, current_app as app
+from flask import redirect, request, current_app as app
 from flask_restful import Resource
 from sqlalchemy import text
 from marshmallow import Schema, fields
@@ -10,7 +10,6 @@ from marshmallow import Schema, fields
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_estimator_by_sim_id_and_est_name,
-    fetch_estimator_id_by_sim_id_and_est_name,
     fetch_estimators_by_sim_id,
     fetch_input_by_sim_id,
     fetch_logfiles_by_sim_id,
@@ -105,7 +104,8 @@ class JobsResource(Resource):
         if job_state == EntityState.FAILED.value:
             update_dict["end_time"] = datetime.utcnow().isoformat(sep=" ")
         update_simulation_state(simulation, update_dict)
-        if payload_dict.get("log"):
+        # the first reason only: the collect job and the reporter job may both report the same failure
+        if payload_dict.get("log") and fetch_logfiles_by_sim_id(sim_id=simulation.id) is None:
             logfiles = LogfilesModel(simulation_id=simulation.id)
             logfiles.data = payload_dict["log"]
             add_object_to_db(logfiles)
@@ -128,6 +128,28 @@ def page_content(page: PageModel) -> dict:
     return page.data
 
 
+# the estimator's metadata says its full resolution is stored (result_storage.full_resolution_key); set by the server
+# only, as a flag: the key is always made from the simulation and the estimator, never read from stored data
+FULL_RESOLUTION = "full_resolution"
+
+
+def estimator_content(estimator: EstimatorModel, pages: list[PageModel]) -> dict:
+    """An estimator as the UI gets it; one whose pages were downsampled for the UI says it has its full resolution
+    to download (GET /results/full_resolution)
+    """
+    metadata = dict(estimator.data)
+    metadata.pop(FULL_RESOLUTION, None)
+    content = {"metadata": metadata, "name": estimator.name, "pages": [page_content(page) for page in pages]}
+    return with_full_resolution(content, estimator)
+
+
+def with_full_resolution(content: dict, estimator: EstimatorModel) -> dict:
+    """The content saying the estimator's full resolution can be downloaded, when it can"""
+    if estimator.data.get(FULL_RESOLUTION) is True and result_storage.configured():
+        content[FULL_RESOLUTION] = True
+    return content
+
+
 def get_single_estimator(sim_id: int, estimator_name: str):
     """Retrieve a single estimator by simulation ID and estimator name"""
     estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=sim_id, est_name=estimator_name)
@@ -135,12 +157,7 @@ def get_single_estimator(sim_id: int, estimator_name: str):
     if not estimator:
         return yaptide_response(message="Estimator not found", code=404)
 
-    pages = fetch_pages_by_estimator_id(est_id=estimator.id)
-    estimator_dict = {
-        "metadata": estimator.data,
-        "name": estimator.name,
-        "pages": [page_content(page) for page in pages],
-    }
+    estimator_dict = estimator_content(estimator, fetch_pages_by_estimator_id(est_id=estimator.id))
     return yaptide_response(
         message=f"Estimator '{estimator_name}' for simulation: {sim_id}", code=200, content=estimator_dict
     )
@@ -158,11 +175,7 @@ def get_all_estimators(sim_id: int):
     outputs = editor_outputs_by_file(fetch_simulation_by_sim_id(sim_id=sim_id))
     result_estimators = []
     for estimator in estimators:
-        estimator_dict = {
-            "metadata": estimator.data,
-            "name": estimator.name,
-            "pages": [page_content(page) for page in estimator.pages],
-        }
+        estimator_dict = estimator_content(estimator, estimator.pages)
         output = outputs.get(estimator_key(estimator.file_name))
         if output and output.get("uuid"):
             estimator_dict["output_uuid"] = output["uuid"]
@@ -258,11 +271,14 @@ def editor_outputs_by_file(simulation: SimulationModel) -> dict[str, dict]:
         return {}
 
 
-def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[dict]) -> None:
+def prepare_estimators_and_pages(
+    simulation: SimulationModel, estimators: list[dict], full_resolution: frozenset = frozenset()
+) -> None:
     """Prepares the estimators and their pages in place of the stored ones, without committing.
 
     An estimator is its result file: the editor output writing it gives the name, and the estimator stored for the
-    same file before (partial results, named with or without the trailing underscore) is updated.
+    same file before (partial results, named with or without the trailing underscore) is updated. The estimators
+    named in full_resolution have theirs in storage, as the server checked.
     """
     outputs = editor_outputs_by_file(simulation)
     order = {key: index for index, key in enumerate(outputs)}
@@ -287,7 +303,14 @@ def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[d
             add_object_to_db(estimator, make_commit=False)
         estimator.name = name
         estimator.file_name = estimator_dict["name"]
-        estimator.data = estimator_dict["metadata"]
+        # the metadata comes from the job: the flag is the server's alone
+        sent = estimator_dict.get("metadata")
+        metadata = (
+            {key: value for key, value in sent.items() if key != FULL_RESOLUTION} if isinstance(sent, dict) else {}
+        )
+        if estimator_dict["name"] in full_resolution:
+            metadata[FULL_RESOLUTION] = True
+        estimator.data = metadata
         # the id for the pages
         db.session.flush()
         use_storage = prepare_create_or_update_pages_in_db(
@@ -295,13 +318,17 @@ def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[d
         )
 
 
-def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
-    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile"""
+def store_results(
+    simulation: SimulationModel, estimators: list[dict], full_resolution: frozenset = frozenset()
+) -> None:
+    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile; the
+    estimators named in full_resolution have their full resolution in storage
+    """
     lock_results(simulation)
     if simulation.job_state in FINAL_STATES:
         logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
         return
-    prepare_estimators_and_pages(simulation, estimators)
+    prepare_estimators_and_pages(simulation, estimators, full_resolution)
     if simulation.partial_primaries is not None:
         # the partial results of an HPC simulation are merged on the server, which names the estimators of input
         # files a little differently from the cluster's convertmc ("dose" and "dose_"): theirs go with them
@@ -420,18 +447,48 @@ class ResultsResource(Resource):
         if page_number is None and page_numbers is None:
             return get_single_estimator(sim_id=simulation_id, estimator_name=estimator_name)
 
-        estimator_id = fetch_estimator_id_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
+        estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=simulation_id, est_name=estimator_name)
+        if estimator is None:
+            return yaptide_response(message="Estimator not found", code=404)
         if page_number is not None:
-            page = fetch_page_by_est_id_and_page_number(est_id=estimator_id, page_number=page_number)
-            result = {"page": page_content(page)}
+            page = fetch_page_by_est_id_and_page_number(est_id=estimator.id, page_number=page_number)
+            result = with_full_resolution({"page": page_content(page)}, estimator)
             return yaptide_response(message="Page retrieved successfully", code=200, content=result)
 
         if page_numbers is not None:
             parsed_page_numbers = parse_page_numbers(page_numbers)
-            pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator_id, page_numbers=parsed_page_numbers)
-            result = {"pages": [page_content(page) for page in pages]}
+            pages = fetch_pages_by_est_id_and_page_numbers(est_id=estimator.id, page_numbers=parsed_page_numbers)
+            result = with_full_resolution({"pages": [page_content(page) for page in pages]}, estimator)
             return yaptide_response(message="Pages retrieved successfully", code=200, content=result)
         return yaptide_response(message="Wrong parameters", code=400, content=errors)
+
+
+class FullResolutionResource(Resource):
+    """The full resolution of an estimator whose pages were downsampled for the UI, for download"""
+
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters"""
+
+        job_id = fields.String(required=True)
+        estimator_name = fields.String(required=True)
+
+    @staticmethod
+    @requires_auth()
+    def get(user: UserModel):
+        """Redirects to a signed link to the file in storage"""
+        schema = FullResolutionResource.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        params: dict = schema.load(request.args)
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=params["job_id"], user=user)
+        if not is_owned:
+            return yaptide_response(message=error_message, code=res_code)
+        simulation_id = fetch_simulation_id_by_job_id(job_id=params["job_id"])
+        estimator = fetch_estimator_by_sim_id_and_est_name(sim_id=simulation_id, est_name=params["estimator_name"])
+        if estimator is None or FULL_RESOLUTION not in with_full_resolution({}, estimator):
+            return yaptide_response(message="No full resolution of this estimator", code=404)
+        return redirect(result_storage.page_url(result_storage.full_resolution_key(simulation_id, estimator.file_name)))
 
 
 class InputsResource(Resource):

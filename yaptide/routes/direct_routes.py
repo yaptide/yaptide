@@ -24,6 +24,7 @@ from yaptide.routes.utils.utils import (
     job_status_content,
 )
 from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.sim_utils import output_size_error
 
 
 class JobsDirect(Resource):
@@ -54,6 +55,9 @@ class JobsDirect(Resource):
         # the simulation, its tasks and input in one commit: the engine starts what it finds PENDING
         job_id = datetime.now().strftime("%Y%m%d-%H%M%S-") + str(uuid4()) + PlatformType.DIRECT.value
         input_dict = make_input_dict(payload_dict=payload_dict, input_type=input_type)
+        too_large = output_size_error(input_dict["input_files"], payload_dict["ntasks"])
+        if too_large:
+            return yaptide_response(message=too_large, code=400)
         requested_primaries = input_dict["number_of_all_primaries"] // payload_dict["ntasks"]
         simulation = CelerySimulationModel(
             user_id=user.id,

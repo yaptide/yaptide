@@ -44,6 +44,8 @@ if [ -n "$JOB_ID" ] ; then
         REPORTER_OPTS="--dependency=afternotok:$COLLECT_ID --kill-on-invalid-dep=yes {reporter_options} --parsable"
         REPORTER_SEND="python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key}"
         REPORTER_SEND="$REPORTER_SEND --backend_url={backend_url} --simulation_state=FAILED"
+        # the collect job's state in SLURM tells why it failed, e.g. its memory limit
+        REPORTER_SEND="$REPORTER_SEND --collect_job_id=$COLLECT_ID"
         REPORTER_CMD="sbatch $REPORTER_OPTS --wrap=\\"$REPORTER_SEND\\" > $OUT"
         eval $REPORTER_CMD
         REPORTER_ID=`cat $OUT | cut -d ";" -f 1`
@@ -73,13 +75,21 @@ mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
 
-if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
+# one task's file at a time; pages too large to show are downsampled, the full resolution is kept next to them.
+# The pymchelper module, as for FLUKA: a python3 that imports pymchelper (shieldhit's module brings convertmc)
+module load pymchelper
+python3 $ROOT_DIR/merge_results.py --output_dir=$OUTPUT_DIRECTORY "$INPUT_WILDCARD"
+MERGED=$?
+if [ $MERGED -ne 0 ] ; then
     # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
     # with empty results; task outputs are kept for a manual look. A failure inline may be the task's memory limit,
     # this job tries again and reports it
     if [ "$1" != inline ] ; then
+        # 137: killed (SIGKILL), as by the memory limit of the job
+        REASON=""
+        [ $MERGED -eq 137 ] && REASON="--reason=out_of_memory"
         python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
-              --backend_url={backend_url} --simulation_state=FAILED
+              --backend_url={backend_url} --simulation_state=FAILED $REASON
     fi
     exit 1
 fi
@@ -99,6 +109,8 @@ CLEAR_BDOS={remove_output_from_workspace}
 # find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect
 if $CLEAR_BDOS; then
     find $ROOT_DIR/workspaces -name "*.bdo" -delete || true
+    # the merged results are in the backend's storage now, the full resolution files among them
+    rm -rf $OUTPUT_DIRECTORY || true
 fi
 """  # skipcq: FLK-E501
 

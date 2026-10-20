@@ -41,8 +41,22 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, SimulationType
-from yaptide.utils.sim_utils import set_shieldhit_save_step, write_simulation_input_files
+from yaptide.utils.sim_utils import (
+    CLUSTER_NODE_MEMORY_BYTES,
+    merge_memory_gb,
+    set_shieldhit_save_step,
+    write_simulation_input_files,
+)
 
+
+# the memory a job gets on the clusters for each CPU it asks for, unless it asks for memory (Ares: 3850 MB); a merge
+# of the results that needs more asks for it, one that needs less keeps this
+DEFAULT_CPU_MEMORY_BYTES = 3850 << 20
+# sbatch options that set a job's memory, and the same in a script header (not --mem-bind)
+MEMORY_OPTIONS = ("mem", "mem-per-cpu", "mem-per-gpu")
+MEMORY_IN_HEADER = re.compile(r"--mem(?:-per-cpu|-per-gpu)?(?:=|\s)")
+# the CPUs of each task in a script header: --cpus-per-task=4, --cpus-per-task 4, -c 4, -c4
+CPUS_IN_HEADER = re.compile(r"(?:--cpus-per-task[=\s]\s*|(?<!\S)-c\s*)(\d+)")
 
 # a command on the login node that does not end in this time is given up (a hung login node must not hold one of
 # the engine's few connections forever); the submit script waits for sbatch several times
@@ -228,7 +242,7 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
     payload_dict = {
         "sim_type": simulation.sim_type,
         "ntasks": len(simulation.tasks),
-        "batch_options": input_dict.get("batch_options") or {},
+        "batch_options": with_merge_memory(input_dict.get("batch_options") or {}, input_dict["input_files"]),
     }
     update_key = encode_simulation_auth_token(simulation.id)
     try:
@@ -291,6 +305,26 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
     return True
 
 
+def with_merge_memory(batch_options: dict, files: dict) -> dict:
+    """The batch options with the memory merging the results takes (the last array task merges, the collect job
+    when that failed), for the jobs whose memory the user did not set and only above what the cluster gives them
+    anyway for their CPUs; never more than a node has (a submit needing more is refused, routes/batch_routes.py)
+    """
+    needed = min(merge_memory_gb(files), CLUSTER_NODE_MEMORY_BYTES >> 30)
+    options = dict(batch_options)
+    for job in ("array", "collect"):
+        own = options.get(f"{job}_options") or {}
+        header = options.get(f"{job}_header", "")
+        if any(key in own for key in MEMORY_OPTIONS) or MEMORY_IN_HEADER.search(header):
+            continue
+        in_header = CPUS_IN_HEADER.search(header)
+        cpus = str(own.get("cpus-per-task") or (in_header.group(1) if in_header else 1))
+        cpus = int(cpus) if cpus.isdigit() else 1
+        if needed << 30 > DEFAULT_CPU_MEMORY_BYTES * cpus:
+            options[f"{job}_options"] = {**own, "mem": f"{needed}G"}
+    return options
+
+
 def saving_tasks(simulation: SimulationModel) -> int:
     """How many tasks of the simulation send their saves for partial results: SHIELD-HIT12A's tasks"""
     return len(simulation.tasks) if simulation.sim_type == SimulationType.SHIELDHIT.value else 0
@@ -306,7 +340,7 @@ def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
                 if file.name != "input.zip":
                     archive.write(file, arcname=file.name)
         con.put(zip_path, job_dir)
-    for script in ("watcher.py", "simulation_data_sender.py", "results_uploader.py"):
+    for script in ("watcher.py", "simulation_data_sender.py", "results_uploader.py", "merge_results.py"):
         con.put(Path(__file__).parent.resolve() / script, job_dir)
 
 

@@ -34,6 +34,7 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.routes.utils.utils import update_state_from_tasks
+from yaptide.utils import sim_utils
 from yaptide.utils.enums import EntityState
 
 SUBMIT_OUTPUT = "Job id: 101\nAggregator id: 102\nCollect id: 103\nReporter id: 104\n"
@@ -704,22 +705,24 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
     script.write_text(render(collect_template, tmp_path).replace("*.bdo", "*.bdo_fort.1"))
     (tmp_path / "collect.lock").mkdir()  # left by the task that tried
     reports = tmp_path / "reports"
-    env = stub_commands(
-        tmp_path / "bin",
-        python3=f'echo "$@" >> {reports}',
-        module="true",
-        convertmc='[ -f "$HOME/merges" ] && touch out.json',
+    # the merge fails until the file $HOME/merges exists; with $HOME/oom in it, it is killed
+    merge = (
+        '[[ "$1" == *merge_results.py ]] && { [ -f "$HOME/merges" ] || exit `cat $HOME/oom 2>/dev/null || echo 1`; }'
     )
+    env = stub_commands(tmp_path / "bin", python3=f'{merge}\necho "$@" >> {reports}', module="true")
 
     def collect(*args) -> int:
         """Runs the collect script; its exit code"""
         return subprocess.run(["bash", str(script), *args], env=env, capture_output=True, check=False).returncode
 
-    env["HOME"] = str(tmp_path)  # convertmc fails until the file $HOME/merges exists
+    env["HOME"] = str(tmp_path)
     assert collect("inline") == 1
     assert "FAILED" not in reports.read_text() and task_output.exists()
     assert collect() == 1
-    assert "--simulation_state=FAILED" in reports.read_text()
+    assert "--simulation_state=FAILED" in reports.read_text() and "--reason" not in reports.read_text()
+    (tmp_path / "oom").write_text("137")
+    assert collect() == 1
+    assert "--simulation_state=FAILED --reason=out_of_memory" in reports.read_text()
 
     (tmp_path / "merges").write_text("")
     reports.unlink()
@@ -820,3 +823,21 @@ def test_the_cancel_command_cancels_by_comment_and_keeps_the_directory_while_slu
     assert calls.read_text().splitlines() == expected
     assert (done.returncode == 0) == (squeue != "stuck")
     assert job_dir.exists() == (squeue == "stuck")
+
+
+def test_a_merge_larger_than_a_node_is_refused(client, monkeypatch):
+    """SLURM would refuse the jobs: the submit is refused at once, with the reason"""
+    monkeypatch.setattr(sim_utils, "CLUSTER_NODE_MEMORY_BYTES", 4 << 30)
+    detect = "Geometry Mesh\n Name M\n X 0 1 10000\n Y 0 1 1\n Z 0 1 10000\nOutput\n Geo M\n Quantity Dose\n"
+    payload = {
+        "input_type": "files",
+        "sim_type": "shieldhit",
+        "ntasks": 2,
+        "input_files": {"beam.dat": "NSTAT 100 0\n", "geo.dat": "", "mat.dat": "", "detect.dat": detect},
+    }
+
+    response = client.post("/jobs/batch", json=payload)
+
+    assert response.status_code == 400
+    assert response.get_json()["message"].startswith("Merging the results would need 5 GB of memory")
+    assert db.session.query(BatchSimulationModel).count() == 0

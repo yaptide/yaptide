@@ -1,9 +1,17 @@
 from flask_restful import Api, Resource
 
+from yaptide.batch.merge_results import DISPLAY_MAX_BINS, MAX_OUTPUT_BYTES
+
 from yaptide.routes.auth_routes import AuthLogIn, AuthLogOut, AuthRefresh, AuthRegister, AuthStatus
 from yaptide.routes.batch_routes import Clusters, JobsBatch
 from yaptide.routes.direct_routes import JobsDirect
-from yaptide.routes.common_sim_routes import JobsResource, InputsResource, LogfilesResource, ResultsResource
+from yaptide.routes.common_sim_routes import (
+    FullResolutionResource,
+    InputsResource,
+    JobsResource,
+    LogfilesResource,
+    ResultsResource,
+)
 from yaptide.routes.estimator_routes import EstimatorResource
 from yaptide.routes.events_routes import SimulationsEventsResource
 from yaptide.routes.keycloak_routes import AuthKeycloak
@@ -23,7 +31,12 @@ class HelloWorld(Resource):
         return yaptide_response(
             message="Hello World!",
             code=200,
-            content={"local_users_enabled": local_users_enabled()},
+            content={
+                "local_users_enabled": local_users_enabled(),
+                # the limits the UI mirrors (yaptide/batch/merge_results.py)
+                "max_output_bytes": MAX_OUTPUT_BYTES,
+                "display_max_bins": DISPLAY_MAX_BINS,
+            },
         )
 
 
@@ -41,6 +54,7 @@ def initialize_routes(api: Api):
     api.add_resource(TaskLinksResource, "/tasks/links")
 
     api.add_resource(ResultsResource, "/results")
+    api.add_resource(FullResolutionResource, "/results/full_resolution")
     api.add_resource(ResultsUploadsResource, "/results/uploads")
     api.add_resource(ResultsDoneResource, "/results/done")
     api.add_resource(InputsResource, "/inputs")

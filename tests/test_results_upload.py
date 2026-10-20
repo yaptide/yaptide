@@ -23,7 +23,7 @@ from yaptide.persistence.models import (
     PageModel,
     SimulationModel,
 )
-from yaptide.routes.common_sim_routes import store_partial_results
+from yaptide.routes.common_sim_routes import estimator_content, store_partial_results
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
 
@@ -62,7 +62,9 @@ def client(monkeypatch):
 def storage(monkeypatch) -> dict:
     """Uploads that reached the storage: key -> (size, md5)"""
     stored = {}
-    monkeypatch.setattr(result_storage, "upload_url", lambda key, size, md5: f"https://storage.test/{key}?signed")
+    monkeypatch.setattr(
+        result_storage, "upload_url", lambda key, size, md5, page=True: f"https://storage.test/{key}?signed"
+    )
     monkeypatch.setattr(result_storage, "stored_matches", lambda key, size, md5: stored.get(key) == (size, md5))
     return stored
 
@@ -185,12 +187,23 @@ class FakeServer(BaseHTTPRequestHandler):
                 {**page, "url": f"http://127.0.0.1:{port}/store/{page['estimator']}/{page['page_number']}"}
                 for page in payload["pages"]
             ]
-            return self.answer(200, {"uploads": uploads})
+            full = [
+                {"estimator": entry["estimator"], "url": f"http://127.0.0.1:{port}/store/{entry['estimator']}/full"}
+                for entry in payload.get("full_resolution", [])
+            ]
+            return self.answer(200, {"uploads": uploads, "full_resolution_uploads": full})
         missing = [
             {"estimator": estimator["name"], "page_number": page["page_number"]}
             for estimator in payload["estimators"]
             for page in estimator["pages"]
             if FakeServer.storage.get(f"{estimator['name']}/{page['page_number']}") != (page["size"], page["md5"])
+        ]
+        missing += [
+            {"estimator": estimator["name"], "full_resolution": True}
+            for estimator in payload["estimators"]
+            if "full_resolution" in estimator
+            and FakeServer.storage.get(f"{estimator['name']}/full")
+            != (estimator["full_resolution"]["size"], estimator["full_resolution"]["md5"])
         ]
         return self.answer(409, {"missing": missing}) if missing else self.answer(202, {})
 
@@ -337,3 +350,89 @@ def test_no_partial_results_once_the_final_pages_are_uploaded(client, storage):
     simulation = db.session.get(SimulationModel, simulation_id())
     assert simulation.job_state == EntityState.MERGING_RUNNING.value
     assert not store_partial_results(simulation, RESULTS, 100)
+
+
+def test_uploader_uploads_the_full_resolution_next_to_the_pages(fake_server):
+    """A .bdo file next to an estimator's JSON is uploaded as it is, checked like the pages; a lost one again"""
+    name = RESULTS[0]["name"]
+    full = Path(fake_server.output_dir) / f"{name}.bdo"
+    full.write_bytes(b"full resolution " * 1000)
+    FakeServer.lost_once = {f"{name}/full"}
+
+    assert results_uploader.main(fake_server) == 0
+
+    md5 = base64.b64encode(hashlib.md5(full.read_bytes()).digest()).decode()
+    assert FakeServer.storage[f"{name}/full"] == (16000, md5)
+    assert FakeServer.calls == ["/results/uploads", "/results/done", "/results/uploads", "/results/done"]
+
+
+def test_uploader_skips_a_full_resolution_too_large_for_a_link(fake_server, monkeypatch):
+    """Larger than nginx lets through: the results go without it"""
+    (Path(fake_server.output_dir) / f"{RESULTS[0]['name']}.bdo").write_bytes(b"full" * 1000)
+    monkeypatch.setattr(results_uploader, "MAX_FULL_RESOLUTION_BYTES", 100)
+
+    assert results_uploader.main(fake_server) == 0
+
+    assert not [key for key in FakeServer.storage if key.endswith("/full")]
+
+
+def test_full_resolution_link_check_and_store(client, storage):
+    """A link for the full resolution under the estimator's pages; the results are stored once it is in storage"""
+    name = RESULTS[0]["name"]
+    full = {"estimator": name, "size": 5000, "md5": MD5}
+    pages = [{"estimator": name, "page_number": 0, "size": 10, "md5": MD5}]
+
+    response = client.post("/results/uploads", json=body(pages=pages, full_resolution=[full]))
+
+    key = result_storage.full_resolution_key(simulation_id(), name)
+    assert response.get_json()["full_resolution_uploads"] == [
+        {"estimator": name, "url": f"https://storage.test/{key}?signed"}
+    ]
+    store_all(storage)
+    estimators = listed()
+    estimators[0]["full_resolution"] = {"size": 5000, "md5": MD5}
+    done = client.post("/results/done", json=body(estimators=estimators))
+    assert done.status_code == 409
+    assert done.get_json()["missing"] == [{"estimator": name, "full_resolution": True}]
+
+    storage[key] = (5000, MD5)
+    assert client.post("/results/done", json=body(estimators=estimators)).status_code == 202
+    db.session.remove()
+    stored = db.session.query(EstimatorModel).filter_by(file_name=name).one()
+    assert stored.data["full_resolution"] is True
+
+
+def test_metadata_cannot_claim_a_full_resolution(client, storage, monkeypatch):
+    """A full resolution in a job's metadata, here pointing at another simulation's page, is dropped"""
+    monkeypatch.setattr(result_storage, "page_url", lambda key: f"https://storage.test/{key}?signed")
+    store_all(storage)
+    estimators = listed()
+    forged = {"key": "simulations/999/secret/0.json", "size": 1}
+    estimators[0]["metadata"] = {**estimators[0]["metadata"], "full_resolution": forged}
+
+    assert client.post("/results/done", json=body(estimators=estimators)).status_code == 202
+
+    db.session.remove()
+    stored = db.session.query(EstimatorModel).filter_by(file_name=estimators[0]["name"]).one()
+    assert "full_resolution" not in stored.data
+    assert "full_resolution" not in estimator_content(stored, stored.pages)
+
+
+@pytest.mark.parametrize("metadata", ["x", [1], None, 5])
+def test_metadata_that_is_not_a_mapping_is_stored_empty(client, storage, metadata):
+    """Metadata a job sends as other than a mapping is dropped instead of failing the results"""
+    store_all(storage)
+    estimators = listed()
+    estimators[0]["metadata"] = metadata
+
+    assert client.post("/results/done", json=body(estimators=estimators)).status_code == 202
+
+
+def test_full_resolution_entries_are_checked(client, storage):
+    """A full resolution larger than a link uploads, or with a bad name, is refused"""
+    pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": MD5}]
+    too_large = {"estimator": "z_profile", "size": results_uploader.MAX_FULL_RESOLUTION_BYTES + 1, "md5": MD5}
+    bad_name = {"estimator": "../x", "size": 10, "md5": MD5}
+
+    for full in (too_large, bad_name):
+        assert client.post("/results/uploads", json=body(pages=pages, full_resolution=[full])).status_code == 400
