@@ -334,7 +334,7 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
             update_simulation_state(simulation, {"job_state": EntityState.MERGING_RUNNING.value})
             estimators = merge_stored(keys, simulation_id=simulation_id)
             if estimators:
-                full_resolution = frozenset(e["name"] for e in estimators if e.pop("full_resolution", False))
+                full_resolution = frozenset(e["name"] for e in estimators if e.pop("full_resolution", False) is True)
                 store_results(simulation, estimators, full_resolution)
             return bool(estimators)
         finally:

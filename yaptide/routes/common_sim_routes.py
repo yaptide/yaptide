@@ -304,7 +304,10 @@ def prepare_estimators_and_pages(
         estimator.name = name
         estimator.file_name = estimator_dict["name"]
         # the metadata comes from the job: the flag is the server's alone
-        metadata = {key: value for key, value in estimator_dict["metadata"].items() if key != FULL_RESOLUTION}
+        sent = estimator_dict.get("metadata")
+        metadata = (
+            {key: value for key, value in sent.items() if key != FULL_RESOLUTION} if isinstance(sent, dict) else {}
+        )
         if estimator_dict["name"] in full_resolution:
             metadata[FULL_RESOLUTION] = True
         estimator.data = metadata

@@ -418,6 +418,16 @@ def test_metadata_cannot_claim_a_full_resolution(client, storage, monkeypatch):
     assert "full_resolution" not in estimator_content(stored, stored.pages)
 
 
+@pytest.mark.parametrize("metadata", ["x", [1], None, 5])
+def test_metadata_that_is_not_a_mapping_is_stored_empty(client, storage, metadata):
+    """Metadata a job sends as other than a mapping is dropped instead of failing the results"""
+    store_all(storage)
+    estimators = listed()
+    estimators[0]["metadata"] = metadata
+
+    assert client.post("/results/done", json=body(estimators=estimators)).status_code == 202
+
+
 def test_full_resolution_entries_are_checked(client, storage):
     """A full resolution larger than a link uploads, or with a bad name, is refused"""
     pages = [{"estimator": "z_profile", "page_number": 0, "size": 10, "md5": MD5}]
