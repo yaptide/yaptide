@@ -1,3 +1,15 @@
+# finds a Python that has pymchelper and numpy, for results_merger.py: the module's, the one convertmc runs with, or
+# python3; MERGE_PYTHON stays empty without one. Put into the scripts as a value, so its braces are its own
+FIND_MERGE_PYTHON: str = """module load pymchelper >/dev/null 2>&1
+MERGE_PYTHON=""
+CONVERTMC_PYTHON=$(head -1 "$(command -v convertmc 2>/dev/null)" 2>/dev/null | sed -n 's/^#!//p')
+for CANDIDATE in "$YAPTIDE_MERGE_PYTHON" "$CONVERTMC_PYTHON" python3 ; do
+    if [ -n "$CANDIDATE" ] && $CANDIDATE -c "import numpy, pymchelper" >/dev/null 2>&1 ; then
+        MERGE_PYTHON=$CANDIDATE
+        break
+    fi
+done"""
+
 SUBMIT_SHIELDHIT: str = """#!/bin/bash
 OUT=`mktemp`
 # sbatch waiting on a stuck SLURM controller is given up, so this script never outlives the backend's wait for it
@@ -69,11 +81,25 @@ python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={upda
 INPUT_WILDCARD=$ROOT_DIR/workspaces/task_*/*.bdo
 OUTPUT_DIRECTORY=$ROOT_DIR/output
 
+# a collect job after a failed inline one starts afresh
+rm -rf $OUTPUT_DIRECTORY
 mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
 
-if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
+{find_merge_python}
+# the tasks' results merged into result pages, one estimator and one file at a time; without a Python that has
+# pymchelper, convertmc merges them into JSON, which the uploader turns into pages
+merge_results() {{
+    if [ -n "$MERGE_PYTHON" ] ; then
+        $MERGE_PYTHON $ROOT_DIR/results_merger.py --output_dir=$OUTPUT_DIRECTORY "$INPUT_WILDCARD"
+    else
+        echo "No Python with pymchelper and numpy, merging with convertmc" >&2
+        convertmc json --many "$INPUT_WILDCARD"
+    fi
+}}
+
+if ! merge_results || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
     # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
     # with empty results; task outputs are kept for a manual look. A failure inline may be the task's memory limit,
     # this job tries again and reports it
@@ -90,16 +116,20 @@ UPLOAD_ATTEMPTS=12
 if [ "$1" = inline ] ; then
     UPLOAD_ATTEMPTS=3
 fi
-python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY --attempts=$UPLOAD_ATTEMPTS \\
+# the uploader needs the standard library only; the merge's Python also reads compressed pages for a backend without
+# object storage
+${{MERGE_PYTHON:-python3}} $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY --attempts=$UPLOAD_ATTEMPTS \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} || exit 1
 touch $ROOT_DIR/collected
 
 CLEAR_BDOS={remove_output_from_workspace}
 
-# find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect
+# find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect. The
+# tasks' saves for partial results go too
 if $CLEAR_BDOS; then
     find $ROOT_DIR/workspaces -name "*.bdo" -delete || true
 fi
+rm -rf $ROOT_DIR/workspaces/task_*/saves $ROOT_DIR/partial_output || true
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash
@@ -147,4 +177,25 @@ touch $ROOT_DIR/done/task_$SLURM_ARRAY_TASK_ID
 if [ `ls $ROOT_DIR/done | wc -l` -eq {n_tasks} ] && mkdir $ROOT_DIR/collect.lock 2>/dev/null ; then
     bash $ROOT_DIR/collect_script.sh inline || echo "Collect left to the collect job"
 fi
+"""  # skipcq: FLK-E501
+
+PARTIAL_SHIELDHIT_BASH: str = """#!/bin/bash
+# merges the latest saves of the tasks into partial results and uploads them; a task's watcher starts it, one at a time
+# (it holds partial.lock, removed at the end), while the simulation runs
+ROOT_DIR={root_dir}
+OUTPUT_DIRECTORY=$ROOT_DIR/partial_output
+trap 'rm -rf $OUTPUT_DIRECTORY; rmdir $ROOT_DIR/partial.lock 2>/dev/null' EXIT
+
+{find_merge_python}
+if [ -z "$MERGE_PYTHON" ] ; then
+    echo "No Python with pymchelper and numpy, no partial results" >&2
+    exit 0
+fi
+
+rm -rf $OUTPUT_DIRECTORY
+# the simulator of this task shares the core: the merge gives way to it
+nice -n 10 $MERGE_PYTHON $ROOT_DIR/results_merger.py --output_dir=$OUTPUT_DIRECTORY \\
+    --latest_saves="$ROOT_DIR/workspaces/task_*/saves" || exit 1
+$MERGE_PYTHON $ROOT_DIR/results_uploader.py --partial --output_dir=$OUTPUT_DIRECTORY --attempts=3 \\
+    --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
 """  # skipcq: FLK-E501

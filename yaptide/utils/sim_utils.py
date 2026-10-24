@@ -1,19 +1,13 @@
 import copy
-import json
 import logging
-import math
 import re
-import tempfile
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import numpy as np
-from pymchelper.estimator import Estimator
-from pymchelper.input_output import AggregationType, fromfile, group_input_files
-from pymchelper.writers.json import JsonWriter
 from pymchelper.flair.Input import Card
-from pymchelper.shieldhit.detector.detector_type import SHDetType
 from converter.api import get_parser_from_str, run_parser
+from yaptide.batch import result_format, results_merger
 from yaptide.utils.enums import InputType, SimulationType
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
@@ -21,80 +15,18 @@ NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 NSTAT_WITHOUT_SAVES = re.compile(r"^(\s*NSTAT\s+\d+)(?:[ \t]+0)?(?=[ \t]*(?:!|\r?$))", re.MULTILINE)
 
 
-def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
-    """Convert simulation output to JSON dictionary representation (to be consumed by UI)"""
-    if not estimators_dict:
-        return {"message": "No estimators"}
-
-    # result_dict is a dictionary, which is later converted to json
-    # to provide readable API response for fronted
-    # keys in results_dict are estimator names, values are the estimator objects
-    result_estimators = []
-    estimator: Estimator
-    for estimator_key, estimator in estimators_dict.items():
-        filepath = dir_path / estimator_key
-        writer = JsonWriter(str(filepath), None)
-        writer.write(estimator)
-
-        with open(writer.filename, "r") as json_file:
-            est_dict = json.load(json_file)
-            est_dict["name"] = estimator_key
-            result_estimators.append(est_dict)
-
-    return result_estimators
+def json_pages(name: str, number: int, page: dict, values: np.ndarray) -> dict:
+    """A merged page as the JSON pages had it, values included: what the database keeps without object storage"""
+    return result_format.json_page(page, values.tolist())
 
 
-def read_estimator(file: str) -> Optional[Estimator]:
-    """Reads a result file; raises ValueError when a page of a SHIELD-HIT12A file holds other than the bins its
-    estimator declares (the JSON for the UI has values for every bin declared)
-    """
-    estimator = fromfile(file)
-    if estimator and file.endswith(".bdo"):
-        for page in estimator.pages:
-            axes = (estimator.x.n, estimator.y.n, estimator.z.n, page.diff_axis1.n, page.diff_axis2.n)
-            if page.dettyp != SHDetType.mcpl and page.data_raw.size != math.prod(axes):
-                raise ValueError(f"{file}: {page.data_raw.size} values for {axes} bins")
-    return estimator
+def merge_simulation_outputs(output_dirs: list[Path], store: Optional[Callable] = None) -> list[dict]:
+    """Merge the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*) of all tasks into estimators for the UI
 
-
-def merge_estimator_files(files: list[str]) -> Optional[Estimator]:
-    """Merge one estimator's task files: each page aggregated by its normalisation, averages weighted by primaries.
-
-    Mean only - pymchelper's WeightedStatsAggregator also accumulates a variance, which the JSON for the UI drops.
-    """
-    result = read_estimator(files[0])
-    if not result:
-        return None
-    kinds = [getattr(page, "page_normalized", AggregationType.AveragingCumulative) for page in result.pages]
-    averaged = [
-        kind not in (AggregationType.NoAggregation, AggregationType.Sum, AggregationType.Concatenation)
-        for kind in kinds
-    ]
-    for page, avg in zip(result.pages, averaged):
-        if avg:
-            page.data_raw = page.data_raw * result.number_of_primaries
-    for file in files[1:]:
-        estimator = read_estimator(file)
-        for page, other, kind, avg in zip(result.pages, estimator.pages, kinds, averaged):
-            if avg:
-                page.data_raw += other.data_raw * estimator.number_of_primaries
-            elif kind == AggregationType.Sum:
-                page.data_raw += other.data_raw
-            elif kind == AggregationType.Concatenation:
-                page.data_raw = np.concatenate((page.data_raw, other.data_raw))
-        result.number_of_primaries += estimator.number_of_primaries
-    for page, avg in zip(result.pages, averaged):
-        if avg:
-            page.data_raw /= result.number_of_primaries
-    result.file_counter = len(files)
-    return result
-
-
-def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
-    """Merge the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*) of all tasks into estimators ready for the UI
-
-    Each page is aggregated by its normalisation and averages are weighted by primaries, as convertmc does for
-    batch simulations. JSON is produced once, from the merged result.
+    Each page is aggregated by its normalisation and averages are weighted by primaries, as on the clusters
+    (yaptide/batch/results_merger.py). One estimator is merged at a time, one file at a time, and each of its pages
+    goes to store(estimator name, page number, page without values, values) before the next estimator is read; the
+    estimators hold what store returned for their pages, by default the pages as JSON with their values.
     The list is sorted by name, the same for every merge.
     """
     missing = [str(path) for path in output_dirs if not path.is_dir()]
@@ -106,17 +38,8 @@ def merge_simulation_outputs(output_dirs: list[Path]) -> list[dict]:
     ]
     if not files:
         return []
-    estimators = {}
-    for corename, group in group_input_files(files).items():
-        estimator = merge_estimator_files(group)
-        if estimator:
-            estimator.file_corename = corename
-            estimators[corename] = estimator
-    if not estimators:
-        return []
-    with tempfile.TemporaryDirectory() as json_dir:
-        merged = estimators_to_list(estimators_dict=estimators, dir_path=Path(json_dir))
-    return sorted(merged, key=lambda estimator: estimator["name"])
+    estimators, _ = results_merger.write_pages(files, store or json_pages)
+    return estimators
 
 
 def get_json_type(payload_dict: dict) -> InputType:

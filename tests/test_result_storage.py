@@ -4,9 +4,11 @@ import json
 from pathlib import Path
 from unittest import mock
 
+import numpy as np
 import pytest
 
 from yaptide.application import create_app
+from yaptide.batch import result_format
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import CelerySimulationModel, PageModel, SimulationModel, YaptideUserModel
@@ -31,10 +33,30 @@ def client():
 def storage(monkeypatch) -> dict:
     """Object storage kept in a dict, as configured on a deployment with a results bucket"""
     objects = {}
+
+    def put_page_files(prefix: str, files: dict) -> int:
+        """Keeps a page's objects"""
+        objects.update({prefix + name: body for name, body in files.items()})
+        return sum(len(body) for body in files.values())
+
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
-    monkeypatch.setattr(result_storage, "put_page", lambda key, page: objects.update({key: page}) or 123)
+    monkeypatch.setattr(result_storage, "put_page_files", put_page_files)
     monkeypatch.setattr(result_storage, "page_url", lambda key: f"https://storage.test/{key}?signature")
     return objects
+
+
+def stored_page(objects: dict, prefix: str) -> dict:
+    """A page in storage read back as the JSON page it was made from"""
+    files = {name: objects[prefix + name] for name in result_format.FILES if prefix + name in objects}
+    return result_format.json_page(*result_format.read_page(files))
+
+
+def assert_same_page(page: dict, expected: dict) -> None:
+    """The page with its values as float32"""
+    page, expected = json.loads(json.dumps(page)), json.loads(json.dumps(expected))
+    values, expected_values = page["data"].pop("values"), expected["data"].pop("values")
+    np.testing.assert_allclose(values, expected_values, rtol=1e-6)
+    assert page == expected
 
 
 @pytest.fixture
@@ -71,19 +93,40 @@ def test_pages_go_to_storage_and_are_read_through_links(client, storage, sim_id)
     pages = db.session.query(PageModel).all()
     assert pages
     assert all(page.compressed_data is None for page in pages)
-    keys = {page.stored_object.key for page in pages}
-    assert keys == set(storage)
+    assert all(page.stored_object.format == result_storage.ZARR_FORMAT for page in pages)
+    prefixes = {page.stored_object.key for page in pages}
+    assert {key.rsplit("/", 2)[0] + "/" for key in storage if key.endswith("/c/0")} <= prefixes
+    assert {key.removesuffix("zarr.json") for key in storage if key.endswith("zarr.json")} == prefixes
     first = RESULTS[0]
-    key = result_storage.page_key(sim_id, first["name"], int(first["pages"][0]["metadata"]["page_number"]))
-    assert storage[key] == first["pages"][0]
+    number = int(first["pages"][0]["metadata"]["page_number"])
+    (prefix,) = [key for key in prefixes if key.startswith(f"simulations/{sim_id}/{first['name']}/{number}/")]
+    assert_same_page(stored_page(storage, prefix), first["pages"][0])
 
     everything = client.get("/results", query_string={"job_id": "storagejob"}).get_json()
     some = client.get(
         "/results", query_string={"job_id": "storagejob", "estimator_name": first["name"], "page_numbers": "0"}
     ).get_json()
     for page in [page for estimator in everything["estimators"] for page in estimator["pages"]] + some["pages"]:
-        assert page["url"].startswith("https://storage.test/simulations/")
-        assert page["format"] == result_storage.PAGE_FORMAT
+        assert page["url"].startswith("https://storage.test/simulations/") and page["url"].endswith(
+            "/zarr.json?signature"
+        )
+        assert page["format"] == result_storage.ZARR_FORMAT
+        assert set(page["files"]) == set(result_format.FILES)
+
+
+def test_zarr_pages_go_to_the_ui_as_json_with_the_bridge_set(client, storage, sim_id, monkeypatch):
+    """RESULTS_SERVE_JSON: a UI that does not read ZARR_FORMAT yet gets the JSON pages, read from storage here"""
+    upload_results(client, sim_id)
+    monkeypatch.setenv("RESULTS_SERVE_JSON", "true")
+    monkeypatch.setattr(
+        result_storage,
+        "get_page_files",
+        lambda prefix: {name: storage[prefix + name] for name in result_format.FILES if prefix + name in storage},
+    )
+
+    first = RESULTS[0]
+    content = client.get("/results", query_string={"job_id": "storagejob", "estimator_name": first["name"]}).get_json()
+    assert_same_page(content["pages"][0], first["pages"][0])
 
 
 def test_pages_stay_in_the_database_without_storage(client, sim_id):
@@ -181,12 +224,12 @@ def test_pages_go_to_the_database_when_storage_fails(client, storage, sim_id, mo
     """Results of a finished simulation are kept even if the storage is down at that moment"""
     calls = []
 
-    def unreachable(key, page):
+    def unreachable(prefix, files):
         """Storage not answering"""
-        calls.append(key)
-        raise ConnectionError(f"storage unreachable for {key}")
+        calls.append(prefix)
+        raise ConnectionError(f"storage unreachable for {prefix}")
 
-    monkeypatch.setattr(result_storage, "put_page", unreachable)
+    monkeypatch.setattr(result_storage, "put_page_files", unreachable)
     upload_results(client, sim_id)
 
     assert len(calls) == 1  # the next pages do not wait for the storage again
@@ -215,22 +258,21 @@ def test_what_tasks_and_hpc_jobs_leave_in_storage_expires(monkeypatch):
     )
 
 
-def test_job_links_let_each_task_put_only_its_own_save(monkeypatch):
-    """A PUT link per saving task, for its work key only, at the public address and lasting as long as the others"""
+def test_job_links_hand_out_no_save_links(monkeypatch):
+    """The tasks' saves stay on the cluster, which merges them itself: the jobs get only progress and cancel links,
+    at the public address
+    """
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
     monkeypatch.setenv("RESULTS_S3_PUBLIC_ENDPOINT", "https://yaptide.test")
     monkeypatch.setenv("RESULTS_S3_ACCESS_KEY", "GK0")
     monkeypatch.setenv("RESULTS_S3_SECRET_KEY", "secret")
     result_storage._client.cache_clear()  # skipcq: PYL-W0212
 
-    links = result_storage.job_links(5, saving_tasks=2)
+    links = result_storage.job_links(5)
     result_storage._client.cache_clear()  # skipcq: PYL-W0212
 
-    urls = links["saves"]["urls"]
-    assert sorted(urls) == ["1", "2"] and links["saves"]["max_bytes"] == result_storage.HPC_SAVES_MAX_BYTES // 2
-    for task, url in urls.items():
-        assert url.startswith(f"https://yaptide.test/results/work/5/task_{task}.tar.gz?")
-        assert f"X-Amz-Expires={result_storage.JOB_LINK_SECONDS}" in url
+    assert set(links) == {"progress", "cancel", "expires"}
+    assert links["cancel"].startswith("https://yaptide.test/results/hpc/5/cancel?")
 
 
 def listing_page(keys: list[str], token: str = "") -> bytes:

@@ -14,6 +14,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from yaptide.application import create_app
+from yaptide.batch import result_format
 from yaptide.engine.pymc import (
     command_to_run_fluka,
     command_to_run_shieldhit,
@@ -292,8 +293,46 @@ def check_bdo(path: Path) -> None:
             file.seek(count * itemsize, 1)
 
 
-def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]:
-    """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises"""
+class PageWriter:
+    """Puts the pages of one merge into object storage as they are merged, in ZARR_FORMAT under a revision of their
+    own; the database gets them while the storage is not configured or fails
+    """
+
+    def __init__(self, simulation_id: Optional[int]):
+        """Pages of the simulation's merge"""
+        self.simulation_id = simulation_id
+        self.revision = result_storage.new_revision()
+        self.use_storage = simulation_id is not None and result_storage.configured()
+        self.written: list[str] = []
+
+    def __call__(self, name: str, number: int, page: dict, values: np.ndarray) -> dict:
+        """Stores a merged page; the page entry store_results takes"""
+        if self.use_storage:
+            prefix = result_storage.page_prefix(self.simulation_id, name, number, self.revision)
+            try:
+                size = result_storage.put_page_files(prefix, result_format.page_files(page, values))
+                self.written.append(prefix)
+                return {
+                    "metadata": page["metadata"],
+                    "dimensions": page["dimensions"],
+                    "stored": {"key": prefix, "size": size, "format": result_storage.ZARR_FORMAT},
+                }
+            except Exception:  # skipcq: PYL-W0703
+                logging.exception(
+                    "Storing results of simulation %d failed, the rest goes to the database", self.simulation_id
+                )
+                self.use_storage = False
+        return result_format.json_page(page, values.tolist())
+
+
+def merge_stored(keys: list[str], max_bytes: float = float("inf"), simulation_id: Optional[int] = None) -> list[dict]:
+    """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises
+
+    With the simulation's id the pages go to object storage as they are merged (PageWriter), the estimators then
+    point at them. The task archives are fetched and unpacked one at a time onto disk; the merge reads one file at a
+    time.
+    """
+    writer = PageWriter(simulation_id)
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
         task_dirs = []
         for number, key in enumerate(keys):
@@ -303,7 +342,11 @@ def merge_stored(keys: list[str], max_bytes: float = float("inf")) -> list[dict]
             max_bytes -= extract_results(archive, task_dir, max_bytes)
             archive.unlink()
             task_dirs.append(task_dir)
-        return merge_simulation_outputs(task_dirs)
+        try:
+            return merge_simulation_outputs(task_dirs, writer)
+        except BaseException:
+            result_storage.delete_pages(writer.written)
+            raise
 
 
 def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
@@ -317,7 +360,7 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
             if simulation is None:
                 return False
             update_simulation_state(simulation, {"job_state": EntityState.MERGING_RUNNING.value})
-            estimators = merge_stored(keys)
+            estimators = merge_stored(keys, simulation_id=simulation_id)
             if estimators:
                 store_results(simulation, estimators)
             return bool(estimators)
@@ -336,7 +379,7 @@ def merge_and_store_partial(
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            estimators = merge_stored(keys, max_bytes)
+            estimators = merge_stored(keys, max_bytes, simulation_id)
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

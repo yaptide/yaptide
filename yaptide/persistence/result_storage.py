@@ -1,5 +1,9 @@
 """Result pages in S3-compatible object storage (Garage on yap-dev); the database keeps only where they are.
 
+New pages are Zarr v3 arrays (yaptide/batch/result_format.py), each under a prefix of its own that changes with every
+merge (a revision), so a page being replaced is never half written for a reader; older pages stay gzipped JSON, each
+page keeps its format.
+
 Without RESULTS_S3_BUCKET set, pages stay in the database as before (tests, local runs, older deployments).
 The result files of direct simulation tasks pass to the merges through the storage too, so a merge may run on
 another machine than the tasks; without a bucket they pass through a local directory instead (one machine only).
@@ -9,8 +13,10 @@ import base64
 import gzip
 import hashlib
 import json
+import logging
 import os
 import re
+import secrets
 import shutil
 import tempfile
 import time
@@ -28,8 +34,12 @@ from botocore.config import Config
 from botocore.credentials import Credentials
 from botocore.exceptions import ClientError
 
-# the page JSON the UI reads, gzipped; a format kept per page lets other formats (binary, chunked) live alongside
+from yaptide.batch import result_format
+
+# the page JSON the UI reads, gzipped: the pages stored before ZARR_FORMAT, and the ones moved from the database
 PAGE_FORMAT = "page-json-gzip-v1"
+# a page as a Zarr v3 array, its objects under a prefix (PageObjectModel.key ends with "/")
+ZARR_FORMAT = result_format.FORMAT
 # the UI fetches a page right after asking for it
 URL_SECONDS = 15 * 60
 # a cluster job uploads its pages right after asking for the links, and asks again when they expire; short, so a
@@ -88,6 +98,50 @@ def page_key(sim_id: int, estimator_file_name: str, page_number: int) -> str:
     return f"{PAGE_PREFIX}{sim_id}/{estimator_file_name}/{page_number}.json"
 
 
+def new_revision() -> str:
+    """A name for the pages of one merge, apart from the pages of every other merge of the simulation"""
+    return secrets.token_hex(8)
+
+
+REVISION_PATTERN = re.compile(r"[0-9a-f]{16}")
+
+
+def page_prefix(sim_id: int, estimator_file_name: str, page_number: int, revision: str) -> str:
+    """Prefix of the objects of a page in ZARR_FORMAT, one for each merge"""
+    return f"{PAGE_PREFIX}{sim_id}/{estimator_file_name}/{page_number}/{revision}/"
+
+
+def put_page_files(prefix: str, files: dict[str, bytes]) -> int:
+    """Stores the objects of a page in ZARR_FORMAT under the prefix; returns their size in bytes"""
+    for name, body in files.items():
+        _internal().put_object(
+            Bucket=os.environ["RESULTS_S3_BUCKET"],
+            Key=prefix + name,
+            Body=body,
+            ContentMD5=body_md5(body),
+            ContentType=result_format.content_type(name),
+        )
+    return sum(len(body) for body in files.values())
+
+
+def page_file_urls(prefix: str) -> dict[str, str]:
+    """Signed links the browser fetches the objects of a page in ZARR_FORMAT from: name -> link; a page without
+    values has no shard, its link answers 404, which a Zarr reader takes as a page of the fill value
+    """
+    return {name: page_url(prefix + name) for name in result_format.FILES}
+
+
+def delete_pages(keys: list[str]) -> None:
+    """Removes stored pages no page points at any more (replaced by a later merge, or refused); a failure only
+    leaves them until the simulation is deleted
+    """
+    for key in keys:
+        try:
+            delete_objects(key)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Removing the stored page %s failed", key)
+
+
 def put_page(key: str, page: dict) -> int:
     """Stores a page as gzipped JSON the browser decompresses itself; returns the stored size in bytes"""
     body = gzip.compress(json.dumps(page).encode())
@@ -113,6 +167,24 @@ def put_gzipped_page(key: str, body: bytes) -> None:
     )
 
 
+def get_page_files(prefix: str) -> dict[str, bytes]:
+    """The objects of a page in ZARR_FORMAT: name -> body; a page without values has no shard"""
+    files = {}
+    for name in result_format.FILES:
+        try:
+            files[name] = (
+                _internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=prefix + name)["Body"].read()
+            )
+        except ClientError as error:
+            if name == result_format.METADATA_FILE or error.response.get("Error", {}).get("Code") not in (
+                "404",
+                "NoSuchKey",
+                "NotFound",
+            ):
+                raise
+    return files
+
+
 def get_gzipped_page(key: str) -> bytes:
     """The stored body of a page, still gzipped"""
     return _internal().get_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=key)["Body"].read()
@@ -125,8 +197,7 @@ def page_url(key: str) -> str:
     )
 
 
-# result files of direct simulation tasks on their way to the merges, removed after the final merge; the saves of
-# HPC tasks on their way to the partial merges, removed once the simulation stops running
+# result files of direct simulation tasks on their way to the merges, removed after the final merge
 WORK_PREFIX = "work/"
 # what HPC jobs report and tasks leave, of no use once their simulation is gone: the engine's look for orphans removes
 # these; never the result pages (PAGE_PREFIX), only a delete of their simulation removes them
@@ -182,8 +253,8 @@ def public_client():
     return _client(os.environ.get("RESULTS_S3_PUBLIC_ENDPOINT") or os.environ["BACKEND_EXTERNAL_URL"])
 
 
-def upload_url(key: str, size: int, md5: str) -> str:
-    """Signed link a cluster job uploads one gzipped page with; the storage rejects any other size or content
+def upload_url(key: str, size: int, md5: str, content_type: str = "application/json") -> str:
+    """Signed link a cluster job uploads one object of a page with; the storage rejects any other size or content
 
     md5 is the base64 MD5 of the body, as the Content-MD5 header carries it.
     """
@@ -192,8 +263,7 @@ def upload_url(key: str, size: int, md5: str) -> str:
         "Key": key,
         "ContentLength": size,
         "ContentMD5": md5,
-        "ContentType": "application/json",
-        "ContentEncoding": "gzip",
+        "ContentType": content_type,
     }
     return public_client().generate_presigned_url("put_object", Params=params, ExpiresIn=UPLOAD_URL_SECONDS)
 
@@ -228,10 +298,10 @@ def cancel_key(sim_id: int) -> str:
     return f"hpc/{sim_id}/cancel"
 
 
-def job_links(sim_id: int, saving_tasks: int = 0) -> dict:
+def job_links(sim_id: int) -> dict:
     """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
-    progress prefix only (each at most MAX_PROGRESS_BYTES), a HEAD of its cancel object and, for each of the first
-    saving_tasks tasks, a PUT of its saves (the work_key of the task, at most its share of HPC_SAVES_MAX_BYTES)
+    progress prefix only (each at most MAX_PROGRESS_BYTES) and a HEAD of its cancel object. The tasks' saves stay on
+    the cluster, which merges them into partial results itself (yaptide/batch/watcher.py)
     """
     bucket = os.environ["RESULTS_S3_BUCKET"]
     prefix = progress_prefix(sim_id)
@@ -245,23 +315,11 @@ def job_links(sim_id: int, saving_tasks: int = 0) -> dict:
     cancel = client.generate_presigned_url(
         "head_object", Params={"Bucket": bucket, "Key": cancel_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
     )
-    # a PUT link per task, not a POST policy: the storage may read a POST body whole into memory before refusing it,
-    # so nginx lets only small ones through; a PUT link is checked before any data is taken (nginx caps it at 2 GB,
-    # the engine merges only saves within HPC_SAVES_MAX_BYTES)
-    saves = {
-        str(task_id): client.generate_presigned_url(
-            "put_object", Params={"Bucket": bucket, "Key": work_key(sim_id, task_id)}, ExpiresIn=JOB_LINK_SECONDS
-        )
-        for task_id in range(1, saving_tasks + 1)
-    }
     # the jobs ask for new links a day before these expire (Garage answers an expired link with 400, like a bad one)
     expires = int(time.time()) + JOB_LINK_SECONDS
     return {
         "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
         "cancel": cancel,
-        # each task its share: the engine merges the saves of all tasks only within the limit, larger ones would be
-        # sent for nothing
-        "saves": {"urls": saves, "max_bytes": HPC_SAVES_MAX_BYTES // max(saving_tasks, 1)},
         "expires": expires,
     }
 
@@ -327,13 +385,7 @@ def put_cancel(sim_id: int) -> None:
     _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=cancel_key(sim_id), Body=b"")
 
 
-# the saves of an HPC simulation's tasks merged into partial results at once, in bytes, packed and unpacked, which
-# bounds one task's save too: a simulation with larger results gets them only at the end
-HPC_SAVES_MAX_BYTES = int(os.environ.get("RESULTS_HPC_SAVES_MAX_BYTES", 128 << 20))
-
-
-# objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; direct tasks run at most 10 hours,
-# an HPC task replaces its save at every save (one expiring first only leaves the partial results without it)
+# objects left under WORK_PREFIX (a crash, a failed delete) expire after this long; direct tasks run at most 10 hours
 WORK_EXPIRY_DAYS = 2
 # objects under hpc/ (progress reports, cancels) expire after this long: the engine reads the last reports within
 # minutes after the simulation ended and puts the cancel again while its jobs may still run; a report expiring under

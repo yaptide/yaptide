@@ -14,7 +14,6 @@ from botocore.exceptions import ClientError
 from flask import current_app
 
 from yaptide.application import create_app
-from yaptide.batch import watcher
 from yaptide.engine import simulation as simulation_module
 from yaptide.persistence import db_methods, result_storage
 from yaptide.persistence.database import db
@@ -276,19 +275,6 @@ def test_results_passed_through_storage_merge_as_from_the_task_directories(tmp_p
 
     result_storage.delete_objects(result_storage.work_prefix(1))
     assert not list(tmp_path.rglob("*.tar.gz"))
-
-
-def test_saves_from_the_cluster_merge_as_from_the_task_directories(tmp_path, monkeypatch):
-    """An HPC task's save, packed by its watcher, goes through the same merge as the saves of direct tasks"""
-    monkeypatch.setenv("TMPDIR", str(tmp_path))
-    keys = []
-    for task in ("task_1", "task_2"):
-        keys.append(result_storage.work_key(1, int(task[-1])))
-        archive = tmp_path / f"{task}.tar.gz"
-        assert watcher.pack(BDO_DIR / task, archive)
-        result_storage.put_file(keys[-1], archive)
-
-    assert simulation_module.merge_stored(keys) == merge_simulation_outputs([BDO_DIR / "task_1", BDO_DIR / "task_2"])
 
 
 def archive_with(tmp_path: Path, name: str, size: int = 4, kind: bytes = tarfile.REGTYPE) -> Path:

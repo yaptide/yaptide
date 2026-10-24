@@ -20,6 +20,8 @@ from paramiko import AuthenticationException, RSAKey
 from yaptide.batch.shieldhit_string_templates import (
     ARRAY_SHIELDHIT_BASH,
     COLLECT_SHIELDHIT_BASH,
+    FIND_MERGE_PYTHON,
+    PARTIAL_SHIELDHIT_BASH,
     SUBMIT_SHIELDHIT,
 )
 from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH, SUBMIT_FLUKA
@@ -42,7 +44,6 @@ from yaptide.persistence.models import (
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, SimulationType
 from yaptide.utils.sim_utils import set_shieldhit_save_step, write_simulation_input_files
-
 
 # a command on the login node that does not end in this time is given up (a hung login node must not hold one of
 # the engine's few connections forever); the submit script waits for sbatch several times
@@ -246,9 +247,8 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
                 # saves along the way for partial results, in the cluster's copy only: the stored input stays the user's
                 set_shieldhit_save_step(files, max(task.requested_primaries or 0 for task in simulation.tasks))
             upload_inputs(con, job_dir, files)
-            # signed links the jobs report progress, look for a cancel and send their saves with, and the key to ask
-            # for new ones
-            job_links = result_storage.job_links(simulation.id, saving_tasks(simulation))
+            # signed links the jobs report progress and look for a cancel with, and the key to ask for new ones
+            job_links = result_storage.job_links(simulation.id)
             links = json.dumps(dict(job_links, update_key=update_key)).encode()
             con.put(io.BytesIO(links), f"{job_dir}/storage_links.json")
             submit_file, sh_files = prepare_script_files(
@@ -291,9 +291,9 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
     return True
 
 
-def saving_tasks(simulation: SimulationModel) -> int:
-    """How many tasks of the simulation send their saves for partial results: SHIELD-HIT12A's tasks"""
-    return len(simulation.tasks) if simulation.sim_type == SimulationType.SHIELDHIT.value else 0
+# the scripts the jobs run, put next to the inputs: the ones merging results need pymchelper, the others the standard
+# library only
+SCRIPTS = ("watcher.py", "simulation_data_sender.py", "results_uploader.py", "results_merger.py", "result_format.py")
 
 
 def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
@@ -306,7 +306,7 @@ def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
                 if file.name != "input.zip":
                     archive.write(file, arcname=file.name)
         con.put(zip_path, job_dir)
-    for script in ("watcher.py", "simulation_data_sender.py", "results_uploader.py"):
+    for script in SCRIPTS:
         con.put(Path(__file__).parent.resolve() / script, job_dir)
 
 
@@ -429,7 +429,13 @@ def prepare_script_files(
     if payload_dict["sim_type"] == SimulationType.FLUKA.value:
         templates = {"submit": SUBMIT_FLUKA, "array": ARRAY_FLUKA_BASH, "collect": COLLECT_FLUKA_BASH}
     else:
-        templates = {"submit": SUBMIT_SHIELDHIT, "array": ARRAY_SHIELDHIT_BASH, "collect": COLLECT_SHIELDHIT_BASH}
+        # the tasks' watchers merge partial results with the partial script (FLUKA's tasks save only at the end)
+        templates = {
+            "submit": SUBMIT_SHIELDHIT,
+            "array": ARRAY_SHIELDHIT_BASH,
+            "collect": COLLECT_SHIELDHIT_BASH,
+            "partial": PARTIAL_SHIELDHIT_BASH,
+        }
     common = {"root_dir": job_dir, "sim_id": sim_id, "update_key": update_key, "backend_url": backend_url}
     sh_files = {
         "submit": templates["submit"].format(
@@ -444,16 +450,22 @@ def prepare_script_files(
         ),
         "array": templates["array"].format(array_header=array_header, n_tasks=str(payload_dict["ntasks"]), **common),
         "collect": templates["collect"].format(
-            collect_header=collect_header, remove_output_from_workspace="true", **common
+            collect_header=collect_header,
+            remove_output_from_workspace="true",
+            find_merge_python=FIND_MERGE_PYTHON,
+            **common,
         ),
     }
+    if "partial" in templates:
+        sh_files["partial"] = templates["partial"].format(find_merge_python=FIND_MERGE_PYTHON, **common)
     paths = {
         "submit": f"{job_dir}/yaptide_submitter.sh",
         "array": f"{job_dir}/array_script.sh",
         "collect": f"{job_dir}/collect_script.sh",
+        "partial": f"{job_dir}/partial_script.sh",
     }
     # put as files: one round trip each and no quoting of the scripts through a shell command
     for name, script in sh_files.items():
         con.put(io.BytesIO(script.encode()), paths[name])
-    con.run("chmod +x " + " ".join(shlex.quote(path) for path in paths.values()), timeout=COMMAND_SECONDS)
+    con.run("chmod +x " + " ".join(shlex.quote(paths[name]) for name in sh_files), timeout=COMMAND_SECONDS)
     return paths["submit"], sh_files

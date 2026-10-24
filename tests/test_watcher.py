@@ -2,6 +2,8 @@
 
 import email
 import io
+import os
+import shutil
 import json
 import signal
 import subprocess
@@ -103,7 +105,6 @@ def links(port: int) -> dict:
             "prefix": "simulations/7/progress/",
         },
         "cancel": f"http://127.0.0.1:{port}/bucket/simulations/7/cancel",
-        "saves": {"urls": {"3": f"http://127.0.0.1:{port}/bucket/work/7/task_3.tar.gz?signed"}, "max_bytes": 10**6},
     }
 
 
@@ -291,30 +292,48 @@ def test_final_state_waits_for_the_storage(storage):
     assert report()["task_state"] == "COMPLETED"
 
 
-SAVE = "/bucket/work/7/task_3.tar.gz"
+# a partial script standing in for the one the submit writes: notes each run, then frees the lock as the real one does
+PARTIAL_SCRIPT = 'echo run >> "$(dirname "$0")/merges"; rmdir "$(dirname "$0")/partial.lock"\n'
 
 
-def saved_files() -> dict:
-    """The result files in the task's save in storage: name -> content"""
-    with tarfile.open(fileobj=io.BytesIO(FakeStorage.objects[SAVE]), mode="r:gz") as tar:
-        return {member.name: tar.extractfile(member).read() for member in tar}
+def saves(work_dir: Path) -> dict:
+    """The task's saves kept aside: directory name -> the result files in it (name -> content)"""
+    saves_dir = work_dir / "saves"
+    if not saves_dir.exists():
+        return {}
+    return {
+        save.name: {path.name: path.read_bytes() for path in save.iterdir()} for save in sorted(saves_dir.iterdir())
+    }
 
 
-def saver(tmp_path: Path, backend_url: str, simulated: int) -> watcher.Saver:
-    """Task 3's saver, with 1000 primaries requested and some simulated, and a result file in its directory"""
+def merges(root: Path) -> int:
+    """Runs of the partial script so far, once they ended"""
+    for _ in range(100):
+        if not (root / "partial.lock").exists():
+            break
+        time.sleep(0.05)
+    return len((root / "merges").read_text().split()) if (root / "merges").exists() else 0
+
+
+def saver(tmp_path: Path, backend_url: str, simulated: int, script: str = PARTIAL_SCRIPT) -> watcher.Saver:
+    """Task 3's saver, with 1000 primaries requested and some simulated, a result file in its directory and the
+    partial script next to the links
+    """
     (tmp_path / "dose.bdo").write_bytes(b"dose")
+    (tmp_path / "partial_script.sh").write_text(script)
     task = reporter(tmp_path, backend_url)
     task.state.update({"requested_primaries": 1000, "simulated_primaries": simulated})
     return watcher.Saver(tmp_path, task)
 
 
-def test_saves_go_into_storage_with_their_primaries(storage):
-    """A save half way through goes into the task's object, packed; its primaries are reported, the last save at
-    the end is left to the collect
+def test_saves_are_kept_aside_and_merged_on_the_cluster(storage):
+    """A save half way through is copied into the task's saves, named by its primaries, and a partial merge starts;
+    the last save at the end is left to the collect. Nothing of it goes into storage
     """
     tmp_path, backend_url = storage
     log = tmp_path / "shieldhit_0003.log"
     (tmp_path / "dose.bdo").write_bytes(b"dose")
+    (tmp_path / "partial_script.sh").write_text(PARTIAL_SCRIPT)
     lines = SHIELDHIT_RUN.replace("4 seconds\n", "4 seconds\n  Saved all 1 estimator(s)\n")
     process = simulator(log, lines + "  Saved all 1 estimator(s)\n", 0)
     task = reporter(tmp_path, backend_url)
@@ -327,64 +346,97 @@ def test_saves_go_into_storage_with_their_primaries(storage):
         saved=watcher.Saver(tmp_path, task).saved,
     )
 
-    assert saved_files() == {"dose.bdo": b"dose"}
-    assert (report()["saved_primaries"], report()["task_state"]) == (500, "COMPLETED")
-    assert not (tmp_path / "yaptide_save.tar.gz").exists()
+    assert saves(tmp_path) == {"500": {"dose.bdo": b"dose"}}
+    assert merges(tmp_path) == 1
+    assert report()["task_state"] == "COMPLETED" and "saved_primaries" not in report()
+    assert set(FakeStorage.objects) == {"simulations/7/progress/task_0003.json"}
 
 
-def test_saves_are_sent_at_most_every_minute_and_tenth(storage, monkeypatch):
-    """Saves bound the transfer: one a minute at most, and each covering more primaries"""
+def test_saves_are_kept_at_most_every_minute_and_tenth_the_latest_two(storage, monkeypatch):
+    """One save a minute at most, each covering more primaries; the two latest are kept (a merge may still read the
+    older one)
+    """
     tmp_path, backend_url = storage
     task = saver(tmp_path, backend_url, 100)
     task.saved()
     task.reporter.state["simulated_primaries"] = 300
     task.saved()
-    assert task.reporter.state["saved_primaries"] == 100  # within the minute
+    assert list(saves(tmp_path)) == ["100"]  # within the minute
 
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
     task.reporter.state["simulated_primaries"] = 120
     task.saved()
-    assert task.reporter.state["saved_primaries"] == 100  # too few new primaries
-    task.reporter.state["simulated_primaries"] = 300
-    task.saved()
-    assert task.reporter.state["saved_primaries"] == 300
+    assert list(saves(tmp_path)) == ["100"]  # too few new primaries
+    for primaries in (300, 500):
+        task.reporter.state["simulated_primaries"] = primaries
+        task.saved()
+    assert list(saves(tmp_path)) == ["300", "500"]
 
 
-def test_failed_save_does_not_stop_the_task(storage, monkeypatch):
-    """Storage down, a save too large or one rewritten while packed: nothing is reported, the next save tries"""
+def test_a_save_rewritten_while_copied_is_skipped(storage, monkeypatch):
+    """The simulator's next save began while this one was copied: no save kept, no merge, the next save tries"""
     tmp_path, backend_url = storage
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
     task = saver(tmp_path, backend_url, 100)
-    FakeStorage.down_for = 1
-    task.saved()
-    assert "saved_primaries" not in task.reporter.state and SAVE not in FakeStorage.objects
-
-    task.reporter.links["saves"]["max_bytes"] = 10
-    task.saved()
-    assert SAVE not in FakeStorage.objects
-
-    task.reporter.links["saves"]["max_bytes"] = 10**6
-    add = tarfile.TarFile.add
+    copy = shutil.copyfile
     monkeypatch.setattr(
-        tarfile.TarFile, "add", lambda tar, name, **kwargs: (add(tar, name, **kwargs), Path(name).write_bytes(b"next"))
+        watcher.shutil, "copyfile", lambda source, target: (copy(source, target), Path(source).write_bytes(b"next"))
     )
     task.saved()
-    assert SAVE not in FakeStorage.objects
-    monkeypatch.setattr(tarfile.TarFile, "add", add)
+    assert saves(tmp_path) == {} and merges(tmp_path) == 0
+    monkeypatch.setattr(watcher.shutil, "copyfile", copy)
 
     task.saved()
-    assert saved_files() == {"dose.bdo": b"next"} and task.reporter.state["saved_primaries"] == 100
-    assert not (tmp_path / "yaptide_save.tar.gz").exists()
+    assert saves(tmp_path) == {"100": {"dose.bdo": b"next"}} and merges(tmp_path) == 1
 
 
-def test_expired_save_link_is_renewed(storage):
-    """A save refused for an expired link goes again with new links"""
+def test_one_partial_merge_at_a_time_and_not_too_often(storage, monkeypatch):
+    """A merge holding the lock (another task's) is not joined, one left by a killed merge is taken over; after a
+    merge the next waits PARTIAL_SECONDS
+    """
     tmp_path, backend_url = storage
-    FakeStorage.expired_once = True
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task = saver(tmp_path, backend_url, 100)
+    (tmp_path / "partial.lock").mkdir()
+    task.saved()
+    assert list(saves(tmp_path)) == ["100"] and not (tmp_path / "merges").exists()
 
-    saver(tmp_path, backend_url, 100).saved()
+    old = time.time() - watcher.PARTIAL_LOCK_SECONDS - 1
+    os.utime(tmp_path / "partial.lock", (old, old))
+    task.reporter.state["simulated_primaries"] = 200
+    task.saved()
+    assert merges(tmp_path) == 1
 
-    assert FakeStorage.renewals == 1 and saved_files() == {"dose.bdo": b"dose"}
+    task.reporter.state["simulated_primaries"] = 300
+    task.saved()
+    assert merges(tmp_path) == 1  # within PARTIAL_SECONDS
+    monkeypatch.setattr(watcher, "PARTIAL_SECONDS", 0)
+    task.reporter.state["simulated_primaries"] = 400
+    task.saved()
+    assert merges(tmp_path) == 2
+
+
+def test_a_partial_merge_stops_with_its_task(storage):
+    """The final results come next: a merge still running when the task ends is stopped and frees the lock"""
+    tmp_path, backend_url = storage
+    task = saver(tmp_path, backend_url, 100, script="sleep 30\n")
+    task.saved()
+    assert task.merge.poll() is None and (tmp_path / "partial.lock").is_dir()
+
+    task.stop_merge()
+
+    assert task.merge.poll() is not None and not (tmp_path / "partial.lock").exists()
+
+
+def test_no_saves_kept_for_jobs_without_the_partial_script(storage):
+    """Jobs submitted before the cluster merged partial results have no partial script: nothing is kept"""
+    tmp_path, backend_url = storage
+    task = saver(tmp_path, backend_url, 100)
+    (tmp_path / "partial_script.sh").unlink()
+
+    task.saved()
+
+    assert saves(tmp_path) == {}
 
 
 def started_task(work_dir: Path, own_group: bool = True) -> subprocess.Popen:

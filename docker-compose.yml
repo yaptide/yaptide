@@ -66,6 +66,8 @@ services:
       - RESULTS_S3_ENDPOINT=http://garage:3900
       - RESULTS_S3_ACCESS_KEY=${RESULTS_S3_ACCESS_KEY:-}
       - RESULTS_S3_SECRET_KEY=${RESULTS_S3_SECRET_KEY:-}
+      # true: pages stored as Zarr go to the UI as JSON, for a UI that does not read Zarr yet
+      - RESULTS_SERVE_JSON=${RESULTS_SERVE_JSON:-false}
     depends_on:
       postgresql:
         condition: service_healthy

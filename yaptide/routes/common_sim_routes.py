@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import datetime, timezone
 from typing import List
 
@@ -24,6 +25,7 @@ from yaptide.persistence.db_methods import (
     make_commit_to_db,
     update_simulation_state,
 )
+from yaptide.batch import result_format
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
@@ -117,13 +119,36 @@ class JobsResource(Resource):
 JOB_REPORTED_STATES = (EntityState.MERGING_RUNNING.value, EntityState.FAILED.value)
 
 
+def serve_json() -> bool:
+    """Whether pages in ZARR_FORMAT go to the UI as JSON pages (RESULTS_SERVE_JSON)"""
+    return os.environ.get("RESULTS_SERVE_JSON", "").lower() in ("1", "true", "yes")
+
+
 def page_content(page: PageModel) -> dict:
-    """A page as the UI gets it: the page itself, or a signed link to it in object storage"""
-    if page.stored_object:
+    """A page as the UI gets it: the page itself, or signed links to it in object storage
+
+    A page in ZARR_FORMAT comes with a link for each of its objects ("files": zarr.json and the shard c/0); "url" is
+    the link of its zarr.json. With RESULTS_SERVE_JSON set it comes as the JSON page instead, read and converted here:
+    a bridge for a UI that does not read ZARR_FORMAT yet, at the cost of the old JSON on every read.
+    """
+    stored = page.stored_object
+    if stored and stored.format == result_storage.ZARR_FORMAT and serve_json():
+        return result_format.json_page(*result_format.read_page(result_storage.get_page_files(stored.key)))
+    if stored and stored.format == result_storage.ZARR_FORMAT:
+        files = result_storage.page_file_urls(stored.key)
         return {
             "page_number": page.page_number,
-            "url": result_storage.page_url(page.stored_object.key),
-            "format": page.stored_object.format,
+            "name": page.page_name,
+            "dimensions": page.page_dimension,
+            "format": stored.format,
+            "url": files[result_format.METADATA_FILE],
+            "files": files,
+        }
+    if stored:
+        return {
+            "page_number": page.page_number,
+            "url": result_storage.page_url(stored.key),
+            "format": stored.format,
         }
     return page.data
 
@@ -172,14 +197,35 @@ def get_all_estimators(sim_id: int):
     )
 
 
+def stored_page(page_dict: dict) -> dict:
+    """The page in object storage a page entry points at: key, size and format"""
+    return {"format": result_storage.PAGE_FORMAT, **page_dict["stored"]}
+
+
+def store_json_page(sim_id: int, estimator: EstimatorModel, page_dict: dict, revision: str) -> PageObjectModel:
+    """Stores a page that came with its values (POST /results of a job submitted before the clusters merged into
+    pages themselves) in ZARR_FORMAT
+    """
+    data = dict(page_dict["data"])
+    values = data.pop("values")
+    prefix = result_storage.page_prefix(
+        sim_id, estimator.file_name, int(page_dict["metadata"]["page_number"]), revision
+    )
+    size = result_storage.put_page_files(prefix, result_format.page_files(dict(page_dict, data=data), values))
+    return PageObjectModel(key=prefix, size=size, format=result_storage.ZARR_FORMAT)
+
+
 def prepare_create_or_update_pages_in_db(
-    sim_id: int, estimator: EstimatorModel, estimator_dict: dict, use_storage: bool
+    sim_id: int, estimator: EstimatorModel, estimator_dict: dict, use_storage: bool, superseded: list[str]
 ) -> bool:
     """Prepares page objects for insertion or update without committing to the database.
 
-    Pages go to object storage while it accepts them and to the database otherwise, so an outage of the storage
-    does not lose the results; returns whether the storage is still used for the next pages.
+    A page comes stored already (a merge put it into storage) or with its values: those go to object storage while
+    it accepts them and to the database otherwise, so an outage of the storage does not lose the results. The keys of
+    stored pages replaced go to superseded, to be removed once the new ones are committed. Returns whether the storage
+    is still used for the next pages.
     """
+    revision = result_storage.new_revision()
     for page_dict in estimator_dict["pages"]:
         page = fetch_page_by_est_id_and_page_number(
             est_id=estimator.id, page_number=int(page_dict["metadata"]["page_number"])
@@ -192,26 +238,26 @@ def prepare_create_or_update_pages_in_db(
                 page_dimension=int(page_dict["dimensions"]),
                 page_name=str(page_dict["metadata"]["name"]),
             )
+        old_key = page.stored_object.key if page.stored_object else None
         # we always update the data
         if "stored" in page_dict:
-            # uploaded straight to storage by a cluster job and checked there (yaptide/routes/results_upload_routes.py)
+            # merged into storage by the engine, or uploaded straight to it by a cluster job and checked there
+            # (yaptide/routes/results_upload_routes.py)
             page.compressed_data = None
-            page.stored_object = PageObjectModel(
-                key=page_dict["stored"]["key"], size=page_dict["stored"]["size"], format=result_storage.PAGE_FORMAT
-            )
+            page.stored_object = PageObjectModel(**stored_page(page_dict))
         else:
             if use_storage:
-                key = result_storage.page_key(sim_id, estimator.file_name, page.page_number)
                 try:
-                    size = result_storage.put_page(key, page_dict)
+                    page.stored_object = store_json_page(sim_id, estimator, page_dict, revision)
                     page.compressed_data = None
-                    page.stored_object = PageObjectModel(key=key, size=size, format=result_storage.PAGE_FORMAT)
                 except Exception:  # skipcq: PYL-W0703
                     logging.exception("Storing results of simulation %d failed, the rest goes to the database", sim_id)
                     use_storage = False
             if not use_storage:
                 page.data = page_dict
                 page.stored_object = None
+        if old_key and old_key != (page.stored_object.key if page.stored_object else None):
+            superseded.append(old_key)
         if not page_existed:
             # if page was created, we add it to the session
             add_object_to_db(page, make_commit=False)
@@ -258,8 +304,9 @@ def editor_outputs_by_file(simulation: SimulationModel) -> dict[str, dict]:
         return {}
 
 
-def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[dict]) -> None:
-    """Prepares the estimators and their pages in place of the stored ones, without committing.
+def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[dict], superseded: list[str]) -> None:
+    """Prepares the estimators and their pages in place of the stored ones, without committing; the keys of the
+    stored pages they replace go to superseded.
 
     An estimator is its result file: the editor output writing it gives the name, and the estimator stored for the
     same file before (partial results, named with or without the trailing underscore) is updated.
@@ -291,24 +338,45 @@ def prepare_estimators_and_pages(simulation: SimulationModel, estimators: list[d
         # the id for the pages
         db.session.flush()
         use_storage = prepare_create_or_update_pages_in_db(
-            sim_id=simulation.id, estimator=estimator, estimator_dict=estimator_dict, use_storage=use_storage
+            sim_id=simulation.id,
+            estimator=estimator,
+            estimator_dict=estimator_dict,
+            use_storage=use_storage,
+            superseded=superseded,
         )
 
 
-def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
-    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile"""
+def stored_pages(estimators: list[dict]) -> list[str]:
+    """Keys of the pages already in storage among the estimators' pages"""
+    return [page["stored"]["key"] for estimator in estimators for page in estimator["pages"] if "stored" in page]
+
+
+def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
+    """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile; whether
+    they were stored (pages already in storage that were not are removed)
+    """
     lock_results(simulation)
     if simulation.job_state in FINAL_STATES:
         logging.info("Simulation %d is %s, its results are not stored", simulation.id, simulation.job_state)
-        return
-    prepare_estimators_and_pages(simulation, estimators)
+        db.session.commit()
+        result_storage.delete_pages(stored_pages(estimators))
+        return False
+    superseded = []
+    prepare_estimators_and_pages(simulation, estimators, superseded)
     if simulation.partial_primaries is not None:
-        # the partial results of an HPC simulation are merged on the server, which names the estimators of input
-        # files a little differently from the cluster's convertmc ("dose" and "dose_"): theirs go with them
-        db.session.query(EstimatorModel).filter(
-            EstimatorModel.simulation_id == simulation.id,
-            EstimatorModel.file_name.notin_([estimator["name"] for estimator in estimators]),
-        ).delete(synchronize_session=False)
+        # partial results of estimators the final ones lack (a result file named differently by the cluster's
+        # convertmc, "dose" and "dose_", when it merged without results_merger.py) go with them
+        others = (
+            db.session.query(EstimatorModel)
+            .filter(
+                EstimatorModel.simulation_id == simulation.id,
+                EstimatorModel.file_name.notin_([estimator["name"] for estimator in estimators]),
+            )
+            .all()
+        )
+        superseded.extend(page.stored_object.key for other in others for page in other.pages if page.stored_object)
+        for other in others:
+            db.session.delete(other)
     # the stored results are the final ones now
     simulation.partial_primaries = None
     simulation.partial_time = None
@@ -317,19 +385,26 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> None:
 
     update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     update_simulation_state(simulation=simulation, update_dict=update_dict)
+    result_storage.delete_pages(superseded)
+    return True
 
 
 def store_partial_results(simulation: SimulationModel, estimators: list[dict], primaries: int) -> bool:
     """Stores the results of a running simulation so far in place of the previous ones; the final results replace
-    them. Returns whether they were stored, i.e. the simulation still runs.
+    them. Returns whether they were stored, i.e. the simulation still runs (pages already in storage that were not
+    are removed).
     """
     lock_results(simulation)
     if simulation.job_state != EntityState.RUNNING.value:
+        db.session.commit()
+        result_storage.delete_pages(stored_pages(estimators))
         return False
-    prepare_estimators_and_pages(simulation, estimators)
+    superseded = []
+    prepare_estimators_and_pages(simulation, estimators, superseded)
     simulation.partial_primaries = primaries
     simulation.partial_time = datetime.now(timezone.utc)
     make_commit_to_db()
+    result_storage.delete_pages(superseded)
     return True
 
 

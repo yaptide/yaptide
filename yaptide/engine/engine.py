@@ -23,7 +23,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 
 import ray
 from botocore.exceptions import BotoCoreError, ClientError
@@ -44,7 +44,6 @@ from yaptide.persistence.db_methods import (
     DATABASE_FAILURES,
     add_object_to_db,
     bulk_update_task_states,
-    fetch_task_summary,
     update_reported_tasks,
     update_simulation_state,
 )
@@ -112,8 +111,7 @@ def clean_report(update: dict) -> dict:
 
 
 def read_report(simulation_id: int, key: str) -> Optional[dict]:
-    """A task's report as a task update: the task comes from the object's name, only valid fields count;
-    the primaries of the task's latest save in storage come as saved_primaries
+    """A task's report as a task update: the task comes from the object's name, only valid fields count
 
     A report that cannot be used gives None; storage out of reach is raised and ends the round.
     """
@@ -125,21 +123,18 @@ def read_report(simulation_id: int, key: str) -> Optional[dict]:
         if not isinstance(report, dict) or not isinstance(report.get("update"), dict):
             raise ValueError("not a report")
         update = {"task_id": int(match.group(1)), "update_dict": clean_report(report["update"])}
-        saved = report["update"].get("saved_primaries")
     except (BotoCoreError, ClientError, OSError):
         raise
     # anything the job wrote, also JSON too deep to parse (RecursionError)
     except Exception:  # skipcq: PYL-W0703
         logging.warning("Unreadable progress report %s", key)
         return None
-    if type(saved) is int and 0 <= saved <= MAX_REPORTED_NUMBER:
-        update["saved_primaries"] = saved
-    return update if update["update_dict"] or "saved_primaries" in update else None
+    return update if update["update_dict"] else None
 
 
-def read_reports(etags: dict[int, dict[str, str]]) -> dict[int, tuple[dict[str, str], dict[int, int]]]:
+def read_reports(etags: dict[int, dict[str, str]]) -> dict[int, dict[str, str]]:
     """Saves what the tasks of HPC simulations (simulation id -> ETags of the reports as last read) put into storage
-    since; for each simulation its reports (key -> ETag) and the primaries of its tasks' latest saves in storage
+    since; for each simulation its reports (key -> ETag)
 
     Many reports are read at once, and a simulation's updates are saved while the next ones are read: one statement
     for its tasks and one event for its streams. A report that cannot be used is skipped (and not read again until
@@ -148,7 +143,6 @@ def read_reports(etags: dict[int, dict[str, str]]) -> dict[int, tuple[dict[str, 
     # one listing at a time and none while reports are read: Garage otherwise burns several times the CPU (SQLite
     # or LMDB metadata alike) and serves no faster
     listings = {simulation_id: result_storage.progress_reports(simulation_id) for simulation_id in etags}
-    saved = {}
     pool = ThreadPoolExecutor(result_storage.REPORT_CONNECTIONS)
     # reads not started yet are dropped when one fails: the round ends at once, also with storage out of reach
     try:
@@ -161,14 +155,10 @@ def read_reports(etags: dict[int, dict[str, str]]) -> dict[int, tuple[dict[str, 
             for simulation_id, last in etags.items()
         }
         for simulation_id, futures in reads.items():
-            updates = [update for update in (future.result() for future in futures) if update]
-            saved[simulation_id] = {
-                update["task_id"]: update.pop("saved_primaries") for update in updates if "saved_primaries" in update
-            }
-            save_reports(simulation_id, [update for update in updates if update["update_dict"]])
+            save_reports(simulation_id, [update for update in (future.result() for future in futures) if update])
     finally:
         pool.shutdown(cancel_futures=True)
-    return {simulation_id: (listings[simulation_id], saved[simulation_id]) for simulation_id in etags}
+    return listings
 
 
 def save_reports(simulation_id: int, updates: list[dict]) -> None:
@@ -212,10 +202,8 @@ CANCEL_RETRY_SECONDS = 10 * 60
 GIVE_UP_SECONDS = 60
 # partial results are merged again once the saves of the tasks cover this much more of the requested primaries
 PARTIAL_GROWTH = 0.05
-# partial merges at once over all simulations: each holds every task's results in memory, next to the simulators
+# partial merges at once over all simulations, next to the simulators (an HPC simulation's are merged on its cluster)
 MAX_PARTIAL_MERGES = 2
-# an HPC simulation's partial results are merged at most this often: its saves come from many tasks
-HPC_PARTIAL_SECONDS = 60
 # besides the delete events, the engine looks this often for objects under hpc/ and work/ of simulations no longer in
 # the database: deletes made while it was not listening, removals that failed (their pages stay: storage cost only)
 ORPHAN_SWEEP_SECONDS = 3600
@@ -377,7 +365,7 @@ class HpcReader:
     """Reads and saves the progress HPC tasks put into storage, for some of the simulations of a round"""
 
     @staticmethod
-    def read(etags: dict[int, dict[str, str]]) -> dict[int, tuple[dict[str, str], dict[int, int]]]:
+    def read(etags: dict[int, dict[str, str]]) -> dict[int, dict[str, str]]:
         """read_reports with a database session of its own"""
         with backend_app().app_context():
             try:
@@ -457,19 +445,6 @@ class Running:
         return [*self.tasks, self.merge] if self.merge else list(self.tasks)
 
 
-@dataclass
-class HpcPartial:
-    """Partial results of a running HPC simulation, merged here from the saves its tasks put into storage"""
-
-    # task id -> primaries of the task's latest save in storage, as the task reported
-    saved: dict[int, int] = field(default_factory=dict)
-    partial: Optional[ray.ObjectRef] = None
-    partial_primaries: int = 0
-    merging_primaries: int = 0
-    # when the last partial merge started (time.monotonic)
-    started: float = float("-inf")
-
-
 def now() -> str:
     """Current time as the task and simulation updates carry it"""
     return datetime.utcnow().isoformat(sep=" ")
@@ -498,8 +473,6 @@ class Engine:
         self.hpc_read_at: dict[int, float] = {}
         # whether HPC simulations may have reports to read: at start, after a submit, until a read finds none
         self.hpc_active = True
-        # HPC simulations whose tasks put saves into storage
-        self.hpc_partials: dict[int, HpcPartial] = {}
         # HPC simulations being submitted and cancelled on their cluster: simulation id -> the call's ref
         self.submitting: dict[int, ray.ObjectRef] = {}
         self.cancelling: dict[int, ray.ObjectRef] = {}
@@ -597,8 +570,8 @@ class Engine:
                 self.start_guarded(simulation)
         elif event in (EntityState.CANCELED.value, "DELETED"):
             self.stop(simulation_id)
-        elif event == "PARTIAL" and (simulation_id in self.running or simulation_id in self.hpc_partials):
-            self.partial_merged(simulation_id, self.running.get(simulation_id) or self.hpc_partials[simulation_id])
+        elif event == "PARTIAL" and simulation_id in self.running:
+            self.partial_merged(simulation_id, self.running[simulation_id])
         elif event == "FINISHED" and simulation_id in self.running:
             running = self.running[simulation_id]
             ready, _ = ray.wait(running.refs(), num_returns=len(running.refs()), timeout=0)
@@ -804,7 +777,7 @@ class Engine:
             self.hpc_progress_read()
 
     def hpc_progress_read(self) -> None:
-        """Ends the round once every reader is done: keeps what was read, merges partial results when they are due
+        """Ends the round once every reader is done: keeps what was read
 
         A reader that failed, e.g. with storage out of reach, leaves its simulations to the next round, which reads
         their reports again (the unwatched ones first); it is not a reason to stop the engine.
@@ -822,67 +795,15 @@ class Engine:
             except Exception:  # skipcq: PYL-W0703
                 logging.exception("Reading HPC progress failed, trying again in %d s", HPC_PROGRESS_SECONDS)
                 continue
-            for simulation_id, (reports, saved) in read.items():
+            for simulation_id, reports in read.items():
                 self.report_etags[simulation_id] = reports
                 self.hpc_read_at[simulation_id] = self.hpc_round_started
-                if saved:
-                    self.hpc_partials.setdefault(simulation_id, HpcPartial()).saved.update(saved)
         self.hpc_reading = []
-        self.merge_hpc_partials(
-            {sim_id for sim_id, job_state, _ in self.hpc_round if job_state == EntityState.RUNNING.value}
-        )
-        self.hpc_active = bool(self.hpc_round or self.hpc_partials)
-
-    def merge_hpc_partials(self, running: set[int]) -> None:
-        """Merges the saves of running HPC simulations into partial results when they are due; removes the saves of
-        the others (left behind, e.g. by a restart, they expire)
-        """
-        for simulation_id, partial in list(self.hpc_partials.items()):
-            if simulation_id in running:
-                try:
-                    self.merge_hpc_partial(simulation_id, partial)
-                except DATABASE_FAILURES:
-                    raise
-                # partial results are skipped, e.g. with the storage out of reach; the simulation goes on
-                except Exception:  # skipcq: PYL-W0703
-                    logging.exception("Partial results of simulation %d not started", simulation_id)
-            elif partial.partial is None:
-                del self.hpc_partials[simulation_id]
-                delete_task_results.remote(simulation_id)
-
-    def merge_hpc_partial(self, simulation_id: int, partial: HpcPartial) -> None:
-        """Merges the saves of an HPC simulation's tasks into partial results, when they cover enough new primaries,
-        not more often than every HPC_PARTIAL_SECONDS and only within HPC_SAVES_MAX_BYTES
-        """
-        grown = sum(partial.saved.values()) - partial.partial_primaries
-        if partial.partial or grown <= 0 or time.monotonic() - partial.started < HPC_PARTIAL_SECONDS:
-            return
-        if grown < PARTIAL_GROWTH * fetch_task_summary(simulation_id)["requested_primaries"]:
-            return
-        if self.partial_merges() >= MAX_PARTIAL_MERGES:
-            return
-        # only the tasks' own keys, of the tasks that reported a save: the cluster may have put anything there
-        sizes = result_storage.stored_sizes(result_storage.work_prefix(simulation_id))
-        saves = {
-            result_storage.work_key(simulation_id, task_id): primaries
-            for task_id, primaries in partial.saved.items()
-            if result_storage.work_key(simulation_id, task_id) in sizes
-        }
-        partial.started = time.monotonic()
-        if not saves:
-            return
-        if sum(sizes[key] for key in saves) > result_storage.HPC_SAVES_MAX_BYTES:
-            logging.info("Saves of simulation %d are too large for partial results", simulation_id)
-            return
-        partial.merging_primaries = sum(saves.values())
-        partial.partial = partial_merge_task.remote(
-            simulation_id, sorted(saves), partial.merging_primaries, result_storage.HPC_SAVES_MAX_BYTES
-        )
-        self.watch(partial.partial, simulation_id, "PARTIAL")
+        self.hpc_active = bool(self.hpc_round)
 
     def partial_merges(self) -> int:
-        """Partial merges running, of direct and HPC simulations"""
-        return sum(1 for merged in [*self.running.values(), *self.hpc_partials.values()] if merged.partial)
+        """Partial merges running"""
+        return sum(1 for running in self.running.values() if running.partial)
 
     def submit(self, simulation_id: int) -> None:
         """Hands a stored HPC simulation to the cluster gateway, once at a time; not while its cluster's SLURM does
@@ -969,8 +890,7 @@ class Engine:
         for simulation in lost:
             logging.warning("Simulation %d was running when the engine stopped, marking it failed", simulation.id)
             self.fail(simulation.id)
-            # what its lost tasks stored is of no use (the saves of running HPC simulations under the same prefix are
-            # kept); objects of others left behind expire
+            # what its lost tasks stored is of no use; objects of others left behind expire
             try:
                 result_storage.delete_objects(result_storage.work_prefix(simulation.id))
             except Exception:  # skipcq: PYL-W0703
@@ -1063,7 +983,7 @@ class Engine:
         self.watch(running.partial, simulation_id, "PARTIAL")
 
     @staticmethod
-    def partial_merged(simulation_id: int, running: Union[Running, HpcPartial]) -> None:
+    def partial_merged(simulation_id: int, running: Running) -> None:
         """Partial results that could not be merged are skipped, the simulation goes on; the next ones are due
         from the last stored ones
         """

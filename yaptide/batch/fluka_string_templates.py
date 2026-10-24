@@ -66,6 +66,8 @@ fi
 INPUT_WILDCARD="$ROOT_DIR/workspaces/task_*/*_fort.*"
 OUTPUT_DIRECTORY=$ROOT_DIR/output
 
+# a collect job after a failed inline one starts afresh
+rm -rf $OUTPUT_DIRECTORY
 mkdir -p $OUTPUT_DIRECTORY
 
 cd $OUTPUT_DIRECTORY
@@ -73,8 +75,19 @@ cd $OUTPUT_DIRECTORY
 python3 $ROOT_DIR/simulation_data_sender.py --sim_id={sim_id} --update_key={update_key} \\
       --backend_url={backend_url} --simulation_state=MERGING_RUNNING
 
-module load pymchelper
-if ! convertmc json --many "$INPUT_WILDCARD" || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
+{find_merge_python}
+# the tasks' results merged into result pages, one estimator and one file at a time; without a Python that has
+# pymchelper, convertmc merges them into JSON, which the uploader turns into pages
+merge_results() {{
+    if [ -n "$MERGE_PYTHON" ] ; then
+        $MERGE_PYTHON $ROOT_DIR/results_merger.py --output_dir=$OUTPUT_DIRECTORY "$INPUT_WILDCARD"
+    else
+        echo "No Python with pymchelper and numpy, merging with convertmc" >&2
+        convertmc json --many "$INPUT_WILDCARD"
+    fi
+}}
+
+if ! merge_results || [ -z "$(ls $OUTPUT_DIRECTORY/*.json 2>/dev/null)" ] ; then
     # nothing to merge (every task failed) or unreadable task outputs - without this the job would end as completed
     # with empty results; task outputs are kept for a manual look. A failure inline may be the task's memory limit,
     # this job tries again and reports it
@@ -91,7 +104,7 @@ UPLOAD_ATTEMPTS=12
 if [ "$1" = inline ] ; then
     UPLOAD_ATTEMPTS=3
 fi
-python3 $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY --attempts=$UPLOAD_ATTEMPTS \\
+${{MERGE_PYTHON:-python3}} $ROOT_DIR/results_uploader.py --output_dir=$OUTPUT_DIRECTORY --attempts=$UPLOAD_ATTEMPTS \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url} || exit 1
 touch $ROOT_DIR/collected
 

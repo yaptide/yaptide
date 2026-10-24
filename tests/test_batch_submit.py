@@ -22,7 +22,13 @@ from paramiko import AuthenticationException, SSHException
 from yaptide.application import create_app
 from yaptide.batch import batch_methods
 from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA_BASH
-from yaptide.batch.shieldhit_string_templates import ARRAY_SHIELDHIT_BASH, COLLECT_SHIELDHIT_BASH, SUBMIT_SHIELDHIT
+from yaptide.batch.shieldhit_string_templates import (
+    ARRAY_SHIELDHIT_BASH,
+    COLLECT_SHIELDHIT_BASH,
+    FIND_MERGE_PYTHON,
+    PARTIAL_SHIELDHIT_BASH,
+    SUBMIT_SHIELDHIT,
+)
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
@@ -49,11 +55,7 @@ def client(monkeypatch):
     monkeypatch.setattr(
         batch_methods.result_storage,
         "job_links",
-        lambda sim_id, saving_tasks=0: {
-            "progress": {"url": "https://s3.test", "fields": {}, "prefix": f"{sim_id}/"},
-            "cancel": "x",
-            "saves": {"urls": {str(task): f"https://s3.test/{task}" for task in range(1, saving_tasks + 1)}},
-        },
+        lambda sim_id: {"progress": {"url": "https://s3.test", "fields": {}, "prefix": f"{sim_id}/"}, "cancel": "x"},
     )
     app = create_app()
     with app.app_context():
@@ -567,8 +569,8 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
 
 
 def test_shieldhit_tasks_on_the_cluster_save_along_the_way(client, cluster_connection, monkeypatch):
-    """The cluster's copy of the input saves every tenth of a task, and each task gets a link for its saves; the
-    stored input stays the user's
+    """The cluster's copy of the input saves every tenth of a task, and the partial script merging the saves is
+    put next to it; the stored input stays the user's
     """
     uploaded = {}
     monkeypatch.setattr(batch_methods, "upload_inputs", lambda con, job_dir, files: uploaded.update(files))
@@ -577,7 +579,9 @@ def test_shieldhit_tasks_on_the_cluster_save_along_the_way(client, cluster_conne
 
     assert uploaded["beam.dat"].startswith("NSTAT 50    5\n")
     put = {call.args[1].rsplit("/", 1)[-1]: call.args[0] for call in cluster_connection.put.call_args_list}
-    assert set(json.loads(put["storage_links.json"].getvalue())["saves"]["urls"]) == {"1", "2"}
+    # the saves stay on the cluster, whose partial script merges them
+    assert "saves" not in json.loads(put["storage_links.json"].getvalue())
+    assert "partial_script.sh" in put
     assert stored(simulation.id).inputs[0].data["input_files"]["beam.dat"] == "NSTAT 50 0\n"
 
 
@@ -661,6 +665,7 @@ def render(template: str, root_dir) -> str:
         update_key="key",
         backend_url="https://yaptide.test",
         remove_output_from_workspace="true",
+        find_merge_python=FIND_MERGE_PYTHON,
     )
 
 
@@ -692,10 +697,21 @@ def test_the_last_array_task_collects_once(tmp_path, array_template):
         assert (root / "collect.lock").is_dir()
 
 
+# python3 standing in for the cluster's: with pymchelper, its results_merger.py writes the manifest once the file
+# $HOME/merges exists; without, only convertmc merges (then once $HOME/merges exists)
+MERGING_PYTHON = (
+    '[ "$1" = -c ] && exit 0; [ "${{1##*/}}" = results_merger.py ] && {{ [ -f "$HOME/merges" ] && touch results.json; '
+    'exit $?; }}; echo "$@" >> {reports}'
+)
+PLAIN_PYTHON = '[ "$1" = -c ] && exit 1; echo "$@" >> {reports}'
+
+
+@pytest.mark.parametrize("python", [MERGING_PYTHON, PLAIN_PYTHON], ids=["merger", "convertmc"])
 @pytest.mark.parametrize("collect_template", [COLLECT_SHIELDHIT_BASH, COLLECT_FLUKA_BASH], ids=["shieldhit", "fluka"])
-def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, collect_template):
+def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, collect_template, python):
     """A failed inline collect reports nothing final and keeps the task outputs; the collect job then tries
-    again (whatever the lock) and reports the failure; after a successful one it just ends
+    again (whatever the lock) and reports the failure; after a successful one it just ends. The merge is
+    results_merger.py's with a Python that has pymchelper, convertmc's without
     """
     (tmp_path / "workspaces" / "task_0001").mkdir(parents=True)
     task_output = tmp_path / "workspaces" / "task_0001" / "a.bdo_fort.1"
@@ -706,7 +722,7 @@ def test_the_collect_job_collects_only_what_the_last_task_did_not(tmp_path, coll
     reports = tmp_path / "reports"
     env = stub_commands(
         tmp_path / "bin",
-        python3=f'echo "$@" >> {reports}',
+        python3=python.format(reports=reports),
         module="true",
         convertmc='[ -f "$HOME/merges" ] && touch out.json',
     )

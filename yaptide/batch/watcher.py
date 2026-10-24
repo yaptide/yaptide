@@ -2,9 +2,10 @@
 
 Runs next to the simulator on the compute node, with the standard library only. The task's state goes into one
 small object of its own, at most every few seconds and at once when the state changes; the backend's engine reads
-these objects. The result files SHIELD-HIT12A saves along the way go into storage too, for the engine to merge into
-partial results. A cancel is an object the backend puts into storage: the watcher checks for it and kills the
-simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
+these objects. The result files SHIELD-HIT12A saves along the way are copied aside on the cluster (the task's saves
+directory), and now and then a watcher starts the partial script, which merges the latest saves of all tasks and
+uploads the merged pages as partial results (results_merger.py, results_uploader.py). A cancel is an object the backend
+puts into storage: the watcher checks for it and kills the simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
 the watcher asks the backend for new ones.
 """
 
@@ -13,9 +14,10 @@ import json
 import logging
 import os
 import re
+import shutil
 import signal
 import ssl
-import tarfile
+import subprocess
 import time
 import uuid
 from datetime import datetime
@@ -48,10 +50,20 @@ RENEW_INTERVAL_SECONDS = 600
 # the final state is retried for about two minutes, longer than a restart of the storage
 FINAL_ATTEMPTS = 6
 FINAL_RETRY_SECONDS = 20
-# a save goes into storage at most this often, and once it covers this much more of the task's primaries (half the
+# a save is copied aside at most this often, and once it covers this much more of the task's primaries (half the
 # step of saving the backend sets, which a save may miss by a few primaries): at most twenty per task
 SAVE_SECONDS = 60
 SAVE_GROWTH = 0.05
+# saves kept of each task: the latest, and the one before for a partial merge still reading it
+KEPT_SAVES = 2
+# the script merging the latest saves of all tasks into partial results, next to the links file; one runs at a time
+# (it holds the lock directory), at most this often for the simulation
+PARTIAL_SCRIPT = "partial_script.sh"
+PARTIAL_LOCK = "partial.lock"
+PARTIAL_STAMP = "partial.stamp"
+PARTIAL_SECONDS = 120
+# a lock older than this was left by a partial merge that was killed (its task ended)
+PARTIAL_LOCK_SECONDS = 3600
 
 
 def log_generator(
@@ -279,86 +291,120 @@ class Reporter:
             return 0
 
 
-def pack(work_dir: Path, archive: Path) -> bool:
-    """Packs the simulator's result files into the archive; False when there are none, or when the simulator began
+def copy_save(work_dir: Path, target: Path) -> bool:
+    """Copies the simulator's result files into target; False when there are none, or when the simulator began
     rewriting one meanwhile (its next save)
     """
     files = sorted(work_dir.glob("*.bdo"))
     before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
-    # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
-    try:
-        with tarfile.open(str(archive), "w:gz", compresslevel=1) as tar:
-            for path in files:
-                tar.add(str(path), arcname=path.name)
-    except OSError:
-        # a file the simulator truncated while it was read
-        return False
+    target.mkdir(parents=True)
+    for path in files:
+        shutil.copyfile(str(path), str(target / path.name))
     return bool(files) and before == [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
 
 
 class Saver:
-    """Puts the simulator's result files into storage after it saved them, for the partial results"""
+    """Copies the simulator's result files aside after it saved them, and starts merges of the latest saves of all
+    tasks into partial results
+    """
 
-    def __init__(self, work_dir: Path, reporter: Reporter):
-        """work_dir: where the simulator writes its result files; reporter: the task's, with the links and state"""
+    def __init__(self, work_dir: Path, reporter: Reporter, root_dir: Optional[Path] = None):
+        """work_dir: where the simulator writes its result files; reporter: the task's, with its state; root_dir: the
+        simulation's directory, with the partial script (the links file's)
+        """
         self.work_dir = work_dir
         self.reporter = reporter
+        self.root_dir = root_dir if root_dir is not None else reporter.links_path.parent
         self.last_time = float("-inf")
         self.last_primaries = 0
+        # the partial merge this watcher started
+        self.merge: Optional[subprocess.Popen] = None
 
     def saved(self) -> None:
-        """The simulator wrote all its result files: put into storage when due, and its primaries reported; a
-        failure loses only this save
+        """The simulator wrote all its result files: copied aside when due, then a partial merge when due; a failure
+        loses only this save
         """
         simulated = self.reporter.state.get("simulated_primaries", 0)
         requested = self.reporter.state.get("requested_primaries", 0)
-        # the last save, at the end, is collected with the others; jobs submitted before saves went to storage have
-        # no links for them
+        # the last save, at the end, is collected with the others; jobs submitted before the partial script have none
         if not 0 < simulated < requested or time.monotonic() - self.last_time < SAVE_SECONDS:
             return
-        if "saves" not in self.reporter.links:
+        if not (self.root_dir / PARTIAL_SCRIPT).exists():
             return
         if simulated - self.last_primaries < SAVE_GROWTH * requested:
             return
         self.last_time = time.monotonic()
         try:
-            sent = self.send()
+            kept = self.keep(simulated)
         except Exception as err:  # skipcq: PYL-W0703
-            logging.warning("Sending the save at %d primaries failed: %s", simulated, err)
+            logging.warning("Keeping the save at %d primaries failed: %s", simulated, err)
             return
-        if sent:
+        if kept:
             self.last_primaries = simulated
-            self.reporter.update({"saved_primaries": simulated})
+            self.start_merge()
 
-    def send(self) -> bool:
-        """Packs the result files and puts them into the task's object; whether they are there"""
-        archive = self.work_dir / "yaptide_save.tar.gz"
+    def keep(self, primaries: int) -> bool:
+        """Copies the result files into the task's saves, named by their primaries, and removes all but the latest
+        KEPT_SAVES; whether the save is there whole (a merge takes only whole ones, a directory named by a number)
+        """
+        saves = self.work_dir / "saves"
+        partial = saves / f".{primaries}"
+        shutil.rmtree(str(partial), ignore_errors=True)
+        if not copy_save(self.work_dir, partial):
+            logging.info("Save skipped: no result files, or the next save began")
+            shutil.rmtree(str(partial), ignore_errors=True)
+            return False
+        partial.rename(saves / str(primaries))
+        whole = sorted((path for path in saves.iterdir() if path.name.isdigit()), key=lambda path: int(path.name))
+        for old in whole[:-KEPT_SAVES]:
+            shutil.rmtree(str(old), ignore_errors=True)
+        return True
+
+    def start_merge(self) -> None:
+        """Starts the partial script unless a merge runs (this watcher's or another's, holding the lock) or one
+        started within PARTIAL_SECONDS
+        """
+        if self.merge is not None and self.merge.poll() is None:
+            return
+        self.merge = None
+        stamp, lock = self.root_dir / PARTIAL_STAMP, self.root_dir / PARTIAL_LOCK
         try:
-            if not pack(self.work_dir, archive):
-                logging.info("Save skipped: no result files, or the next save began")
-                return False
-            size = archive.stat().st_size
-            if size > self.reporter.links.get("saves", {}).get("max_bytes", 0):
-                logging.info("Save of %d bytes is too large for partial results", size)
-                return False
-            self.reporter.renew_links_if_expiring()
-            status = self.put(archive, size)
-            # 400 or 403: an expired or otherwise refused link - new links, then one more try
-            if status in (400, 403) and self.reporter.renew_links():
-                status = self.put(archive, size)
-            return status in (200, 201, 204)
+            if time.time() - stamp.stat().st_mtime < PARTIAL_SECONDS:
+                return
+        except FileNotFoundError:
+            pass
+        try:
+            lock.mkdir()
+        except FileExistsError:
+            try:
+                if time.time() - lock.stat().st_mtime < PARTIAL_LOCK_SECONDS:
+                    return
+                lock.rmdir()
+                lock.mkdir()
+            except OSError:
+                # another watcher took it meanwhile
+                return
+        stamp.touch()
+        log = open(str(self.work_dir / "partial_merge.log"), "ab")  # skipcq: PTC-W6004
+        try:
+            self.merge = subprocess.Popen(
+                ["bash", str(self.root_dir / PARTIAL_SCRIPT)], stdout=log, stderr=subprocess.STDOUT
+            )
+        except OSError as err:
+            logging.warning("The partial merge did not start: %s", err)
+            lock.rmdir()
         finally:
-            if archive.exists():
-                archive.unlink()
+            log.close()
 
-    def put(self, archive: Path, size: int) -> int:
-        """One upload of the archive, read from the file as it is sent; the status, 0 without a link"""
-        url = self.reporter.links.get("saves", {}).get("urls", {}).get(str(self.reporter.task_id))
-        if not url:
-            return 0
-        with open(str(archive), "rb") as body:  # skipcq: PTC-W6004 # the archive this watcher made
-            headers = {"Content-Length": str(size), "Content-Type": "application/gzip"}
-            return self.reporter.send(url, "PUT", body, headers)
+    def stop_merge(self) -> None:
+        """Stops the partial merge this watcher started, when the task ends: final results come next"""
+        if self.merge is not None and self.merge.poll() is None:
+            self.merge.terminate()
+            try:
+                self.merge.wait(STOP_SECONDS)
+            except subprocess.TimeoutExpired:
+                self.merge.kill()
+            shutil.rmtree(str(self.root_dir / PARTIAL_LOCK), ignore_errors=True)
 
 
 def running(pid: int, kill: Callable[[int, int], None] = os.kill) -> bool:
@@ -484,14 +530,17 @@ def main(args) -> None:
     else:
         log_path = Path(args.filepath)
         saver = Saver(log_path.parent, reporter)
-        watch(
-            lambda: log_path if log_path.exists() else None,
-            shieldhit_update,
-            args.pid,
-            reporter,
-            saved=saver.saved,
-            work_dir=log_path.parent,
-        )
+        try:
+            watch(
+                lambda: log_path if log_path.exists() else None,
+                shieldhit_update,
+                args.pid,
+                reporter,
+                saved=saver.saved,
+                work_dir=log_path.parent,
+            )
+        finally:
+            saver.stop_merge()
     reporter.report_final()
 
 
