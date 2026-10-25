@@ -92,7 +92,9 @@ cd $OUTPUT_DIRECTORY
 # pymchelper, convertmc merges them into JSON, which the uploader turns into pages
 merge_results() {{
     if [ -n "$MERGE_PYTHON" ] ; then
-        $MERGE_PYTHON $ROOT_DIR/results_merger.py --output_dir=$OUTPUT_DIRECTORY "$INPUT_WILDCARD"
+        # the merges of groups of tasks their last tasks made are merged, or the tasks' files (merge_groups.py)
+        $MERGE_PYTHON $ROOT_DIR/merge_groups.py collect --root=$ROOT_DIR --ntasks={n_tasks} \\
+            --output_dir=$OUTPUT_DIRECTORY
     else
         echo "No Python with pymchelper and numpy, merging with convertmc" >&2
         convertmc json --many "$INPUT_WILDCARD"
@@ -125,11 +127,11 @@ touch $ROOT_DIR/collected
 CLEAR_BDOS={remove_output_from_workspace}
 
 # find, as thousands of task outputs pass the argument limit of rm; a leftover file does not fail the collect. The
-# tasks' saves for partial results go too
+# tasks' saves for partial results and the merges of groups of tasks go too
 if $CLEAR_BDOS; then
     find $ROOT_DIR/workspaces -name "*.bdo" -delete || true
 fi
-rm -rf $ROOT_DIR/workspaces/task_*/saves $ROOT_DIR/partial_output || true
+rm -rf $ROOT_DIR/workspaces/task_*/saves $ROOT_DIR/partial_output $ROOT_DIR/groups || true
 """  # skipcq: FLK-E501
 
 ARRAY_SHIELDHIT_BASH: str = """#!/bin/bash
@@ -174,28 +176,33 @@ wait
 # the last task to end merges and uploads the results at once: the collect job, queued after the whole array, waits
 # minutes for a node; it collects only when this did not happen or failed
 touch $ROOT_DIR/done/task_$SLURM_ARRAY_TASK_ID
+# with many large results the tasks are merged in groups: the last task of a group to end merges the group's files
+# here, on its node, so the collect merges one file per group (merge_groups.py)
+{find_merge_python}
+if [ -n "$MERGE_PYTHON" ] ; then
+    $MERGE_PYTHON $ROOT_DIR/merge_groups.py task_end --root=$ROOT_DIR --ntasks={n_tasks} \\
+        --task=$SLURM_ARRAY_TASK_ID || echo "The merge of this task's group is left to the collect"
+fi
 if [ `ls $ROOT_DIR/done | wc -l` -eq {n_tasks} ] && mkdir $ROOT_DIR/collect.lock 2>/dev/null ; then
     bash $ROOT_DIR/collect_script.sh inline || echo "Collect left to the collect job"
 fi
 """  # skipcq: FLK-E501
 
 PARTIAL_SHIELDHIT_BASH: str = """#!/bin/bash
-# merges the latest saves of the tasks into partial results and uploads them; a task's watcher starts it, one at a time
-# (it holds partial.lock, removed at the end), while the simulation runs
+# merges the latest saves of the tasks of a group (the first argument) into partial results, while the simulation runs;
+# a task's watcher starts it holding the group's lock, partial.lock.<group>, which merge_groups.py frees. With many
+# large results it merges the group's saves, then the latest merges of all groups, and uploads them
 ROOT_DIR={root_dir}
-OUTPUT_DIRECTORY=$ROOT_DIR/partial_output
-trap 'rm -rf $OUTPUT_DIRECTORY; rmdir $ROOT_DIR/partial.lock 2>/dev/null' EXIT
+GROUP=$1
 
 {find_merge_python}
 if [ -z "$MERGE_PYTHON" ] ; then
     echo "No Python with pymchelper and numpy, no partial results" >&2
+    rm -rf $ROOT_DIR/partial.lock.$GROUP
     exit 0
 fi
 
-rm -rf $OUTPUT_DIRECTORY
-# the simulator of this task shares the core: the merge gives way to it
-nice -n 10 $MERGE_PYTHON $ROOT_DIR/results_merger.py --output_dir=$OUTPUT_DIRECTORY \\
-    --latest_saves="$ROOT_DIR/workspaces/task_*/saves" || exit 1
-$MERGE_PYTHON $ROOT_DIR/results_uploader.py --partial --output_dir=$OUTPUT_DIRECTORY --attempts=3 \\
+# the simulator of this task shares the node: the merge gives way to it
+nice -n 10 $MERGE_PYTHON $ROOT_DIR/merge_groups.py partial --root=$ROOT_DIR --ntasks={n_tasks} --group=$GROUP \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
 """  # skipcq: FLK-E501

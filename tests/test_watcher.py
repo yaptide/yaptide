@@ -246,9 +246,13 @@ def test_fluka_output_gives_progress_and_completion():
 
 
 def test_watcher_runs_with_the_standard_library_only(tmp_path):
-    """The cluster's Python has no packages of ours: the script imports nothing beyond the standard library"""
+    """The cluster's Python has no packages of ours: the script imports nothing beyond the standard library and the
+    scripts beside it (merge_groups.py), as python3 runs it there
+    """
+    script = Path(watcher.__file__)
+    code = f"import runpy, sys; sys.path.insert(0, {str(script.parent)!r}); runpy.run_path({str(script)!r})"
     result = subprocess.run(
-        [sys.executable, "-I", "-S", "-c", f"import runpy; runpy.run_path({str(Path(watcher.__file__))!r})"],
+        [sys.executable, "-I", "-S", "-c", code],
         capture_output=True,
         text=True,
         check=False,
@@ -293,7 +297,7 @@ def test_final_state_waits_for_the_storage(storage):
 
 
 # a partial script standing in for the one the submit writes: notes each run, then frees the lock as the real one does
-PARTIAL_SCRIPT = 'echo run >> "$(dirname "$0")/merges"; rmdir "$(dirname "$0")/partial.lock"\n'
+PARTIAL_SCRIPT = 'echo run >> "$(dirname "$0")/merges"; rmdir "$(dirname "$0")/partial.lock.0"\n'
 
 
 def saves(work_dir: Path) -> dict:
@@ -309,7 +313,7 @@ def saves(work_dir: Path) -> dict:
 def merges(root: Path) -> int:
     """Runs of the partial script so far, once they ended"""
     for _ in range(100):
-        if not (root / "partial.lock").exists():
+        if not (root / "partial.lock.0").exists():
             break
         time.sleep(0.05)
     return len((root / "merges").read_text().split()) if (root / "merges").exists() else 0
@@ -397,12 +401,12 @@ def test_one_partial_merge_at_a_time_and_not_too_often(storage, monkeypatch):
     tmp_path, backend_url = storage
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
     task = saver(tmp_path, backend_url, 100)
-    (tmp_path / "partial.lock").mkdir()
+    (tmp_path / "partial.lock.0").mkdir()
     task.saved()
     assert list(saves(tmp_path)) == ["100"] and not (tmp_path / "merges").exists()
 
     old = time.time() - watcher.PARTIAL_LOCK_SECONDS - 1
-    os.utime(tmp_path / "partial.lock", (old, old))
+    os.utime(tmp_path / "partial.lock.0", (old, old))
     task.reporter.state["simulated_primaries"] = 200
     task.saved()
     assert merges(tmp_path) == 1
@@ -421,11 +425,11 @@ def test_a_partial_merge_stops_with_its_task(storage):
     tmp_path, backend_url = storage
     task = saver(tmp_path, backend_url, 100, script="sleep 30\n")
     task.saved()
-    assert task.merge.poll() is None and (tmp_path / "partial.lock").is_dir()
+    assert task.merge.poll() is None and (tmp_path / "partial.lock.0").is_dir()
 
     task.stop_merge()
 
-    assert task.merge.poll() is not None and not (tmp_path / "partial.lock").exists()
+    assert task.merge.poll() is not None and not (tmp_path / "partial.lock.0").exists()
 
 
 def test_no_saves_kept_for_jobs_without_the_partial_script(storage):

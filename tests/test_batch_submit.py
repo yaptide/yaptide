@@ -697,11 +697,12 @@ def test_the_last_array_task_collects_once(tmp_path, array_template):
         assert (root / "collect.lock").is_dir()
 
 
-# python3 standing in for the cluster's: with pymchelper, its results_merger.py writes the manifest once the file
-# $HOME/merges exists; without, only convertmc merges (then once $HOME/merges exists)
+# python3 standing in for the cluster's: with pymchelper, its merge (merge_groups.py for SHIELD-HIT12A,
+# results_merger.py for FLUKA) writes the manifest once the file $HOME/merges exists; without, only convertmc merges
+# (then once $HOME/merges exists)
 MERGING_PYTHON = (
-    '[ "$1" = -c ] && exit 0; [ "${{1##*/}}" = results_merger.py ] && {{ [ -f "$HOME/merges" ] && touch results.json; '
-    'exit $?; }}; echo "$@" >> {reports}'
+    '[ "$1" = -c ] && exit 0; case "${{1##*/}}" in results_merger.py|merge_groups.py) [ -f "$HOME/merges" ] && '
+    'touch results.json; exit $? ;; esac; echo "$@" >> {reports}'
 )
 PLAIN_PYTHON = '[ "$1" = -c ] && exit 1; echo "$@" >> {reports}'
 

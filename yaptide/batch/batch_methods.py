@@ -293,7 +293,14 @@ def submit_simulation(simulation_id: int) -> Optional[bool]:  # skipcq: PY-R1000
 
 # the scripts the jobs run, put next to the inputs: the ones merging results need pymchelper, the others the standard
 # library only
-SCRIPTS = ("watcher.py", "simulation_data_sender.py", "results_uploader.py", "results_merger.py", "result_format.py")
+SCRIPTS = (
+    "watcher.py",
+    "simulation_data_sender.py",
+    "results_uploader.py",
+    "results_merger.py",
+    "result_format.py",
+    "merge_groups.py",
+)
 
 
 def upload_inputs(con: Connection, job_dir: str, files_dict: dict) -> None:
@@ -448,16 +455,24 @@ def prepare_script_files(
             sbatch_seconds=SBATCH_SECONDS,
             **common,
         ),
-        "array": templates["array"].format(array_header=array_header, n_tasks=str(payload_dict["ntasks"]), **common),
+        "array": templates["array"].format(
+            array_header=array_header,
+            n_tasks=str(payload_dict["ntasks"]),
+            find_merge_python=FIND_MERGE_PYTHON,
+            **common,
+        ),
         "collect": templates["collect"].format(
             collect_header=collect_header,
             remove_output_from_workspace="true",
             find_merge_python=FIND_MERGE_PYTHON,
+            n_tasks=str(payload_dict["ntasks"]),
             **common,
         ),
     }
     if "partial" in templates:
-        sh_files["partial"] = templates["partial"].format(find_merge_python=FIND_MERGE_PYTHON, **common)
+        sh_files["partial"] = templates["partial"].format(
+            find_merge_python=FIND_MERGE_PYTHON, n_tasks=str(payload_dict["ntasks"]), **common
+        )
     paths = {
         "submit": f"{job_dir}/yaptide_submitter.sh",
         "array": f"{job_dir}/array_script.sh",

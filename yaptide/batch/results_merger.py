@@ -18,13 +18,14 @@ import glob
 import json
 import logging
 import math
+import pickle
 import sys
 from pathlib import Path
 from typing import Callable, Iterator, List, Optional, Tuple
 
 import numpy as np
 from pymchelper.estimator import Estimator
-from pymchelper.input_output import AggregationType, fromfile, group_input_files
+from pymchelper.input_output import AggregationType, fromfile, guess_corename
 from pymchelper.page import Page
 from pymchelper.shieldhit.detector.detector_type import SHDetType
 
@@ -38,12 +39,25 @@ MANIFEST = "results.json"
 # estimator fields that are not its metadata, and page fields that are not the page's (as pymchelper's JsonWriter)
 NOT_ESTIMATOR_METADATA = {"data", "data_raw", "error", "error_raw", "counter", "pages", "x", "y", "z"}
 NOT_PAGE_METADATA = {"data_raw", "error_raw", "estimator", "diff_axis1", "diff_axis2"}
+# a group's merged estimator, pickled by merge_groups.py: named by the estimator, it merges again with task files
+MERGED_SUFFIX = ".pkl"
+
+
+def collect_garbage() -> None:
+    """Frees a merged or read estimator dropped: its pages and the estimator refer to each other, a cycle only the
+    garbage collector frees (pymchelper's fromfilelist does the same)
+    """
+    gc.collect()
 
 
 def read_estimator(file: str) -> Optional[Estimator]:
     """Reads a result file; raises ValueError when a page of a SHIELD-HIT12A file holds other than the bins its
     estimator declares (the UI gets values for every bin declared)
     """
+    if file.endswith(MERGED_SUFFIX):
+        # written by this simulation's merge_groups.py, next to this script
+        with open(file, "rb") as merged:
+            return pickle.load(merged)  # skipcq: BAN-B301
     estimator = fromfile(file)
     if estimator and file.endswith(".bdo"):
         for page in estimator.pages:
@@ -54,14 +68,16 @@ def read_estimator(file: str) -> Optional[Estimator]:
 
 
 def merge_estimator_files(files: List[str]) -> Optional[Estimator]:
-    """Merges one estimator's task files, reading one file at a time: each page aggregated by its normalisation,
-    averages weighted by primaries, as pymchelper's fromfilelist does
+    """Merges one estimator's task files (or files merged already, of groups of tasks), reading one file at a time:
+    each page aggregated by its normalisation, averages weighted by primaries, as pymchelper's fromfilelist does
 
     Mean only: pymchelper's WeightedStatsAggregator also keeps a variance of every bin, which the pages do not hold.
     """
     result = read_estimator(files[0])
     if not result:
         return None
+    # the task files merged: one for a task's, the group's for a group's
+    counter = getattr(result, "file_counter", 1) or 1
     kinds = [getattr(page, "page_normalized", AggregationType.AveragingCumulative) for page in result.pages]
     averaged = [
         kind not in (AggregationType.NoAggregation, AggregationType.Sum, AggregationType.Concatenation)
@@ -86,26 +102,41 @@ def merge_estimator_files(files: List[str]) -> Optional[Estimator]:
             elif kind == AggregationType.Concatenation:
                 page.data_raw = np.concatenate((page.data_raw, other.data_raw))
         result.number_of_primaries += estimator.number_of_primaries
-        # the file's arrays go before the next one is read: its pages and the estimator refer to each other, a cycle
-        # only the garbage collector frees (pymchelper's fromfilelist does the same)
+        counter += getattr(estimator, "file_counter", 1) or 1
+        # the file's arrays go before the next one is read
         del estimator
-        gc.collect()
+        collect_garbage()
     for page, avg in zip(result.pages, averaged):
         if avg:
             page.data_raw /= result.number_of_primaries
-    result.file_counter = len(files)
+    result.file_counter = counter
     return result
 
 
+def corename(file: str) -> str:
+    """The estimator a file holds: pymchelper's guess for task files, the name of a merged one"""
+    if file.endswith(MERGED_SUFFIX):
+        return Path(file).name[: -len(MERGED_SUFFIX)]
+    return guess_corename(file)
+
+
+def group_input_files(files: List[str]) -> dict:
+    """The files of every estimator: name -> files"""
+    grouped: dict = {}
+    for file in files:
+        grouped.setdefault(corename(file), []).append(file)
+    return grouped
+
+
 def merged_estimators(files: List[str]) -> Iterator[Tuple[str, Estimator]]:
-    """The merged estimators of the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*), by name, one at a time: the
-    next one is merged when the caller asks for it
+    """The merged estimators of the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*, merged ones of groups), by
+    name, one at a time: the next one is merged when the caller asks for it
     """
-    for corename, group in sorted(group_input_files(sorted(files)).items()):
+    for name, group in sorted(group_input_files(sorted(files)).items()):
         estimator = merge_estimator_files(group)
         if estimator:
-            estimator.file_corename = corename
-            yield corename, estimator
+            estimator.file_corename = name
+            yield name, estimator
 
 
 def estimator_metadata(estimator: Estimator) -> dict:
@@ -156,9 +187,9 @@ def write_pages(files: List[str], store: Callable[[str, int, dict, np.ndarray], 
             pages.append(store(name, number, page_dict, page_values(page)))
         estimators.append({"name": name, "metadata": estimator_metadata(estimator), "pages": pages})
         primaries = max(primaries, int(estimator.number_of_primaries))
-        # the next estimator is merged once this one is gone (a cycle, see merge_estimator_files)
+        # the next estimator is merged once this one is gone
         del estimator, page
-        gc.collect()
+        collect_garbage()
     return estimators, primaries
 
 

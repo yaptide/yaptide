@@ -141,15 +141,16 @@ def render_partial(root: Path) -> str:
         update_key="key",
         backend_url="https://yaptide.test",
         find_merge_python=FIND_MERGE_PYTHON,
+        n_tasks=4,
     )
 
 
 @pytest.mark.parametrize("has_pymchelper", [True, False])
-def test_partial_script_merges_the_latest_saves_and_frees_the_lock(tmp_path: Path, has_pymchelper: bool):
-    """The partial script merges the tasks' latest saves and uploads them as partial results, with a Python that has
-    pymchelper; without one it does nothing. Either way it frees the lock its watcher took
+def test_partial_script_merges_its_group_or_frees_the_lock(tmp_path: Path, has_pymchelper: bool):
+    """The partial script hands the group to merge_groups.py, with a Python that has pymchelper; without one it does
+    nothing but free the group's lock its watcher took
     """
-    (tmp_path / "partial.lock").mkdir()
+    (tmp_path / "partial.lock.2").mkdir()
     script = tmp_path / "partial_script.sh"
     script.write_text(render_partial(tmp_path))
     bin_dir = tmp_path / "bin"
@@ -163,17 +164,20 @@ def test_partial_script_merges_the_latest_saves_and_frees_the_lock(tmp_path: Pat
     (bin_dir / "nice").chmod(0o755)
 
     result = subprocess.run(
-        ["bash", str(script)], env={"PATH": f"{bin_dir}:/usr/bin:/bin"}, capture_output=True, text=True, check=False
+        ["bash", str(script), "2"],
+        env={"PATH": f"{bin_dir}:/usr/bin:/bin"},
+        capture_output=True,
+        text=True,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr
-    assert not (tmp_path / "partial.lock").exists()
     if has_pymchelper:
-        merge, upload = calls.read_text().splitlines()
-        assert "results_merger.py" in merge and f"--latest_saves={tmp_path}/workspaces/task_*/saves" in merge
-        assert "results_uploader.py --partial" in upload and "--sim_id=1" in upload
+        (merge,) = calls.read_text().splitlines()
+        assert "merge_groups.py partial" in merge and "--group=2" in merge and "--ntasks=4" in merge
+        assert "--sim_id=1" in merge
     else:
-        assert not calls.exists()
+        assert not calls.exists() and not (tmp_path / "partial.lock.2").exists()
 
 
 def test_uploader_reads_the_merger_manifest(tmp_path: Path):

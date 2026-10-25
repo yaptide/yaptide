@@ -3,8 +3,8 @@
 Runs next to the simulator on the compute node, with the standard library only. The task's state goes into one
 small object of its own, at most every few seconds and at once when the state changes; the backend's engine reads
 these objects. The result files SHIELD-HIT12A saves along the way are copied aside on the cluster (the task's saves
-directory), and now and then a watcher starts the partial script, which merges the latest saves of all tasks and
-uploads the merged pages as partial results (results_merger.py, results_uploader.py). A cancel is an object the backend
+directory), and now and then a watcher starts the partial script for its task's group, which merges the latest saves
+of the group, then of all tasks, and uploads the merged pages as partial results (merge_groups.py, results_uploader.py). A cancel is an object the backend
 puts into storage: the watcher checks for it and kills the simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
 the watcher asks the backend for new ones.
 """
@@ -25,6 +25,11 @@ from io import TextIOWrapper
 from pathlib import Path
 from typing import Callable, Iterator, Optional, Tuple
 from urllib import error, request
+
+try:
+    from yaptide.batch import merge_groups
+except ImportError:  # on a cluster, next to this script
+    import merge_groups
 
 RUN_MATCH = r"\bPrimary particle no.\s*\d*\s*ETR:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
 COMPLETE_MATCH = r"\bRun time:\s*\d*\s*hour.*\d*\s*minute.*\d*\s*second.*\b"
@@ -56,14 +61,13 @@ SAVE_SECONDS = 60
 SAVE_GROWTH = 0.05
 # saves kept of each task: the latest, and the one before for a partial merge still reading it
 KEPT_SAVES = 2
-# the script merging the latest saves of all tasks into partial results, next to the links file; one runs at a time
-# (it holds the lock directory), at most this often for the simulation
+# the script merging the latest saves of a group of tasks into partial results, next to the links file; one runs at a
+# time for each group (it holds the group's lock, merge_groups.py), at most this often for the group
 PARTIAL_SCRIPT = "partial_script.sh"
-PARTIAL_LOCK = "partial.lock"
-PARTIAL_STAMP = "partial.stamp"
+PARTIAL_STAMP = merge_groups.PARTIAL_STAMP
 PARTIAL_SECONDS = 120
 # a lock older than this was left by a partial merge that was killed (its task ended)
-PARTIAL_LOCK_SECONDS = 3600
+PARTIAL_LOCK_SECONDS = merge_groups.LOCK_SECONDS
 
 
 def log_generator(
@@ -308,17 +312,19 @@ class Saver:
     tasks into partial results
     """
 
-    def __init__(self, work_dir: Path, reporter: Reporter, root_dir: Optional[Path] = None):
+    def __init__(self, work_dir: Path, reporter: Reporter, root_dir: Optional[Path] = None, n_tasks: int = 1):
         """work_dir: where the simulator writes its result files; reporter: the task's, with its state; root_dir: the
-        simulation's directory, with the partial script (the links file's)
+        simulation's directory, with the partial script (the links file's); n_tasks: the simulation's tasks
         """
         self.work_dir = work_dir
         self.reporter = reporter
         self.root_dir = root_dir if root_dir is not None else reporter.links_path.parent
+        self.n_tasks = n_tasks
         self.last_time = float("-inf")
         self.last_primaries = 0
-        # the partial merge this watcher started
+        # the partial merge this watcher started, and for which group
         self.merge: Optional[subprocess.Popen] = None
+        self.group = 0
 
     def saved(self) -> None:
         """The simulator wrote all its result files: copied aside when due, then a partial merge when due; a failure
@@ -341,7 +347,10 @@ class Saver:
             return
         if kept:
             self.last_primaries = simulated
-            self.start_merge()
+            # the groups are planned from the size of a save: the same for every task
+            latest = self.work_dir / "saves" / str(simulated)
+            size = merge_groups.plan(self.root_dir, self.n_tasks, merge_groups.files_size(latest))
+            self.start_merge(merge_groups.group_of(self.reporter.task_id, size, self.n_tasks))
 
     def keep(self, primaries: int) -> bool:
         """Copies the result files into the task's saves, named by their primaries, and removes all but the latest
@@ -360,51 +369,53 @@ class Saver:
             shutil.rmtree(str(old), ignore_errors=True)
         return True
 
-    def start_merge(self) -> None:
-        """Starts the partial script unless a merge runs (this watcher's or another's, holding the lock) or one
-        started within PARTIAL_SECONDS
+    def start_merge(self, group: int = 0) -> None:
+        """Starts the partial script for the task's group unless a merge of the group runs (this watcher's or
+        another's, holding the group's lock) or one started within PARTIAL_SECONDS
         """
         if self.merge is not None and self.merge.poll() is None:
             return
         self.merge = None
-        stamp, lock = self.root_dir / PARTIAL_STAMP, self.root_dir / PARTIAL_LOCK
+        stamp, lock = self.root_dir / f"{PARTIAL_STAMP}.{group}", merge_groups.lock_path(self.root_dir, group)
         try:
             if time.time() - stamp.stat().st_mtime < PARTIAL_SECONDS:
                 return
         except FileNotFoundError:
             pass
-        try:
-            lock.mkdir()
-        except FileExistsError:
-            try:
-                if time.time() - lock.stat().st_mtime < PARTIAL_LOCK_SECONDS:
-                    return
-                lock.rmdir()
-                lock.mkdir()
-            except OSError:
-                # another watcher took it meanwhile
-                return
+        if not merge_groups.take_lock(lock, PARTIAL_LOCK_SECONDS):
+            return
         stamp.touch()
         log = open(str(self.work_dir / "partial_merge.log"), "ab")  # skipcq: PTC-W6004
         try:
+            # a process group of its own, stopped as a whole with the task (the merge runs in a child of the script)
             self.merge = subprocess.Popen(
-                ["bash", str(self.root_dir / PARTIAL_SCRIPT)], stdout=log, stderr=subprocess.STDOUT
+                ["bash", str(self.root_dir / PARTIAL_SCRIPT), str(group)],
+                stdout=log,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
             )
+            self.group = group
         except OSError as err:
             logging.warning("The partial merge did not start: %s", err)
-            lock.rmdir()
+            merge_groups.free_lock(lock)
         finally:
             log.close()
 
     def stop_merge(self) -> None:
-        """Stops the partial merge this watcher started, when the task ends: final results come next"""
+        """Stops the partial merge this watcher started, when the task ends: final results come next. The locks it
+        held are freed
+        """
         if self.merge is not None and self.merge.poll() is None:
-            self.merge.terminate()
             try:
-                self.merge.wait(STOP_SECONDS)
-            except subprocess.TimeoutExpired:
-                self.merge.kill()
-            shutil.rmtree(str(self.root_dir / PARTIAL_LOCK), ignore_errors=True)
+                os.killpg(self.merge.pid, signal.SIGTERM)
+                try:
+                    self.merge.wait(STOP_SECONDS)
+                except subprocess.TimeoutExpired:
+                    os.killpg(self.merge.pid, signal.SIGKILL)
+                    self.merge.wait()
+            except ProcessLookupError:
+                pass
+            merge_groups.free_locks(self.root_dir, self.merge.pid, self.group)
 
 
 def running(pid: int, kill: Callable[[int, int], None] = os.kill) -> bool:
@@ -529,7 +540,7 @@ def main(args) -> None:
         watch(fluka_log(Path(args.work_dir)), FlukaParser(), args.pid, reporter, work_dir=Path(args.work_dir))
     else:
         log_path = Path(args.filepath)
-        saver = Saver(log_path.parent, reporter)
+        saver = Saver(log_path.parent, reporter, n_tasks=args.ntasks)
         try:
             watch(
                 lambda: log_path if log_path.exists() else None,
