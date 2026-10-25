@@ -252,6 +252,7 @@ def merge_group_saves(root: Path, group: int, size: int, n_tasks: int) -> None:
     if target.exists():
         return
     write_merged([str(path) for save in saves for path in sorted(save.glob("*.bdo"))], target)
+    logging.info("Merged the saves of group %d: %d tasks, %s primaries", group, len(saves), target.name)
     for old in numbered_dirs(group_dir)[:-KEPT_MERGES]:
         shutil.rmtree(str(old), ignore_errors=True)
 
@@ -286,8 +287,10 @@ def merge_and_upload(root: Path, files: List[str], args) -> int:
     shutil.rmtree(str(output), ignore_errors=True)
     output.mkdir()
     try:
-        if not results_merger.write_directory(files, output)["estimators"]:
+        manifest = results_merger.write_directory(files, output)
+        if not manifest["estimators"]:
             return 1
+        logging.info("Merged %d files into partial results of %d primaries", len(files), manifest["primaries"])
         uploader = Path(__file__).resolve().parent / "results_uploader.py"
         command = [sys.executable, str(uploader), "--partial", f"--output_dir={output}", "--attempts=3"]
         command += [f"--sim_id={args.sim_id}", f"--update_key={args.update_key}", f"--backend_url={args.backend_url}"]
