@@ -636,6 +636,7 @@
             "sad": { "type": "none", "x": 0, "y": 0 },
             "divergence": { "distanceToFocal": 0, "x": 0, "y": 0 },
             "particle_PDG": 2212,
+            "energyUnit": "MeV",
             "colorHex": 16776960,
             "numberOfParticles": 10000,
             "sourceFile": { "name": "", "value": "" },
