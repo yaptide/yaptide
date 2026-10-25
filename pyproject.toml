@@ -28,7 +28,7 @@ werkzeug = "3.1.8"
 boto3 = "1.42.10"
 cryptography = "50.0.0"
 psycopg = {version = "3.2.13", extras = ["binary"]}
-yaptide-converter = { git = "https://github.com/yaptide/converter.git", rev = "69f615d0fb391984793017b7eaa0336c38fa1f4b"}
+yaptide-converter = { git = "https://github.com/yaptide/converter.git", branch = "handle-heavy-ions" }
 
 [tool.poetry.group.test.dependencies]
 pytest-flask = "1.3.0"
