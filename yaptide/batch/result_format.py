@@ -1,12 +1,13 @@
 """Result pages as Zarr v3 arrays: one array per page, its values as float32 and its metadata as attributes.
 
 Written on the backend (the merges of direct simulations) and on the clusters (the merges of HPC simulations), so it
-needs the standard library only: numpy and zstandard are used when there. A page is two objects, under one prefix:
+needs the standard library only: numpy and zstandard are used when there, gzip (zlib) otherwise. A page is two objects, under one prefix:
 
 - zarr.json: the array's metadata; its attributes hold the page as the UI knew it from the JSON pages, without the
   values (attributes.yaptide_page);
 - c/0: one shard holding every chunk of the values. Chunks of zeros only are left out (the shard's index marks them
-  empty), so sparse results take little space even without compression; with zstandard each chunk is compressed.
+  empty), so sparse results take little space even without compression; each chunk is compressed with zstd, or with
+  gzip where zstandard is missing (a cluster's Python), whose output is some 50 times smaller than the raw values.
 
 Any Zarr v3 reader opens the prefix (zarr-python, zarrita.js in the browser): one signed link per object. The values
 are flat, in the order pymchelper keeps them (Page.data_raw), as the JSON pages had them; a page of dimension 0 has one
@@ -14,6 +15,7 @@ value.
 """
 
 import base64
+import gzip
 import hashlib
 import json
 import math
@@ -44,6 +46,8 @@ ITEM_SIZE = 4
 # a chunk left out of a shard: its offset and size in the index
 EMPTY = 2**64 - 1
 ZSTD_LEVEL = 1
+# the level of gzip where zstandard is missing: level 1 is several times faster than 6 and only a little larger
+GZIP_LEVEL = 1
 BYTES_CODEC = {"name": "bytes", "configuration": {"endian": "little"}}
 
 
@@ -71,12 +75,35 @@ def chunk_items(count: int) -> int:
     return max(1, min(CHUNK_ITEMS, count))
 
 
-def metadata(page: dict, count: int, compressed: bool) -> dict:
-    """zarr.json of a page of count values"""
+class GzipCompressor:
+    """Zarr's gzip codec with the standard library, for a Python without zstandard"""
+
+    codec = {"name": "gzip", "configuration": {"level": GZIP_LEVEL}}
+
+    @staticmethod
+    def compress(chunk: bytes) -> bytes:
+        """The chunk as a gzip member; mtime 0 so the same values give the same bytes"""
+        return gzip.compress(chunk, compresslevel=GZIP_LEVEL, mtime=0)
+
+
+def compressor_and_codec(compress: bool) -> tuple:
+    """The compressor of a page's chunks and its codec in zarr.json: zstd, else gzip; (None, None) uncompressed"""
+    if not compress:
+        return None, None
+    if zstandard is not None:
+        return zstandard.ZstdCompressor(level=ZSTD_LEVEL), {
+            "name": "zstd",
+            "configuration": {"level": ZSTD_LEVEL, "checksum": False},
+        }
+    return GzipCompressor(), GzipCompressor.codec
+
+
+def metadata(page: dict, count: int, codec: Optional[dict]) -> dict:
+    """zarr.json of a page of count values, its chunks compressed with codec (none: raw)"""
     inner = chunk_items(count)
     codecs = [BYTES_CODEC]
-    if compressed:
-        codecs.append({"name": "zstd", "configuration": {"level": ZSTD_LEVEL, "checksum": False}})
+    if codec:
+        codecs.append(codec)
     return {
         "zarr_format": 3,
         "node_type": "array",
@@ -125,8 +152,8 @@ def page_files(page: dict, values: Sequence[float], compress: bool = True) -> di
     """The objects of a page: name -> bytes; page is the page as the UI reads it, without its values"""
     data = float32_bytes(values)
     count = len(data) // ITEM_SIZE
-    compressor = zstandard.ZstdCompressor(level=ZSTD_LEVEL) if compress and zstandard is not None else None
-    meta = metadata(page, count, compressor is not None)
+    compressor, codec = compressor_and_codec(compress)
+    meta = metadata(page, count, codec)
     files = {METADATA_FILE: json.dumps(meta).encode()}
     if count:
         files[SHARD_FILE] = shard(data, chunk_items(count), compressor)
@@ -146,18 +173,21 @@ def content_type(name: str) -> str:
 
 def read_page(files: dict) -> tuple:
     """A page's objects (name -> bytes) back to the page without values and its values (a list of floats); a page
-    compressed with zstd needs zstandard. Reads the pages written here, not every Zarr array.
+    compressed with zstd needs zstandard (gzip needs nothing). Reads the pages written here, not every Zarr array.
     """
     meta = json.loads(files[METADATA_FILE])
     count = meta["shape"][0]
     config = meta["codecs"][0]["configuration"]
     inner = config["chunk_shape"][0]
-    compressed = any(codec["name"] == "zstd" for codec in config["codecs"])
-    decompressor: Optional[object] = None
-    if compressed:
+    names = {codec["name"] for codec in config["codecs"]}
+    decompress = None
+    if "zstd" in names:
         if zstandard is None:
             raise ValueError("the page is compressed with zstd, which needs the zstandard module")
         decompressor = zstandard.ZstdDecompressor()
+        decompress = lambda chunk: decompressor.decompress(chunk, max_output_size=inner * ITEM_SIZE)  # noqa: E731
+    elif "gzip" in names:
+        decompress = gzip.decompress
     data = bytearray()
     if count:
         body = files[SHARD_FILE]
@@ -169,7 +199,7 @@ def read_page(files: dict) -> tuple:
                 data += bytes(inner * ITEM_SIZE)
                 continue
             chunk = body[offset : offset + size]
-            data += decompressor.decompress(chunk, max_output_size=inner * ITEM_SIZE) if decompressor else chunk
+            data += decompress(chunk) if decompress else chunk
     return meta["attributes"]["yaptide_page"], float32_values(bytes(data[: count * ITEM_SIZE]))
 
 
