@@ -19,6 +19,7 @@ import json
 import logging
 import math
 import pickle
+import struct
 import sys
 from pathlib import Path
 from typing import Callable, Iterator, List, Optional, Tuple
@@ -50,20 +51,34 @@ def collect_garbage() -> None:
     gc.collect()
 
 
+class ResultFileError(ValueError):
+    """A result file that cannot be read whole: cut short, or gone (a save removed while a merge read it)"""
+
+    def __init__(self, file: str, reason) -> None:
+        super().__init__(f"{file}: {reason}")
+        self.file = file
+
+
 def read_estimator(file: str) -> Optional[Estimator]:
-    """Reads a result file; raises ValueError when a page of a SHIELD-HIT12A file holds other than the bins its
-    estimator declares (the UI gets values for every bin declared)
+    """Reads a result file; raises ResultFileError when it is gone, when a SHIELD-HIT12A file has no pages, or when
+    one of its pages holds other than the bins its estimator declares (the UI gets values for every bin declared)
     """
-    if file.endswith(MERGED_SUFFIX):
-        # written by this simulation's merge_groups.py, next to this script
-        with open(file, "rb") as merged:
-            return pickle.load(merged)  # skipcq: BAN-B301
-    estimator = fromfile(file)
+    try:
+        if file.endswith(MERGED_SUFFIX):
+            # written by this simulation's merge_groups.py, next to this script
+            with open(file, "rb") as merged:
+                return pickle.load(merged)  # skipcq: BAN-B301
+        estimator = fromfile(file)
+    except (OSError, EOFError, IndexError, AttributeError, struct.error, pickle.UnpicklingError) as err:
+        # gone, or cut short inside a page's tags (pymchelper then misses what the page needs)
+        raise ResultFileError(file, err) from err
+    if estimator is not None and file.endswith(".bdo") and not estimator.pages:
+        raise ResultFileError(file, "no pages")
     if estimator and file.endswith(".bdo"):
         for page in estimator.pages:
             axes = (estimator.x.n, estimator.y.n, estimator.z.n, page.diff_axis1.n, page.diff_axis2.n)
             if page.dettyp != SHDetType.mcpl and page.data_raw.size != math.prod(axes):
-                raise ValueError(f"{file}: {page.data_raw.size} values for {axes} bins")
+                raise ResultFileError(file, f"{page.data_raw.size} values for {axes} bins")
     return estimator
 
 
@@ -88,6 +103,10 @@ def merge_estimator_files(files: List[str]) -> Optional[Estimator]:
             page.data_raw = page.data_raw * result.number_of_primaries
     for file in files[1:]:
         estimator = read_estimator(file)
+        # a file cut short between pages reads whole, with fewer pages: the shorter one is left out
+        if len(estimator.pages) != len(result.pages):
+            short = file if len(estimator.pages) < len(result.pages) else files[0]
+            raise ResultFileError(short, f"{len(estimator.pages)} pages, {len(result.pages)} in {files[0]}")
         for page, other, kind, avg in zip(result.pages, estimator.pages, kinds, averaged):
             if avg:
                 # in place where the reader allows it: the file's values are not needed afterwards, so no third array

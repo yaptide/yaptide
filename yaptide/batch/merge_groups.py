@@ -57,6 +57,8 @@ OWNER_FILE = "owner"
 LOCK_SECONDS = 3600
 # the last partial merge runs at most this often; the watchers start group merges as often (watcher.py)
 PARTIAL_SECONDS = 120
+# a last partial merge that failed is tried again this soon
+RETRY_SECONDS = 20
 # merged saves kept of each group: the latest, and the one before for a last merge still reading it
 KEPT_MERGES = 2
 # the collect waits this long for a group's merge still running (the group's last task ended a moment ago)
@@ -239,55 +241,82 @@ def merged_files(directory: Path) -> List[str]:
     return sorted(str(path) for path in directory.glob(f"*{INTERMEDIATE_SUFFIX}"))
 
 
+def unreadable(err: Exception, units: List[List[str]]) -> Optional[int]:
+    """Which of the merge's units (a task's save, a group's merge) holds the file it could not read whole
+    (results_merger.ResultFileError: cut short, or removed meanwhile); None for another error
+    """
+    file = getattr(err, "file", None)
+    return next((index for index, unit in enumerate(units) if file is not None and file in unit), None)
+
+
 def merge_group_saves(root: Path, group: int, size: int, n_tasks: int) -> None:
     """Merges the latest saves of the group's tasks into groups/<group>/<their primaries>/, unless merged already;
-    the older merges but the latest KEPT_MERGES go
+    a save that cannot be read whole is left out (the next merge takes the task's next save). The older merges but
+    the latest KEPT_MERGES go
     """
     saves = [latest_save(task_dir(root, task)) for task in group_tasks(group, size, n_tasks)]
     saves = [save for save in saves if save is not None]
+    units = [[str(path) for path in sorted(save.glob("*.bdo"))] for save in saves]
+    group_dir = root / GROUPS_DIR / str(group)
+    while saves:
+        target = group_dir / str(sum(int(save.name) for save in saves))
+        if target.exists():
+            return
+        try:
+            write_merged([file for unit in units for file in unit], target)
+            break
+        except ValueError as err:
+            index = unreadable(err, units)
+            if index is None:
+                raise
+            logging.warning("Left out the save %s of group %d: %s", saves[index], group, err)
+            del saves[index], units[index]
     if not saves:
         return
-    group_dir = root / GROUPS_DIR / str(group)
-    target = group_dir / str(sum(int(save.name) for save in saves))
-    if target.exists():
-        return
-    write_merged([str(path) for save in saves for path in sorted(save.glob("*.bdo"))], target)
     logging.info("Merged the saves of group %d: %d tasks, %s primaries", group, len(saves), target.name)
     for old in numbered_dirs(group_dir)[:-KEPT_MERGES]:
         shutil.rmtree(str(old), ignore_errors=True)
 
 
-def partial_files(root: Path, size: int, n_tasks: int) -> List[str]:
-    """What the last partial merge reads: the latest merge of every group, or the latest saves of a group's tasks
-    when the group has none yet
+def partial_units(root: Path, size: int, n_tasks: int) -> List[List[str]]:
+    """What the last partial merge reads: the latest merge of every group that has one, or with one group, the
+    latest saves of its tasks. A group without a merge yet waits for it: reading its tasks' saves instead took
+    minutes with large results, while the tasks removed them for newer ones
     """
-    files = []
-    for group in range(groups(size, n_tasks)):
-        merges = numbered_dirs(root / GROUPS_DIR / str(group)) if size < n_tasks else []
-        if merges:
-            files.extend(merged_files(merges[-1]))
-            continue
-        for task in group_tasks(group, size, n_tasks):
-            save = latest_save(task_dir(root, task))
-            if save is not None:
-                files.extend(str(path) for path in sorted(save.glob("*.bdo")))
-    return files
+    if size < n_tasks:
+        merges = (numbered_dirs(root / GROUPS_DIR / str(group)) for group in range(groups(size, n_tasks)))
+        return [merged_files(group_merges[-1]) for group_merges in merges if group_merges]
+    saves = (latest_save(task_dir(root, task)) for task in range(1, n_tasks + 1))
+    return [[str(path) for path in sorted(save.glob("*.bdo"))] for save in saves if save is not None]
 
 
-def merge_and_upload(root: Path, files: List[str], args) -> int:
-    """Merges the files into partial results and uploads them (results_uploader.py, beside this script)"""
+def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
+    """Merges the units' files into partial results and uploads them (results_uploader.py, beside this script); a
+    unit with a file that cannot be read whole is left out
+    """
     try:
         from yaptide.batch import results_merger
     except ImportError:  # on a cluster, next to this script
         import results_merger
 
-    if not files:
-        return 0
+    units = [unit for unit in units if unit]
     output = root / PARTIAL_OUTPUT
-    shutil.rmtree(str(output), ignore_errors=True)
-    output.mkdir()
     try:
-        manifest = results_merger.write_directory(files, output)
+        while True:
+            if not units:
+                return 0
+            shutil.rmtree(str(output), ignore_errors=True)
+            output.mkdir()
+            files = [file for unit in units for file in unit]
+            try:
+                manifest = results_merger.write_directory(files, output)
+                break
+            except ValueError as err:
+                index = unreadable(err, units)
+                if index is None:
+                    raise
+                logging.warning("Left out %s from the partial results: %s", Path(units[index][0]).parent, err)
+                del units[index]
         if not manifest["estimators"]:
             return 1
         logging.info("Merged %d files into partial results of %d primaries", len(files), manifest["primaries"])
@@ -313,18 +342,32 @@ def partial(args) -> int:
         if size is None:
             return 1
         if size >= n_tasks:
-            return merge_and_upload(root, partial_files(root, size, n_tasks), args)
+            return merge_and_upload(root, partial_units(root, size, n_tasks), args)
         merge_group_saves(root, args.group, size, n_tasks)
     finally:
         free_lock(group_lock)
     final_lock = lock_path(root, FINAL_LOCK)
-    if not stamp_due(root / f"{PARTIAL_STAMP}.{FINAL_LOCK}", PARTIAL_SECONDS) or not take_lock(final_lock):
+    stamp = root / f"{PARTIAL_STAMP}.{FINAL_LOCK}"
+    if not stamp_due(stamp, PARTIAL_SECONDS) or not take_lock(final_lock):
         return 0
     own_lock(final_lock)
+    code = 1
     try:
-        return merge_and_upload(root, partial_files(root, size, n_tasks), args)
+        code = merge_and_upload(root, partial_units(root, size, n_tasks), args)
+        return code
     finally:
         free_lock(final_lock)
+        if code:
+            retry_soon(stamp)
+
+
+def retry_soon(stamp: Path) -> None:
+    """A last partial merge that failed is tried again by a group merge RETRY_SECONDS later, not PARTIAL_SECONDS"""
+    try:
+        when = time.time() - PARTIAL_SECONDS + RETRY_SECONDS
+        os.utime(str(stamp), (when, when))
+    except OSError:
+        pass
 
 
 def done(root: Path, task: int) -> bool:

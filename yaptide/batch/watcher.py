@@ -296,15 +296,21 @@ class Reporter:
 
 
 def copy_save(work_dir: Path, target: Path) -> bool:
-    """Copies the simulator's result files into target; False when there are none, or when the simulator began
-    rewriting one meanwhile (its next save)
+    """Copies the simulator's result files into target; False when there are none, when the simulator began
+    rewriting one meanwhile (its next save), or when a copy came out shorter than its file (seen on a cluster node
+    busy writing other tasks' saves, the file unchanged)
     """
     files = sorted(work_dir.glob("*.bdo"))
     before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
     target.mkdir(parents=True)
     for path in files:
         shutil.copyfile(str(path), str(target / path.name))
-    return bool(files) and before == [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
+    copied = [(target / path.name).stat().st_size for path in files]
+    return (
+        bool(files)
+        and before == [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
+        and copied == [size for _, size in before]
+    )
 
 
 class Saver:

@@ -4,6 +4,8 @@ import json
 import shutil
 import subprocess
 import sys
+import time
+from argparse import Namespace
 from pathlib import Path
 
 import numpy as np
@@ -167,7 +169,7 @@ def partial(root: Path, group: int) -> int:
 
 def test_partial_results_merge_the_group_then_the_groups(root: Path, uploads: list, monkeypatch):
     """A group's latest saves are merged into a file per estimator, named by their primaries; the last merge takes
-    those of every group, or a group's saves while it has none, and uploads them. The locks are freed
+    those of every group that has one (not the saves of a group without) and uploads them. The locks are freed
     """
     merge_groups.plan(root, N_TASKS, 1)
     for task in range(1, N_TASKS + 1):
@@ -179,8 +181,8 @@ def test_partial_results_merge_the_group_then_the_groups(root: Path, uploads: li
     assert [path.name for path in merge_groups.numbered_dirs(root / "groups" / "0")] == ["400"]
     assert not (root / "groups" / "1").exists()
     (manifest,) = uploads
-    # group 0's merge (tasks' primaries as the files hold them) and group 1's saves
-    assert manifest["primaries"] == 800
+    # group 0's merge only (tasks' primaries as the files hold them)
+    assert manifest["primaries"] == 400
     assert not list(root.glob("partial.lock.*"))
     assert not (root / merge_groups.PARTIAL_OUTPUT).exists()
 
@@ -191,9 +193,57 @@ def test_partial_results_merge_the_group_then_the_groups(root: Path, uploads: li
     monkeypatch.setattr(merge_groups, "PARTIAL_SECONDS", 0)
     save(root, 3, 300)
     assert partial(root, 1) == 0
-    assert len(uploads) == 2
+    assert len(uploads) == 2 and uploads[1]["primaries"] == 800
     # the older merges but the latest two go
     assert [path.name for path in merge_groups.numbered_dirs(root / "groups" / "1")] == ["500", "700"]
+
+
+def cut_short(save_dir: Path) -> None:
+    """Cuts the largest result file of a save short, as the copies seen on a busy cluster node"""
+    path = max(save_dir.glob("*.bdo"), key=lambda p: p.stat().st_size)
+    path.write_bytes(path.read_bytes()[: path.stat().st_size // 2])
+
+
+def test_a_group_merge_leaves_out_a_save_cut_short(root: Path, uploads: list):
+    """A save that cannot be read whole is left out of its group's merge, named by the primaries of the others"""
+    merge_groups.plan(root, N_TASKS, 1)
+    for task in (1, 2):
+        save(root, task, 100)
+    cut_short(merge_groups.task_dir(root, 2) / "saves" / "100")
+
+    assert partial(root, 0) == 0
+
+    assert [path.name for path in merge_groups.numbered_dirs(root / "groups" / "0")] == ["100"]
+    assert uploads[0]["primaries"] == 100  # as task 1's files hold them
+
+
+def test_the_last_merge_leaves_out_a_group_merge_gone(root: Path, uploads: list):
+    """A group's merge removed while the last merge reads it (a newer one replaced it) leaves only that group out"""
+    merge_groups.plan(root, N_TASKS, 1)
+    units = []
+    for group in (0, 1):
+        target = root / "groups" / str(group) / "400"
+        merge_groups.write_merged([file for file in all_files(root) if f"task_000{group + 1}" in file], target)
+        units.append(merge_groups.merged_files(target))
+    units[1] = [file.replace("/400/", "/300/") for file in units[1]]
+    args = Namespace(sim_id="1", update_key="key", backend_url="https://y.t")
+
+    assert merge_groups.merge_and_upload(root, units, args) == 0
+
+    assert len(uploads) == 1 and uploads[0]["primaries"] == 100  # group 0: task 1's files
+
+
+def test_a_failed_last_merge_is_tried_again_soon(root: Path, monkeypatch):
+    """The last merge failed: the next group merge tries it again RETRY_SECONDS later, not PARTIAL_SECONDS"""
+    merge_groups.plan(root, N_TASKS, 1)
+    save(root, 1, 100)
+    monkeypatch.setattr(merge_groups, "merge_and_upload", lambda *args: 1)
+    stamp = root / f"{merge_groups.PARTIAL_STAMP}.{merge_groups.FINAL_LOCK}"
+
+    assert partial(root, 0) == 1
+
+    assert merge_groups.PARTIAL_SECONDS - merge_groups.RETRY_SECONDS - 5 < time.time() - stamp.stat().st_mtime
+    assert not merge_groups.lock_path(root, merge_groups.FINAL_LOCK).exists()
 
 
 def test_partial_results_of_one_group_are_one_merge(tmp_path: Path, uploads: list):

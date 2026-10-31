@@ -394,6 +394,18 @@ def test_a_save_rewritten_while_copied_is_skipped(storage, monkeypatch):
     assert saves(tmp_path) == {"100": {"dose.bdo": b"next"}} and merges(tmp_path) == 1
 
 
+def test_a_save_copied_short_is_skipped(storage, monkeypatch):
+    """A copy shorter than its file, the file unchanged (seen on a busy cluster node): no save kept, no merge"""
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task = saver(tmp_path, backend_url, 100)
+    monkeypatch.setattr(
+        watcher.shutil, "copyfile", lambda source, target: Path(target).write_bytes(Path(source).read_bytes()[:2])
+    )
+    task.saved()
+    assert saves(tmp_path) == {} and merges(tmp_path) == 0
+
+
 def test_one_partial_merge_at_a_time_and_not_too_often(storage, monkeypatch):
     """A merge holding the lock (another task's) is not joined, one left by a killed merge is taken over; after a
     merge the next waits PARTIAL_SECONDS
