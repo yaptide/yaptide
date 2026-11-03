@@ -206,3 +206,25 @@ def read_page(files: dict) -> tuple:
 def json_page(page: dict, values: list) -> dict:
     """The page as the JSON pages had it, values included"""
     return dict(page, data=dict(page["data"], values=values))
+
+
+# what partial results carry of a page, by its dimensions (the axes with more than one bin, differential ones included):
+# a point or a line in every partial result, a map when the user asks for it (it costs a merge of its bins at each
+# request), a volume only in the final results - the UI does not plot one, and its merge can take gigabytes
+LIVE, ON_DEMAND, FINAL_ONLY = "live", "on_demand", "final_only"
+LIVE_DIMENSIONS = 1
+ON_DEMAND_DIMENSIONS = 2
+
+
+def partial_mode(dimensions: int) -> str:
+    """What partial results carry of a page of these dimensions: LIVE, ON_DEMAND or FINAL_ONLY"""
+    if dimensions <= LIVE_DIMENSIONS:
+        return LIVE
+    if dimensions <= ON_DEMAND_DIMENSIONS:
+        return ON_DEMAND
+    return FINAL_ONLY
+
+
+def partial_modes(on_demand: bool) -> set:
+    """The modes of the pages a partial result carries: the live ones, and the on-demand ones when asked for"""
+    return {LIVE, ON_DEMAND} if on_demand else {LIVE}

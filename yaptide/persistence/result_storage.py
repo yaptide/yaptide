@@ -298,10 +298,37 @@ def cancel_key(sim_id: int) -> str:
     return f"hpc/{sim_id}/cancel"
 
 
+def on_demand_key(sim_id: int) -> str:
+    """The object whose presence asks for the on-demand pages in the next partial results of a simulation
+    (result_format.partial_mode); the backend removes it once partial results carry them
+    """
+    return f"hpc/{sim_id}/on_demand"
+
+
+def put_on_demand(sim_id: int) -> None:
+    """Asks for the on-demand pages in the simulation's next partial results"""
+    _internal().put_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=on_demand_key(sim_id), Body=b"")
+
+
+def on_demand_requested(sim_id: int) -> bool:
+    """Whether the on-demand pages are asked for (and not delivered yet)"""
+    try:
+        _internal().head_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=on_demand_key(sim_id))
+        return True
+    except ClientError:
+        return False
+
+
+def clear_on_demand(sim_id: int) -> None:
+    """The on-demand pages were delivered: the next partial results carry the live ones only again"""
+    _internal().delete_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=on_demand_key(sim_id))
+
+
 def job_links(sim_id: int) -> dict:
     """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
-    progress prefix only (each at most MAX_PROGRESS_BYTES) and a HEAD of its cancel object. The tasks' saves stay on
-    the cluster, which merges them into partial results itself (yaptide/batch/watcher.py)
+    progress prefix only (each at most MAX_PROGRESS_BYTES), a HEAD of its cancel object and one of its on-demand
+    object. The tasks' saves stay on the cluster, which merges them into partial results itself
+    (yaptide/batch/watcher.py, yaptide/batch/merge_groups.py)
     """
     bucket = os.environ["RESULTS_S3_BUCKET"]
     prefix = progress_prefix(sim_id)
@@ -315,11 +342,15 @@ def job_links(sim_id: int) -> dict:
     cancel = client.generate_presigned_url(
         "head_object", Params={"Bucket": bucket, "Key": cancel_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
     )
+    on_demand = client.generate_presigned_url(
+        "head_object", Params={"Bucket": bucket, "Key": on_demand_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
+    )
     # the jobs ask for new links a day before these expire (Garage answers an expired link with 400, like a bad one)
     expires = int(time.time()) + JOB_LINK_SECONDS
     return {
         "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
         "cancel": cancel,
+        "on_demand": on_demand,
         "expires": expires,
     }
 

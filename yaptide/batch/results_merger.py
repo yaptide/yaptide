@@ -82,14 +82,37 @@ def read_estimator(file: str) -> Optional[Estimator]:
     return estimator
 
 
-def merge_estimator_files(files: List[str]) -> Optional[Estimator]:
+def page_mode(page: Page) -> str:
+    """What partial results carry of the page (result_format.partial_mode): by its dimensions, a list of particles
+    (MCPL) only in the final results
+    """
+    if page.dettyp == SHDetType.mcpl:
+        return result_format.FINAL_ONLY
+    return result_format.partial_mode(page.dimension)
+
+
+def keep_pages(estimator: Optional[Estimator], modes: Optional[set]) -> Optional[Estimator]:
+    """Leaves the estimator its pages of the modes only (all of them without modes), each keeping its number: the
+    others of a partial result are not merged, so a large page does not cost its merge at every partial result
+    """
+    if estimator is None or modes is None:
+        return estimator
+    for number, page in enumerate(estimator.pages):
+        if getattr(page, "page_number", None) is None:
+            page.page_number = number
+    estimator.pages = [page for page in estimator.pages if page_mode(page) in modes]
+    return estimator
+
+
+def merge_estimator_files(files: List[str], modes: Optional[set] = None) -> Optional[Estimator]:
     """Merges one estimator's task files (or files merged already, of groups of tasks), reading one file at a time:
-    each page aggregated by its normalisation, averages weighted by primaries, as pymchelper's fromfilelist does
+    each page aggregated by its normalisation, averages weighted by primaries, as pymchelper's fromfilelist does.
+    With modes (result_format.partial_modes), only the pages of those modes; None when the estimator has none.
 
     Mean only: pymchelper's WeightedStatsAggregator also keeps a variance of every bin, which the pages do not hold.
     """
-    result = read_estimator(files[0])
-    if not result:
+    result = keep_pages(read_estimator(files[0]), modes)
+    if not result or not result.pages:
         return None
     # the task files merged: one for a task's, the group's for a group's
     counter = getattr(result, "file_counter", 1) or 1
@@ -102,7 +125,7 @@ def merge_estimator_files(files: List[str]) -> Optional[Estimator]:
         if avg:
             page.data_raw = page.data_raw * result.number_of_primaries
     for file in files[1:]:
-        estimator = read_estimator(file)
+        estimator = keep_pages(read_estimator(file), modes)
         # a file cut short between pages reads whole, with fewer pages: the shorter one is left out
         if len(estimator.pages) != len(result.pages):
             short = file if len(estimator.pages) < len(result.pages) else files[0]
@@ -147,12 +170,13 @@ def group_input_files(files: List[str]) -> dict:
     return grouped
 
 
-def merged_estimators(files: List[str]) -> Iterator[Tuple[str, Estimator]]:
+def merged_estimators(files: List[str], modes: Optional[set] = None) -> Iterator[Tuple[str, Estimator]]:
     """The merged estimators of the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*, merged ones of groups), by
-    name, one at a time: the next one is merged when the caller asks for it
+    name, one at a time: the next one is merged when the caller asks for it. With modes, only the pages of those
+    modes (merge_estimator_files)
     """
     for name, group in sorted(group_input_files(sorted(files)).items()):
-        estimator = merge_estimator_files(group)
+        estimator = merge_estimator_files(group, modes)
         if estimator:
             estimator.file_corename = name
             yield name, estimator
@@ -192,13 +216,15 @@ def page_values(page: Page) -> np.ndarray:
     return np.ravel(page.data_raw)
 
 
-def write_pages(files: List[str], store: Callable[[str, int, dict, np.ndarray], dict]) -> Tuple[List[dict], int]:
+def write_pages(
+    files: List[str], store: Callable[[str, int, dict, np.ndarray], dict], modes: Optional[set] = None
+) -> Tuple[List[dict], int]:
     """Merges the result files and hands every page to store(estimator name, page number, page without values,
     values), one estimator at a time; returns the estimators (name, metadata and what store returned for each page)
-    and the primaries merged
+    and the primaries merged. With modes, only the pages of those modes (merge_estimator_files)
     """
     estimators, primaries = [], 0
-    for name, estimator in merged_estimators(files):
+    for name, estimator in merged_estimators(files, modes):
         pages = []
         for page in estimator.pages:
             page_dict = page_without_values(estimator, page)
@@ -212,8 +238,10 @@ def write_pages(files: List[str], store: Callable[[str, int, dict, np.ndarray], 
     return estimators, primaries
 
 
-def write_directory(files: List[str], output_dir: Path, compress: bool = True) -> dict:
-    """Merges the result files into pages in output_dir and writes its manifest; returns the manifest"""
+def write_directory(files: List[str], output_dir: Path, compress: bool = True, modes: Optional[set] = None) -> dict:
+    """Merges the result files into pages in output_dir and writes its manifest; returns the manifest. With modes,
+    only the pages of those modes (merge_estimator_files)
+    """
 
     def store(name: str, number: int, page: dict, values: np.ndarray) -> dict:
         """Writes a page's objects into the directory; the page's entry of the manifest"""
@@ -231,7 +259,7 @@ def write_directory(files: List[str], output_dir: Path, compress: bool = True) -
             "files": objects,
         }
 
-    estimators, primaries = write_pages(files, store)
+    estimators, primaries = write_pages(files, store, modes)
     manifest = {"format": result_format.FORMAT, "primaries": primaries, "estimators": estimators}
     (output_dir / MANIFEST).write_text(json.dumps(manifest))
     return manifest

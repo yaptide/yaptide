@@ -259,8 +259,8 @@ def test_what_tasks_and_hpc_jobs_leave_in_storage_expires(monkeypatch):
 
 
 def test_job_links_hand_out_no_save_links(monkeypatch):
-    """The tasks' saves stay on the cluster, which merges them itself: the jobs get only progress and cancel links,
-    at the public address
+    """The tasks' saves stay on the cluster, which merges them itself: the jobs get only progress, cancel and
+    on-demand links, at the public address
     """
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
     monkeypatch.setenv("RESULTS_S3_PUBLIC_ENDPOINT", "https://yaptide.test")
@@ -271,8 +271,9 @@ def test_job_links_hand_out_no_save_links(monkeypatch):
     links = result_storage.job_links(5)
     result_storage._client.cache_clear()  # skipcq: PYL-W0212
 
-    assert set(links) == {"progress", "cancel", "expires"}
+    assert set(links) == {"progress", "cancel", "on_demand", "expires"}
     assert links["cancel"].startswith("https://yaptide.test/results/hpc/5/cancel?")
+    assert links["on_demand"].startswith("https://yaptide.test/results/hpc/5/on_demand?")
 
 
 def listing_page(keys: list[str], token: str = "") -> bytes:

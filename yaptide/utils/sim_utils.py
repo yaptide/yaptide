@@ -20,14 +20,17 @@ def json_pages(name: str, number: int, page: dict, values: np.ndarray) -> dict:
     return result_format.json_page(page, values.tolist())
 
 
-def merge_simulation_outputs(output_dirs: list[Path], store: Optional[Callable] = None) -> list[dict]:
+def merge_simulation_outputs(
+    output_dirs: list[Path], store: Optional[Callable] = None, modes: Optional[set] = None
+) -> list[dict]:
     """Merge the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*) of all tasks into estimators for the UI
 
     Each page is aggregated by its normalisation and averages are weighted by primaries, as on the clusters
     (yaptide/batch/results_merger.py). One estimator is merged at a time, one file at a time, and each of its pages
     goes to store(estimator name, page number, page without values, values) before the next estimator is read; the
     estimators hold what store returned for their pages, by default the pages as JSON with their values.
-    The list is sorted by name, the same for every merge.
+    The list is sorted by name, the same for every merge. With modes (result_format.partial_modes), only the pages of
+    those modes, for partial results.
     """
     missing = [str(path) for path in output_dirs if not path.is_dir()]
     if missing:
@@ -38,7 +41,7 @@ def merge_simulation_outputs(output_dirs: list[Path], store: Optional[Callable] 
     ]
     if not files:
         return []
-    estimators, _ = results_merger.write_pages(files, store or json_pages)
+    estimators, _ = results_merger.write_pages(files, store or json_pages, modes)
     return estimators
 
 

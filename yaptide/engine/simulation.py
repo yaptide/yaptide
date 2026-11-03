@@ -325,12 +325,17 @@ class PageWriter:
         return result_format.json_page(page, values.tolist())
 
 
-def merge_stored(keys: list[str], max_bytes: float = float("inf"), simulation_id: Optional[int] = None) -> list[dict]:
+def merge_stored(
+    keys: list[str],
+    max_bytes: float = float("inf"),
+    simulation_id: Optional[int] = None,
+    modes: Optional[set] = None,
+) -> list[dict]:
     """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises
 
     With the simulation's id the pages go to object storage as they are merged (PageWriter), the estimators then
     point at them. The task archives are fetched and unpacked one at a time onto disk; the merge reads one file at a
-    time.
+    time. With modes (result_format.partial_modes), only the pages of those modes.
     """
     writer = PageWriter(simulation_id)
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
@@ -343,7 +348,7 @@ def merge_stored(keys: list[str], max_bytes: float = float("inf"), simulation_id
             archive.unlink()
             task_dirs.append(task_dir)
         try:
-            return merge_simulation_outputs(task_dirs, writer)
+            return merge_simulation_outputs(task_dirs, writer, modes)
         except BaseException:
             result_storage.delete_pages(writer.written)
             raise
@@ -372,14 +377,16 @@ def merge_and_store_partial(
     simulation_id: int, keys: list[str], primaries: int, max_bytes: float = float("inf")
 ) -> bool:
     """Merges the latest saves of the tasks, at most max_bytes of result files, into the simulation's partial
-    results; whether they were stored
+    results: the live pages, and the on-demand ones when the user asks for them; whether they were stored
     """
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            estimators = merge_stored(keys, max_bytes, simulation_id)
+            on_demand = result_storage.configured() and result_storage.on_demand_requested(simulation_id)
+            modes = result_format.partial_modes(on_demand)
+            estimators = merge_stored(keys, max_bytes, simulation_id, modes)
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

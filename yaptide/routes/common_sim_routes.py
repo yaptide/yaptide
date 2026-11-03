@@ -389,10 +389,30 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
     return True
 
 
+def carries_on_demand(estimators: list[dict]) -> bool:
+    """Whether merged results carry an on-demand page (result_format.partial_mode)"""
+    return any(
+        result_format.partial_mode(int(page.get("dimensions", 0))) == result_format.ON_DEMAND
+        for estimator in estimators
+        for page in estimator["pages"]
+    )
+
+
+def on_demand_delivered(simulation: SimulationModel) -> None:
+    """Partial results carried the on-demand pages asked for: the next ones carry the live pages only again, until the
+    user asks again; a failure only leaves them in the next partial results too
+    """
+    try:
+        result_storage.clear_on_demand(simulation.id)
+    except Exception as err:  # skipcq: PYL-W0703 - the partial results are stored already, whatever the storage says
+        logging.warning("The request of on-demand pages of simulation %d stays: %s", simulation.id, err)
+
+
 def store_partial_results(simulation: SimulationModel, estimators: list[dict], primaries: int) -> bool:
     """Stores the results of a running simulation so far in place of the previous ones; the final results replace
-    them. Returns whether they were stored, i.e. the simulation still runs (pages already in storage that were not
-    are removed).
+    them. A page missing from them keeps its previous partial results (an on-demand page the user did not ask for
+    again, yaptide/batch/result_format.py). Returns whether they were stored, i.e. the simulation still runs (pages
+    already in storage that were not are removed).
     """
     lock_results(simulation)
     if simulation.job_state != EntityState.RUNNING.value:
@@ -405,6 +425,8 @@ def store_partial_results(simulation: SimulationModel, estimators: list[dict], p
     simulation.partial_time = datetime.now(timezone.utc)
     make_commit_to_db()
     result_storage.delete_pages(superseded)
+    if result_storage.configured() and carries_on_demand(estimators):
+        on_demand_delivered(simulation)
     return True
 
 
@@ -507,6 +529,61 @@ class ResultsResource(Resource):
             result = {"pages": [page_content(page) for page in pages]}
             return yaptide_response(message="Pages retrieved successfully", code=200, content=result)
         return yaptide_response(message="Wrong parameters", code=400, content=errors)
+
+
+class OnDemandResource(Resource):
+    """The on-demand pages of a running simulation (yaptide/batch/result_format.py): partial results carry them only
+    when the user asks, as each costs a merge of a whole map; the next partial results then carry them once
+    """
+
+    class APIParametersSchema(Schema):
+        """Class specifies API parameters"""
+
+        job_id = fields.String(required=True)
+
+    @staticmethod
+    def owned_simulation(user: UserModel, job_id: str):
+        """The user's simulation of the job, or the error response"""
+        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+        if not is_owned:
+            return None, yaptide_response(message=error_message, code=res_code)
+        return fetch_simulation_by_job_id(job_id=job_id), None
+
+    @staticmethod
+    @requires_auth()
+    def get(user: UserModel):
+        """Whether the on-demand pages are asked for and not delivered yet, and whether this server can deliver them"""
+        schema = OnDemandResource.APIParametersSchema()
+        errors: dict[str, list[str]] = schema.validate(request.args)
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        simulation, error = OnDemandResource.owned_simulation(user, schema.load(request.args)["job_id"])
+        if error:
+            return error
+        available = result_storage.configured()
+        requested = available and result_storage.on_demand_requested(simulation.id)
+        return yaptide_response(
+            message="On-demand pages", code=200, content={"requested": requested, "available": available}
+        )
+
+    @staticmethod
+    @requires_auth()
+    def post(user: UserModel):
+        """Asks for the on-demand pages in the next partial results of a running simulation; body: job_id"""
+        payload = request.get_json(force=True, silent=True)
+        errors = OnDemandResource.APIParametersSchema().validate(payload if isinstance(payload, dict) else {})
+        if errors:
+            return yaptide_response(message="Wrong parameters", code=400, content=errors)
+        simulation, error = OnDemandResource.owned_simulation(user, payload["job_id"])
+        if error:
+            return error
+        if not result_storage.configured():
+            # the request is an object in storage, which the cluster's jobs and the engine look for
+            return yaptide_response(message="On-demand pages need results storage on this server", code=501)
+        if simulation.job_state != EntityState.RUNNING.value:
+            return yaptide_response(message=f"Simulation is {simulation.job_state}", code=409)
+        result_storage.put_on_demand(simulation.id)
+        return yaptide_response(message="On-demand pages requested", code=202, content={"requested": True})
 
 
 class InputsResource(Resource):

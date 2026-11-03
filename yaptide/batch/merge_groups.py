@@ -9,7 +9,9 @@ Results whose files fit in GROUP_BYTES altogether are one group: a single merge,
 
 - partial results: a task's watcher starts the partial script for the task's group, holding the group's lock
   (partial.lock.<group>). The group's latest saves are merged into groups/<group>/<primaries>/, then the one getting
-  the last lock (partial.lock.final) merges the latest of every group and uploads it.
+  the last lock (partial.lock.final) merges the latest of every group and uploads it. Partial results carry the live
+  pages, and the on-demand ones while the user asks for them (result_format.partial_mode): the groups merge both, the
+  last merge takes the on-demand ones only when the simulation's on-demand object is in storage.
 - final results: the last task of a group to end merges the group's result files into groups/<group>/final/; the
   collect merges those, and the result files of a group whose merge is missing.
 
@@ -31,12 +33,19 @@ import math
 import os
 import pickle
 import shutil
+import ssl
 import subprocess
 import sys
 import time
 import uuid
 from pathlib import Path
 from typing import List, Optional
+from urllib import error, request
+
+try:
+    from yaptide.batch import result_format
+except ImportError:  # on a cluster, next to this script
+    import result_format
 
 # the plan of the groups, in the simulation's directory
 PLAN_FILE = "merge_groups.json"
@@ -66,6 +75,10 @@ GROUP_WAIT_SECONDS = 600
 GROUP_POLL_SECONDS = 5
 # where the partial results are merged into before they are uploaded
 PARTIAL_OUTPUT = "partial_output"
+# the signed links of the simulation (written at submit, renewed by the watchers): the on-demand object's HEAD in it
+LINKS_FILE = "storage_links.json"
+# the pages the groups merge for partial results: the last merge takes the on-demand ones only when asked for
+GROUP_PARTIAL_MODES = result_format.partial_modes(on_demand=True)
 
 
 def group_size(task_bytes: int, n_tasks: int) -> int:
@@ -210,9 +223,9 @@ def latest_save(task_path: Path) -> Optional[Path]:
     return saves[-1] if saves else None
 
 
-def write_merged(files: List[str], target: Path) -> int:
+def write_merged(files: List[str], target: Path, modes: Optional[set] = None) -> int:
     """Merges the files into one pickled estimator each in target, whole or not at all (written aside, then renamed);
-    the primaries merged
+    the primaries merged. With modes, only the pages of those modes (results_merger.merge_estimator_files)
     """
     try:
         from yaptide.batch import results_merger
@@ -223,7 +236,7 @@ def write_merged(files: List[str], target: Path) -> int:
     partial.mkdir(parents=True)
     primaries = 0
     try:
-        for name, estimator in results_merger.merged_estimators(files):
+        for name, estimator in results_merger.merged_estimators(files, modes):
             with open(partial / f"{name}{INTERMEDIATE_SUFFIX}", "wb") as file:
                 pickle.dump(estimator, file, protocol=pickle.HIGHEST_PROTOCOL)
             primaries = max(primaries, int(estimator.number_of_primaries))
@@ -263,7 +276,7 @@ def merge_group_saves(root: Path, group: int, size: int, n_tasks: int) -> None:
         if target.exists():
             return
         try:
-            write_merged([file for unit in units for file in unit], target)
+            write_merged([file for unit in units for file in unit], target, GROUP_PARTIAL_MODES)
             break
         except ValueError as err:
             index = unreadable(err, units)
@@ -290,9 +303,30 @@ def partial_units(root: Path, size: int, n_tasks: int) -> List[List[str]]:
     return [[str(path) for path in sorted(save.glob("*.bdo"))] for save in saves if save is not None]
 
 
+def on_demand_requested(root: Path) -> bool:
+    """Whether the user asks for the on-demand pages: the simulation's on-demand object is in storage (a HEAD of its
+    signed link answers 200). False without the link (a simulation submitted before) or when storage cannot be reached
+    """
+    try:
+        url = json.loads((root / LINKS_FILE).read_text())["on_demand"]
+    except (OSError, ValueError, KeyError, TypeError):
+        return False
+    try:
+        with request.urlopen(  # skipcq: BAN-B310
+            request.Request(url, method="HEAD"), context=ssl.create_default_context(), timeout=60
+        ) as response:
+            return response.status == 200
+    except error.HTTPError:
+        return False
+    except Exception as err:  # skipcq: PYL-W0703
+        logging.warning("Could not look for a request of the on-demand pages: %s", err)
+        return False
+
+
 def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
     """Merges the units' files into partial results and uploads them (results_uploader.py, beside this script); a
-    unit with a file that cannot be read whole is left out
+    unit with a file that cannot be read whole is left out. The partial results carry the live pages, and the
+    on-demand ones when the user asks for them
     """
     try:
         from yaptide.batch import results_merger
@@ -300,6 +334,7 @@ def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
         import results_merger
 
     units = [unit for unit in units if unit]
+    modes = result_format.partial_modes(on_demand_requested(root))
     output = root / PARTIAL_OUTPUT
     try:
         while True:
@@ -309,7 +344,7 @@ def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
             output.mkdir()
             files = [file for unit in units for file in unit]
             try:
-                manifest = results_merger.write_directory(files, output)
+                manifest = results_merger.write_directory(files, output, modes=modes)
                 break
             except ValueError as err:
                 index = unreadable(err, units)
@@ -319,7 +354,12 @@ def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
                 del units[index]
         if not manifest["estimators"]:
             return 1
-        logging.info("Merged %d files into partial results of %d primaries", len(files), manifest["primaries"])
+        logging.info(
+            "Merged %d files into partial results of %d primaries (%s pages)",
+            len(files),
+            manifest["primaries"],
+            " and ".join(sorted(modes)),
+        )
         uploader = Path(__file__).resolve().parent / "results_uploader.py"
         command = [sys.executable, str(uploader), "--partial", f"--output_dir={output}", "--attempts=3"]
         command += [f"--sim_id={args.sim_id}", f"--update_key={args.update_key}", f"--backend_url={args.backend_url}"]
