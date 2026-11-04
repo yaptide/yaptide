@@ -3,7 +3,6 @@
 import email
 import io
 import os
-import shutil
 import json
 import signal
 import subprocess
@@ -32,6 +31,7 @@ class FakeStorage(BaseHTTPRequestHandler):
 
     objects: dict = {}
     cancelled = False
+    on_demand = False
     # Garage answers an expired link with 400; a link signed with a wrong secret gets 403 every time
     expired_once = False
     always_refused = False
@@ -81,8 +81,9 @@ class FakeStorage(BaseHTTPRequestHandler):
         return self.answer(200, None)
 
     def do_HEAD(self):
-        """The cancel object exists once the simulation is cancelled"""
-        self.send_response(200 if FakeStorage.cancelled else 404)
+        """The cancel object exists once the simulation is cancelled, the on-demand one while the maps are asked for"""
+        exists = FakeStorage.on_demand if self.path.endswith("/on_demand") else FakeStorage.cancelled
+        self.send_response(200 if exists else 404)
         self.end_headers()
 
     def answer(self, code: int, content) -> None:
@@ -105,6 +106,7 @@ def links(port: int) -> dict:
             "prefix": "simulations/7/progress/",
         },
         "cancel": f"http://127.0.0.1:{port}/bucket/simulations/7/cancel",
+        "on_demand": f"http://127.0.0.1:{port}/bucket/hpc/7/on_demand",
     }
 
 
@@ -112,6 +114,7 @@ def links(port: int) -> dict:
 def storage(tmp_path, monkeypatch):
     """The fake storage running, the links file written, and the watcher's waits shortened"""
     FakeStorage.objects, FakeStorage.cancelled, FakeStorage.expired_once, FakeStorage.renewals = {}, False, False, 0
+    FakeStorage.on_demand = False
     FakeStorage.always_refused, FakeStorage.down_for, FakeStorage.renewal_keys = False, 0, []
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeStorage)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -300,6 +303,12 @@ def test_final_state_waits_for_the_storage(storage):
 PARTIAL_SCRIPT = 'echo run >> "$(dirname "$0")/merges"; rmdir "$(dirname "$0")/partial.lock.0"\n'
 
 
+# a result file with points and a line (live pages), and one with maps (on-demand pages)
+BDO_DIR = Path(__file__).resolve().parent / "res" / "bdo" / "task_1"
+DOSE = (BDO_DIR / "z_profile_0001.bdo").read_bytes()
+NEXT = (BDO_DIR / "peak_0001.bdo").read_bytes()
+
+
 def saves(work_dir: Path) -> dict:
     """The task's saves kept aside: directory name -> the result files in it (name -> content)"""
     saves_dir = work_dir / "saves"
@@ -323,7 +332,7 @@ def saver(tmp_path: Path, backend_url: str, simulated: int, script: str = PARTIA
     """Task 3's saver, with 1000 primaries requested and some simulated, a result file in its directory and the
     partial script next to the links
     """
-    (tmp_path / "dose.bdo").write_bytes(b"dose")
+    (tmp_path / "dose.bdo").write_bytes(DOSE)
     (tmp_path / "partial_script.sh").write_text(script)
     task = reporter(tmp_path, backend_url)
     task.state.update({"requested_primaries": 1000, "simulated_primaries": simulated})
@@ -336,7 +345,7 @@ def test_saves_are_kept_aside_and_merged_on_the_cluster(storage):
     """
     tmp_path, backend_url = storage
     log = tmp_path / "shieldhit_0003.log"
-    (tmp_path / "dose.bdo").write_bytes(b"dose")
+    (tmp_path / "dose.bdo").write_bytes(DOSE)
     (tmp_path / "partial_script.sh").write_text(PARTIAL_SCRIPT)
     lines = SHIELDHIT_RUN.replace("4 seconds\n", "4 seconds\n  Saved all 1 estimator(s)\n")
     process = simulator(log, lines + "  Saved all 1 estimator(s)\n", 0)
@@ -350,7 +359,7 @@ def test_saves_are_kept_aside_and_merged_on_the_cluster(storage):
         saved=watcher.Saver(tmp_path, task).saved,
     )
 
-    assert saves(tmp_path) == {"500": {"dose.bdo": b"dose"}}
+    assert saves(tmp_path) == {"500": {"dose.bdo": DOSE}}
     assert merges(tmp_path) == 1
     assert report()["task_state"] == "COMPLETED" and "saved_primaries" not in report()
     assert set(FakeStorage.objects) == {"simulations/7/progress/task_0003.json"}
@@ -382,28 +391,44 @@ def test_a_save_rewritten_while_copied_is_skipped(storage, monkeypatch):
     tmp_path, backend_url = storage
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
     task = saver(tmp_path, backend_url, 100)
-    copy = shutil.copyfile
-    monkeypatch.setattr(
-        watcher.shutil, "copyfile", lambda source, target: (copy(source, target), Path(source).write_bytes(b"next"))
-    )
+    copy = watcher.bdo_pages.copy_pages
+
+    def rewritten(source, target, keep):
+        """The copy, then the simulator's next save"""
+        copied = copy(source, target, keep)
+        Path(source).write_bytes(NEXT)
+        return copied
+
+    monkeypatch.setattr(watcher.bdo_pages, "copy_pages", rewritten)
     task.saved()
     assert saves(tmp_path) == {} and merges(tmp_path) == 0
-    monkeypatch.setattr(watcher.shutil, "copyfile", copy)
+    monkeypatch.setattr(watcher.bdo_pages, "copy_pages", copy)
 
     task.saved()
-    assert saves(tmp_path) == {"100": {"dose.bdo": b"next"}} and merges(tmp_path) == 1
+    assert saves(tmp_path) == {"100": {"dose.bdo": NEXT}} and merges(tmp_path) == 1
 
 
-def test_a_save_copied_short_is_skipped(storage, monkeypatch):
-    """A copy shorter than its file, the file unchanged (seen on a busy cluster node): no save kept, no merge"""
+def test_a_save_cut_short_is_skipped(storage, monkeypatch):
+    """A result file that ends within a page (the simulator still writes it): no save kept, no merge"""
     tmp_path, backend_url = storage
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
     task = saver(tmp_path, backend_url, 100)
-    monkeypatch.setattr(
-        watcher.shutil, "copyfile", lambda source, target: Path(target).write_bytes(Path(source).read_bytes()[:2])
-    )
+    (tmp_path / "dose.bdo").write_bytes(DOSE[:-40])
     task.saved()
     assert saves(tmp_path) == {} and merges(tmp_path) == 0
+
+
+def test_saves_are_copied_without_volumes(storage, monkeypatch):
+    """A save keeps the pages of partial results only: a map is copied, a volume is not (it waits for the end)"""
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task = saver(tmp_path, backend_url, 100)
+    (tmp_path / "dose.bdo").unlink()
+    (tmp_path / "maps.bdo").write_bytes((BDO_DIR / "yz_profile_0001.bdo").read_bytes())
+    monkeypatch.setattr(watcher.result_format, "ON_DEMAND_DIMENSIONS", 1)
+    task.saved()
+    kept = watcher.bdo_pages.pages_of(tmp_path / "saves" / "100" / "maps.bdo")
+    assert kept == []  # the maps count as volumes here
 
 
 def test_one_partial_merge_at_a_time_and_not_too_often(storage, monkeypatch):
@@ -425,8 +450,8 @@ def test_one_partial_merge_at_a_time_and_not_too_often(storage, monkeypatch):
 
     task.reporter.state["simulated_primaries"] = 300
     task.saved()
-    assert merges(tmp_path) == 1  # within PARTIAL_SECONDS
-    monkeypatch.setattr(watcher, "PARTIAL_SECONDS", 0)
+    assert merges(tmp_path) == 1  # within the live interval
+    monkeypatch.setattr(watcher.result_format, "LIVE_MIN_SECONDS", 0)
     task.reporter.state["simulated_primaries"] = 400
     task.saved()
     assert merges(tmp_path) == 2
@@ -442,6 +467,47 @@ def test_a_partial_merge_stops_with_its_task(storage):
     task.stop_merge()
 
     assert task.merge.poll() is not None and not (tmp_path / "partial.lock.0").exists()
+
+
+ON_DEMAND_SCRIPT = 'echo "$1" >> "$(dirname "$0")/on_demand_merges"; rmdir "$(dirname "$0")/partial.lock.$1"\n'
+
+
+def on_demand_merges(root: Path) -> list:
+    """Arguments of the runs of the partial script for the maps, once they ended"""
+    for _ in range(100):
+        if not (root / "partial.lock.on_demand").exists():
+            break
+        time.sleep(0.05)
+    path = root / "on_demand_merges"
+    # the live merge of the save runs the same script, for its group
+    return [run for run in path.read_text().split() if run == "on_demand"] if path.exists() else []
+
+
+def test_the_maps_are_merged_apart_once_asked_for(storage, monkeypatch):
+    """Between log lines the watcher looks for the user's request of the maps; one asked for starts the partial
+    script for them (not the live one), once at a time and not more often than ON_DEMAND_SECONDS
+    """
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task = saver(tmp_path, backend_url, 100, script=ON_DEMAND_SCRIPT)
+    task.idle()
+    assert on_demand_merges(tmp_path) == []  # no save of its own yet
+    task.saved()
+    task.idle()
+    assert on_demand_merges(tmp_path) == []  # not asked for
+
+    FakeStorage.on_demand = True
+    task.idle()
+    assert on_demand_merges(tmp_path) == ["on_demand"]
+    task.idle()
+    assert on_demand_merges(tmp_path) == ["on_demand"]  # within ON_DEMAND_SECONDS
+    monkeypatch.setattr(watcher, "ON_DEMAND_SECONDS", 0)
+    (tmp_path / "partial.lock.on_demand").mkdir()  # another task's merge of the maps runs
+    task.idle()
+    assert on_demand_merges(tmp_path) == ["on_demand"]
+    (tmp_path / "partial.lock.on_demand").rmdir()
+    task.idle()
+    assert on_demand_merges(tmp_path) == ["on_demand", "on_demand"]
 
 
 def test_no_saves_kept_for_jobs_without_the_partial_script(storage):

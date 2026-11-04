@@ -1,5 +1,6 @@
 import copy
 import logging
+import math
 import re
 from pathlib import Path
 from typing import Callable, Optional
@@ -286,12 +287,56 @@ def adjust_primaries_for_fluka_files(
     return files_dict, parsed_number_of_all_primaries
 
 
+# SHIELD-HIT12A writes every page of every output at each save, so a task with large results saves less often: its
+# saves together write about SAVE_BUDGET_BYTES, between MIN_SAVES and MAX_SAVES saves (a tenth of the primaries each
+# for results up to 200 MB)
+SAVE_BUDGET_BYTES = 2e9
+MIN_SAVES = 2
+MAX_SAVES = 9
+# a SHIELD-HIT12A geometry's axis (X, Y, Z, R, Phi and so on: the bins are its third number) and an output's lines
+DETECT_BLOCK = re.compile(r"^\s*(Geometry|Output|Filter)\b", re.MULTILINE | re.IGNORECASE)
+DETECT_AXIS = re.compile(r"^\s*(X|Y|Z|R|Phi|Theta)\s+\S+\s+\S+\s+(\d+)\b", re.MULTILINE | re.IGNORECASE)
+DETECT_NAME = re.compile(r"^\s*Name\s+(\S+)", re.MULTILINE | re.IGNORECASE)
+DETECT_GEO = re.compile(r"^\s*Geo\s+(\S+)", re.MULTILINE | re.IGNORECASE)
+DETECT_QUANTITY = re.compile(r"^\s*Quantity\b", re.MULTILINE | re.IGNORECASE)
+DETECT_DIFF = re.compile(r"^\s*Diff[12]\s+\S+\s+\S+\s+(\d+)\b", re.MULTILINE | re.IGNORECASE)
+
+
+def estimated_result_bytes(detect: str) -> Optional[int]:
+    """Bytes one save of a task writes, from SHIELD-HIT12A's detect.dat: the bins of every output's mesh, times its
+    quantities and differential bins, 8 bytes each. None when the file names no output it can size
+    """
+    starts = [match.start() for match in DETECT_BLOCK.finditer(detect)] + [len(detect)]
+    blocks = [detect[start:end] for start, end in zip(starts, starts[1:])]
+    meshes = {}
+    for block in blocks:
+        name = DETECT_NAME.search(block)
+        if block.lstrip().lower().startswith("geometry") and name:
+            meshes[name[1]] = math.prod(int(match[2]) for match in DETECT_AXIS.finditer(block))
+    total = 0
+    for block in blocks:
+        geo = DETECT_GEO.search(block)
+        if not block.lstrip().lower().startswith("output") or not geo or geo[1] not in meshes:
+            continue
+        diffs = math.prod(max(1, int(match[1])) for match in DETECT_DIFF.finditer(block))
+        total += meshes[geo[1]] * max(1, len(DETECT_QUANTITY.findall(block))) * diffs * 8
+    return total or None
+
+
+def saves_per_task(result_bytes: Optional[int]) -> int:
+    """Saves a task makes before its end: fewer for larger results (SAVE_BUDGET_BYTES)"""
+    if not result_bytes:
+        return MAX_SAVES
+    return int(min(MAX_SAVES, max(MIN_SAVES, SAVE_BUDGET_BYTES // result_bytes)))
+
+
 def set_shieldhit_save_step(files_dict: dict, primaries_per_task: int) -> None:
-    """Makes SHIELD-HIT12A save its results every tenth of a task's primaries, for partial results; a step of saving
-    set in the input is kept
+    """Makes SHIELD-HIT12A save its results along the way, for partial results: about every tenth of a task's
+    primaries, less often for large results (saves_per_task); a step of saving set in the input is kept
     """
     if "beam.dat" in files_dict:
-        step = max(1, primaries_per_task // 10)
+        saves = saves_per_task(estimated_result_bytes(files_dict.get("detect.dat", "")))
+        step = max(1, primaries_per_task // (saves + 1))
         files_dict["beam.dat"] = NSTAT_WITHOUT_SAVES.sub(lambda match: f"{match[1]}    {step}", files_dict["beam.dat"])
 
 

@@ -12,7 +12,8 @@ from yaptide.application import create_app
 from yaptide.persistence.database import db
 from yaptide.persistence.models import prepare_database
 
-# the revision before the PageObject table, the partial results columns, Cluster.busy_until and Cluster.notice
+# the revision before the PageObject table, the partial results columns, Cluster.busy_until, Cluster.notice and the
+# ExpiringObject table
 PREVIOUS = "5003b9acb1f4"
 
 
@@ -49,6 +50,7 @@ def test_database_under_migrations_is_migrated(app):
     db.create_all()
     db.session.execute(text('DROP TABLE "PageObject"'))
     db.session.execute(text('DROP TABLE "UserActivity"'))
+    db.session.execute(text('DROP TABLE "ExpiringObject"'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_primaries'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN partial_time'))
     db.session.execute(text('ALTER TABLE "Simulation" DROP COLUMN progress_revision'))
@@ -67,6 +69,7 @@ def test_database_under_migrations_is_migrated(app):
         column["name"] for column in inspect(db.engine).get_columns("Simulation")
     }
     assert inspect(db.engine).has_table("UserActivity")
+    assert inspect(db.engine).has_table("ExpiringObject")
     assert {"busy_until", "notice"} <= {column["name"] for column in inspect(db.engine).get_columns("Cluster")}
     assert version() == head()
 

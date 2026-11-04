@@ -7,11 +7,16 @@ merge takes one merged file per group instead of one file per task. Every merge 
 group merges run on different nodes at once, and the last merge reads one task's worth of results per group.
 Results whose files fit in GROUP_BYTES altogether are one group: a single merge, as without groups.
 
-- partial results: a task's watcher starts the partial script for the task's group, holding the group's lock
-  (partial.lock.<group>). The group's latest saves are merged into groups/<group>/<primaries>/, then the one getting
-  the last lock (partial.lock.final) merges the latest of every group and uploads it. Partial results carry the live
-  pages, and the on-demand ones while the user asks for them (result_format.partial_mode): the groups merge both, the
-  last merge takes the on-demand ones only when the simulation's on-demand object is in storage.
+- live partial results (points and lines, result_format.partial_mode): a task's watcher starts the partial script
+  for the task's group, holding the group's lock (partial.lock.<group>). The group's latest saves are merged into
+  groups/<group>/<primaries>/, then the one getting the last lock (partial.lock.final) merges the latest of every
+  group and uploads it. Only the live pages are read (bdo_pages.py).
+- on-demand partial results (maps): while the user asks for them (the simulation's on-demand object is in storage),
+  a watcher holding partial.lock.on_demand starts the partial script for them: the latest saves of all tasks, their
+  maps only, merged and uploaded at once. The backend keeps the live pages as they were, and drops the request.
+- a lock is a directory with its owner; a merge holding one touches it every HEARTBEAT_SECONDS, and a lock left
+  untouched for LOCK_SECONDS (its merge was killed: out of memory, its task's time limit, a failed node) is taken
+  over, so a failed task holds up the partial results of the others for a minute or two at most.
 - final results: the last task of a group to end merges the group's result files into groups/<group>/final/; the
   collect merges those, and the result files of a group whose merge is missing.
 
@@ -42,6 +47,8 @@ from pathlib import Path
 from typing import List, Optional
 from urllib import error, request
 
+import threading
+
 try:
     from yaptide.batch import result_format
 except ImportError:  # on a cluster, next to this script
@@ -62,10 +69,15 @@ PARTIAL_STAMP = "partial.stamp"
 FINAL_LOCK = "final"
 # what holds a lock: the process group of the merge (the watcher stops it by that)
 OWNER_FILE = "owner"
-# a lock older than this was left by a merge that was killed (its task ended, or its node failed)
-LOCK_SECONDS = 3600
-# the last partial merge runs at most this often; the watchers start group merges as often (watcher.py)
-PARTIAL_SECONDS = 120
+# a merge holding a lock touches it this often; a lock untouched for LOCK_SECONDS was left by a merge that was killed
+# (its task ended, it ran out of memory, or its node failed) and is taken over
+HEARTBEAT_SECONDS = 15
+LOCK_SECONDS = 90
+# the last partial merge runs at most this often by default (the watchers pass the live interval of the simulation,
+# result_format.live_interval); the watchers start group merges as often (watcher.py)
+PARTIAL_SECONDS = result_format.LIVE_MIN_SECONDS
+# the lock of the on-demand merge
+ON_DEMAND_LOCK = result_format.ON_DEMAND
 # a last partial merge that failed is tried again this soon
 RETRY_SECONDS = 20
 # merged saves kept of each group: the latest, and the one before for a last merge still reading it
@@ -77,8 +89,8 @@ GROUP_POLL_SECONDS = 5
 PARTIAL_OUTPUT = "partial_output"
 # the signed links of the simulation (written at submit, renewed by the watchers): the on-demand object's HEAD in it
 LINKS_FILE = "storage_links.json"
-# the pages the groups merge for partial results: the last merge takes the on-demand ones only when asked for
-GROUP_PARTIAL_MODES = result_format.partial_modes(on_demand=True)
+# the pages the groups merge for partial results: the live ones only, the on-demand ones are merged apart
+GROUP_PARTIAL_MODES = result_format.kind_modes(result_format.LIVE)
 
 
 def group_size(task_bytes: int, n_tasks: int) -> int:
@@ -149,9 +161,20 @@ def lock_path(root: Path, name) -> Path:
     return root / f"{PARTIAL_LOCK}.{name}"
 
 
+def lock_age(path: Path) -> float:
+    """Seconds since the lock was taken or last touched by its merge"""
+    stamps = [path.stat().st_mtime]
+    try:
+        stamps.append((path / OWNER_FILE).stat().st_mtime)
+    except FileNotFoundError:
+        pass
+    return time.time() - max(stamps)
+
+
 def take_lock(path: Path, max_age: float = LOCK_SECONDS) -> bool:
-    """Takes a lock (a directory: making one is atomic on a shared filesystem); one older than max_age is taken
-    over. False when another holds it
+    """Takes a lock (a directory: making one is atomic on a shared filesystem); one untouched for max_age is taken
+    over: renamed aside first, which only one of the merges taking it over at once manages. False when another
+    holds it
     """
     try:
         path.mkdir()
@@ -159,28 +182,52 @@ def take_lock(path: Path, max_age: float = LOCK_SECONDS) -> bool:
     except FileExistsError:
         pass
     try:
-        if time.time() - path.stat().st_mtime < max_age:
+        if lock_age(path) < max_age:
             return False
-        shutil.rmtree(str(path))
+        stale = path.with_name(f".{path.name}.stale.{uuid.uuid4().hex}")
+        path.rename(stale)
+        shutil.rmtree(str(stale), ignore_errors=True)
         path.mkdir()
+        logging.warning("Took over %s, left by a merge that stopped", path.name)
         return True
     except OSError:
         # another took it meanwhile
         return False
 
 
+# the locks this process holds, each with the event that stops its heartbeat
+_heartbeats: dict = {}
+
+
+def _heartbeat(owner: Path, stop: threading.Event) -> None:
+    """Touches the lock's owner file until stopped: the lock is alive while its merge is"""
+    while not stop.wait(HEARTBEAT_SECONDS):
+        try:
+            owner.touch()
+        except OSError:
+            pass
+
+
 def own_lock(path: Path) -> None:
-    """Marks the lock as held by this process's group: the watcher that started the merge frees it when it stops
-    the merge
+    """Marks the lock as held by this process's group, and keeps it alive while this process runs: the watcher that
+    started the merge frees it when it stops the merge, and a merge killed leaves it to go stale
     """
     try:
         (path / OWNER_FILE).write_text(str(os.getpgrp()))
     except OSError:
-        pass
+        return
+    if path in _heartbeats:
+        return
+    stop = threading.Event()
+    _heartbeats[path] = stop
+    threading.Thread(target=_heartbeat, args=(path / OWNER_FILE, stop), daemon=True).start()
 
 
 def free_lock(path: Path, owner: Optional[int] = None) -> None:
     """Frees a lock this process holds, or one held by owner's merge (or by no one yet)"""
+    stop = _heartbeats.pop(path, None)
+    if stop is not None:
+        stop.set()
     try:
         held_by = int((path / OWNER_FILE).read_text())
     except FileNotFoundError:
@@ -191,9 +238,12 @@ def free_lock(path: Path, owner: Optional[int] = None) -> None:
         shutil.rmtree(str(path), ignore_errors=True)
 
 
-def free_locks(root: Path, owner: int, group: int) -> None:
-    """Frees the locks a stopped merge held: the group's it was started for, and the last merge's"""
-    for name in (group, FINAL_LOCK):
+def free_locks(root: Path, owner: int, group, kind: str = result_format.LIVE) -> None:
+    """Frees the locks a stopped merge held: the group's it was started for and the last merge's, or the on-demand
+    merge's
+    """
+    names = (ON_DEMAND_LOCK,) if kind == result_format.ON_DEMAND else (group, FINAL_LOCK)
+    for name in names:
         free_lock(lock_path(root, name), owner)
 
 
@@ -299,8 +349,7 @@ def partial_units(root: Path, size: int, n_tasks: int) -> List[List[str]]:
     if size < n_tasks:
         merges = (numbered_dirs(root / GROUPS_DIR / str(group)) for group in range(groups(size, n_tasks)))
         return [merged_files(group_merges[-1]) for group_merges in merges if group_merges]
-    saves = (latest_save(task_dir(root, task)) for task in range(1, n_tasks + 1))
-    return [[str(path) for path in sorted(save.glob("*.bdo"))] for save in saves if save is not None]
+    return latest_saves(root, n_tasks)
 
 
 def on_demand_requested(root: Path) -> bool:
@@ -323,10 +372,9 @@ def on_demand_requested(root: Path) -> bool:
         return False
 
 
-def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
-    """Merges the units' files into partial results and uploads them (results_uploader.py, beside this script); a
-    unit with a file that cannot be read whole is left out. The partial results carry the live pages, and the
-    on-demand ones when the user asks for them
+def merge_and_upload(root: Path, units: List[List[str]], args, kind: str = result_format.LIVE) -> int:
+    """Merges the units' files into partial results of the kind (the live pages, or the on-demand ones) and uploads
+    them (results_uploader.py, beside this script); a unit with a file that cannot be read whole is left out
     """
     try:
         from yaptide.batch import results_merger
@@ -334,8 +382,9 @@ def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
         import results_merger
 
     units = [unit for unit in units if unit]
-    modes = result_format.partial_modes(on_demand_requested(root))
-    output = root / PARTIAL_OUTPUT
+    modes = result_format.kind_modes(kind)
+    # the two kinds run at once, each into its own directory
+    output = root / f"{PARTIAL_OUTPUT}.{kind}"
     try:
         while True:
             if not units:
@@ -353,13 +402,10 @@ def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
                 logging.warning("Left out %s from the partial results: %s", Path(units[index][0]).parent, err)
                 del units[index]
         if not manifest["estimators"]:
-            return 1
-        logging.info(
-            "Merged %d files into partial results of %d primaries (%s pages)",
-            len(files),
-            manifest["primaries"],
-            " and ".join(sorted(modes)),
-        )
+            # nothing of the kind (no maps, say): nothing to upload, and nothing to retry
+            logging.info("No %s pages in %d files", kind, len(files))
+            return 0
+        logging.info("Merged %d files into %s partial results of %d primaries", len(files), kind, manifest["primaries"])
         uploader = Path(__file__).resolve().parent / "results_uploader.py"
         command = [sys.executable, str(uploader), "--partial", f"--output_dir={output}", "--attempts=3"]
         command += [f"--sim_id={args.sim_id}", f"--update_key={args.update_key}", f"--backend_url={args.backend_url}"]
@@ -368,12 +414,35 @@ def merge_and_upload(root: Path, units: List[List[str]], args) -> int:
         shutil.rmtree(str(output), ignore_errors=True)
 
 
-def partial(args) -> int:
-    """Partial results, started by a task's watcher holding the lock of its group: the group's latest saves merged,
-    then, by the one getting the last lock, the latest of every group merged and uploaded. One group: its saves are
-    the whole simulation's, merged and uploaded at once
+def latest_saves(root: Path, n_tasks: int) -> List[List[str]]:
+    """The result files of the latest save of every task that has one"""
+    saves = (latest_save(task_dir(root, task)) for task in range(1, n_tasks + 1))
+    return [[str(path) for path in sorted(save.glob("*.bdo"))] for save in saves if save is not None]
+
+
+def partial_on_demand(args) -> int:
+    """On-demand partial results, started by a watcher holding the on-demand lock while the user asks for them: the
+    maps of the latest saves of all tasks, merged and uploaded at once (the live pages are not read)
     """
     root = Path(args.root)
+    lock = lock_path(root, ON_DEMAND_LOCK)
+    own_lock(lock)
+    try:
+        return merge_and_upload(root, latest_saves(root, args.ntasks), args, result_format.ON_DEMAND)
+    finally:
+        free_lock(lock)
+
+
+def partial(args) -> int:
+    """Partial results, started by a task's watcher holding the lock of its group: the group's latest saves merged
+    (their live pages), then, by the one getting the last lock, the latest of every group merged and uploaded. One
+    group: its saves are the whole simulation's, merged and uploaded at once. With --kind on_demand, the maps
+    (partial_on_demand)
+    """
+    if getattr(args, "kind", result_format.LIVE) == result_format.ON_DEMAND:
+        return partial_on_demand(args)
+    root = Path(args.root)
+    interval = getattr(args, "interval", None) or PARTIAL_SECONDS
     group_lock = lock_path(root, args.group)
     own_lock(group_lock)
     try:
@@ -388,7 +457,7 @@ def partial(args) -> int:
         free_lock(group_lock)
     final_lock = lock_path(root, FINAL_LOCK)
     stamp = root / f"{PARTIAL_STAMP}.{FINAL_LOCK}"
-    if not stamp_due(stamp, PARTIAL_SECONDS) or not take_lock(final_lock):
+    if not stamp_due(stamp, interval) or not take_lock(final_lock):
         return 0
     own_lock(final_lock)
     code = 1
@@ -398,13 +467,13 @@ def partial(args) -> int:
     finally:
         free_lock(final_lock)
         if code:
-            retry_soon(stamp)
+            retry_soon(stamp, interval)
 
 
-def retry_soon(stamp: Path) -> None:
-    """A last partial merge that failed is tried again by a group merge RETRY_SECONDS later, not PARTIAL_SECONDS"""
+def retry_soon(stamp: Path, interval: float = PARTIAL_SECONDS) -> None:
+    """A last partial merge that failed is tried again by a group merge RETRY_SECONDS later, not an interval later"""
     try:
-        when = time.time() - PARTIAL_SECONDS + RETRY_SECONDS
+        when = time.time() - interval + min(RETRY_SECONDS, interval)
         os.utime(str(stamp), (when, when))
     except OSError:
         pass
@@ -430,13 +499,22 @@ def task_end(args) -> int:
     lock = group_dir / f"{FINAL_DIR}.lock"
     if (group_dir / FINAL_DIR).exists() or not take_lock(lock):
         return 0
+    own_lock(lock)
     try:
         files = [str(path) for task in tasks for path in sorted(task_dir(root, task).glob("*.bdo"))]
         write_merged(files, group_dir / FINAL_DIR)
     finally:
-        shutil.rmtree(str(lock), ignore_errors=True)
+        free_lock(lock)
     logging.info("Merged the results of tasks %d-%d", tasks.start, tasks.stop - 1)
     return 0
+
+
+def lock_alive(path: Path) -> bool:
+    """Whether a lock is held by a merge still running (touched within LOCK_SECONDS)"""
+    try:
+        return lock_age(path) < LOCK_SECONDS
+    except FileNotFoundError:
+        return False
 
 
 def final_files(root: Path, n_tasks: int, wait_seconds: float = GROUP_WAIT_SECONDS) -> List[str]:
@@ -454,7 +532,8 @@ def final_files(root: Path, n_tasks: int, wait_seconds: float = GROUP_WAIT_SECON
         group_dir = root / GROUPS_DIR / str(group)
         if size < n_tasks:
             lock = group_dir / f"{FINAL_DIR}.lock"
-            while not (group_dir / FINAL_DIR).exists() and lock.exists() and time.monotonic() < deadline:
+            # a merge killed meanwhile leaves its lock untouched: not waited for
+            while not (group_dir / FINAL_DIR).exists() and lock_alive(lock) and time.monotonic() < deadline:
                 time.sleep(GROUP_POLL_SECONDS)
             if (group_dir / FINAL_DIR).exists():
                 files.extend(merged_files(group_dir / FINAL_DIR))
@@ -493,7 +572,9 @@ def main(argv: Optional[List[str]] = None) -> int:
         command = commands.add_parser(name)
         command.add_argument("--root", required=True, help="the simulation's directory")
         command.add_argument("--ntasks", type=int, required=True)
-    commands.choices["partial"].add_argument("--group", type=int, required=True)
+    commands.choices["partial"].add_argument("--group", type=int, default=0)
+    commands.choices["partial"].add_argument("--kind", choices=result_format.PARTIAL_KINDS, default=result_format.LIVE)
+    commands.choices["partial"].add_argument("--interval", type=float, help="seconds between the last partial merges")
     for name in ("sim_id", "update_key", "backend_url"):
         commands.choices["partial"].add_argument(f"--{name}", required=True)
     commands.choices["task_end"].add_argument("--task", type=int, required=True)

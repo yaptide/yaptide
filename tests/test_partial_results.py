@@ -351,27 +351,44 @@ def test_save_rewritten_while_packed_is_not_stored(tmp_path, monkeypatch):
     monkeypatch.setenv("TMPDIR", str(tmp_path))
     work_dir = tmp_path / "task"
     work_dir.mkdir()
-    (work_dir / "dose.bdo").write_bytes(b"save 1")
-    add = tarfile.TarFile.add
+    first, second = (BDO_DIR / "task_1" / "z_profile_0001.bdo"), (BDO_DIR / "task_2" / "z_profile_0002.bdo")
+    (work_dir / "dose.bdo").write_bytes(first.read_bytes())
+    copy = simulation_module.bdo_pages.copy_pages
 
-    def add_during_next_save(self, name, *args, **kwargs):
-        """Packs a file, while the simulator writes its next save"""
-        add(self, name, *args, **kwargs)
-        Path(name).write_bytes(b"save 2, longer")
+    def copy_during_next_save(source, target, keep):
+        """Copies a file's pages, while the simulator writes its next save"""
+        copied = copy(source, target, keep)
+        Path(source).write_bytes(second.read_bytes() + b"\0" * 8)
+        return copied
 
     key = result_storage.work_key(1, 1)
     saved = []
-    monkeypatch.setattr(tarfile.TarFile, "add", add_during_next_save)
+    monkeypatch.setattr(simulation_module.bdo_pages, "copy_pages", copy_during_next_save)
     simulation_module.store_save(work_dir, key, 100, lambda key, primaries: saved.append((key, primaries)))
     assert not saved
     assert not list(tmp_path.rglob("*.tar.gz"))
 
-    monkeypatch.setattr(tarfile.TarFile, "add", add)
+    monkeypatch.setattr(simulation_module.bdo_pages, "copy_pages", copy)
+    (work_dir / "dose.bdo").write_bytes(second.read_bytes())
     simulation_module.store_save(work_dir, key, 200, lambda key, primaries: saved.append((key, primaries)))
     assert saved == [(key, 200)]
     result_storage.get_file(key, tmp_path / "save.tar.gz")
     with tarfile.open(tmp_path / "save.tar.gz") as tar:
-        assert tar.extractfile("dose.bdo").read() == b"save 2, longer"
+        assert tar.extractfile("dose.bdo").read() == second.read_bytes()
+
+
+def test_saves_are_stored_without_volumes(tmp_path, monkeypatch):
+    """A save along the way goes to storage with the pages of partial results only; the final results whole"""
+    monkeypatch.setenv("TMPDIR", str(tmp_path))
+    work_dir = tmp_path / "task"
+    work_dir.mkdir()
+    (work_dir / "maps.bdo").write_bytes((BDO_DIR / "task_1" / "yz_profile_0001.bdo").read_bytes())
+    monkeypatch.setattr(simulation_module.result_format, "ON_DEMAND_DIMENSIONS", 1)
+    for partial, pages in ((True, 0), (False, 3)):
+        archive = simulation_module.pack_results(work_dir, partial=partial)
+        with tarfile.open(archive) as tar:
+            tar.extract("maps.bdo", tmp_path / str(partial), filter="data")
+        assert len(simulation_module.bdo_pages.pages_of(tmp_path / str(partial) / "maps.bdo")) == pages
 
 
 def test_one_user_cannot_take_every_stream(monkeypatch):

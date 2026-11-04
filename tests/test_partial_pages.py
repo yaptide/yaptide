@@ -58,15 +58,33 @@ def test_final_only_pages_are_never_merged_for_partial_results(tmp_path: Path, m
     assert MAPS_ONLY not in [estimator["name"] for estimator in manifest["estimators"]]
 
 
-def test_group_merges_keep_the_maps_for_the_last_partial_merge(tmp_path: Path):
-    """A group's partial merge keeps the maps, so the last merge can take them whenever the user asks"""
+def test_group_merges_carry_the_live_pages_only(tmp_path: Path):
+    """A group's partial merge reads the points and lines only: the maps are merged apart, when asked for"""
     target = tmp_path / "group"
     merge_groups.write_merged(FILES, target, merge_groups.GROUP_PARTIAL_MODES)
     merged = merge_groups.merged_files(target)
-    assert any(Path(file).name.startswith(MAPS_ONLY) for file in merged)
+    assert merged and not any(Path(file).name.startswith(MAPS_ONLY) for file in merged)
 
-    manifest = results_merger.write_directory(merged, tmp_path / "out", modes=result_format.partial_modes(False))
-    assert MAPS_ONLY not in [estimator["name"] for estimator in manifest["estimators"]]
+
+def test_partial_merges_read_only_their_pages(tmp_path: Path, monkeypatch):
+    """A live merge never reads the values of a map, an on-demand merge never those of a line (bdo_pages)"""
+    read = []
+    copy = results_merger.bdo_pages.copy_pages
+
+    def copy_pages(source, target, keep):
+        """Notes which pages were copied out to be read"""
+        kept = copy(source, target, keep)
+        read.extend(page.dimensions for page in results_merger.bdo_pages.pages_of(target))
+        return kept
+
+    monkeypatch.setattr(results_merger.bdo_pages, "copy_pages", copy_pages)
+    results_merger.write_directory(FILES, tmp_path / "live", modes=result_format.kind_modes(result_format.LIVE))
+    assert read and max(read) <= result_format.LIVE_DIMENSIONS
+    read.clear()
+    manifest = results_merger.write_directory(
+        FILES, tmp_path / "maps", modes=result_format.kind_modes(result_format.ON_DEMAND)
+    )
+    assert set(read) == {2} and [estimator["name"] for estimator in manifest["estimators"]] == [MAPS_ONLY]
 
 
 class FakeResponse:
@@ -100,21 +118,27 @@ def test_the_job_looks_for_the_request_with_its_signed_link(tmp_path: Path, monk
     assert not merge_groups.on_demand_requested(tmp_path)
 
 
-@pytest.mark.parametrize("requested", [False, True])
-def test_last_partial_merge_takes_the_maps_when_asked(tmp_path: Path, monkeypatch, requested: bool):
-    """The uploaded partial results carry the maps only when the user asked for them"""
-    monkeypatch.setattr(merge_groups, "on_demand_requested", lambda root: requested)
+@pytest.mark.parametrize("kind", [result_format.LIVE, result_format.ON_DEMAND])
+def test_each_kind_of_partial_merge_takes_its_pages(tmp_path: Path, monkeypatch, kind: str):
+    """The live merge uploads the points and lines, the on-demand merge the maps of the latest saves of all tasks"""
     merged = {}
 
     def write_directory(files, output, modes=None):
         """Notes what was merged"""
-        merged["modes"] = modes
+        merged.update(modes=modes, files=files)
         return {"estimators": [], "primaries": 0}
 
     monkeypatch.setattr(results_merger, "write_directory", write_directory)
-    args = SimpleNamespace(sim_id=1, update_key="key", backend_url="https://backend.test")
-    merge_groups.merge_and_upload(tmp_path, [FILES], args)
-    assert merged["modes"] == result_format.partial_modes(requested)
+    save = tmp_path / "workspaces" / "task_0001" / "saves" / "100"
+    save.mkdir(parents=True)
+    (save / "dose.bdo").write_bytes(Path(FILES[0]).read_bytes())
+    merge_groups.plan(tmp_path, 1, 10)
+    args = SimpleNamespace(
+        root=str(tmp_path), ntasks=1, group=0, kind=kind, sim_id=1, update_key="key", backend_url="https://b.test"
+    )
+    assert merge_groups.partial(args) == 0  # nothing to upload: not a failure
+    assert merged["modes"] == result_format.kind_modes(kind) and merged["files"] == [str(save / "dose.bdo")]
+    assert not list(tmp_path.glob("partial.lock.*"))
 
 
 @pytest.fixture

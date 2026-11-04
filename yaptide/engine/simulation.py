@@ -14,7 +14,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from yaptide.application import create_app
-from yaptide.batch import result_format
+from yaptide.batch import bdo_pages, result_format
 from yaptide.engine.pymc import (
     command_to_run_fluka,
     command_to_run_shieldhit,
@@ -197,16 +197,36 @@ class TornSave(Exception):
     """The simulator's next save began while the last one was packed (its log is read up to a second late)"""
 
 
-def pack_results(work_dir: Path) -> Path:
-    """Packs the result files into one archive in work_dir; raises if the simulator rewrote one meanwhile"""
+# the pages a save of a task is stored with: the ones of partial results (volumes and particle lists wait for the end)
+SAVED_MODES = {result_format.LIVE, result_format.ON_DEMAND}
+
+
+def pack_results(work_dir: Path, partial: bool = False) -> Path:
+    """Packs the result files into one archive in work_dir; raises if the simulator rewrote one meanwhile. For a save
+    along the way (partial), a SHIELD-HIT12A file goes with the pages of partial results only (bdo_pages)
+    """
     result_files = sorted(path for pattern in RESULT_PATTERNS for path in work_dir.glob(pattern))
     before = [(path.stat().st_mtime_ns, path.stat().st_size) for path in result_files]
     archive = work_dir / "results.tar.gz"
     # the fastest compression: it saves most where the results are sparse, and the simulator shares the core
     try:
-        with tarfile.open(archive, "w:gz", compresslevel=1) as tar:
+        with tempfile.TemporaryDirectory(dir=work_dir, prefix=".pages_") as pages_dir, tarfile.open(
+            archive, "w:gz", compresslevel=1
+        ) as tar:
             for result_file in result_files:
-                tar.add(result_file, arcname=result_file.name)
+                if partial and result_file.suffix == ".bdo":
+                    copy = Path(pages_dir) / result_file.name
+                    bdo_pages.copy_pages(
+                        result_file,
+                        copy,
+                        lambda info: result_format.partial_mode(info.dimensions, info.mcpl) in SAVED_MODES,
+                    )
+                    tar.add(copy, arcname=result_file.name)
+                else:
+                    tar.add(result_file, arcname=result_file.name)
+    except bdo_pages.BdoError as error:
+        archive.unlink(missing_ok=True)
+        raise TornSave(f"a result file in {work_dir} is cut short: {error}") from error
     except OSError as error:
         # a file the simulator truncated while it was read ("unexpected end of data")
         archive.unlink(missing_ok=True)
@@ -220,7 +240,7 @@ def pack_results(work_dir: Path) -> Path:
 def store_save(work_dir: Path, key: str, primaries: int, saved: Callable[[str, int], None]) -> None:
     """Stores the result files of a finished save: the simulator rewrites them in place at its next save"""
     try:
-        result_storage.put_file(key, pack_results(work_dir))
+        result_storage.put_file(key, pack_results(work_dir, partial=True))
         saved(key, primaries)
     except TornSave:
         logging.info("Save of %s at %d primaries skipped, the next one was under way", work_dir, primaries)
@@ -374,19 +394,22 @@ def merge_and_store(simulation_id: int, keys: list[str]) -> bool:
 
 
 def merge_and_store_partial(
-    simulation_id: int, keys: list[str], primaries: int, max_bytes: float = float("inf")
+    simulation_id: int,
+    keys: list[str],
+    primaries: int,
+    max_bytes: float = float("inf"),
+    kind: str = result_format.LIVE,
 ) -> bool:
     """Merges the latest saves of the tasks, at most max_bytes of result files, into the simulation's partial
-    results: the live pages, and the on-demand ones when the user asks for them; whether they were stored
+    results of the kind: the live pages, or the on-demand ones the user asked for (the others keep what they had);
+    whether they were stored
     """
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            on_demand = result_storage.configured() and result_storage.on_demand_requested(simulation_id)
-            modes = result_format.partial_modes(on_demand)
-            estimators = merge_stored(keys, max_bytes, simulation_id, modes)
+            estimators = merge_stored(keys, max_bytes, simulation_id, result_format.kind_modes(kind))
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

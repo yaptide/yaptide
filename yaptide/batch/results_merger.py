@@ -21,6 +21,7 @@ import math
 import pickle
 import struct
 import sys
+import tempfile
 from pathlib import Path
 from typing import Callable, Iterator, List, Optional, Tuple
 
@@ -31,8 +32,9 @@ from pymchelper.page import Page
 from pymchelper.shieldhit.detector.detector_type import SHDetType
 
 try:
-    from yaptide.batch import result_format
+    from yaptide.batch import bdo_pages, result_format
 except ImportError:  # on a cluster, next to this script
+    import bdo_pages
     import result_format
 
 # the manifest of a merge's output directory
@@ -59,19 +61,47 @@ class ResultFileError(ValueError):
         self.file = file
 
 
-def read_estimator(file: str) -> Optional[Estimator]:
-    """Reads a result file; raises ResultFileError when it is gone, when a SHIELD-HIT12A file has no pages, or when
-    one of its pages holds other than the bins its estimator declares (the UI gets values for every bin declared)
+def read_whole(file: str) -> Optional[Estimator]:
+    """Reads a result file with all its pages"""
+    if file.endswith(MERGED_SUFFIX):
+        # written by this simulation's merge_groups.py, next to this script
+        with open(file, "rb") as merged:
+            return pickle.load(merged)  # skipcq: BAN-B301
+    return fromfile(file)
+
+
+def read_pages(file: str, modes: set) -> Optional[Estimator]:
+    """Reads only the pages of the modes of a SHIELD-HIT12A result file: the others are skipped, their values never
+    read (bdo_pages); None when it has none of them. The pages wanted are copied into a file of their own, which
+    pymchelper reads as it reads the whole file
     """
+    with tempfile.TemporaryDirectory(prefix="yaptide_pages_") as directory:
+        # the same name, so pymchelper finds the estimator's name in it
+        copy = Path(directory) / Path(file).name
+        try:
+            kept = bdo_pages.copy_pages(
+                Path(file), copy, lambda info: result_format.partial_mode(info.dimensions, info.mcpl) in modes
+            )
+        except bdo_pages.BdoError as err:
+            raise ResultFileError(file, err) from err
+        if not kept:
+            return None
+        return fromfile(str(copy))
+
+
+def read_estimator(file: str, modes: Optional[set] = None) -> Optional[Estimator]:
+    """Reads a result file, with modes only the pages of those modes (None when it has none of them); raises
+    ResultFileError when it is gone, when a SHIELD-HIT12A file has no pages, or when one of its pages holds other than
+    the bins its estimator declares (the UI gets values for every bin declared)
+    """
+    partial = modes is not None and file.endswith(".bdo")
     try:
-        if file.endswith(MERGED_SUFFIX):
-            # written by this simulation's merge_groups.py, next to this script
-            with open(file, "rb") as merged:
-                return pickle.load(merged)  # skipcq: BAN-B301
-        estimator = fromfile(file)
+        estimator = read_pages(file, modes) if partial else read_whole(file)
     except (OSError, EOFError, IndexError, AttributeError, struct.error, pickle.UnpicklingError) as err:
         # gone, or cut short inside a page's tags (pymchelper then misses what the page needs)
         raise ResultFileError(file, err) from err
+    if partial and estimator is None:
+        return None
     if estimator is not None and file.endswith(".bdo") and not estimator.pages:
         raise ResultFileError(file, "no pages")
     if estimator and file.endswith(".bdo"):
@@ -86,9 +116,7 @@ def page_mode(page: Page) -> str:
     """What partial results carry of the page (result_format.partial_mode): by its dimensions, a list of particles
     (MCPL) only in the final results
     """
-    if page.dettyp == SHDetType.mcpl:
-        return result_format.FINAL_ONLY
-    return result_format.partial_mode(page.dimension)
+    return result_format.partial_mode(page.dimension, page.dettyp == SHDetType.mcpl)
 
 
 def keep_pages(estimator: Optional[Estimator], modes: Optional[set]) -> Optional[Estimator]:
@@ -111,7 +139,7 @@ def merge_estimator_files(files: List[str], modes: Optional[set] = None) -> Opti
 
     Mean only: pymchelper's WeightedStatsAggregator also keeps a variance of every bin, which the pages do not hold.
     """
-    result = keep_pages(read_estimator(files[0]), modes)
+    result = keep_pages(read_estimator(files[0], modes), modes)
     if not result or not result.pages:
         return None
     # the task files merged: one for a task's, the group's for a group's
@@ -125,7 +153,9 @@ def merge_estimator_files(files: List[str], modes: Optional[set] = None) -> Opti
         if avg:
             page.data_raw = page.data_raw * result.number_of_primaries
     for file in files[1:]:
-        estimator = keep_pages(read_estimator(file), modes)
+        estimator = keep_pages(read_estimator(file, modes), modes)
+        if estimator is None:
+            raise ResultFileError(file, f"none of the pages of {files[0]}")
         # a file cut short between pages reads whole, with fewer pages: the shorter one is left out
         if len(estimator.pages) != len(result.pages):
             short = file if len(estimator.pages) < len(result.pages) else files[0]

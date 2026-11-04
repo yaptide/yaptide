@@ -300,6 +300,7 @@ SCRIPTS = (
     "results_merger.py",
     "result_format.py",
     "merge_groups.py",
+    "bdo_pages.py",
 )
 
 

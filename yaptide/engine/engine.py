@@ -30,6 +30,7 @@ from botocore.exceptions import BotoCoreError, ClientError
 from sqlalchemy import and_, func, or_, text
 
 from yaptide.batch.batch_methods import SUBMIT_SECONDS, cancel_simulation, fail_submit, submit_simulation
+from yaptide.batch import result_format
 from yaptide.engine.pymc import get_tmp_dir
 from yaptide.engine.simulation import (
     WORK_DIR_PREFIX,
@@ -57,9 +58,10 @@ from yaptide.persistence.models import (
     TaskModel,
     UserActivityModel,
 )
+from yaptide.routes.common_sim_routes import clean_partial_results
 from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
 from yaptide.utils.enums import EntityState, PlatformType, SimulationType
-from yaptide.utils.sim_utils import set_shieldhit_save_step
+from yaptide.utils.sim_utils import estimated_result_bytes, set_shieldhit_save_step
 
 # SSH connections to the clusters at once; they ban accounts that log in often
 CLUSTER_CONNECTIONS = 4
@@ -204,6 +206,8 @@ GIVE_UP_SECONDS = 60
 PARTIAL_GROWTH = 0.05
 # partial merges at once over all simulations, next to the simulators (an HPC simulation's are merged on its cluster)
 MAX_PARTIAL_MERGES = 2
+# a running simulation's request of the maps (result_format.ON_DEMAND) is looked for this often
+ON_DEMAND_CHECK_SECONDS = 5
 # besides the delete events, the engine looks this often for objects under hpc/ and work/ of simulations no longer in
 # the database: deletes made while it was not listening, removals that failed (their pages stay: storage cost only)
 ORPHAN_SWEEP_SECONDS = 3600
@@ -278,11 +282,17 @@ def merge_task(simulation_id: int, keys: list[str]) -> bool:
 
 # like the merge; one that fails is skipped, the next saves bring the next partial results
 @ray.remote(num_cpus=0, max_retries=0)
-def partial_merge_task(simulation_id: int, keys: list[str], primaries: int, max_bytes: float = float("inf")) -> bool:
+def partial_merge_task(
+    simulation_id: int,
+    keys: list[str],
+    primaries: int,
+    max_bytes: float = float("inf"),
+    kind: str = result_format.LIVE,
+) -> bool:
     """Merges the latest saves of the tasks of a running simulation, at most max_bytes of result files, and stores
-    them as its partial results
+    them as its partial results of the kind (the live pages, or the on-demand ones)
     """
-    return merge_and_store_partial(simulation_id, keys, primaries, max_bytes)
+    return merge_and_store_partial(simulation_id, keys, primaries, max_bytes, kind)
 
 
 # a task cancelled meanwhile may still store its save, and removes it itself
@@ -439,6 +449,12 @@ class Running:
     # primaries of the stored partial results, and of the ones being merged
     partial_primaries: int = 0
     merging_primaries: int = 0
+    # the live merges are this far apart at least (result_format.live_interval), the last one started then
+    live_seconds: float = result_format.LIVE_MIN_SECONDS
+    partial_started: float = float("-inf")
+    # the on-demand merge (the maps the user asked for) and when the request was last looked for
+    on_demand: Optional[ray.ObjectRef] = None
+    on_demand_checked: float = float("-inf")
 
     def refs(self) -> list:
         """What the engine waits for"""
@@ -527,6 +543,7 @@ class Engine:
                     self.stop_overdue()
                     self.retry_cancels()
                     self.submit_waiting()
+                    self.clean_partial_results()
                 if time.monotonic() - last_orphan_sweep >= ORPHAN_SWEEP_SECONDS:
                     last_orphan_sweep = time.monotonic()
                     self.delete_orphans()
@@ -572,6 +589,8 @@ class Engine:
             self.stop(simulation_id)
         elif event == "PARTIAL" and simulation_id in self.running:
             self.partial_merged(simulation_id, self.running[simulation_id])
+        elif event == "ON_DEMAND" and simulation_id in self.running:
+            self.on_demand_merged(simulation_id, self.running[simulation_id])
         elif event == "FINISHED" and simulation_id in self.running:
             running = self.running[simulation_id]
             ready, _ = ray.wait(running.refs(), num_returns=len(running.refs()), timeout=0)
@@ -596,6 +615,19 @@ class Engine:
         existing = db.session.query(SimulationModel.id).filter(SimulationModel.id.in_(wanted))
         for simulation_id in sorted(wanted - {simulation_id for (simulation_id,) in existing}):
             self.removing[(simulation_id, pages)] = self.cleaner.delete.remote(simulation_id, pages)
+
+    @staticmethod
+    def clean_partial_results() -> None:
+        """Partial results PARTIAL_CLEANUP_SECONDS after their simulation ended go (clean_partial_results)"""
+        try:
+            removed = clean_partial_results()
+            if removed:
+                logging.info("Removed %d pages of partial results", removed)
+        except DATABASE_FAILURES:
+            raise
+        except Exception:  # skipcq: PYL-W0703 - tried again next minute
+            db.session.rollback()
+            logging.exception("Removing partial results failed")
 
     def delete_orphans(self) -> None:
         """Removes what HPC jobs and tasks left in storage (never result pages) of simulations no longer in the
@@ -802,8 +834,8 @@ class Engine:
         self.hpc_active = bool(self.hpc_round)
 
     def partial_merges(self) -> int:
-        """Partial merges running"""
-        return sum(1 for running in self.running.values() if running.partial)
+        """Partial merges running, of both kinds"""
+        return sum(bool(running.partial) + bool(running.on_demand) for running in self.running.values())
 
     def submit(self, simulation_id: int) -> None:
         """Hands a stored HPC simulation to the cluster gateway, once at a time; not while its cluster's SLURM does
@@ -934,9 +966,11 @@ class Engine:
     def start(self, simulation: CelerySimulationModel) -> None:
         """Submits the tasks of a simulation"""
         files = dict(simulation.inputs[0].data["input_files"])
+        live_seconds = result_format.LIVE_MIN_SECONDS
         if simulation.sim_type == SimulationType.SHIELDHIT.value:
             # saves along the way for partial results, in the tasks' copy only: the stored input stays the user's
             set_shieldhit_save_step(files, max(task.requested_primaries or 0 for task in simulation.tasks))
+            live_seconds = result_format.live_interval(estimated_result_bytes(files.get("detect.dat", "")) or 0)
         files_ref = ray.put(files)
         task_ids = sorted(task.task_id for task in simulation.tasks)
         work_dirs = {task_id: get_tmp_dir() / f"{WORK_DIR_PREFIX}{simulation.id}_{task_id}" for task_id in task_ids}
@@ -945,7 +979,9 @@ class Engine:
             for task_id, work_dir in work_dirs.items()
         }
         requested_primaries = sum(task.requested_primaries or 0 for task in simulation.tasks)
-        self.running[simulation.id] = Running(tasks=tasks, work_dirs=work_dirs, requested_primaries=requested_primaries)
+        self.running[simulation.id] = Running(
+            tasks=tasks, work_dirs=work_dirs, requested_primaries=requested_primaries, live_seconds=live_seconds
+        )
         for ref in tasks:
             self.watch(ref, simulation.id)
         logging.info("Started simulation %d with %d tasks", simulation.id, len(tasks))
@@ -969,10 +1005,15 @@ class Engine:
             self.merge_partial(simulation_id, running)
 
     def merge_partial(self, simulation_id: int, running: Running) -> None:
-        """Merges the latest results of the tasks into partial results, when they cover enough new primaries"""
+        """Merges the latest results of the tasks into live partial results, when they cover enough new primaries and
+        the last live merge started an interval ago; and into on-demand ones while the user asks for them
+        """
+        self.merge_on_demand(simulation_id, running)
         primaries = sum(primaries for _, primaries in running.saves.values())
         grown = primaries - running.partial_primaries
         if running.partial or running.merge or grown <= 0 or grown < PARTIAL_GROWTH * running.requested_primaries:
+            return
+        if time.monotonic() - running.partial_started < running.live_seconds:
             return
         # with every task finished the final merge is next
         if not running.tasks or self.partial_merges() >= MAX_PARTIAL_MERGES:
@@ -980,7 +1021,40 @@ class Engine:
         keys = [key for key, _ in running.saves.values()]
         running.partial = partial_merge_task.remote(simulation_id, keys, primaries)
         running.merging_primaries = primaries
+        running.partial_started = time.monotonic()
         self.watch(running.partial, simulation_id, "PARTIAL")
+
+    def merge_on_demand(self, simulation_id: int, running: Running) -> None:
+        """Merges the maps of the tasks' latest saves while the user asks for them (an object in storage, looked for
+        at most every ON_DEMAND_CHECK_SECONDS); apart from the live merges, which never read a map
+        """
+        if running.on_demand or running.merge or not running.tasks or not running.saves:
+            return
+        if time.monotonic() - running.on_demand_checked < ON_DEMAND_CHECK_SECONDS or not result_storage.configured():
+            return
+        running.on_demand_checked = time.monotonic()
+        try:
+            requested = result_storage.on_demand_requested(simulation_id)
+        except Exception as error:  # skipcq: PYL-W0703 - partial results only
+            logging.warning("Looking for a request of the maps of simulation %d failed: %s", simulation_id, error)
+            return
+        if not requested or self.partial_merges() >= MAX_PARTIAL_MERGES:
+            return
+        keys = [key for key, _ in running.saves.values()]
+        primaries = sum(primaries for _, primaries in running.saves.values())
+        running.on_demand = partial_merge_task.remote(
+            simulation_id, keys, primaries, float("inf"), result_format.ON_DEMAND
+        )
+        self.watch(running.on_demand, simulation_id, "ON_DEMAND")
+
+    @staticmethod
+    def on_demand_merged(simulation_id: int, running: Running) -> None:
+        """An on-demand merge that failed leaves the request: the next check tries again"""
+        try:
+            ray.get(running.on_demand)
+        except Exception as error:  # skipcq: PYL-W0703
+            logging.warning("The maps of simulation %d failed: %s", simulation_id, error)
+        running.on_demand = None
 
     @staticmethod
     def partial_merged(simulation_id: int, running: Running) -> None:

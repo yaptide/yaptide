@@ -1,7 +1,7 @@
 import logging
 import os
-from datetime import datetime, timezone
-from typing import List
+from datetime import datetime, timedelta, timezone
+from typing import List, Optional
 
 from flask import request, current_app as app
 from flask_restful import Resource
@@ -30,6 +30,7 @@ from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     EstimatorModel,
+    ExpiringObjectModel,
     LogfilesModel,
     PageModel,
     PageObjectModel,
@@ -363,7 +364,8 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
         return False
     superseded = []
     prepare_estimators_and_pages(simulation, estimators, superseded)
-    if simulation.partial_primaries is not None:
+    had_partial = simulation.partial_primaries is not None
+    if had_partial:
         # partial results of estimators the final ones lack (a result file named differently by the cluster's
         # convertmc, "dose" and "dose_", when it merged without results_merger.py) go with them
         others = (
@@ -385,8 +387,73 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
 
     update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     update_simulation_state(simulation=simulation, update_dict=update_dict)
-    result_storage.delete_pages(superseded)
+    if had_partial:
+        # partial results a browser may still be loading: removed PARTIAL_CLEANUP_SECONDS from now
+        expire_pages(simulation.id, superseded)
+    else:
+        result_storage.delete_pages(superseded)
     return True
+
+
+# the stored pages of partial results stay this long after the simulation ended (clean_partial_results)
+PARTIAL_CLEANUP_SECONDS = 15 * 60
+
+
+def expire_pages(simulation_id: int, keys: list[str]) -> None:
+    """Removes the stored pages PARTIAL_CLEANUP_SECONDS from now; at once when that cannot be noted"""
+    if not keys:
+        return
+    delete_after = datetime.now(timezone.utc) + timedelta(seconds=PARTIAL_CLEANUP_SECONDS)
+    try:
+        db.session.add_all(
+            ExpiringObjectModel(simulation_id=simulation_id, key=key, delete_after=delete_after) for key in keys
+        )
+        db.session.commit()
+    except Exception:  # skipcq: PYL-W0703 - the final results are stored already
+        db.session.rollback()
+        logging.exception("Noting the partial results of simulation %d for removal failed", simulation_id)
+        result_storage.delete_pages(keys)
+
+
+def aware(moment: Optional[datetime]) -> Optional[datetime]:
+    """A time from the database, in UTC (SQLite keeps none of the zone)"""
+    if moment is not None and moment.tzinfo is None:
+        return moment.replace(tzinfo=timezone.utc)
+    return moment
+
+
+def clean_partial_results(now: Optional[datetime] = None) -> int:
+    """Removes partial results PARTIAL_CLEANUP_SECONDS after their simulation ended: the stored pages the final
+    results replaced, and the partial results of a simulation that failed or was cancelled (its estimators and
+    pages). Returns the pages removed
+    """
+    now = now or datetime.now(timezone.utc)
+    expired = db.session.query(ExpiringObjectModel).filter(ExpiringObjectModel.delete_after <= now).all()
+    keys = [row.key for row in expired]
+    for row in expired:
+        db.session.delete(row)
+    ended = (
+        db.session.query(SimulationModel)
+        .filter(
+            SimulationModel.partial_primaries.isnot(None),
+            SimulationModel.job_state.in_([EntityState.FAILED.value, EntityState.CANCELED.value]),
+        )
+        .all()
+    )
+    cutoff = now - timedelta(seconds=PARTIAL_CLEANUP_SECONDS)
+    for simulation in ended:
+        end = aware(simulation.end_time) or aware(simulation.partial_time)
+        if end is None or end > cutoff:
+            continue
+        for estimator in fetch_estimators_by_sim_id(simulation.id):
+            keys.extend(page.stored_object.key for page in estimator.pages if page.stored_object)
+            db.session.delete(estimator)
+        simulation.partial_primaries = None
+        simulation.partial_time = None
+        logging.info("Removed the partial results of simulation %d, %s", simulation.id, simulation.job_state)
+    db.session.commit()
+    result_storage.delete_pages(keys)
+    return len(keys)
 
 
 def carries_on_demand(estimators: list[dict]) -> bool:

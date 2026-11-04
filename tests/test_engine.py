@@ -839,7 +839,11 @@ def test_partial_merges_are_limited_and_a_failed_one_is_repeated(engine, monkeyp
     monkeypatch.setattr(engine, "watch", lambda *args: None)
     for simulation_id in (1, 2, 3):
         engine.running[simulation_id] = engine_module.Running(
-            tasks={f"ref{simulation_id}": 1}, work_dirs={}, requested_primaries=1000, saves={1: ("key", 100)}
+            tasks={f"ref{simulation_id}": 1},
+            work_dirs={},
+            requested_primaries=1000,
+            saves={1: ("key", 100)},
+            live_seconds=0,
         )
         engine.merge_partial(simulation_id, engine.running[simulation_id])
     assert started == [1, 2]

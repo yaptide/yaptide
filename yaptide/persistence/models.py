@@ -165,8 +165,7 @@ class SimulationModel(db.Model):
 # HPC ones it submits and cancels: every change, from any route, script or psql, sends the event when its
 # transaction commits. The migrations 9e1d2f3a4b5c and 4b8e2c6d1a7f create the same for databases created before.
 ENGINE_CHANNEL = "yaptide_engine"
-NOTIFY_ENGINE_FUNCTION = DDL(
-    """
+NOTIFY_ENGINE_FUNCTION = DDL("""
 CREATE OR REPLACE FUNCTION notify_engine() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'DELETE' THEN
@@ -187,19 +186,15 @@ BEGIN
     RETURN NEW;
 END
 $$ LANGUAGE plpgsql
-"""
-)
-NOTIFY_ENGINE_TRIGGER = DDL(
-    """
+""")
+NOTIFY_ENGINE_TRIGGER = DDL("""
 CREATE OR REPLACE TRIGGER simulation_engine_events AFTER INSERT OR UPDATE OF job_state OR DELETE ON "Simulation"
 FOR EACH ROW EXECUTE FUNCTION notify_engine()
-"""
-)
+""")
 # the open event streams of a user (yaptide/routes/events_routes.py) learn about a new simulation, a new state, partial
 # results or a save of the tasks' progress; the migration 2a6c8e0b4d17 creates the same for databases created before
 SIMULATION_CHANNEL = "yaptide_simulation"
-NOTIFY_SIMULATION_FUNCTION = DDL(
-    """
+NOTIFY_SIMULATION_FUNCTION = DDL("""
 CREATE OR REPLACE FUNCTION notify_simulation() RETURNS trigger AS $$
 BEGIN
     IF TG_OP = 'INSERT' OR OLD.job_state IS DISTINCT FROM NEW.job_state
@@ -210,15 +205,12 @@ BEGIN
     RETURN NEW;
 END
 $$ LANGUAGE plpgsql
-"""
-)
-NOTIFY_SIMULATION_TRIGGER = DDL(
-    """
+""")
+NOTIFY_SIMULATION_TRIGGER = DDL("""
 CREATE OR REPLACE TRIGGER simulation_stream_events
 AFTER INSERT OR UPDATE OF job_state, partial_primaries, progress_revision ON "Simulation"
 FOR EACH ROW EXECUTE FUNCTION notify_simulation()
-"""
-)
+""")
 NOTIFY_STATEMENTS = (
     NOTIFY_ENGINE_FUNCTION,
     NOTIFY_ENGINE_TRIGGER,
@@ -492,6 +484,20 @@ class PageObjectModel(db.Model):
     key: Column[str] = db.Column(db.String, nullable=False, doc="Object key in the results bucket")
     size: Column[int] = db.Column(db.Integer, nullable=False, doc="Stored size in bytes")
     format: Column[str] = db.Column(db.String, nullable=False, doc="How the page is encoded in the object")
+
+
+class ExpiringObjectModel(db.Model):
+    """Stored pages of partial results replaced by the final ones, removed a while after the simulation ended: a
+    browser may still be loading them (yaptide/routes/common_sim_routes.py, the engine's partial cleanup)
+    """
+
+    __tablename__ = "ExpiringObject"
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(
+        db.Integer, db.ForeignKey("Simulation.id", ondelete="CASCADE"), nullable=False
+    )
+    key: Column[str] = db.Column(db.String, nullable=False, doc="Object key (a page's prefix) in the results bucket")
+    delete_after: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
 
 
 class LogfilesModel(db.Model):

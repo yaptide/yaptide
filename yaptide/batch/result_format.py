@@ -209,15 +209,21 @@ def json_page(page: dict, values: list) -> dict:
 
 
 # what partial results carry of a page, by its dimensions (the axes with more than one bin, differential ones included):
-# a point or a line in every partial result, a map when the user asks for it (it costs a merge of its bins at each
-# request), a volume only in the final results - the UI does not plot one, and its merge can take gigabytes
+# a point or a line in every live partial result, a map in an on-demand one when the user asks for it (it costs a merge
+# of its bins), a volume only in the final results - the UI does not plot one, and its merge can take gigabytes.
+# The live and the on-demand pages are merged apart: a live merge never reads a map, an on-demand merge never a line.
 LIVE, ON_DEMAND, FINAL_ONLY = "live", "on_demand", "final_only"
+PARTIAL_KINDS = (LIVE, ON_DEMAND)
 LIVE_DIMENSIONS = 1
 ON_DEMAND_DIMENSIONS = 2
+# the result files' type of a list of particles (pymchelper's SHDetType.mcpl): only in the final results
+MCPL_DETECTOR = 63
 
 
-def partial_mode(dimensions: int) -> str:
+def partial_mode(dimensions: int, mcpl: bool = False) -> str:
     """What partial results carry of a page of these dimensions: LIVE, ON_DEMAND or FINAL_ONLY"""
+    if mcpl:
+        return FINAL_ONLY
     if dimensions <= LIVE_DIMENSIONS:
         return LIVE
     if dimensions <= ON_DEMAND_DIMENSIONS:
@@ -226,5 +232,25 @@ def partial_mode(dimensions: int) -> str:
 
 
 def partial_modes(on_demand: bool) -> set:
-    """The modes of the pages a partial result carries: the live ones, and the on-demand ones when asked for"""
+    """The modes of the pages of both kinds of partial result: the live ones, and the on-demand ones too"""
     return {LIVE, ON_DEMAND} if on_demand else {LIVE}
+
+
+def kind_modes(kind: str) -> set:
+    """The modes of the pages a partial merge of a kind (LIVE or ON_DEMAND) carries: that kind's only"""
+    if kind not in PARTIAL_KINDS:
+        raise ValueError(f"no partial results of kind {kind!r}")
+    return {kind}
+
+
+# the live partial results are merged at most this often, and less often for large results: SHIELD-HIT12A writes
+# every page at each save (volumes too) and a merge reads the saves of all tasks
+LIVE_MIN_SECONDS = 15.0
+# seconds of the interval for each byte one save of a task writes: 15 s up to 100 MB, a minute for 400 MB
+LIVE_SECONDS_PER_BYTE = 15.0 / 100e6
+LIVE_MAX_SECONDS = 600.0
+
+
+def live_interval(save_bytes: float) -> float:
+    """How often the live partial results are merged, for a task's save of save_bytes (all its result files)"""
+    return min(LIVE_MAX_SECONDS, max(LIVE_MIN_SECONDS, save_bytes * LIVE_SECONDS_PER_BYTE))
