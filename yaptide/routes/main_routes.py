@@ -8,6 +8,7 @@ from yaptide.routes.common_sim_routes import (
     JobsResource,
     LogfilesResource,
     OnDemandResource,
+    WatchResource,
     ResultsResource,
 )
 from yaptide.routes.estimator_routes import EstimatorResource
@@ -48,6 +49,7 @@ def initialize_routes(api: Api):
 
     api.add_resource(ResultsResource, "/results")
     api.add_resource(OnDemandResource, "/results/on_demand")
+    api.add_resource(WatchResource, "/results/watch")
     api.add_resource(ResultsUploadsResource, "/results/uploads")
     api.add_resource(ResultsDoneResource, "/results/done")
     api.add_resource(InputsResource, "/inputs")

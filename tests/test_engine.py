@@ -174,6 +174,9 @@ def test_saves_of_running_tasks_become_partial_results(client, engine, cluster):
     replace it
     """
     simulation_id = submit(client, "FAKE_SAVES")
+    # someone has the app open: the live pages are merged while the tab beats
+    job_id = db.session.get(SimulationModel, simulation_id).job_id
+    assert client.post("/results/watch", json={"job_ids": [job_id], "viewer": "tab"}).status_code == 200
     engine.handle(EntityState.PENDING.value, simulation_id)
 
     # the tasks hold after their saves: the save of one may be merged before the other's comes, then both are, once
@@ -837,6 +840,8 @@ def test_partial_merges_are_limited_and_a_failed_one_is_repeated(engine, monkeyp
         engine_module, "partial_merge_task", mock.Mock(remote=lambda *args: started.append(args[0]) or ray.put(False))
     )
     monkeypatch.setattr(engine, "watch", lambda *args: None)
+    # someone looks at all of them
+    monkeypatch.setattr(engine_module, "wanted_state", lambda simulation_id: (time.time() + 3600, set()))
     for simulation_id in (1, 2, 3):
         engine.running[simulation_id] = engine_module.Running(
             tasks={f"ref{simulation_id}": 1},
@@ -857,6 +862,38 @@ def test_partial_merges_are_limited_and_a_failed_one_is_repeated(engine, monkeyp
     engine.partial_merged(2, engine.running[2])
     engine.merge_partial(1, engine.running[1])
     assert started == [1, 2, 3, 1]
+    engine.running.clear()
+
+
+def test_live_merges_only_while_someone_looks_and_maps_only_when_asked(engine, monkeypatch):
+    """No live merge while no one has the results open; a map asked for is merged alone, then looked up again"""
+    started = []
+    monkeypatch.setattr(
+        engine_module,
+        "partial_merge_task",
+        mock.Mock(remote=lambda *args: started.append(args[3:]) or ray.put(True)),
+    )
+    monkeypatch.setattr(engine, "watch", lambda *args: None)
+    wanted = {"live_until": 0.0, "pages": set()}
+    monkeypatch.setattr(engine_module, "wanted_state", lambda simulation_id: (wanted["live_until"], wanted["pages"]))
+    running = engine_module.Running(
+        tasks={"ref": 1}, work_dirs={}, requested_primaries=1000, saves={1: ("key", 100)}, live_seconds=0
+    )
+    engine.running[1] = running
+    engine.merge_partial(1, running)
+    assert started == []
+
+    wanted["pages"] = {("yz", 1)}
+    running.wanted_checked = float("-inf")
+    engine.merge_partial(1, running)
+    assert started == [(float("inf"), engine_module.result_format.ON_DEMAND, [("yz", 1)])]
+    wanted["pages"] = set()
+    engine.on_demand_merged(1, running)
+    assert running.wanted_checked == float("-inf") and not running.pages
+
+    wanted["live_until"] = time.time() + 60
+    engine.merge_partial(1, running)
+    assert started[-1] == ()  # the live merge, of the live pages
     engine.running.clear()
 
 

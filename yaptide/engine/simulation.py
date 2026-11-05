@@ -350,12 +350,14 @@ def merge_stored(
     max_bytes: float = float("inf"),
     simulation_id: Optional[int] = None,
     modes: Optional[set] = None,
+    pages: Optional[dict] = None,
 ) -> list[dict]:
     """Merges the result files the tasks stored under the keys, at most max_bytes of them; a missing one raises
 
     With the simulation's id the pages go to object storage as they are merged (PageWriter), the estimators then
     point at them. The task archives are fetched and unpacked one at a time onto disk; the merge reads one file at a
-    time. With modes (result_format.partial_modes), only the pages of those modes.
+    time. With modes (result_format.partial_modes), only the pages of those modes; with pages (estimator -> page
+    numbers), only those pages.
     """
     writer = PageWriter(simulation_id)
     with tempfile.TemporaryDirectory(dir=get_tmp_dir()) as merge_dir:
@@ -368,7 +370,7 @@ def merge_stored(
             archive.unlink()
             task_dirs.append(task_dir)
         try:
-            return merge_simulation_outputs(task_dirs, writer, modes)
+            return merge_simulation_outputs(task_dirs, writer, modes, pages)
         except BaseException:
             result_storage.delete_pages(writer.written)
             raise
@@ -399,17 +401,22 @@ def merge_and_store_partial(
     primaries: int,
     max_bytes: float = float("inf"),
     kind: str = result_format.LIVE,
+    pages: Optional[list] = None,
 ) -> bool:
     """Merges the latest saves of the tasks, at most max_bytes of result files, into the simulation's partial
-    results of the kind: the live pages, or the on-demand ones the user asked for (the others keep what they had);
-    whether they were stored
+    results of the kind: the live pages, or (ON_DEMAND) the pages the user asked for ((estimator, page number)
+    pairs; the others keep what they had); whether they were stored
     """
     with backend_app().app_context():
         try:
             simulation = fetch_simulation_by_sim_id(simulation_id)
             if simulation is None:
                 return False
-            estimators = merge_stored(keys, max_bytes, simulation_id, result_format.kind_modes(kind))
+            if kind == result_format.LIVE:
+                estimators = merge_stored(keys, max_bytes, simulation_id, result_format.kind_modes(kind))
+            else:
+                selected = result_format.pages_by_estimator(pages or ())
+                estimators = merge_stored(keys, max_bytes, simulation_id, None, selected) if selected else []
             return bool(estimators) and store_partial_results(simulation, estimators, primaries)
         finally:
             db.session.remove()

@@ -91,7 +91,20 @@ def valid_page(page: dict) -> bool:
         # bool is an int too, and would become a key like .../True.json
         and type(page.get("page_number")) is int
         and page["page_number"] >= 0
+        and not page.get("stub")
         and (valid_files(page["files"]) if "files" in page else valid_object(page))
+    )
+
+
+def valid_stub(page) -> bool:
+    """A stub of a map partial results announce (results_merger.page_stubs): its number, name and dimensions"""
+    return (
+        isinstance(page, dict)
+        and page.get("stub") is True
+        and type(page.get("page_number")) is int
+        and page["page_number"] >= 0
+        and type(page.get("dimensions")) is int
+        and isinstance(page.get("name", ""), str)
     )
 
 
@@ -189,6 +202,11 @@ def check_pages(simulation_id: int, estimator: dict, revision: str) -> tuple[lis
     """
     stored, missing = [], []
     for page in estimator["pages"]:
+        if valid_stub(page):
+            stored.append(
+                {"stub": True, "page_number": page["page_number"], "name": page.get("name", ""), "dimensions": page["dimensions"]}
+            )
+            continue
         entry = {**page, "estimator": estimator["name"]} if isinstance(page, dict) else None
         if not valid_page(entry) or ("files" in entry and revision is None):
             raise ValueError("Invalid page entry")
@@ -253,5 +271,7 @@ class ResultsDoneResource(Resource):
             if not store_partial_results(simulation, results, payload["primaries"]):
                 return yaptide_response(message=f"Simulation is {simulation.job_state}", code=409)
             return yaptide_response(message="Partial results saved", code=202)
+        # stubs of maps belong to partial results only
+        results = [dict(result, pages=[page for page in result["pages"] if not page.get("stub")]) for result in results]
         store_results(simulation, results)
         return yaptide_response(message="Results saved", code=202)

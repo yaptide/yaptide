@@ -29,6 +29,7 @@ import numpy as np
 from pymchelper.estimator import Estimator
 from pymchelper.input_output import AggregationType, fromfile, guess_corename
 from pymchelper.page import Page
+from pymchelper.readers.shieldhit.reader_bdo2019 import SHReaderBDO2019
 from pymchelper.shieldhit.detector.detector_type import SHDetType
 
 try:
@@ -61,42 +62,90 @@ class ResultFileError(ValueError):
         self.file = file
 
 
+def read_bdo(file: str) -> Optional[Estimator]:
+    """Reads a SHIELD-HIT12A file of the token format of 2019 with pymchelper's reader of that format, once:
+    pymchelper's fromfile first tries the file as FLUKA's (whose reader takes the magic number for the length of a
+    record, and reads the whole file into it), then looks for its format, before it reads the file once more
+    """
+    estimator = Estimator()
+    estimator.file_counter = 1
+    if not SHReaderBDO2019(file).read(estimator):
+        return None
+    return estimator
+
+
 def read_whole(file: str) -> Optional[Estimator]:
     """Reads a result file with all its pages"""
     if file.endswith(MERGED_SUFFIX):
         # written by this simulation's merge_groups.py, next to this script
         with open(file, "rb") as merged:
             return pickle.load(merged)  # skipcq: BAN-B301
+    if file.endswith(".bdo"):
+        try:
+            with open(file, "rb") as source:
+                walked = bdo_pages.walk(source, lambda info: False)
+        except bdo_pages.BdoError:
+            walked = None
+        if walked is not None and walked.file_format == bdo_pages.BDO2019:
+            return read_bdo(file)
     return fromfile(file)
 
 
-def read_pages(file: str, modes: set) -> Optional[Estimator]:
-    """Reads only the pages of the modes of a SHIELD-HIT12A result file: the others are skipped, their values never
-    read (bdo_pages); None when it has none of them. The pages wanted are copied into a file of their own, which
-    pymchelper reads as it reads the whole file
+def page_wanted(
+    info: bdo_pages.PageInfo, modes: Optional[set] = None, numbers: Optional[set] = None
+) -> bool:
+    """Whether a merge takes a page: of one of the modes (all without modes), and one of the numbers (all without)"""
+    if modes is not None and result_format.partial_mode(info.dimensions, info.mcpl) not in modes:
+        return False
+    return numbers is None or info.number in numbers
+
+
+# where the pages read of a file are copied, for pymchelper to read them: memory, where there is a tmpfs
+PAGES_DIR = "/dev/shm" if Path("/dev/shm").is_dir() else None
+
+
+def read_pages(file: str, modes: Optional[set] = None, numbers: Optional[set] = None) -> Optional[Estimator]:
+    """Reads only the pages of the modes and numbers of a SHIELD-HIT12A result file: the others are skipped, their
+    values never read (bdo_pages); None when it has none of them. The pages wanted are copied into a file of their
+    own (in memory where it can), which pymchelper reads as it reads the whole file
     """
-    with tempfile.TemporaryDirectory(prefix="yaptide_pages_") as directory:
+    keep = lambda info: page_wanted(info, modes, numbers)  # noqa: E731
+    try:
+        with open(file, "rb") as source:
+            walked = bdo_pages.walk(source, keep)
+    except bdo_pages.BdoError as err:
+        raise ResultFileError(file, err) from err
+    if not walked.whole:
+        raise ResultFileError(file, "the file ends within a page")
+    if not any(walked.kept):
+        return None
+    if all(walked.kept) and walked.file_format == bdo_pages.BDO2019:
+        # every page wanted (a save holds only the pages of partial results): read as it is
+        return read_bdo(file)
+    try:
+        directory = tempfile.TemporaryDirectory(prefix="yaptide_pages_", dir=PAGES_DIR)
+    except OSError:
+        directory = tempfile.TemporaryDirectory(prefix="yaptide_pages_")
+    with directory:
         # the same name, so pymchelper finds the estimator's name in it
-        copy = Path(directory) / Path(file).name
+        copy = Path(directory.name) / Path(file).name
         try:
-            kept = bdo_pages.copy_pages(
-                Path(file), copy, lambda info: result_format.partial_mode(info.dimensions, info.mcpl) in modes
-            )
+            walked = bdo_pages.copy_file(Path(file), copy, keep)
         except bdo_pages.BdoError as err:
             raise ResultFileError(file, err) from err
-        if not kept:
-            return None
+        if walked.file_format == bdo_pages.BDO2019:
+            return read_bdo(str(copy))
         return fromfile(str(copy))
 
 
-def read_estimator(file: str, modes: Optional[set] = None) -> Optional[Estimator]:
-    """Reads a result file, with modes only the pages of those modes (None when it has none of them); raises
+def read_estimator(file: str, modes: Optional[set] = None, numbers: Optional[set] = None) -> Optional[Estimator]:
+    """Reads a result file, with modes or numbers only those pages (None when it has none of them); raises
     ResultFileError when it is gone, when a SHIELD-HIT12A file has no pages, or when one of its pages holds other than
     the bins its estimator declares (the UI gets values for every bin declared)
     """
-    partial = modes is not None and file.endswith(".bdo")
+    partial = (modes is not None or numbers is not None) and file.endswith(".bdo")
     try:
-        estimator = read_pages(file, modes) if partial else read_whole(file)
+        estimator = read_pages(file, modes, numbers) if partial else read_whole(file)
     except (OSError, EOFError, IndexError, AttributeError, struct.error, pickle.UnpicklingError) as err:
         # gone, or cut short inside a page's tags (pymchelper then misses what the page needs)
         raise ResultFileError(file, err) from err
@@ -119,27 +168,35 @@ def page_mode(page: Page) -> str:
     return result_format.partial_mode(page.dimension, page.dettyp == SHDetType.mcpl)
 
 
-def keep_pages(estimator: Optional[Estimator], modes: Optional[set]) -> Optional[Estimator]:
-    """Leaves the estimator its pages of the modes only (all of them without modes), each keeping its number: the
-    others of a partial result are not merged, so a large page does not cost its merge at every partial result
+def keep_pages(
+    estimator: Optional[Estimator], modes: Optional[set], numbers: Optional[set] = None
+) -> Optional[Estimator]:
+    """Leaves the estimator its pages of the modes and numbers only (all of them without), each keeping its number:
+    the others of a partial result are not merged, so a large page does not cost its merge at every partial result
     """
-    if estimator is None or modes is None:
+    if estimator is None or (modes is None and numbers is None):
         return estimator
     for number, page in enumerate(estimator.pages):
         if getattr(page, "page_number", None) is None:
             page.page_number = number
-    estimator.pages = [page for page in estimator.pages if page_mode(page) in modes]
+    estimator.pages = [
+        page
+        for page in estimator.pages
+        if (modes is None or page_mode(page) in modes) and (numbers is None or int(page.page_number) in numbers)
+    ]
     return estimator
 
 
-def merge_estimator_files(files: List[str], modes: Optional[set] = None) -> Optional[Estimator]:
+def merge_estimator_files(
+    files: List[str], modes: Optional[set] = None, numbers: Optional[set] = None
+) -> Optional[Estimator]:
     """Merges one estimator's task files (or files merged already, of groups of tasks), reading one file at a time:
     each page aggregated by its normalisation, averages weighted by primaries, as pymchelper's fromfilelist does.
-    With modes (result_format.partial_modes), only the pages of those modes; None when the estimator has none.
+    With modes (result_format.partial_modes) or page numbers, only those pages; None when the estimator has none.
 
     Mean only: pymchelper's WeightedStatsAggregator also keeps a variance of every bin, which the pages do not hold.
     """
-    result = keep_pages(read_estimator(files[0], modes), modes)
+    result = keep_pages(read_estimator(files[0], modes, numbers), modes, numbers)
     if not result or not result.pages:
         return None
     # the task files merged: one for a task's, the group's for a group's
@@ -153,7 +210,7 @@ def merge_estimator_files(files: List[str], modes: Optional[set] = None) -> Opti
         if avg:
             page.data_raw = page.data_raw * result.number_of_primaries
     for file in files[1:]:
-        estimator = keep_pages(read_estimator(file, modes), modes)
+        estimator = keep_pages(read_estimator(file, modes, numbers), modes, numbers)
         if estimator is None:
             raise ResultFileError(file, f"none of the pages of {files[0]}")
         # a file cut short between pages reads whole, with fewer pages: the shorter one is left out
@@ -200,16 +257,49 @@ def group_input_files(files: List[str]) -> dict:
     return grouped
 
 
-def merged_estimators(files: List[str], modes: Optional[set] = None) -> Iterator[Tuple[str, Estimator]]:
+def merged_estimators(
+    files: List[str], modes: Optional[set] = None, pages: Optional[dict] = None
+) -> Iterator[Tuple[str, Estimator]]:
     """The merged estimators of the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*, merged ones of groups), by
     name, one at a time: the next one is merged when the caller asks for it. With modes, only the pages of those
-    modes (merge_estimator_files)
+    modes; with pages (estimator -> page numbers), only those estimators and pages (merge_estimator_files)
     """
     for name, group in sorted(group_input_files(sorted(files)).items()):
-        estimator = merge_estimator_files(group, modes)
+        if pages is not None and name not in pages:
+            continue
+        estimator = merge_estimator_files(group, modes, None if pages is None else set(pages[name]))
         if estimator:
             estimator.file_corename = name
             yield name, estimator
+
+
+def page_stubs(files: List[str], modes: set) -> dict:
+    """The pages of the modes the result files hold, without their values: estimator -> stubs (page number, name and
+    dimensions), so the user sees which maps there are to ask for before any was merged. Only the tokens are read
+    (bdo_pages), one file of each estimator; a file that cannot be read gives none
+    """
+    stubs: dict = {}
+    for name, group in sorted(group_input_files(sorted(file for file in files if file.endswith(".bdo"))).items()):
+        try:
+            infos = bdo_pages.pages_of(Path(group[0]))
+        except (OSError, bdo_pages.BdoError):
+            continue
+        entries = [
+            {"page_number": info.number, "name": detector_name(info.detector_type), "dimensions": info.dimensions}
+            for info in infos
+            if result_format.partial_mode(info.dimensions, info.mcpl) in modes
+        ]
+        if entries:
+            stubs[name] = entries
+    return stubs
+
+
+def detector_name(detector_type: int) -> str:
+    """The name pymchelper gives a page of a detector type"""
+    try:
+        return str(SHDetType(detector_type))
+    except ValueError:
+        return ""
 
 
 def estimator_metadata(estimator: Estimator) -> dict:
@@ -247,30 +337,47 @@ def page_values(page: Page) -> np.ndarray:
 
 
 def write_pages(
-    files: List[str], store: Callable[[str, int, dict, np.ndarray], dict], modes: Optional[set] = None
+    files: List[str],
+    store: Callable[[str, int, dict, np.ndarray], dict],
+    modes: Optional[set] = None,
+    pages: Optional[dict] = None,
+    stubs: Optional[dict] = None,
 ) -> Tuple[List[dict], int]:
     """Merges the result files and hands every page to store(estimator name, page number, page without values,
     values), one estimator at a time; returns the estimators (name, metadata and what store returned for each page)
-    and the primaries merged. With modes, only the pages of those modes (merge_estimator_files)
+    and the primaries merged. With modes, only the pages of those modes; with pages (estimator -> page numbers), only
+    those (merge_estimator_files). Stubs (page_stubs) go with the estimators' pages, marked "stub"
     """
     estimators, primaries = [], 0
-    for name, estimator in merged_estimators(files, modes):
-        pages = []
+    stubs = dict(stubs or {})
+    for name, estimator in merged_estimators(files, modes, pages):
+        entries = []
         for page in estimator.pages:
             page_dict = page_without_values(estimator, page)
-            number = int(page_dict["metadata"].get("page_number", len(pages)))
-            pages.append(store(name, number, page_dict, page_values(page)))
-        estimators.append({"name": name, "metadata": estimator_metadata(estimator), "pages": pages})
+            number = int(page_dict["metadata"].get("page_number", len(entries)))
+            entries.append(store(name, number, page_dict, page_values(page)))
+        entries.extend(dict(stub, stub=True) for stub in stubs.pop(name, ()))
+        estimators.append({"name": name, "metadata": estimator_metadata(estimator), "pages": entries})
         primaries = max(primaries, int(estimator.number_of_primaries))
         # the next estimator is merged once this one is gone
         del estimator, page
         collect_garbage()
+    # estimators of maps only: their stubs alone
+    for name, entries in sorted(stubs.items()):
+        estimators.append({"name": name, "metadata": {}, "pages": [dict(stub, stub=True) for stub in entries]})
     return estimators, primaries
 
 
-def write_directory(files: List[str], output_dir: Path, compress: bool = True, modes: Optional[set] = None) -> dict:
-    """Merges the result files into pages in output_dir and writes its manifest; returns the manifest. With modes,
-    only the pages of those modes (merge_estimator_files)
+def write_directory(
+    files: List[str],
+    output_dir: Path,
+    compress: bool = True,
+    modes: Optional[set] = None,
+    pages: Optional[dict] = None,
+    stubs: Optional[dict] = None,
+) -> dict:
+    """Merges the result files into pages in output_dir and writes its manifest; returns the manifest. With modes or
+    pages, only those pages; stubs go with them (write_pages)
     """
 
     def store(name: str, number: int, page: dict, values: np.ndarray) -> dict:
@@ -289,7 +396,7 @@ def write_directory(files: List[str], output_dir: Path, compress: bool = True, m
             "files": objects,
         }
 
-    estimators, primaries = write_pages(files, store, modes)
+    estimators, primaries = write_pages(files, store, modes, pages, stubs)
     manifest = {"format": result_format.FORMAT, "primaries": primaries, "estimators": estimators}
     (output_dir / MANIFEST).write_text(json.dumps(manifest))
     return manifest

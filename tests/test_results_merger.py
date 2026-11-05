@@ -53,7 +53,7 @@ def test_one_estimator_at_a_time(monkeypatch):
     monkeypatch.setattr(
         results_merger,
         "read_estimator",
-        lambda file, modes=None: events.append(("read", Path(file).name)) or read(file, modes),
+        lambda file, modes=None, numbers=None: events.append(("read", Path(file).name)) or read(file, modes, numbers),
     )
 
     def store(name, number, page, values):

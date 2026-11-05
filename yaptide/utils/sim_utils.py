@@ -22,7 +22,10 @@ def json_pages(name: str, number: int, page: dict, values: np.ndarray) -> dict:
 
 
 def merge_simulation_outputs(
-    output_dirs: list[Path], store: Optional[Callable] = None, modes: Optional[set] = None
+    output_dirs: list[Path],
+    store: Optional[Callable] = None,
+    modes: Optional[set] = None,
+    pages: Optional[dict] = None,
 ) -> list[dict]:
     """Merge the result files (SHIELD-HIT12A .bdo, FLUKA *_fort.*) of all tasks into estimators for the UI
 
@@ -31,7 +34,8 @@ def merge_simulation_outputs(
     goes to store(estimator name, page number, page without values, values) before the next estimator is read; the
     estimators hold what store returned for their pages, by default the pages as JSON with their values.
     The list is sorted by name, the same for every merge. With modes (result_format.partial_modes), only the pages of
-    those modes, for partial results.
+    those modes, for partial results; the live ones come with stubs of the maps (results_merger.page_stubs). With
+    pages (estimator -> page numbers), only those pages: the maps a user asked for.
     """
     missing = [str(path) for path in output_dirs if not path.is_dir()]
     if missing:
@@ -42,7 +46,11 @@ def merge_simulation_outputs(
     ]
     if not files:
         return []
-    estimators, _ = results_merger.write_pages(files, store or json_pages, modes)
+    stubs = None
+    if modes is not None and result_format.LIVE in modes and result_format.ON_DEMAND not in modes:
+        first = sorted(str(file) for file in output_dirs[0].glob("*.bdo"))
+        stubs = results_merger.page_stubs(first, {result_format.ON_DEMAND})
+    estimators, _ = results_merger.write_pages(files, store or json_pages, modes, pages, stubs)
     return estimators
 
 

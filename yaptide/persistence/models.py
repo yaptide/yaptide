@@ -500,6 +500,43 @@ class ExpiringObjectModel(db.Model):
     delete_after: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=False, index=True)
 
 
+class PartialViewerModel(db.Model):
+    """Someone who has a running simulation's results open: partial results are merged only while someone does. A
+    browser tab beats every few seconds, and says when it closes; one that stopped beating counts as gone
+    (yaptide/routes/common_sim_routes.py)
+    """
+
+    __tablename__ = "PartialViewer"
+    __table_args__ = (db.UniqueConstraint("simulation_id", "viewer"),)
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(
+        db.Integer, db.ForeignKey("Simulation.id", ondelete="CASCADE"), nullable=False
+    )
+    viewer: Column[str] = db.Column(db.String(64), nullable=False, doc="The browser tab's own random id")
+    last_seen: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=False)
+
+
+class PartialPageModel(db.Model):
+    """A map of a running simulation's partial results, merged only when the user asks for it: known from the live
+    partial results (its number, name and dimensions), when it was asked for, and when it was last merged and of how
+    many primaries (yaptide/routes/common_sim_routes.py)
+    """
+
+    __tablename__ = "PartialPage"
+    __table_args__ = (db.UniqueConstraint("simulation_id", "estimator", "page_number"),)
+    id: Column[int] = db.Column(db.Integer, primary_key=True)
+    simulation_id: Column[int] = db.Column(
+        db.Integer, db.ForeignKey("Simulation.id", ondelete="CASCADE"), nullable=False
+    )
+    estimator: Column[str] = db.Column(db.String, nullable=False, doc="The estimator's result file name")
+    page_number: Column[int] = db.Column(db.Integer, nullable=False)
+    page_name: Column[str] = db.Column(db.String, nullable=False, default="")
+    dimensions: Column[int] = db.Column(db.Integer, nullable=False, default=2)
+    requested_at: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Asked for, not merged")
+    merged_at: Column[datetime] = db.Column(db.DateTime(timezone=True), nullable=True, doc="Last merged")
+    primaries: Column[int] = db.Column(db.BigInteger, nullable=True, doc="Primaries of the last merge")
+
+
 class LogfilesModel(db.Model):
     """Simulation logfiles model"""
 

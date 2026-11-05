@@ -7,13 +7,15 @@ merge takes one merged file per group instead of one file per task. Every merge 
 group merges run on different nodes at once, and the last merge reads one task's worth of results per group.
 Results whose files fit in GROUP_BYTES altogether are one group: a single merge, as without groups.
 
-- live partial results (points and lines, result_format.partial_mode): a task's watcher starts the partial script
-  for the task's group, holding the group's lock (partial.lock.<group>). The group's latest saves are merged into
+- live partial results (points and lines, result_format.partial_mode), while someone looks at the simulation (the
+  wanted object in storage, result_format.parse_wanted): a task's watcher starts the partial script for the task's
+  group, holding the group's lock (partial.lock.<group>). The group's latest saves are merged into
   groups/<group>/<primaries>/, then the one getting the last lock (partial.lock.final) merges the latest of every
-  group and uploads it. Only the live pages are read (bdo_pages.py).
-- on-demand partial results (maps): while the user asks for them (the simulation's on-demand object is in storage),
-  a watcher holding partial.lock.on_demand starts the partial script for them: the latest saves of all tasks, their
-  maps only, merged and uploaded at once. The backend keeps the live pages as they were, and drops the request.
+  group and uploads it, with stubs of the maps (their numbers, names and dimensions, no values) so the user can ask
+  for one. Only the live pages are read (bdo_pages.py); nothing is uploaded when no save changed since the last.
+- maps asked for (on demand): a watcher holding partial.lock.on_demand starts the partial script for the pages the
+  wanted object lists, each by its estimator and number: the latest saves of all tasks, those pages only, merged and
+  uploaded at once. The backend keeps the other pages as they were, and takes the pages off the list.
 - a lock is a directory with its owner; a merge holding one touches it every HEARTBEAT_SECONDS, and a lock left
   untouched for LOCK_SECONDS (its merge was killed: out of memory, its task's time limit, a failed node) is taken
   over, so a failed task holds up the partial results of the others for a minute or two at most.
@@ -38,14 +40,12 @@ import math
 import os
 import pickle
 import shutil
-import ssl
 import subprocess
 import sys
 import time
 import uuid
 from pathlib import Path
 from typing import List, Optional
-from urllib import error, request
 
 import threading
 
@@ -87,8 +87,8 @@ GROUP_WAIT_SECONDS = 600
 GROUP_POLL_SECONDS = 5
 # where the partial results are merged into before they are uploaded
 PARTIAL_OUTPUT = "partial_output"
-# the signed links of the simulation (written at submit, renewed by the watchers): the on-demand object's HEAD in it
-LINKS_FILE = "storage_links.json"
+# what the last live partial results were merged from (the saves, or the groups' merges): the same is not uploaded again
+UPLOADED_FILE = "partial.uploaded"
 # the pages the groups merge for partial results: the live ones only, the on-demand ones are merged apart
 GROUP_PARTIAL_MODES = result_format.kind_modes(result_format.LIVE)
 
@@ -352,29 +352,17 @@ def partial_units(root: Path, size: int, n_tasks: int) -> List[List[str]]:
     return latest_saves(root, n_tasks)
 
 
-def on_demand_requested(root: Path) -> bool:
-    """Whether the user asks for the on-demand pages: the simulation's on-demand object is in storage (a HEAD of its
-    signed link answers 200). False without the link (a simulation submitted before) or when storage cannot be reached
-    """
-    try:
-        url = json.loads((root / LINKS_FILE).read_text())["on_demand"]
-    except (OSError, ValueError, KeyError, TypeError):
-        return False
-    try:
-        with request.urlopen(  # skipcq: BAN-B310
-            request.Request(url, method="HEAD"), context=ssl.create_default_context(), timeout=60
-        ) as response:
-            return response.status == 200
-    except error.HTTPError:
-        return False
-    except Exception as err:  # skipcq: PYL-W0703
-        logging.warning("Could not look for a request of the on-demand pages: %s", err)
-        return False
-
-
-def merge_and_upload(root: Path, units: List[List[str]], args, kind: str = result_format.LIVE) -> int:
-    """Merges the units' files into partial results of the kind (the live pages, or the on-demand ones) and uploads
-    them (results_uploader.py, beside this script); a unit with a file that cannot be read whole is left out
+def merge_and_upload(
+    root: Path,
+    units: List[List[str]],
+    args,
+    kind: str = result_format.LIVE,
+    pages: Optional[dict] = None,
+) -> int:
+    """Merges the units' files into partial results and uploads them (results_uploader.py, beside this script): the
+    live pages with stubs of the maps, or (kind ON_DEMAND) the pages asked for (estimator -> page numbers); a unit with
+    a file that cannot be read whole is left out. Live results merged from the same units as the last ones uploaded
+    are not merged again
     """
     try:
         from yaptide.batch import results_merger
@@ -382,18 +370,26 @@ def merge_and_upload(root: Path, units: List[List[str]], args, kind: str = resul
         import results_merger
 
     units = [unit for unit in units if unit]
-    modes = result_format.kind_modes(kind)
+    live = kind == result_format.LIVE
+    modes = result_format.kind_modes(kind) if live else None
+    uploaded = root / f"{UPLOADED_FILE}.{kind}"
     # the two kinds run at once, each into its own directory
     output = root / f"{PARTIAL_OUTPUT}.{kind}"
     try:
         while True:
             if not units:
                 return 0
+            signature = json.dumps(sorted(str(Path(unit[0]).parent) for unit in units))
+            if live and read_text(uploaded) == signature:
+                logging.info("No new saves since the last partial results")
+                return 0
             shutil.rmtree(str(output), ignore_errors=True)
             output.mkdir()
             files = [file for unit in units for file in unit]
+            # the maps there are, from a save (a group's merges hold the live pages only)
+            stubs = results_merger.page_stubs(stub_files(root, units, args), {result_format.ON_DEMAND}) if live else None
             try:
-                manifest = results_merger.write_directory(files, output, modes=modes)
+                manifest = results_merger.write_directory(files, output, modes=modes, pages=pages, stubs=stubs)
                 break
             except ValueError as err:
                 index = unreadable(err, units)
@@ -409,9 +405,20 @@ def merge_and_upload(root: Path, units: List[List[str]], args, kind: str = resul
         uploader = Path(__file__).resolve().parent / "results_uploader.py"
         command = [sys.executable, str(uploader), "--partial", f"--output_dir={output}", "--attempts=3"]
         command += [f"--sim_id={args.sim_id}", f"--update_key={args.update_key}", f"--backend_url={args.backend_url}"]
-        return subprocess.run(command, check=False).returncode
+        code = subprocess.run(command, check=False).returncode
+        if live and code == 0:
+            uploaded.write_text(signature)
+        return code
     finally:
         shutil.rmtree(str(output), ignore_errors=True)
+
+
+def read_text(path: Path) -> Optional[str]:
+    """A small file's text, None when it is missing"""
+    try:
+        return path.read_text()
+    except OSError:
+        return None
 
 
 def latest_saves(root: Path, n_tasks: int) -> List[List[str]]:
@@ -420,16 +427,37 @@ def latest_saves(root: Path, n_tasks: int) -> List[List[str]]:
     return [[str(path) for path in sorted(save.glob("*.bdo"))] for save in saves if save is not None]
 
 
+def stub_files(root: Path, units: List[List[str]], args) -> List[str]:
+    """Result files to read the maps there are from: a task's save among the units, else the first task's save"""
+    files = [file for file in units[0] if file.endswith(".bdo")] if units else []
+    return files or first_save(root, getattr(args, "ntasks", 0) or 0)
+
+
+def first_save(root: Path, n_tasks: int) -> List[str]:
+    """The result files of a task's latest save, the first found"""
+    for task in range(1, n_tasks + 1):
+        save = latest_save(task_dir(root, task))
+        if save is not None:
+            return [str(path) for path in sorted(save.glob("*.bdo"))]
+    return []
+
+
 def partial_on_demand(args) -> int:
-    """On-demand partial results, started by a watcher holding the on-demand lock while the user asks for them: the
-    maps of the latest saves of all tasks, merged and uploaded at once (the live pages are not read)
+    """The pages the user asked for (--pages, result_format.pages_argument), started by a watcher holding the
+    on-demand lock: those pages of the latest saves of all tasks, merged and uploaded at once (no other page is read).
+    The on-demand stamp is touched when it ends, so the watchers that still see the request before the backend took
+    it off do not merge the pages again at once
     """
     root = Path(args.root)
     lock = lock_path(root, ON_DEMAND_LOCK)
     own_lock(lock)
     try:
-        return merge_and_upload(root, latest_saves(root, args.ntasks), args, result_format.ON_DEMAND)
+        pages = result_format.parse_pages_argument(getattr(args, "pages", None))
+        if not pages:
+            return 0
+        return merge_and_upload(root, latest_saves(root, args.ntasks), args, result_format.ON_DEMAND, pages)
     finally:
+        (root / f"{PARTIAL_STAMP}.{ON_DEMAND_LOCK}").touch()
         free_lock(lock)
 
 
@@ -575,6 +603,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     commands.choices["partial"].add_argument("--group", type=int, default=0)
     commands.choices["partial"].add_argument("--kind", choices=result_format.PARTIAL_KINDS, default=result_format.LIVE)
     commands.choices["partial"].add_argument("--interval", type=float, help="seconds between the last partial merges")
+    commands.choices["partial"].add_argument("--pages", help="the pages asked for (on_demand): JSON [[estimator, n]]")
     for name in ("sim_id", "update_key", "backend_url"):
         commands.choices["partial"].add_argument(f"--{name}", required=True)
     commands.choices["task_end"].add_argument("--task", type=int, required=True)

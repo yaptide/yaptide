@@ -1,11 +1,13 @@
 import logging
 import os
+import re
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional
 
 from flask import request, current_app as app
 from flask_restful import Resource
 from sqlalchemy import text
+from sqlalchemy.dialects import postgresql, sqlite
 from marshmallow import Schema, fields
 
 from yaptide.persistence.db_methods import (
@@ -34,6 +36,8 @@ from yaptide.persistence.models import (
     LogfilesModel,
     PageModel,
     PageObjectModel,
+    PartialPageModel,
+    PartialViewerModel,
     SimulationModel,
     UserModel,
 )
@@ -41,7 +45,7 @@ from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
 from yaptide.routes.utils.utils import FINAL_STATES, check_if_job_is_owned_and_exist, job_status_content
 from yaptide.routes.utils.tokens import decode_auth_token
-from yaptide.utils.enums import EntityState, InputType, SimulationType
+from yaptide.utils.enums import EntityState, InputType, PlatformType, SimulationType
 
 
 class JobsResource(Resource):
@@ -382,6 +386,7 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
     # the stored results are the final ones now
     simulation.partial_primaries = None
     simulation.partial_time = None
+    forget_partial(simulation.id)
     # estimators and pages together, so a failure in between does not leave estimators without pages
     make_commit_to_db()
 
@@ -450,50 +455,212 @@ def clean_partial_results(now: Optional[datetime] = None) -> int:
             db.session.delete(estimator)
         simulation.partial_primaries = None
         simulation.partial_time = None
+        forget_partial(simulation.id)
         logging.info("Removed the partial results of simulation %d, %s", simulation.id, simulation.job_state)
+    # who looked at a simulation that ended without partial results, and the maps asked for
+    lingering = {
+        simulation_id
+        for (simulation_id,) in db.session.query(PartialViewerModel.simulation_id)
+        .union(db.session.query(PartialPageModel.simulation_id))
+        .all()
+    }
+    for simulation_id in lingering:
+        simulation = db.session.get(SimulationModel, simulation_id)
+        if simulation is None or simulation.job_state in FINAL_STATES:
+            forget_partial(simulation_id)
     db.session.commit()
     result_storage.delete_pages(keys)
     return len(keys)
 
 
-def carries_on_demand(estimators: list[dict]) -> bool:
-    """Whether merged results carry an on-demand page (result_format.partial_mode)"""
-    return any(
-        result_format.partial_mode(int(page.get("dimensions", 0))) == result_format.ON_DEMAND
-        for estimator in estimators
-        for page in estimator["pages"]
+# Partial results are merged only for the users who look at them. A browser tab with a running simulation's results
+# open beats (POST /results/watch) every few seconds and says when it closes; the live pages are merged while one beats.
+# A map is merged only when asked for (POST /results/on_demand), only that page. Both go into the simulation's wanted
+# object in storage, which the cluster's watchers read (result_format.parse_wanted); the engine reads the database.
+VIEWER_SECONDS = result_format.WANTED_LIVE_SECONDS
+
+
+def utc_now() -> datetime:
+    """Now, in UTC"""
+    return datetime.now(timezone.utc)
+
+
+def wanted_state(simulation_id: int, now: Optional[datetime] = None) -> tuple[float, set]:
+    """What the users look at: until when (seconds since the epoch, 0 for no one) the live pages are wanted, and the
+    pages asked for ((estimator file name, page number) pairs)
+    """
+    now = now or utc_now()
+    last_seen = (
+        db.session.query(db.func.max(PartialViewerModel.last_seen))
+        .filter(PartialViewerModel.simulation_id == simulation_id)
+        .scalar()
+    )
+    live_until = 0.0
+    if last_seen is not None and aware(last_seen) > now - timedelta(seconds=VIEWER_SECONDS):
+        live_until = aware(last_seen).timestamp() + VIEWER_SECONDS
+    requested = (
+        db.session.query(PartialPageModel)
+        .filter(PartialPageModel.simulation_id == simulation_id, PartialPageModel.requested_at.isnot(None))
+        .all()
+    )
+    return live_until, {(page.estimator, page.page_number) for page in requested}
+
+
+def on_cluster(simulation_id: int) -> bool:
+    """Whether the simulation runs on a cluster, whose watchers read the wanted object (the engine reads the
+    database for the direct ones)
+    """
+    simulation = db.session.get(SimulationModel, simulation_id)
+    return simulation is not None and simulation.platform == PlatformType.BATCH.value
+
+
+def publish_wanted(simulation_id: int) -> None:
+    """Writes what the users look at into the wanted object of a simulation on a cluster, for its watchers; a
+    failure is only logged (the next beat writes it again)
+    """
+    if not result_storage.configured() or not on_cluster(simulation_id):
+        return
+    try:
+        result_storage.put_wanted(simulation_id, result_format.wanted_body(*wanted_state(simulation_id)))
+    except Exception as err:  # skipcq: PYL-W0703
+        logging.warning("Writing what the users of simulation %d look at failed: %s", simulation_id, err)
+
+
+def note_viewer(simulation_id: int, viewer: str, closed: bool = False) -> None:
+    """A browser tab beat (or closed): noted, the tabs that stopped beating forgotten; commits"""
+    now = utc_now()
+    db.session.query(PartialViewerModel).filter(
+        PartialViewerModel.simulation_id == simulation_id,
+        PartialViewerModel.last_seen < now - timedelta(seconds=VIEWER_SECONDS),
+    ).delete(synchronize_session=False)
+    if closed:
+        db.session.query(PartialViewerModel).filter(
+            PartialViewerModel.simulation_id == simulation_id, PartialViewerModel.viewer == viewer
+        ).delete(synchronize_session=False)
+    else:
+        insert = postgresql.insert if db.engine.dialect.name == "postgresql" else sqlite.insert
+        seen = {"simulation_id": simulation_id, "viewer": viewer, "last_seen": now}
+        db.session.execute(
+            insert(PartialViewerModel)
+            .values(seen)
+            .on_conflict_do_update(index_elements=["simulation_id", "viewer"], set_={"last_seen": now})
+        )
+    db.session.commit()
+
+
+def partial_pages(simulation_id: int) -> list[PartialPageModel]:
+    """The maps of a running simulation's partial results, in order"""
+    return (
+        db.session.query(PartialPageModel)
+        .filter(PartialPageModel.simulation_id == simulation_id)
+        .order_by(PartialPageModel.estimator, PartialPageModel.page_number)
+        .all()
     )
 
 
-def on_demand_delivered(simulation: SimulationModel) -> None:
-    """Partial results carried the on-demand pages asked for: the next ones carry the live pages only again, until the
-    user asks again; a failure only leaves them in the next partial results too
+def iso(moment: Optional[datetime]) -> Optional[str]:
+    """A time as the UI reads it"""
+    moment = aware(moment)
+    return moment.isoformat() if moment else None
+
+
+def partial_pages_content(simulation: SimulationModel) -> list[dict]:
+    """The maps of a running simulation as the UI gets them: estimator (its name in the results) and file, page
+    number, name and dimensions, when last asked for, merged and of how many primaries
     """
-    try:
-        result_storage.clear_on_demand(simulation.id)
-    except Exception as err:  # skipcq: PYL-W0703 - the partial results are stored already, whatever the storage says
-        logging.warning("The request of on-demand pages of simulation %d stays: %s", simulation.id, err)
+    names = {estimator_key(estimator.file_name): estimator.name for estimator in fetch_estimators_by_sim_id(simulation.id)}
+    outputs = editor_outputs_by_file(simulation)
+    content = []
+    for page in partial_pages(simulation.id):
+        key = estimator_key(page.estimator)
+        content.append(
+            {
+                "estimator": names.get(key) or (outputs[key]["name"] if key in outputs else page.estimator),
+                "file": page.estimator,
+                "page_number": page.page_number,
+                "name": page.page_name,
+                "dimensions": page.dimensions,
+                "requested_at": iso(page.requested_at),
+                "merged_at": iso(page.merged_at),
+                "primaries": page.primaries,
+            }
+        )
+    return content
+
+
+def note_partial_pages(simulation_id: int, estimators: list[dict], primaries: int) -> bool:
+    """Notes the maps partial results carry or announce (stubs, results_merger.page_stubs): a map merged is no longer
+    asked for, and keeps when and of how many primaries. Without committing; whether a request was taken off
+    """
+    known = {(page.estimator, page.page_number): page for page in partial_pages(simulation_id)}
+    now, delivered = utc_now(), False
+    for estimator in estimators:
+        for entry in estimator["pages"]:
+            dimensions = int(entry.get("dimensions", 0))
+            if result_format.partial_mode(dimensions) != result_format.ON_DEMAND:
+                continue
+            number = int(entry.get("page_number", entry.get("metadata", {}).get("page_number", 0)))
+            page = known.get((estimator["name"], number))
+            if page is None:
+                page = PartialPageModel(simulation_id=simulation_id, estimator=estimator["name"], page_number=number)
+                known[(estimator["name"], number)] = page
+                db.session.add(page)
+            name = entry.get("name", entry.get("metadata", {}).get("name"))
+            if name:
+                page.page_name = str(name)
+            page.page_name = page.page_name or ""
+            page.dimensions = dimensions
+            if entry.get("stub"):
+                continue
+            delivered = delivered or page.requested_at is not None
+            page.requested_at = None
+            page.merged_at = now
+            page.primaries = primaries
+    return delivered
+
+
+def forget_partial(simulation_id: int) -> None:
+    """The simulation ended: no one's looking and no map asked for is noted any more (without committing), and its
+    wanted object goes
+    """
+    db.session.query(PartialViewerModel).filter(PartialViewerModel.simulation_id == simulation_id).delete(
+        synchronize_session=False
+    )
+    db.session.query(PartialPageModel).filter(PartialPageModel.simulation_id == simulation_id).delete(
+        synchronize_session=False
+    )
+    if result_storage.configured() and on_cluster(simulation_id):
+        try:
+            result_storage.delete_wanted(simulation_id)
+        except Exception as err:  # skipcq: PYL-W0703
+            logging.warning("Removing the wanted object of simulation %d failed: %s", simulation_id, err)
 
 
 def store_partial_results(simulation: SimulationModel, estimators: list[dict], primaries: int) -> bool:
     """Stores the results of a running simulation so far in place of the previous ones; the final results replace
-    them. A page missing from them keeps its previous partial results (an on-demand page the user did not ask for
-    again, yaptide/batch/result_format.py). Returns whether they were stored, i.e. the simulation still runs (pages
-    already in storage that were not are removed).
+    them. A page missing from them keeps its previous partial results (a map not asked for again,
+    yaptide/batch/result_format.py); stubs of maps only note them. Returns whether they were stored, i.e. the
+    simulation still runs (pages already in storage that were not are removed).
     """
     lock_results(simulation)
     if simulation.job_state != EntityState.RUNNING.value:
         db.session.commit()
         result_storage.delete_pages(stored_pages(estimators))
         return False
+    delivered = note_partial_pages(simulation.id, estimators, primaries)
+    with_values = [
+        dict(estimator, pages=[page for page in estimator["pages"] if not page.get("stub")]) for estimator in estimators
+    ]
+    with_values = [estimator for estimator in with_values if estimator["pages"]]
     superseded = []
-    prepare_estimators_and_pages(simulation, estimators, superseded)
-    simulation.partial_primaries = primaries
-    simulation.partial_time = datetime.now(timezone.utc)
+    if with_values:
+        prepare_estimators_and_pages(simulation, with_values, superseded)
+        simulation.partial_primaries = primaries
+        simulation.partial_time = utc_now()
     make_commit_to_db()
     result_storage.delete_pages(superseded)
-    if result_storage.configured() and carries_on_demand(estimators):
-        on_demand_delivered(simulation)
+    if delivered:
+        publish_wanted(simulation.id)
     return True
 
 
@@ -598,9 +765,66 @@ class ResultsResource(Resource):
         return yaptide_response(message="Wrong parameters", code=400, content=errors)
 
 
+VIEWER_PATTERN = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def owned_simulation(user: UserModel, job_id):
+    """The user's simulation of the job, or the error response"""
+    if not isinstance(job_id, str):
+        return None, yaptide_response(message="job_id is required", code=400)
+    is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
+    if not is_owned:
+        return None, yaptide_response(message=error_message, code=res_code)
+    return fetch_simulation_by_job_id(job_id=job_id), None
+
+
+def partial_state(simulation: SimulationModel) -> dict:
+    """What the UI shows of a running simulation's partial results besides the pages: whether the live ones are
+    merged now (someone looks), and the maps there are to ask for
+    """
+    live_until, _ = wanted_state(simulation.id)
+    return {"live": live_until > utc_now().timestamp(), "pages": partial_pages_content(simulation)}
+
+
+# simulations one beat may name: far more than anyone runs at once
+MAX_WATCHED = 100
+
+
+class WatchResource(Resource):
+    """A browser tab with the app open: it beats every few seconds while open, naming the user's unfinished
+    simulations (their live pages are merged while one does), and says when it closes (navigator.sendBeacon, a
+    text/plain body)
+    """
+
+    @staticmethod
+    @requires_auth()
+    def post(user: UserModel):
+        """Body: job_ids, viewer (the tab's own random id: letters, digits, - and _) and closed (optional, true when
+        the tab closes). Answers the partial state (partial_state) of each running simulation, by job id
+        """
+        payload = request.get_json(force=True, silent=True)
+        if not isinstance(payload, dict) or not VIEWER_PATTERN.fullmatch(str(payload.get("viewer", ""))):
+            return yaptide_response(message="job_ids and viewer are required", code=400)
+        job_ids = payload.get("job_ids")
+        if not isinstance(job_ids, list) or len(job_ids) > MAX_WATCHED or not all(isinstance(j, str) for j in job_ids):
+            return yaptide_response(message=f"job_ids: a list of at most {MAX_WATCHED} job ids", code=400)
+        closed = bool(payload.get("closed"))
+        states = {}
+        for job_id in dict.fromkeys(job_ids):
+            simulation, error = owned_simulation(user, job_id)
+            if error or simulation.job_state in FINAL_STATES:
+                continue
+            note_viewer(simulation.id, payload["viewer"], closed)
+            publish_wanted(simulation.id)
+            if not closed:
+                states[job_id] = partial_state(simulation)
+        return yaptide_response(message="Closed" if closed else "Watching", code=200, content={"simulations": states})
+
+
 class OnDemandResource(Resource):
-    """The on-demand pages of a running simulation (yaptide/batch/result_format.py): partial results carry them only
-    when the user asks, as each costs a merge of a whole map; the next partial results then carry them once
+    """The maps of a running simulation's partial results (yaptide/batch/result_format.py): each merged only when the
+    user asks for it, as each costs a merge of the map's bins over the tasks' saves; the next partial results carry
+    that page once
     """
 
     class APIParametersSchema(Schema):
@@ -609,48 +833,47 @@ class OnDemandResource(Resource):
         job_id = fields.String(required=True)
 
     @staticmethod
-    def owned_simulation(user: UserModel, job_id: str):
-        """The user's simulation of the job, or the error response"""
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
-        if not is_owned:
-            return None, yaptide_response(message=error_message, code=res_code)
-        return fetch_simulation_by_job_id(job_id=job_id), None
-
-    @staticmethod
     @requires_auth()
     def get(user: UserModel):
-        """Whether the on-demand pages are asked for and not delivered yet, and whether this server can deliver them"""
+        """The maps there are to ask for, and whether this server can deliver them"""
         schema = OnDemandResource.APIParametersSchema()
         errors: dict[str, list[str]] = schema.validate(request.args)
         if errors:
             return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        simulation, error = OnDemandResource.owned_simulation(user, schema.load(request.args)["job_id"])
+        simulation, error = owned_simulation(user, schema.load(request.args)["job_id"])
         if error:
             return error
-        available = result_storage.configured()
-        requested = available and result_storage.on_demand_requested(simulation.id)
-        return yaptide_response(
-            message="On-demand pages", code=200, content={"requested": requested, "available": available}
-        )
+        content = dict(partial_state(simulation), available=result_storage.configured())
+        return yaptide_response(message="On-demand pages", code=200, content=content)
 
     @staticmethod
     @requires_auth()
     def post(user: UserModel):
-        """Asks for the on-demand pages in the next partial results of a running simulation; body: job_id"""
+        """Asks for one map in the next partial results of a running simulation; body: job_id, file (the
+        estimator's result file, as GET lists it) and page_number
+        """
         payload = request.get_json(force=True, silent=True)
-        errors = OnDemandResource.APIParametersSchema().validate(payload if isinstance(payload, dict) else {})
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        simulation, error = OnDemandResource.owned_simulation(user, payload["job_id"])
+        if not isinstance(payload, dict) or not isinstance(payload.get("file"), str):
+            return yaptide_response(message="job_id, file and page_number are required", code=400)
+        number = payload.get("page_number")
+        if type(number) is not int or number < 0:
+            return yaptide_response(message="page_number must be a number", code=400)
+        simulation, error = owned_simulation(user, payload.get("job_id"))
         if error:
             return error
-        if not result_storage.configured():
-            # the request is an object in storage, which the cluster's jobs and the engine look for
-            return yaptide_response(message="On-demand pages need results storage on this server", code=501)
         if simulation.job_state != EntityState.RUNNING.value:
             return yaptide_response(message=f"Simulation is {simulation.job_state}", code=409)
-        result_storage.put_on_demand(simulation.id)
-        return yaptide_response(message="On-demand pages requested", code=202, content={"requested": True})
+        page = (
+            db.session.query(PartialPageModel)
+            .filter_by(simulation_id=simulation.id, estimator=payload["file"], page_number=number)
+            .one_or_none()
+        )
+        if page is None:
+            return yaptide_response(message="No such map in the partial results", code=404)
+        page.requested_at = utc_now()
+        db.session.commit()
+        publish_wanted(simulation.id)
+        return yaptide_response(message="Page requested", code=202, content=partial_state(simulation))
 
 
 class InputsResource(Resource):

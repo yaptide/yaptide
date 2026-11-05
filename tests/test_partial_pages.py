@@ -1,8 +1,11 @@
-"""Partial results carry pages by their dimensions: points and lines always, maps when the user asks for them, volumes
-only in the final results (yaptide/batch/result_format.py)
+"""Partial results carry pages by their dimensions: points and lines while someone looks, a map when the user asks for
+that page, volumes only in the final results (yaptide/batch/result_format.py); and the routes the browser tells the
+backend through what it looks at
 """
 
 import json
+import time
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -12,7 +15,14 @@ from yaptide.application import create_app
 from yaptide.batch import merge_groups, result_format, results_merger
 from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
-from yaptide.persistence.models import BatchSimulationModel, ClusterModel, KeycloakUserModel, SimulationModel
+from yaptide.persistence.models import (
+    BatchSimulationModel,
+    ClusterModel,
+    KeycloakUserModel,
+    PartialPageModel,
+    PartialViewerModel,
+    SimulationModel,
+)
 from yaptide.routes import common_sim_routes
 from yaptide.routes.utils.tokens import encode_auth_token
 from yaptide.utils.enums import EntityState, InputType, SimulationType
@@ -67,94 +77,119 @@ def test_group_merges_carry_the_live_pages_only(tmp_path: Path):
 
 
 def test_partial_merges_read_only_their_pages(tmp_path: Path, monkeypatch):
-    """A live merge never reads the values of a map, an on-demand merge never those of a line (bdo_pages)"""
+    """A live merge never reads the values of a map, a merge of a page asked for only that page's (bdo_pages): what
+    pymchelper reads holds no other page
+    """
     read = []
-    copy = results_merger.bdo_pages.copy_pages
+    read_bdo = results_merger.read_bdo
 
-    def copy_pages(source, target, keep):
-        """Notes which pages were copied out to be read"""
-        kept = copy(source, target, keep)
-        read.extend(page.dimensions for page in results_merger.bdo_pages.pages_of(target))
-        return kept
+    def noting(file):
+        """Notes the pages of each file pymchelper reads"""
+        read.extend((Path(file).name, info.number, info.dimensions) for info in results_merger.bdo_pages.pages_of(file))
+        return read_bdo(file)
 
-    monkeypatch.setattr(results_merger.bdo_pages, "copy_pages", copy_pages)
+    monkeypatch.setattr(results_merger, "read_bdo", noting)
     results_merger.write_directory(FILES, tmp_path / "live", modes=result_format.kind_modes(result_format.LIVE))
-    assert read and max(read) <= result_format.LIVE_DIMENSIONS
+    assert read and max(dimensions for _, _, dimensions in read) <= result_format.LIVE_DIMENSIONS
     read.clear()
-    manifest = results_merger.write_directory(
-        FILES, tmp_path / "maps", modes=result_format.kind_modes(result_format.ON_DEMAND)
-    )
-    assert set(read) == {2} and [estimator["name"] for estimator in manifest["estimators"]] == [MAPS_ONLY]
+    manifest = results_merger.write_directory(FILES, tmp_path / "page", pages={MAPS_ONLY: {1}})
+    assert {(number, dimensions) for _, number, dimensions in read} == {(1, 2)}
+    assert [(e["name"], [p["page_number"] for p in e["pages"]]) for e in manifest["estimators"]] == [(MAPS_ONLY, [1])]
 
 
-class FakeResponse:
-    """What urlopen gives, as a context manager"""
-
-    def __init__(self, status: int):
-        self.status = status
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc):
-        return False
-
-
-def test_the_job_looks_for_the_request_with_its_signed_link(tmp_path: Path, monkeypatch):
-    """The last partial merge asks storage for the on-demand object; no link (a job submitted before) means no"""
-    assert not merge_groups.on_demand_requested(tmp_path)
-
-    (tmp_path / merge_groups.LINKS_FILE).write_text(json.dumps({"on_demand": "https://storage.test/od?signed"}))
-    asked = []
+def test_a_file_holding_only_the_pages_wanted_is_read_as_it_is(tmp_path: Path, monkeypatch):
+    """No copy when every page of a file is wanted (a save holds only the pages of partial results), and pymchelper's
+    reader of the format is called directly: no guess of the format, which reads the whole file more than once
+    """
+    monkeypatch.setattr(results_merger, "fromfile", lambda file: pytest.fail("the format was guessed"))
     monkeypatch.setattr(
-        merge_groups.request, "urlopen", lambda req, **kwargs: asked.append(req.get_method()) or FakeResponse(200)
+        results_merger.bdo_pages, "copy_file", lambda *args: pytest.fail("a file of wanted pages only was copied")
     )
-    assert merge_groups.on_demand_requested(tmp_path) and asked == ["HEAD"]
+    estimator = results_merger.read_estimator(str(BDO_DIR / "task_1" / "yz_profile_0001.bdo"), modes={result_format.ON_DEMAND})
+    assert [page.dimension for page in estimator.pages] == [2, 2, 2]
 
-    def missing(req, **kwargs):
-        raise merge_groups.error.HTTPError(req.full_url, 404, "Not Found", {}, None)
 
-    monkeypatch.setattr(merge_groups.request, "urlopen", missing)
-    assert not merge_groups.on_demand_requested(tmp_path)
+def test_live_partial_results_announce_the_maps(tmp_path: Path):
+    """The live pages come with stubs of the maps (number, name and dimensions, no values), an estimator of maps only
+    with its stubs alone, so the user can ask for one before any was merged
+    """
+    stubs = results_merger.page_stubs(FILES, {result_format.ON_DEMAND})
+    manifest = results_merger.write_directory(FILES, tmp_path, modes={result_format.LIVE}, stubs=stubs)
+    maps = next(estimator for estimator in manifest["estimators"] if estimator["name"] == MAPS_ONLY)
+    assert maps["pages"] == [
+        {"page_number": number, "name": name, "dimensions": 2, "stub": True}
+        for number, name in enumerate(["DOSE", "FLUENCE", "FLUENCE"])
+    ]
+    assert not list((tmp_path / MAPS_ONLY).glob("*"))
 
 
 @pytest.mark.parametrize("kind", [result_format.LIVE, result_format.ON_DEMAND])
 def test_each_kind_of_partial_merge_takes_its_pages(tmp_path: Path, monkeypatch, kind: str):
-    """The live merge uploads the points and lines, the on-demand merge the maps of the latest saves of all tasks"""
+    """The live merge uploads the points and lines (with stubs of the maps), the merge of pages asked for those
+    pages of the latest saves of all tasks
+    """
     merged = {}
 
-    def write_directory(files, output, modes=None):
+    def write_directory(files, output, modes=None, pages=None, stubs=None):
         """Notes what was merged"""
-        merged.update(modes=modes, files=files)
+        merged.update(modes=modes, files=files, pages=pages, stubs=stubs)
         return {"estimators": [], "primaries": 0}
 
     monkeypatch.setattr(results_merger, "write_directory", write_directory)
     save = tmp_path / "workspaces" / "task_0001" / "saves" / "100"
     save.mkdir(parents=True)
-    (save / "dose.bdo").write_bytes(Path(FILES[0]).read_bytes())
+    (save / "yz_profile.bdo").write_bytes(Path(FILES[2]).read_bytes())
     merge_groups.plan(tmp_path, 1, 10)
     args = SimpleNamespace(
-        root=str(tmp_path), ntasks=1, group=0, kind=kind, sim_id=1, update_key="key", backend_url="https://b.test"
+        root=str(tmp_path),
+        ntasks=1,
+        group=0,
+        kind=kind,
+        sim_id=1,
+        update_key="key",
+        backend_url="https://b.test",
+        pages=result_format.pages_argument([("yz_profile", 1)]),
     )
     assert merge_groups.partial(args) == 0  # nothing to upload: not a failure
-    assert merged["modes"] == result_format.kind_modes(kind) and merged["files"] == [str(save / "dose.bdo")]
+    assert merged["files"] == [str(save / "yz_profile.bdo")]
+    if kind == result_format.LIVE:
+        assert merged["modes"] == {result_format.LIVE} and merged["pages"] is None and "yz_profile" in merged["stubs"]
+    else:
+        assert merged["modes"] is None and merged["pages"] == {"yz_profile": {1}} and merged["stubs"] is None
+        assert (tmp_path / f"{merge_groups.PARTIAL_STAMP}.{merge_groups.ON_DEMAND_LOCK}").exists()
     assert not list(tmp_path.glob("partial.lock.*"))
+
+
+def test_live_results_of_the_same_saves_are_not_uploaded_again(tmp_path: Path, monkeypatch):
+    """No one's save changed since the last live partial results: no merge, no upload"""
+    merges = []
+    monkeypatch.setattr(
+        results_merger,
+        "write_directory",
+        lambda files, output, **kwargs: merges.append(files) or {"estimators": [{"name": "d", "pages": []}], "primaries": 1},
+    )
+    monkeypatch.setattr(merge_groups.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=0))
+    save = tmp_path / "workspaces" / "task_0001" / "saves" / "100"
+    save.mkdir(parents=True)
+    (save / "dose.bdo").write_bytes(Path(FILES[0]).read_bytes())
+    args = SimpleNamespace(ntasks=1, sim_id=1, update_key="key", backend_url="https://b.test")
+    units = merge_groups.latest_saves(tmp_path, 1)
+    assert merge_groups.merge_and_upload(tmp_path, units, args) == 0
+    assert merge_groups.merge_and_upload(tmp_path, units, args) == 0
+    assert len(merges) == 1
+    newer = save.parent / "200"
+    save.rename(newer)
+    assert merge_groups.merge_and_upload(tmp_path, merge_groups.latest_saves(tmp_path, 1), args) == 0
+    assert len(merges) == 2
 
 
 @pytest.fixture
 def client(monkeypatch):
-    """Test client signed in as the owner of a running HPC simulation, with object storage kept in a set"""
+    """Test client signed in as the owner of a running HPC simulation, the wanted objects in storage kept in a dict"""
     monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
-    objects = set()
-    monkeypatch.setattr(
-        result_storage, "put_on_demand", lambda sim_id: objects.add(result_storage.on_demand_key(sim_id))
-    )
-    monkeypatch.setattr(
-        result_storage, "on_demand_requested", lambda sim_id: result_storage.on_demand_key(sim_id) in objects
-    )
-    monkeypatch.setattr(
-        result_storage, "clear_on_demand", lambda sim_id: objects.discard(result_storage.on_demand_key(sim_id))
-    )
+    objects = {}
+    monkeypatch.setattr(result_storage, "put_wanted", lambda sim_id, body: objects.__setitem__(sim_id, json.loads(body)))
+    monkeypatch.setattr(result_storage, "delete_wanted", lambda sim_id: objects.pop(sim_id, None))
     app = create_app()
     with app.app_context():
         db.create_all()
@@ -182,35 +217,94 @@ def client(monkeypatch):
         db.drop_all()
 
 
-def test_the_user_asks_for_the_on_demand_pages(client, monkeypatch):
-    """A request is stored for the jobs to find, and reported until partial results carry the maps"""
-    # the pages themselves are stored as test_results_upload.py checks
+def beat(client, closed=False, viewer="tab1", job_ids=("hpcjob",)):
+    """A beat of a browser tab with the app open"""
+    return client.post("/results/watch", json={"job_ids": list(job_ids), "viewer": viewer, "closed": closed})
+
+
+LINE = {"name": "z", "metadata": {}, "pages": [{"metadata": {"page_number": 0}, "dimensions": 1, "data": {}}]}
+MAP_STUBS = {
+    "name": "yz",
+    "metadata": {},
+    "pages": [
+        {"page_number": 0, "name": "DOSE", "dimensions": 2, "stub": True},
+        {"page_number": 1, "name": "FLUENCE", "dimensions": 2, "stub": True},
+    ],
+}
+
+
+def test_live_pages_are_wanted_while_a_tab_beats(client, monkeypatch):
+    """A beat makes the live pages wanted for WANTED_LIVE_SECONDS; a tab that closes ends it unless another beats"""
+    assert beat(client).status_code == 200
+    live_until = client.objects[client.simulation_id]["live_until"]
+    assert abs(live_until - time.time() - result_format.WANTED_LIVE_SECONDS) < 5
+    assert beat(client, viewer="tab2").get_json()["simulations"]["hpcjob"]["live"] is True
+
+    beat(client, closed=True)
+    assert client.objects[client.simulation_id]["live_until"] > time.time()  # tab2 still beats
+    beat(client, closed=True, viewer="tab2")
+    assert client.objects[client.simulation_id]["live_until"] == 0
+
+    # a tab that stopped beating counts as gone after WANTED_LIVE_SECONDS
+    beat(client)
+    db.session.query(PartialViewerModel).update(
+        {"last_seen": datetime.now(timezone.utc) - timedelta(seconds=result_format.WANTED_LIVE_SECONDS + 1)}
+    )
+    db.session.commit()
+    assert common_sim_routes.wanted_state(client.simulation_id)[0] == 0
+
+
+def test_a_map_is_asked_for_alone_and_kept_with_its_time(client, monkeypatch):
+    """The live partial results announce the maps; one asked for is listed in the wanted object until partial results
+    carry it, then shows when it was merged and of how many primaries
+    """
     monkeypatch.setattr(common_sim_routes, "prepare_estimators_and_pages", lambda *args: None)
-    assert client.get("/results/on_demand?job_id=hpcjob").get_json()["requested"] is False
-    assert client.post("/results/on_demand", json={"job_id": "hpcjob"}).status_code == 202
-    assert client.get("/results/on_demand?job_id=hpcjob").get_json()["requested"] is True
-
-    line = {"name": "z", "metadata": {}, "pages": [{"metadata": {"page_number": 0}, "dimensions": 1, "data": {}}]}
     simulation = db.session.get(BatchSimulationModel, client.simulation_id)
-    common_sim_routes.store_partial_results(simulation, [line], 100)
-    assert client.get("/results/on_demand?job_id=hpcjob").get_json()["requested"] is True
+    assert client.post("/results/on_demand", json={"job_id": "hpcjob", "file": "yz", "page_number": 1}).status_code == 404
 
-    a_map = {"name": "yz", "metadata": {}, "pages": [{"metadata": {"page_number": 0}, "dimensions": 2, "data": {}}]}
-    common_sim_routes.store_partial_results(simulation, [line, a_map], 200)
-    assert client.get("/results/on_demand?job_id=hpcjob").get_json()["requested"] is False
+    common_sim_routes.store_partial_results(simulation, [LINE, MAP_STUBS], 100)
+    pages = client.get("/results/on_demand?job_id=hpcjob").get_json()["pages"]
+    assert [(page["file"], page["page_number"], page["name"], page["merged_at"]) for page in pages] == [
+        ("yz", 0, "DOSE", None),
+        ("yz", 1, "FLUENCE", None),
+    ]
+    assert simulation.partial_primaries == 100
+
+    assert client.post("/results/on_demand", json={"job_id": "hpcjob", "file": "yz", "page_number": 1}).status_code == 202
+    assert client.objects[client.simulation_id]["pages"] == [{"estimator": "yz", "page": 1}]
+
+    # live partial results again: the request stays
+    common_sim_routes.store_partial_results(simulation, [LINE, MAP_STUBS], 200)
+    assert client.objects[client.simulation_id]["pages"] == [{"estimator": "yz", "page": 1}]
+
+    a_map = {"name": "yz", "metadata": {}, "pages": [{"metadata": {"page_number": 1, "name": "FLUENCE"}, "dimensions": 2}]}
+    common_sim_routes.store_partial_results(simulation, [a_map], 300)
+    assert client.objects[client.simulation_id]["pages"] == []
+    page = client.get("/results/on_demand?job_id=hpcjob").get_json()["pages"][1]
+    assert page["requested_at"] is None and page["merged_at"] and page["primaries"] == 300
 
 
-def test_only_a_running_simulation_of_the_user_takes_a_request(client, monkeypatch):
-    """Another user's or an unknown job is refused, as is a simulation no longer running or a server without storage"""
-    assert client.post("/results/on_demand", json={"job_id": "nosuchjob"}).status_code != 202
-    assert client.post("/results/on_demand", json={}).status_code == 400
+def test_only_a_running_simulation_of_the_user_takes_a_request(client):
+    """Another user's or an unknown job is refused, as is a simulation no longer running; a beat skips them"""
+    simulation = db.session.get(BatchSimulationModel, client.simulation_id)
+    common_sim_routes.store_partial_results(simulation, [MAP_STUBS], 100)
+    request = {"job_id": "hpcjob", "file": "yz", "page_number": 0}
+    assert client.post("/results/on_demand", json=dict(request, job_id="nosuchjob")).status_code != 202
+    assert client.post("/results/on_demand", json={"job_id": "hpcjob"}).status_code == 400
+    assert client.post("/results/watch", json={"job_ids": ["hpcjob"], "viewer": "no spaces"}).status_code == 400
+    assert beat(client, job_ids=["nosuchjob"]).get_json()["simulations"] == {}
 
     db.session.query(SimulationModel).update({"job_state": EntityState.MERGING_RUNNING.value})
     db.session.commit()
-    assert client.post("/results/on_demand", json={"job_id": "hpcjob"}).status_code == 409
+    assert client.post("/results/on_demand", json=request).status_code == 409
 
-    db.session.query(SimulationModel).update({"job_state": EntityState.RUNNING.value})
-    db.session.commit()
-    monkeypatch.delenv("RESULTS_S3_BUCKET")
-    assert client.post("/results/on_demand", json={"job_id": "hpcjob"}).status_code == 501
-    assert not client.objects
+
+def test_final_results_forget_who_looked_and_what_was_asked(client, monkeypatch):
+    """The wanted object goes with the final results, and so do the viewers and the maps noted"""
+    monkeypatch.setattr(common_sim_routes, "prepare_estimators_and_pages", lambda *args: None)
+    simulation = db.session.get(BatchSimulationModel, client.simulation_id)
+    beat(client)
+    common_sim_routes.store_partial_results(simulation, [LINE, MAP_STUBS], 100)
+    common_sim_routes.store_results(simulation, [LINE])
+    assert client.simulation_id not in client.objects
+    assert db.session.query(PartialViewerModel).count() == 0 and db.session.query(PartialPageModel).count() == 0

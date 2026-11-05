@@ -179,12 +179,15 @@ class Upload:
             {"estimator": estimator["name"], "page_number": page["page_number"], "files": page["files"]}
             for estimator in self.manifest["estimators"]
             for page in estimator["pages"]
-            if (estimator["name"], page["page_number"]) in wanted
+            if (estimator["name"], page["page_number"]) in wanted and not page.get("stub")
         ]
 
     def upload(self, wanted: set) -> str:
         """Uploads the wanted pages ((estimator, page number) pairs)"""
         entries = self.entries(wanted)
+        if not entries:
+            # stubs of maps only (partial results of a simulation whose only pages are maps): nothing to upload
+            return UPLOADED
         status, answer = post(f"{self.args.backend_url}/results/uploads", self.payload(pages=entries))
         if status == 501:
             return NO_STORAGE
@@ -217,6 +220,8 @@ class Upload:
         for estimator in self.manifest["estimators"]:
             pages = []
             for page in estimator["pages"]:
+                if page.get("stub"):
+                    continue
                 page_dir = self.pages_dir / estimator["name"] / str(page["page_number"])
                 files = {name: (page_dir / name).read_bytes() for name in page["files"]}
                 pages.append(result_format.json_page(*result_format.read_page(files)))
@@ -244,7 +249,10 @@ def main(args) -> int:
     upload = Upload(manifest, pages_dir, args)
     partial = getattr(args, "partial", False)
     wanted = {
-        (estimator["name"], page["page_number"]) for estimator in manifest["estimators"] for page in estimator["pages"]
+        (estimator["name"], page["page_number"])
+        for estimator in manifest["estimators"]
+        for page in estimator["pages"]
+        if not page.get("stub")
     }
     for _ in range(ROUNDS):
         uploaded = upload.upload(wanted)

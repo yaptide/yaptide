@@ -3,11 +3,13 @@
 Runs next to the simulator on the compute node, with the standard library only. The task's state goes into one
 small object of its own, at most every few seconds and at once when the state changes; the backend's engine reads
 these objects. The result files SHIELD-HIT12A saves along the way are copied aside on the cluster (the task's saves
-directory, only the pages partial results carry: bdo_pages.py), and now and then a watcher starts the partial script
-for its task's group, which merges the latest saves of the group, then of all tasks, and uploads the merged live
-pages as partial results (merge_groups.py, results_uploader.py). While the user asks for the maps (an object in
-storage), a watcher starts the partial script for them. A cancel is an object the backend
-puts into storage: the watcher checks for it and kills the simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
+directory, only the pages partial results carry: bdo_pages.py). Partial results are merged only for the users who
+look at them: the backend keeps a small object in storage saying until when someone has the simulation's results
+open, and which maps they asked for (result_format.parse_wanted). While someone looks, a watcher now and then starts
+the partial script for its task's group, which merges the latest saves of the group, then of all tasks, and uploads
+the merged live pages as partial results (merge_groups.py, results_uploader.py); for a map asked for, a watcher starts
+the partial script for that page alone. A cancel is an object the backend puts into storage: the watcher checks for it
+and kills the simulator. The signed links come in storage_links.json, written at submit; when they expire (after a week),
 the watcher asks the backend for new ones.
 """
 
@@ -75,7 +77,8 @@ PARTIAL_STAMP = merge_groups.PARTIAL_STAMP
 PARTIAL_SECONDS = result_format.LIVE_MIN_SECONDS
 # a lock untouched for this long was left by a partial merge that was killed (its task ended, it ran out of memory)
 PARTIAL_LOCK_SECONDS = merge_groups.LOCK_SECONDS
-# an on-demand merge starts at most this often for the simulation, while the user's request stays (one failed)
+# a merge of pages asked for starts at most this long after the last one ended, while the request stays (one failed,
+# or the backend has not taken the pages off the list yet)
 ON_DEMAND_SECONDS = result_format.LIVE_MIN_SECONDS
 
 
@@ -202,8 +205,11 @@ class Reporter:
         self.unsent = False
         self.last_report = 0.0
         self.last_cancel_check = 0.0
-        self.last_on_demand_check = 0.0
+        self.last_wanted_check = float("-inf")
         self.last_renewal = 0.0
+        # the wanted object as last read: its ETag, and live_until and the pages asked for (result_format.parse_wanted)
+        self.wanted_etag: Optional[str] = None
+        self.wanted_state: tuple = (0.0, frozenset())
 
     def update(self, changes: dict) -> None:
         """Takes a change of the task's state; a new state is reported at once, progress at most every interval"""
@@ -258,18 +264,39 @@ class Reporter:
             status = self.send(self.links["cancel"], "HEAD")
         return status == 200
 
-    def on_demand_requested(self) -> bool:
-        """Whether the user asks for the maps (the simulation's on-demand object is in storage); looked up at most
-        every interval. False for links without it (a job submitted before)
+    def wanted(self) -> tuple:
+        """What the users look at (result_format.parse_wanted): live_until and the pages asked for; read again at most
+        every interval, a conditional GET (an unchanged object is not sent again). The last known state when storage
+        cannot be reached; nothing for links without the object (a job submitted before)
         """
-        if "on_demand" not in self.links or time.monotonic() - self.last_on_demand_check < self.interval_seconds:
-            return False
-        self.last_on_demand_check = time.monotonic()
+        if "wanted" not in self.links or time.monotonic() - self.last_wanted_check < self.interval_seconds:
+            return self.wanted_state
+        self.last_wanted_check = time.monotonic()
         self.renew_links_if_expiring()
-        status = self.send(self.links["on_demand"], "HEAD")
+        status, body, etag = self.fetch(self.links["wanted"], self.wanted_etag)
         if status in (400, 403) and self.renew_links():
-            status = self.send(self.links["on_demand"], "HEAD")
-        return status == 200
+            status, body, etag = self.fetch(self.links["wanted"], self.wanted_etag)
+        if status == 200:
+            self.wanted_state, self.wanted_etag = result_format.parse_wanted(body), etag
+        elif status == 404:
+            # no one looked at the simulation yet, or its results are final
+            self.wanted_state, self.wanted_etag = (0.0, frozenset()), None
+        return self.wanted_state
+
+    @staticmethod
+    def fetch(url: str, etag: Optional[str] = None) -> Tuple[int, bytes, Optional[str]]:
+        """A GET from storage, conditional on the ETag: status, body and ETag; 0 when storage could not be reached"""
+        headers = {"If-None-Match": etag} if etag else {}
+        try:
+            with request.urlopen(  # skipcq: BAN-B310
+                request.Request(url, headers=headers), context=CONTEXT, timeout=60
+            ) as response:
+                return response.status, response.read(1 << 20), response.headers.get("ETag")
+        except error.HTTPError as http_error:
+            return http_error.code, b"", None
+        except Exception as err:  # skipcq: PYL-W0703
+            logging.warning("GET %s failed: %s", url.split("?")[0], err)
+            return 0, b"", None
 
     def renew_links_if_expiring(self) -> None:
         """New links a day before these expire"""
@@ -339,7 +366,7 @@ def copy_save(work_dir: Path, target: Path) -> bool:
 
 class Saver:
     """Copies the simulator's result files aside after it saved them, and starts merges of the latest saves of all
-    tasks into partial results
+    tasks into partial results while someone looks at them: of the live pages, and of the maps asked for
     """
 
     def __init__(self, work_dir: Path, reporter: Reporter, root_dir: Optional[Path] = None, n_tasks: int = 1):
@@ -352,16 +379,22 @@ class Saver:
         self.n_tasks = n_tasks
         self.last_time = float("-inf")
         self.last_primaries = 0
-        # the live partial merge this watcher started, and for which group; the on-demand one
+        # the live partial merge this watcher started, and for which group (the task's, once planned); the merge of
+        # pages asked for
         self.merge: Optional[subprocess.Popen] = None
-        self.group = 0
+        self.group: Optional[int] = None
         self.on_demand: Optional[subprocess.Popen] = None
         # seconds between live merges, from the size of a save (all its result files)
         self.interval = PARTIAL_SECONDS
 
+    def watched(self) -> bool:
+        """Whether someone looks at the simulation's results now (the wanted object's live_until)"""
+        live_until, _ = self.reporter.wanted()
+        return time.time() < live_until
+
     def saved(self) -> None:
-        """The simulator wrote all its result files: copied aside when due, then a partial merge when due; a failure
-        loses only this save
+        """The simulator wrote all its result files: copied aside when due (a merge asked for later needs every
+        task's latest save), then a live merge when someone looks and one is due; a failure loses only this save
         """
         simulated = self.reporter.state.get("simulated_primaries", 0)
         requested = self.reporter.state.get("requested_primaries", 0)
@@ -385,7 +418,9 @@ class Saver:
             save_bytes = merge_groups.files_size(self.work_dir)
             self.interval = result_format.live_interval(save_bytes)
             size = merge_groups.plan(self.root_dir, self.n_tasks, save_bytes)
-            self.start_merge(merge_groups.group_of(self.reporter.task_id, size, self.n_tasks))
+            self.group = merge_groups.group_of(self.reporter.task_id, size, self.n_tasks)
+            if self.watched():
+                self.start_merge(self.group)
 
     def keep(self, primaries: int) -> bool:
         """Copies the result files into the task's saves, named by their primaries, and removes all but the latest
@@ -424,17 +459,30 @@ class Saver:
         self.group = group
 
     def idle(self) -> None:
-        """Between the simulator's log lines: starts the on-demand partial script when the user asks for the maps,
-        unless one runs (this watcher's or another's) or one started within ON_DEMAND_SECONDS
+        """Between the simulator's log lines: while someone looks, a live merge when one is due (so a user who just
+        opened the results does not wait for the next save); a merge of the pages asked for, unless one runs (this
+        watcher's or another's) or one ended within ON_DEMAND_SECONDS
+        """
+        # a task without a save yet: the others' watchers take it
+        if self.last_primaries == 0 or self.group is None or not (self.root_dir / PARTIAL_SCRIPT).exists():
+            return
+        checked = self.reporter.last_wanted_check
+        live_until, pages = self.reporter.wanted()
+        if self.reporter.last_wanted_check == checked:
+            # nothing read now: the merges are started at most once per read of the wanted object
+            return
+        if time.time() < live_until:
+            self.start_merge(self.group)
+        if pages:
+            self.start_pages(pages)
+
+    def start_pages(self, pages) -> None:
+        """Starts the partial script for the pages asked for ((estimator, page number) pairs), unless a merge of
+        pages runs or one ended within ON_DEMAND_SECONDS
         """
         if self.on_demand is not None and self.on_demand.poll() is None:
             return
         self.on_demand = None
-        # a task without a save yet: the others' watchers take it
-        if self.last_primaries == 0 or not (self.root_dir / PARTIAL_SCRIPT).exists():
-            return
-        if not self.reporter.on_demand_requested():
-            return
         stamp = self.root_dir / f"{PARTIAL_STAMP}.{merge_groups.ON_DEMAND_LOCK}"
         lock = merge_groups.lock_path(self.root_dir, merge_groups.ON_DEMAND_LOCK)
         try:
@@ -445,7 +493,9 @@ class Saver:
         if not merge_groups.take_lock(lock, PARTIAL_LOCK_SECONDS):
             return
         stamp.touch()
-        self.on_demand = self.start_script(lock, merge_groups.ON_DEMAND_LOCK)
+        self.on_demand = self.start_script(
+            lock, merge_groups.ON_DEMAND_LOCK, str(self.interval), result_format.pages_argument(pages)
+        )
 
     def start_script(self, lock: Path, *arguments: str) -> Optional[subprocess.Popen]:
         """Starts the partial script holding the lock (it frees it); the lock is freed when the script fails to
@@ -483,7 +533,7 @@ class Saver:
                     merge.wait()
             except ProcessLookupError:
                 pass
-            merge_groups.free_locks(self.root_dir, merge.pid, self.group, kind)
+            merge_groups.free_locks(self.root_dir, merge.pid, self.group or 0, kind)
 
 
 def running(pid: int, kill: Callable[[int, int], None] = os.kill) -> bool:

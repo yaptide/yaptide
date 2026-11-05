@@ -1,6 +1,7 @@
 """The watcher of an HPC task: progress into storage with a signed policy, a cancel from storage stops the simulator"""
 
 import email
+import hashlib
 import io
 import os
 import json
@@ -12,6 +13,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from typing import Optional
 
 import pytest
 
@@ -25,13 +27,15 @@ SHIELDHIT_RUN = """  Requested number of primaries NSTAT      : 1000
 
 
 class FakeStorage(BaseHTTPRequestHandler):
-    """The bucket as the jobs see it: POST uploads under the policy's prefix, HEAD of the cancel object, and the
-    backend's endpoint for new links
+    """The bucket as the jobs see it: POST uploads under the policy's prefix, HEAD of the cancel object, GET of the
+    wanted object, and the backend's endpoint for new links
     """
 
     objects: dict = {}
     cancelled = False
-    on_demand = False
+    # the wanted object (result_format.wanted_body's fields), None when there is none; its GETs
+    wanted: Optional[dict] = None
+    wanted_gets: list = []
     # Garage answers an expired link with 400; a link signed with a wrong secret gets 403 every time
     expired_once = False
     always_refused = False
@@ -81,10 +85,30 @@ class FakeStorage(BaseHTTPRequestHandler):
         return self.answer(200, None)
 
     def do_HEAD(self):
-        """The cancel object exists once the simulation is cancelled, the on-demand one while the maps are asked for"""
-        exists = FakeStorage.on_demand if self.path.endswith("/on_demand") else FakeStorage.cancelled
-        self.send_response(200 if exists else 404)
+        """The cancel object exists once the simulation is cancelled"""
+        self.send_response(200 if FakeStorage.cancelled else 404)
         self.end_headers()
+
+    def do_GET(self):
+        """The wanted object, answered 304 when the ETag sent is its own"""
+        if FakeStorage.wanted is None:
+            FakeStorage.wanted_gets.append(404)
+            self.send_response(404)
+            self.end_headers()
+            return
+        body = json.dumps(FakeStorage.wanted).encode()
+        etag = f'"{hashlib.md5(body).hexdigest()}"'  # skipcq: PTC-W1003
+        if self.headers.get("If-None-Match") == etag:
+            FakeStorage.wanted_gets.append(304)
+            self.send_response(304)
+            self.end_headers()
+            return
+        FakeStorage.wanted_gets.append(200)
+        self.send_response(200)
+        self.send_header("ETag", etag)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def answer(self, code: int, content) -> None:
         """JSON answer, or none"""
@@ -106,15 +130,21 @@ def links(port: int) -> dict:
             "prefix": "simulations/7/progress/",
         },
         "cancel": f"http://127.0.0.1:{port}/bucket/simulations/7/cancel",
-        "on_demand": f"http://127.0.0.1:{port}/bucket/hpc/7/on_demand",
+        "wanted": f"http://127.0.0.1:{port}/bucket/hpc/7/wanted",
     }
+
+
+def watching(pages=()) -> dict:
+    """The wanted object while someone looks at the simulation, with the pages asked for"""
+    return {"live_until": time.time() + 3600, "pages": [{"estimator": e, "page": n} for e, n in pages]}
 
 
 @pytest.fixture
 def storage(tmp_path, monkeypatch):
     """The fake storage running, the links file written, and the watcher's waits shortened"""
     FakeStorage.objects, FakeStorage.cancelled, FakeStorage.expired_once, FakeStorage.renewals = {}, False, False, 0
-    FakeStorage.on_demand = False
+    # someone looks at the simulation, unless a test says otherwise
+    FakeStorage.wanted, FakeStorage.wanted_gets = watching(), []
     FakeStorage.always_refused, FakeStorage.down_for, FakeStorage.renewal_keys = False, 0, []
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeStorage)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -469,26 +499,30 @@ def test_a_partial_merge_stops_with_its_task(storage):
     assert task.merge.poll() is not None and not (tmp_path / "partial.lock.0").exists()
 
 
-ON_DEMAND_SCRIPT = 'echo "$1" >> "$(dirname "$0")/on_demand_merges"; rmdir "$(dirname "$0")/partial.lock.$1"\n'
+ON_DEMAND_SCRIPT = (
+    'echo "$1 $3" >> "$(dirname "$0")/on_demand_merges"; rmdir "$(dirname "$0")/partial.lock.$1" 2>/dev/null\n'
+)
 
 
 def on_demand_merges(root: Path) -> list:
-    """Arguments of the runs of the partial script for the maps, once they ended"""
+    """The pages each run of the partial script for pages asked for merged (its argument), once they ended"""
     for _ in range(100):
         if not (root / "partial.lock.on_demand").exists():
             break
         time.sleep(0.05)
     path = root / "on_demand_merges"
-    # the live merge of the save runs the same script, for its group
-    return [run for run in path.read_text().split() if run == "on_demand"] if path.exists() else []
+    # the live merges run the same script, for their group
+    lines = path.read_text().splitlines() if path.exists() else []
+    return [json.loads(line.split(" ", 1)[1]) for line in lines if line.startswith("on_demand ")]
 
 
-def test_the_maps_are_merged_apart_once_asked_for(storage, monkeypatch):
-    """Between log lines the watcher looks for the user's request of the maps; one asked for starts the partial
-    script for them (not the live one), once at a time and not more often than ON_DEMAND_SECONDS
+def test_a_page_asked_for_is_merged_alone(storage, monkeypatch):
+    """Between log lines the watcher reads the wanted object (at most every interval); a page asked for starts the
+    partial script for that page alone, once at a time and not more often than ON_DEMAND_SECONDS
     """
     tmp_path, backend_url = storage
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    FakeStorage.wanted = None
     task = saver(tmp_path, backend_url, 100, script=ON_DEMAND_SCRIPT)
     task.idle()
     assert on_demand_merges(tmp_path) == []  # no save of its own yet
@@ -496,18 +530,57 @@ def test_the_maps_are_merged_apart_once_asked_for(storage, monkeypatch):
     task.idle()
     assert on_demand_merges(tmp_path) == []  # not asked for
 
-    FakeStorage.on_demand = True
+    FakeStorage.wanted = watching([("dose", 1)])
     task.idle()
-    assert on_demand_merges(tmp_path) == ["on_demand"]
+    assert on_demand_merges(tmp_path) == [[["dose", 1]]]
     task.idle()
-    assert on_demand_merges(tmp_path) == ["on_demand"]  # within ON_DEMAND_SECONDS
+    assert on_demand_merges(tmp_path) == [[["dose", 1]]]  # within ON_DEMAND_SECONDS
     monkeypatch.setattr(watcher, "ON_DEMAND_SECONDS", 0)
-    (tmp_path / "partial.lock.on_demand").mkdir()  # another task's merge of the maps runs
+    (tmp_path / "partial.lock.on_demand").mkdir()  # another task's merge of pages runs
     task.idle()
-    assert on_demand_merges(tmp_path) == ["on_demand"]
+    assert on_demand_merges(tmp_path) == [[["dose", 1]]]
     (tmp_path / "partial.lock.on_demand").rmdir()
     task.idle()
-    assert on_demand_merges(tmp_path) == ["on_demand", "on_demand"]
+    assert on_demand_merges(tmp_path) == [[["dose", 1]], [["dose", 1]]]
+
+
+def test_no_live_merges_while_no_one_looks(storage, monkeypatch):
+    """Saves are still copied aside (a page asked for later needs every task's latest save), but the live pages are
+    merged only while someone has the simulation's results open: no wanted object, or one whose live_until passed
+    """
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    monkeypatch.setattr(watcher.result_format, "LIVE_MIN_SECONDS", 0)
+    FakeStorage.wanted = None
+    task = saver(tmp_path, backend_url, 100)
+    task.saved()
+    assert list(saves(tmp_path)) == ["100"] and merges(tmp_path) == 0
+    FakeStorage.wanted = {"live_until": time.time() - 1, "pages": []}
+    task.reporter.state["simulated_primaries"] = 200
+    task.saved()
+    task.idle()
+    assert list(saves(tmp_path)) == ["100", "200"] and merges(tmp_path) == 0
+
+    # someone opens the results: the next read of the wanted object starts a merge, without waiting for a save
+    FakeStorage.wanted = watching()
+    task.idle()
+    assert merges(tmp_path) == 1
+
+
+def test_the_wanted_object_is_read_at_most_every_interval_and_conditionally(storage):
+    """One GET an interval at most; an unchanged object is answered 304 and its state kept"""
+    tmp_path, backend_url = storage
+    task = watcher.Reporter(
+        tmp_path / "storage_links.json", 3, 0.3, {"sim_id": 7, "update_key": "key", "backend_url": backend_url}
+    )
+    FakeStorage.wanted = watching([("dose", 0)])
+    assert task.wanted()[1] == frozenset({("dose", 0)})
+    assert task.wanted()[1] == frozenset({("dose", 0)}) and FakeStorage.wanted_gets == [200]
+    time.sleep(0.35)
+    assert task.wanted()[1] == frozenset({("dose", 0)}) and FakeStorage.wanted_gets == [200, 304]
+    FakeStorage.wanted = None
+    time.sleep(0.35)
+    assert task.wanted() == (0.0, frozenset())
 
 
 def test_no_saves_kept_for_jobs_without_the_partial_script(storage):

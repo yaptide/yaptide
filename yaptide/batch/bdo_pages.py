@@ -24,12 +24,16 @@ HEADER_BYTES = 24
 MAGIC = b"xSH12A"
 TOKEN = struct.Struct("<Q8sQ")
 # the token ids (pymchelper.readers.shieldhit.binary_spec.SHBDOTagID)
+FORMAT = 0x05
 GEO_N_BINS = 0xE004
 DETECTOR_TYPE = 0xDD30
+PAGE_NUMBER = 0xDD31
 PAGE_DIFF_SIZE = 0xDDD4
 DATA_BLOCK = 0xDDBB
 # a list of particles (SHDetType.mcpl): not a page of bins
 MCPL = 63
+# the FORMAT of a file of the token format of 2019 (pymchelper's SHFileFormatId.bdo2019), the one read here
+BDO2019 = 2
 # copies values through a buffer of this size
 COPY_BYTES = 1 << 20
 NUMPY_TYPE = re.compile(r"^[<>|=]?([a-zA-Z])(\d+)$")
@@ -42,12 +46,15 @@ class BdoError(ValueError):
 @dataclass
 class PageInfo:
     """A page of a result file: its dimensions (axes with more than one bin, differential ones included), whether it
-    is a list of particles, and the bytes of its values
+    is a list of particles, the bytes of its values, its number (the page number the file gives it, else its place in
+    the file, from 0: the number its results are stored under) and its detector type
     """
 
     dimensions: int
     mcpl: bool
     data_bytes: int
+    number: int = 0
+    detector_type: int = 0
 
 
 @dataclass
@@ -57,6 +64,19 @@ class _Page:
     tokens: List[bytes] = field(default_factory=list)
     detector_type: Optional[int] = None
     diff_sizes: Tuple[int, ...] = ()
+    number: Optional[int] = None
+
+
+@dataclass
+class Walked:
+    """What a walk through a result file found: its pages, which of them were kept, whether it ended with a whole
+    page (a file the simulator is still writing ends within one), and its FORMAT (None when it gives none)
+    """
+
+    pages: List[PageInfo]
+    kept: List[bool]
+    whole: bool
+    file_format: Optional[int] = None
 
 
 def item_size(kind: bytes) -> int:
@@ -97,13 +117,8 @@ def _copy(source: BinaryIO, target: BinaryIO, size: int) -> None:
         size -= len(chunk)
 
 
-def walk(
-    source: BinaryIO, keep: Callable[[PageInfo], bool], target: Optional[BinaryIO] = None
-) -> Tuple[List[PageInfo], List[bool], bool]:
-    """Walks a result file's tokens: with a target, copies the estimator's tokens and the pages keep wants into it.
-    Returns the pages, which of them were kept, and whether the file ended with a whole page (a file the simulator
-    is still writing ends within one)
-    """
+def walk(source: BinaryIO, keep: Callable[[PageInfo], bool], target: Optional[BinaryIO] = None) -> Walked:
+    """Walks a result file's tokens: with a target, copies the estimator's tokens and the pages keep wants into it"""
     header = source.read(HEADER_BYTES)
     if len(header) < HEADER_BYTES or not header.startswith(MAGIC):
         raise BdoError("not a SHIELD-HIT12A result file of the token format")
@@ -111,6 +126,7 @@ def walk(
     if target is not None:
         target.write(header)
     mesh_bins: Tuple[int, ...] = ()
+    file_format: Optional[int] = None
     pages: List[PageInfo] = []
     kept: List[bool] = []
     # tokens after a page's data block (or the estimator's) wait for the next detector type: they go with it
@@ -133,6 +149,8 @@ def walk(
                 dimensions=page_dimensions(mesh_bins, page.diff_sizes),
                 mcpl=page.detector_type == MCPL,
                 data_bytes=payload_bytes,
+                number=len(pages) if page.number is None else page.number,
+                detector_type=page.detector_type or 0,
             )
             wanted = keep(info)
             pages.append(info)
@@ -155,34 +173,43 @@ def walk(
             page.tokens.append(token)
             if token_id == PAGE_DIFF_SIZE:
                 page.diff_sizes = int_values(token[TOKEN.size :])
+            elif token_id == PAGE_NUMBER:
+                page.number = int_values(token[TOKEN.size :])[0]
         elif pages:
             waiting.append(token)
         else:
             # the estimator's own tokens
             if token_id == GEO_N_BINS:
                 mesh_bins = int_values(token[TOKEN.size :])
+            elif token_id == FORMAT:
+                file_format = int_values(token[TOKEN.size :])[0]
             if target is not None:
                 target.write(token)
     if target is not None and page is None:
         target.write(b"".join(waiting))
-    return pages, kept, page is None
+    return Walked(pages, kept, page is None, file_format)
 
 
 def pages_of(path: Path) -> List[PageInfo]:
     """The pages of a result file, its values not read; BdoError when cut short within a page"""
     with open(path, "rb") as source:
-        pages, _, whole = walk(source, lambda info: False)
-    if not whole:
+        walked = walk(source, lambda info: False)
+    if not walked.whole:
         raise BdoError(f"{path}: the file ends within a page")
-    return pages
+    return walked.pages
 
 
-def copy_pages(source_path: Path, target_path: Path, keep: Callable[[PageInfo], bool]) -> int:
-    """Copies a result file with only the pages keep wants (the estimator's tokens all kept); the pages copied.
+def copy_file(source_path: Path, target_path: Path, keep: Callable[[PageInfo], bool]) -> Walked:
+    """Copies a result file with only the pages keep wants (the estimator's tokens all kept); what the walk found.
     BdoError when the file is cut short within a page: the copy would miss it
     """
     with open(source_path, "rb") as source, open(target_path, "wb") as target:
-        _, kept, whole = walk(source, keep, target)
-    if not whole:
+        walked = walk(source, keep, target)
+    if not walked.whole:
         raise BdoError(f"{source_path}: the file ends within a page")
-    return sum(kept)
+    return walked
+
+
+def copy_pages(source_path: Path, target_path: Path, keep: Callable[[PageInfo], bool]) -> int:
+    """Copies a result file with only the pages keep wants (copy_file); the pages copied"""
+    return sum(copy_file(source_path, target_path, keep).kept)

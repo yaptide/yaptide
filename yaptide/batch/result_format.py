@@ -254,3 +254,56 @@ LIVE_MAX_SECONDS = 600.0
 def live_interval(save_bytes: float) -> float:
     """How often the live partial results are merged, for a task's save of save_bytes (all its result files)"""
     return min(LIVE_MAX_SECONDS, max(LIVE_MIN_SECONDS, save_bytes * LIVE_SECONDS_PER_BYTE))
+
+
+# What the users look at, so partial results are merged only for them: the backend keeps one small JSON object per
+# running simulation in storage (hpc/<sim>/wanted), the cluster's watchers and the engine read it.
+# - live_until: while someone has the simulation's results open (their browser sends a heartbeat, and a beacon when
+#   it closes), the live pages (points and lines) are merged every live interval; until this time (seconds since the
+#   epoch), WANTED_LIVE_SECONDS after the last heartbeat, so a browser that died stops the merges by itself.
+# - pages: the maps the users asked for, each by its estimator (the result file's name) and page number: merged once,
+#   only that page, then the backend takes it off the list.
+WANTED_LIVE_SECONDS = 60.0
+
+
+def wanted_body(live_until: float, pages: Sequence) -> bytes:
+    """The wanted object: live until then, and the pages ((estimator, page number) pairs) asked for"""
+    return json.dumps(
+        {
+            "live_until": float(live_until),
+            "pages": [{"estimator": estimator, "page": int(number)} for estimator, number in sorted(set(pages))],
+        }
+    ).encode()
+
+
+def parse_wanted(body: Optional[bytes]) -> tuple:
+    """live_until and the set of (estimator, page number) pairs of a wanted object; (0, empty) for none or one that
+    is not one
+    """
+    try:
+        wanted = json.loads(body or b"{}")
+        live_until = float(wanted.get("live_until") or 0)
+        pages = frozenset((str(page["estimator"]), int(page["page"])) for page in wanted.get("pages") or ())
+    except (ValueError, TypeError, KeyError, AttributeError):
+        return 0.0, frozenset()
+    return live_until, pages
+
+
+def pages_by_estimator(pages) -> dict:
+    """(estimator, page number) pairs as estimator -> set of page numbers"""
+    selected: dict = {}
+    for estimator, number in pages:
+        selected.setdefault(estimator, set()).add(int(number))
+    return selected
+
+
+def pages_argument(pages) -> str:
+    """Pages asked for, as one command line argument of the partial script"""
+    return json.dumps(sorted([estimator, int(number)] for estimator, number in set(pages)))
+
+
+def parse_pages_argument(text: Optional[str]) -> dict:
+    """The pages of pages_argument, as estimator -> set of page numbers"""
+    if not text:
+        return {}
+    return pages_by_estimator((str(estimator), int(number)) for estimator, number in json.loads(text))

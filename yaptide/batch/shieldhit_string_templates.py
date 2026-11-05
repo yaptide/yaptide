@@ -190,16 +190,17 @@ fi
 
 PARTIAL_SHIELDHIT_BASH: str = """#!/bin/bash
 # merges the latest saves of the tasks into partial results while the simulation runs. Arguments: the group of the
-# task (live results, holding the group's lock partial.lock.<group>) or "on_demand" (the maps the user asked for,
-# holding partial.lock.on_demand), then the seconds between the last live merges. merge_groups.py frees the lock.
+# task (live results, holding the group's lock partial.lock.<group>) or "on_demand" (the pages the user asked for,
+# holding partial.lock.on_demand), then the seconds between the last live merges, then (on_demand) the pages asked
+# for as JSON. merge_groups.py frees the lock.
 # With many large results the live merge merges the group's saves, then the latest merges of all groups
 ROOT_DIR={root_dir}
 GROUP=$1
 INTERVAL=${{2:-15}}
 if [ "$GROUP" = on_demand ] ; then
-    KIND_ARGS="--kind=on_demand"
+    KIND_ARGS=(--kind=on_demand "--pages=$3")
 else
-    KIND_ARGS="--kind=live --group=$GROUP --interval=$INTERVAL"
+    KIND_ARGS=(--kind=live --group=$GROUP --interval=$INTERVAL)
 fi
 
 {find_merge_python}
@@ -210,6 +211,6 @@ if [ -z "$MERGE_PYTHON" ] ; then
 fi
 
 # the simulator of this task shares the node: the merge gives way to it
-nice -n 10 $MERGE_PYTHON $ROOT_DIR/merge_groups.py partial --root=$ROOT_DIR --ntasks={n_tasks} $KIND_ARGS \\
+nice -n 10 $MERGE_PYTHON $ROOT_DIR/merge_groups.py partial --root=$ROOT_DIR --ntasks={n_tasks} "${{KIND_ARGS[@]}}" \\
     --sim_id={sim_id} --update_key={update_key} --backend_url={backend_url}
 """  # skipcq: FLK-E501
