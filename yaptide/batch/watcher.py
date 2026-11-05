@@ -364,6 +364,21 @@ def copy_save(work_dir: Path, target: Path) -> bool:
     return bool(files) and before == [(path.stat().st_mtime_ns, path.stat().st_size) for path in files]
 
 
+def live_bytes(directory: Path, fallback: int) -> int:
+    """Bytes of the values of the live pages (points and lines) in a save's result files: what a live merge reads of
+    it; fallback when a file cannot be walked
+    """
+    try:
+        return sum(
+            info.data_bytes
+            for path in directory.glob("*.bdo")
+            for info in bdo_pages.pages_of(path)
+            if result_format.partial_mode(info.dimensions, info.mcpl) == result_format.LIVE
+        )
+    except (OSError, bdo_pages.BdoError):
+        return fallback
+
+
 class Saver:
     """Copies the simulator's result files aside after it saved them, and starts merges of the latest saves of all
     tasks into partial results while someone looks at them: of the live pages, and of the maps asked for
@@ -416,7 +431,8 @@ class Saver:
             # the groups are planned from the size of the whole result files (the final merges read them whole): the
             # same for every task
             save_bytes = merge_groups.files_size(self.work_dir)
-            self.interval = result_format.live_interval(save_bytes)
+            # a live merge reads only the live pages of the saves (it skips the others): its interval goes by them
+            self.interval = result_format.live_interval(live_bytes(self.work_dir / "saves" / str(simulated), save_bytes))
             size = merge_groups.plan(self.root_dir, self.n_tasks, save_bytes)
             self.group = merge_groups.group_of(self.reporter.task_id, size, self.n_tasks)
             if self.watched():

@@ -631,3 +631,21 @@ def test_a_cancel_stops_the_simulator_without_slurm_only_in_the_tasks_own_direct
     finally:
         for process in (task, other, shared_group):
             process.kill()
+
+
+def test_the_live_interval_goes_by_the_live_pages_only(storage, monkeypatch):
+    """A large volume or map in the result files does not slow the live merges: they read only points and lines"""
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    task = saver(tmp_path, backend_url, 100)
+    maps = (BDO_DIR / "yz_profile_0001.bdo").read_bytes()
+    (tmp_path / "maps.bdo").write_bytes(maps)
+    live = sum(
+        info.data_bytes
+        for info in watcher.bdo_pages.pages_of(tmp_path / "dose.bdo")
+        if watcher.result_format.partial_mode(info.dimensions, info.mcpl) == watcher.result_format.LIVE
+    )
+    seen = []
+    monkeypatch.setattr(watcher.result_format, "live_interval", lambda size: seen.append(size) or 15.0)
+    task.saved()
+    assert seen == [live] and live < len(DOSE) + len(maps)

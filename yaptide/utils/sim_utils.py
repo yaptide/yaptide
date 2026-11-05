@@ -310,9 +310,10 @@ DETECT_QUANTITY = re.compile(r"^\s*Quantity\b", re.MULTILINE | re.IGNORECASE)
 DETECT_DIFF = re.compile(r"^\s*Diff[12]\s+\S+\s+\S+\s+(\d+)\b", re.MULTILINE | re.IGNORECASE)
 
 
-def estimated_result_bytes(detect: str) -> Optional[int]:
+def estimated_result_bytes(detect: str, max_dimensions: Optional[int] = None) -> Optional[int]:
     """Bytes one save of a task writes, from SHIELD-HIT12A's detect.dat: the bins of every output's mesh, times its
-    quantities and differential bins, 8 bytes each. None when the file names no output it can size
+    quantities and differential bins, 8 bytes each; with max_dimensions, of the pages of that many dimensions at most
+    (axes with more than one bin, differential ones included). None when the file names no output it can size
     """
     starts = [match.start() for match in DETECT_BLOCK.finditer(detect)] + [len(detect)]
     blocks = [detect[start:end] for start, end in zip(starts, starts[1:])]
@@ -320,14 +321,16 @@ def estimated_result_bytes(detect: str) -> Optional[int]:
     for block in blocks:
         name = DETECT_NAME.search(block)
         if block.lstrip().lower().startswith("geometry") and name:
-            meshes[name[1]] = math.prod(int(match[2]) for match in DETECT_AXIS.finditer(block))
+            meshes[name[1]] = [int(match[2]) for match in DETECT_AXIS.finditer(block)]
     total = 0
     for block in blocks:
         geo = DETECT_GEO.search(block)
         if not block.lstrip().lower().startswith("output") or not geo or geo[1] not in meshes:
             continue
-        diffs = math.prod(max(1, int(match[1])) for match in DETECT_DIFF.finditer(block))
-        total += meshes[geo[1]] * max(1, len(DETECT_QUANTITY.findall(block))) * diffs * 8
+        bins = meshes[geo[1]] + [int(match[1]) for match in DETECT_DIFF.finditer(block)]
+        if max_dimensions is not None and sum(1 for n in bins if n > 1) > max_dimensions:
+            continue
+        total += math.prod(max(1, n) for n in bins) * max(1, len(DETECT_QUANTITY.findall(block))) * 8
     return total or None
 
 

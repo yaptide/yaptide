@@ -973,7 +973,9 @@ class Engine:
         if simulation.sim_type == SimulationType.SHIELDHIT.value:
             # saves along the way for partial results, in the tasks' copy only: the stored input stays the user's
             set_shieldhit_save_step(files, max(task.requested_primaries or 0 for task in simulation.tasks))
-            live_seconds = result_format.live_interval(estimated_result_bytes(files.get("detect.dat", "")) or 0)
+            # a live merge reads only the live pages (points and lines) of the saves: its interval goes by them
+            live_bytes = estimated_result_bytes(files.get("detect.dat", ""), result_format.LIVE_DIMENSIONS)
+            live_seconds = result_format.live_interval(live_bytes or 0)
         files_ref = ray.put(files)
         task_ids = sorted(task.task_id for task in simulation.tasks)
         work_dirs = {task_id: get_tmp_dir() / f"{WORK_DIR_PREFIX}{simulation.id}_{task_id}" for task_id in task_ids}

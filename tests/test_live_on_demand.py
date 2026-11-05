@@ -107,6 +107,15 @@ def test_result_size_is_estimated_from_the_detectors():
     assert sim_utils.estimated_result_bytes("") is None
 
 
+def test_live_size_counts_only_points_and_lines():
+    """The live merges read only the pages of one dimension at most: their interval goes by those"""
+    detect = MESH.format(x=10, y=20, z=30) + "\n" + MESH.replace("Volume", "Line").replace("volume", "line").format(
+        x=1, y=1, z=2000)
+    assert sim_utils.estimated_result_bytes(detect, 1) == 2000 * 2 * 8
+    assert sim_utils.estimated_result_bytes(detect) == (10 * 20 * 30 + 2000) * 2 * 8
+    assert sim_utils.estimated_result_bytes(MESH.format(x=10, y=20, z=30), 1) is None
+
+
 @pytest.mark.parametrize(
     "bins, saves",
     [((1, 1, 2000), sim_utils.MAX_SAVES), ((400, 400, 300), 2), ((2000, 600, 100), sim_utils.MIN_SAVES)],
