@@ -152,6 +152,36 @@ def fetch_task_summaries(sim_ids: list[int]) -> dict[int, dict]:
     return summaries
 
 
+# a task's state in the per-task progress, one letter each
+STATE_LETTERS = {"PENDING": "P", "RUNNING": "R", "COMPLETED": "C", "FAILED": "F", "CANCELED": "X"}
+
+
+def fetch_task_progress(sim_ids: list[int]) -> dict[int, dict]:
+    """The progress of every task of the simulations, by task number, compact for a progress bar of many segments
+    (500 tasks take about 2.5 kB): permille of its primaries simulated, and its state as one letter
+    (STATE_LETTERS, "U" for another)
+    """
+    if not sim_ids:
+        return {}
+    rows = (
+        db.session.query(
+            TaskModel.simulation_id,
+            TaskModel.task_state,
+            TaskModel.requested_primaries,
+            TaskModel.simulated_primaries,
+        )
+        .filter(TaskModel.simulation_id.in_(sim_ids))
+        .order_by(TaskModel.simulation_id, TaskModel.task_id)
+        .all()
+    )
+    progress: dict[int, dict] = {sim_id: {"permille": [], "states": ""} for sim_id in sim_ids}
+    for sim_id, state, requested, simulated in rows:
+        entry = progress[sim_id]
+        entry["permille"].append(min(1000, int(1000 * (simulated or 0) / requested)) if requested else 0)
+        entry["states"] += STATE_LETTERS.get(state, "U")
+    return progress
+
+
 def bulk_update_task_states(sim_id: int, task_updates: list[dict]) -> int:
     """Updates many tasks of one simulation in a single query and a single commit.
 

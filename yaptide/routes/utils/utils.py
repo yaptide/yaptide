@@ -7,6 +7,7 @@ from environs import env, EnvValidationError
 from yaptide.persistence.database import db
 from yaptide.persistence.db_methods import (
     fetch_simulation_by_job_id,
+    fetch_task_progress,
     fetch_task_summary,
     fetch_tasks_by_sim_id,
 )
@@ -63,11 +64,16 @@ PROGRESSION = [
 ]
 
 
-def job_status_content(simulation: SimulationModel, with_tasks: bool, summary: Optional[dict] = None) -> dict:
-    """Simulation status as the UI polls it: totals over the tasks always (counted here unless given), the list of
+def job_status_content(
+    simulation: SimulationModel, with_tasks: bool, summary: Optional[dict] = None, progress: Optional[dict] = None
+) -> dict:
+    """Simulation status as the UI polls it: totals over the tasks always (counted here unless given), the progress
+    of each task while the simulation has not finished (fetch_task_progress, read here unless given), the list of
     tasks only when asked for
     """
     content = {"job_state": simulation.job_state, "job_tasks_summary": summary or fetch_task_summary(simulation.id)}
+    if simulation.job_state not in FINAL_STATES:
+        content["task_progress"] = progress or fetch_task_progress([simulation.id])[simulation.id]
     if simulation.partial_primaries is not None:
         # the stored results cover only these primaries: the simulation has not finished
         content["partial_results"] = {

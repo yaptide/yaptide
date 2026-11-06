@@ -16,7 +16,7 @@ from flask_restful import Resource
 from sqlalchemy import or_
 
 from yaptide.persistence.database import db, listen_to
-from yaptide.persistence.db_methods import fetch_task_summaries, note_watching
+from yaptide.persistence.db_methods import fetch_task_progress, fetch_task_summaries, note_watching
 from yaptide.persistence.models import SIMULATION_CHANNEL, SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import yaptide_response
@@ -117,10 +117,15 @@ def statuses(user_id: int, changed: Optional[set[int]], followed: Iterable[int])
         query = query.filter(SimulationModel.id.in_(changed))
     simulations = query.order_by(SimulationModel.id).all()
     summaries = fetch_task_summaries([simulation.id for simulation in simulations])
+    unfinished = [simulation.id for simulation in simulations if simulation.job_state not in FINAL_STATES]
+    progress = fetch_task_progress(unfinished)
     found = [
         (
             simulation.id,
-            {"job_id": simulation.job_id, **job_status_content(simulation, False, summaries[simulation.id])},
+            {
+                "job_id": simulation.job_id,
+                **job_status_content(simulation, False, summaries[simulation.id], progress.get(simulation.id)),
+            },
         )
         for simulation in simulations
     ]

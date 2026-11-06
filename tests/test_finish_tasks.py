@@ -143,3 +143,15 @@ def test_a_direct_task_finishes_at_a_whole_save(tmp_path, monkeypatch):
     finally:
         if process.poll() is None:
             process.kill()
+
+
+def test_a_running_simulation_shows_the_progress_of_each_task(client):
+    """Per task by number, for a progress bar of many segments: permille of its primaries and its state's letter"""
+    db.session.query(TaskModel).filter_by(task_id=2).update({"requested_primaries": 200, "simulated_primaries": 50})
+    db.session.commit()
+    status = client.get("/jobs", query_string={"job_id": "hpcjob"}).get_json()
+    assert status["task_progress"] == {"permille": [0, 250, 0], "states": "CRP"}
+
+    db.session.query(SimulationModel).update({"job_state": EntityState.COMPLETED.value})
+    db.session.commit()
+    assert "task_progress" not in client.get("/jobs", query_string={"job_id": "hpcjob"}).get_json()
