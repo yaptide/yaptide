@@ -329,7 +329,8 @@ class TaskModel(db.Model):
             self.task_state, update_dict["task_state"]
         ):
             self.task_state = update_dict["task_state"]
-            if self.task_state == EntityState.COMPLETED.value:
+            # a task finished early by the user ends with the primaries of its last save, which it reports
+            if self.task_state == EntityState.COMPLETED.value and not update_dict.get("finished_early"):
                 self.simulated_primaries = self.requested_primaries
         # Here we have a special case, `estimated_time` cannot be set when `end_time` is set - it is meaningless
         have_estim_time = "estimated_time" in update_dict and self.estimated_time != update_dict["estimated_time"]

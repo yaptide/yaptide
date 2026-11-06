@@ -717,7 +717,12 @@ def finish_shieldhit(work_dir: Path, log_path: Path, pid: int, saved_primaries: 
         logging.info("Finished early without a whole save: nothing of this task goes into the results")
         return {"task_state": "CANCELED", "end_time": now()}
     logging.info("Finished early at the save of %d primaries", saved_primaries)
-    return {"task_state": "COMPLETED", "simulated_primaries": saved_primaries, "end_time": now()}
+    return {
+        "task_state": "COMPLETED",
+        "simulated_primaries": saved_primaries,
+        "finished_early": True,
+        "end_time": now(),
+    }
 
 
 # FLUKA ends its cycle when a file of this name appears in its run directory, writing the results of the primaries
@@ -740,7 +745,7 @@ def finish_fluka(work_dir: Path, pid: int, wait_seconds: float = FINISH_WAIT_SEC
         stop_task(work_dir)
         stop(pid)
     if ended and any(work_dir.glob("*_fort.*")):
-        return {"task_state": "COMPLETED", "end_time": now()}
+        return {"task_state": "COMPLETED", "finished_early": True, "end_time": now()}
     set_aside_unfinished(work_dir, ("*_fort.*",))
     return {"task_state": "CANCELED", "end_time": now()}
 

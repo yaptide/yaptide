@@ -3,7 +3,7 @@ import time
 from datetime import datetime, timezone
 from typing import Optional, Union
 
-from sqlalchemy import DateTime, Integer, String, and_, bindparam, case, func, update
+from sqlalchemy import Boolean, DateTime, Integer, String, and_, bindparam, case, false, func, update
 from sqlalchemy.exc import InterfaceError, InternalError, OperationalError
 from sqlalchemy.dialects import postgresql, sqlite
 from sqlalchemy.orm import with_polymorphic
@@ -256,7 +256,14 @@ def _reported_update():
         .values(
             requested_primaries=requested,
             simulated_primaries=case(
-                (state == EntityState.COMPLETED.value, requested),
+                (
+                    and_(
+                        state == EntityState.COMPLETED.value,
+                        # a task finished early by the user ends with the primaries of its last save
+                        func.coalesce(bindparam("new_finished_early", type_=Boolean), false()).is_(false()),
+                    ),
+                    requested,
+                ),
                 else_=func.coalesce(
                     func.nullif(bindparam("new_simulated_primaries", type_=Integer), 0), TASK.simulated_primaries
                 ),
@@ -281,6 +288,7 @@ REPORTED_FIELDS = (
     "estimated_time",
     "start_time",
     "end_time",
+    "finished_early",
 )
 
 

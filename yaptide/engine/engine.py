@@ -115,6 +115,8 @@ def clean_report(update: dict) -> dict:
             except ValueError:
                 continue
             clean[name] = value
+    if update.get("finished_early") is True:
+        clean["finished_early"] = True
     return clean
 
 

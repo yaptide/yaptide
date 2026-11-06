@@ -1162,3 +1162,30 @@ def test_tasks_finished_early_end_with_their_last_save(client, engine, cluster):
     primaries = [task.simulated_primaries for task in db.session.query(TaskModel).filter_by(simulation_id=simulation_id)]
     assert primaries == [50, 50]
     assert db.session.query(PageModel).count() > 0
+
+
+def test_a_task_finished_early_keeps_the_primaries_it_reports(client, engine, monkeypatch):
+    """A completed task counts its requested primaries, unless it was finished early: then those of its last save"""
+    simulation_id = hpc_simulation()
+    monkeypatch.setenv("RESULTS_S3_BUCKET", "results")
+    prefix = f"hpc/{simulation_id}/progress/"
+    reports = {
+        prefix + "task_0001.json": ("e1", {"task_state": "COMPLETED", "simulated_primaries": 120}),
+        prefix + "task_0002.json": (
+            "e2",
+            {"task_state": "COMPLETED", "simulated_primaries": 120, "finished_early": True},
+        ),
+    }
+    monkeypatch.setattr(
+        engine_module.result_storage, "progress_reports", lambda sim_id: {k: v[0] for k, v in reports.items()}
+    )
+    monkeypatch.setattr(
+        engine_module.result_storage, "read_report", lambda key: {"task_id": 99, "update": reports[key][1]}
+    )
+
+    hpc_round(engine)
+    db.session.remove()
+    tasks = db.session.query(TaskModel).filter_by(simulation_id=simulation_id).order_by(TaskModel.task_id).all()
+    assert [task.task_state for task in tasks] == [EntityState.COMPLETED.value] * 2
+    assert tasks[0].simulated_primaries == tasks[0].requested_primaries
+    assert tasks[1].simulated_primaries == 120 != tasks[1].requested_primaries

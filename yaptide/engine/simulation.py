@@ -159,7 +159,11 @@ def run_simulation(
 
     if finisher.finished:
         # finished early: the primaries of its last save (FLUKA's results carry their own)
-        update = {"task_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        update = {
+            "task_state": EntityState.COMPLETED.value,
+            "end_time": datetime.utcnow().isoformat(sep=" "),
+            "finished_early": True,
+        }
         if sim_type == "shieldhit":
             update["simulated_primaries"] = finisher.saved_primaries
         return {"result_key": key, "final_update": update}
