@@ -36,6 +36,8 @@ class FakeStorage(BaseHTTPRequestHandler):
     # the wanted object (result_format.wanted_body's fields), None when there is none; its GETs
     wanted: Optional[dict] = None
     wanted_gets: list = []
+    # the finish object ({"tasks": [numbers]}), None when there is none
+    finish: Optional[dict] = None
     # Garage answers an expired link with 400; a link signed with a wrong secret gets 403 every time
     expired_once = False
     always_refused = False
@@ -90,7 +92,11 @@ class FakeStorage(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        """The wanted object, answered 304 when the ETag sent is its own"""
+        """The wanted object, answered 304 when the ETag sent is its own; the finish object"""
+        if self.path.startswith("/bucket/hpc/7/finish"):
+            if FakeStorage.finish is None:
+                return self.answer(404, None)
+            return self.answer(200, FakeStorage.finish)
         if FakeStorage.wanted is None:
             FakeStorage.wanted_gets.append(404)
             self.send_response(404)
@@ -131,6 +137,7 @@ def links(port: int) -> dict:
         },
         "cancel": f"http://127.0.0.1:{port}/bucket/simulations/7/cancel",
         "wanted": f"http://127.0.0.1:{port}/bucket/hpc/7/wanted",
+        "finish": f"http://127.0.0.1:{port}/bucket/hpc/7/finish",
     }
 
 
@@ -144,7 +151,7 @@ def storage(tmp_path, monkeypatch):
     """The fake storage running, the links file written, and the watcher's waits shortened"""
     FakeStorage.objects, FakeStorage.cancelled, FakeStorage.expired_once, FakeStorage.renewals = {}, False, False, 0
     # someone looks at the simulation, unless a test says otherwise
-    FakeStorage.wanted, FakeStorage.wanted_gets = watching(), []
+    FakeStorage.wanted, FakeStorage.wanted_gets, FakeStorage.finish = watching(), [], None
     FakeStorage.always_refused, FakeStorage.down_for, FakeStorage.renewal_keys = False, 0, []
     server = ThreadingHTTPServer(("127.0.0.1", 0), FakeStorage)
     threading.Thread(target=server.serve_forever, daemon=True).start()
@@ -672,3 +679,97 @@ def test_a_live_merge_with_nothing_new_is_not_started(storage, monkeypatch):
     task.reporter.state["simulated_primaries"] = 200
     task.saved()
     assert merges(tmp_path) == 2
+
+
+# a simulator saving its results again and again: each save written in two halves a while apart (a reader may find it
+# cut short), then the log line SHIELD-HIT12A writes after a save
+SAVING = """
+import os, pathlib, sys, time
+work, data = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2]).read_bytes()
+(work / "simulator.pid").write_text(str(os.getpid()))
+log = work / "shieldhit_0003.log"
+log.write_text("  Requested number of primaries NSTAT      : 1000\\n")
+done = 0
+while True:
+    with open(work / "dose.bdo", "wb") as out:
+        out.write(data[: len(data) // 2]); out.flush(); time.sleep(0.3); out.write(data[len(data) // 2 :])
+    done += 100
+    with open(log, "a") as out:
+        out.write(f"     Primary particle no. {done:11d}      ETR:   0 hours  0 minutes  4 seconds\\n")
+        out.write("  Saved all 1 estimator(s)\\n")
+    time.sleep(0.2)
+"""
+
+
+def saving_simulator(tmp_path: Path) -> subprocess.Popen:
+    """The saving simulator, leading its own process group in the task's directory as SLURM starts it"""
+    (tmp_path / "data.bin").write_bytes(DOSE)
+    process = subprocess.Popen(
+        [sys.executable, "-c", SAVING, str(tmp_path), str(tmp_path / "data.bin")], cwd=tmp_path, start_new_session=True
+    )
+    threading.Thread(target=process.wait, daemon=True).start()
+    for _ in range(100):
+        if (tmp_path / "dose.bdo").exists() and "Saved" in (tmp_path / "shieldhit_0003.log").read_text():
+            break
+        time.sleep(0.05)
+    return process
+
+
+def test_a_simulator_is_stopped_between_saves(tmp_path):
+    """A task finished early keeps its last whole save: the simulator is never stopped while it writes one"""
+    for _ in range(5):
+        process = saving_simulator(tmp_path)
+        assert watcher.stop_at_whole_save(process.pid, tmp_path, tmp_path / "shieldhit_0003.log", poll_seconds=0.05)
+        for _ in range(100):
+            if process.poll() is not None:
+                break
+            time.sleep(0.05)
+        assert process.poll() is not None
+        assert (tmp_path / "dose.bdo").read_bytes() == DOSE
+        time.sleep(0.1)
+
+
+def test_a_task_asked_to_finish_ends_with_its_last_save(storage):
+    """The finish object names the task: it stops at a whole save, reports the primaries of that save as completed,
+    and its result files stay for the collect
+    """
+    tmp_path, backend_url = storage
+    process = saving_simulator(tmp_path)
+    log = tmp_path / "shieldhit_0003.log"
+    task = reporter(tmp_path, backend_url)
+    FakeStorage.finish = {"tasks": [1, 3]}
+
+    watcher.watch(
+        lambda: log,
+        watcher.shieldhit_update,
+        process.pid,
+        task,
+        work_dir=tmp_path,
+        finish=lambda primaries: watcher.finish_shieldhit(tmp_path, log, process.pid, primaries),
+    )
+
+    assert report()["task_state"] == "COMPLETED"
+    assert report()["simulated_primaries"] > 0 and report()["simulated_primaries"] % 100 == 0
+    assert (tmp_path / "dose.bdo").read_bytes() == DOSE
+    assert not watcher.running(process.pid)
+
+
+def test_a_task_not_named_runs_on(storage):
+    """Another task's finish leaves this one alone"""
+    tmp_path, backend_url = storage
+    task = reporter(tmp_path, backend_url)
+    FakeStorage.finish = {"tasks": [1]}
+    assert not task.finish_requested()
+    FakeStorage.finish = {"tasks": [1, 3]}
+    assert task.finish_requested()
+
+
+def test_a_task_finished_before_its_first_save_ends_canceled(storage):
+    """Nothing whole to keep: the task ends canceled and a file cut short is moved out of the merges' way"""
+    tmp_path, backend_url = storage
+    process = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"], start_new_session=True)
+    threading.Thread(target=process.wait, daemon=True).start()
+    (tmp_path / "dose.bdo").write_bytes(DOSE[:-40])
+    update = watcher.finish_shieldhit(tmp_path, tmp_path / "missing.log", process.pid, 0)
+    assert update["task_state"] == "CANCELED"
+    assert not list(tmp_path.glob("*.bdo")) and (tmp_path / watcher.UNFINISHED_DIR / "dose.bdo").exists()

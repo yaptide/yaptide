@@ -7,6 +7,7 @@ from datetime import datetime
 
 import flask_migrate
 from sqlalchemy import DDL, Column, UniqueConstraint, event, inspect
+from sqlalchemy import false as sa_false
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql.functions import now
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -300,6 +301,13 @@ class TaskModel(db.Model):
     last_update_time: Column[datetime] = db.Column(
         db.DateTime(timezone=True), default=now(), doc="Task last update time"
     )
+    finish_requested: Column[bool] = db.Column(
+        db.Boolean,
+        nullable=False,
+        default=False,
+        server_default=sa_false(),
+        doc="The user asked to finish the task early: it stops at its last whole save, which goes into the results",
+    )
 
     __table_args__ = (UniqueConstraint("simulation_id", "task_id", name="_simulation_id_task_id_uc"),)
 
@@ -348,7 +356,11 @@ class TaskModel(db.Model):
             "simulated_primaries": self.simulated_primaries,
             "last_update_time": self.last_update_time,
             "task_id": self.id,
+            # the task's number in the simulation (from 1), which a request to finish it early names
+            "task_number": self.task_id,
         }
+        if self.finish_requested:
+            result["finish_requested"] = True
         if self.estimated_time:
             result["estimated_time"] = {
                 "hours": self.estimated_time // 3600,

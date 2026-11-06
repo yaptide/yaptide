@@ -58,7 +58,7 @@ from yaptide.persistence.models import (
     TaskModel,
     UserActivityModel,
 )
-from yaptide.routes.common_sim_routes import clean_partial_results, wanted_state
+from yaptide.routes.common_sim_routes import clean_partial_results, finish_requested_numbers, wanted_state
 from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
 from yaptide.utils.enums import EntityState, PlatformType, SimulationType
 from yaptide.utils.sim_utils import estimated_result_bytes, set_shieldhit_save_step
@@ -234,6 +234,8 @@ class ProgressInbox:
         self.updates: dict[tuple[int, int], dict] = {}
         self.saves: dict[tuple[int, int], tuple[str, int]] = {}
         self.new_state = threading.Event()
+        # the tasks the users asked to finish early, by simulation (the engine hands them over again after a restart)
+        self.finishing: dict[int, frozenset] = {}
 
     def report(self, simulation_id: int, task_id: int, update_dict: dict) -> None:
         """Merges a task's update into the one waiting to be saved"""
@@ -250,6 +252,17 @@ class ProgressInbox:
         self.new_state.clear()
         updates, saves, self.updates, self.saves = self.updates, self.saves, {}, {}
         return updates, saves
+
+    def finish(self, simulation_id: int, task_ids: list[int]) -> None:
+        """The tasks of a simulation the users asked to finish early, all of them so far; none forgets the simulation"""
+        if task_ids:
+            self.finishing[simulation_id] = frozenset(task_ids)
+        else:
+            self.finishing.pop(simulation_id, None)
+
+    def finish_requested(self, simulation_id: int, task_id: int) -> bool:
+        """Whether a task is to finish early (its task asks)"""
+        return task_id in self.finishing.get(simulation_id, ())
 
     @ray.method(concurrency_group="wait")
     def state_changed(self) -> None:
@@ -269,7 +282,13 @@ def run_task(inbox, files_dict: dict, sim_type: str, simulation_id: int, task_id
         """Hands a save of the results to the inbox"""
         inbox.saved.remote(simulation_id, task_id, key, primaries)
 
-    return run_simulation(files_dict, task_id, sim_type, Path(work_dir), simulation_id, report, saved)
+    def finish_requested() -> bool:
+        """Whether the user asked to finish this task early"""
+        return ray.get(inbox.finish_requested.remote(simulation_id, task_id))
+
+    return run_simulation(
+        files_dict, task_id, sim_type, Path(work_dir), simulation_id, report, saved, finish_requested
+    )
 
 
 # a merge killed for memory must not be retried forever, which Ray does unless retries are off;
@@ -458,6 +477,8 @@ class Running:
     wanted_checked: float = float("-inf")
     live_until: float = 0.0
     pages: frozenset = frozenset()
+    # the tasks the users asked to finish early, as last handed to the inbox
+    finishing: frozenset = frozenset()
 
     def refs(self) -> list:
         """What the engine waits for"""
@@ -1014,7 +1035,10 @@ class Engine:
         results, when they cover enough new primaries and the last live merge started an interval ago; and the maps
         the users asked for
         """
+        checked = running.wanted_checked
         self.look_up_wanted(simulation_id, running)
+        if running.wanted_checked != checked:
+            self.look_up_finish(simulation_id, running)
         self.merge_on_demand(simulation_id, running)
         if time.time() >= running.live_until:
             return
@@ -1045,6 +1069,19 @@ class Engine:
             logging.warning("Looking up what the users of simulation %d look at failed: %s", simulation_id, error)
             return
         running.live_until, running.pages = live_until, frozenset(pages)
+
+    def look_up_finish(self, simulation_id: int, running: Running) -> None:
+        """The tasks the users asked to finish early, from the database, handed to the inbox the tasks ask (again
+        each time, as a restarted inbox forgets them)
+        """
+        try:
+            finishing = frozenset(finish_requested_numbers(simulation_id))
+        except Exception as error:  # skipcq: PYL-W0703
+            logging.warning("Looking up the tasks of simulation %d to finish failed: %s", simulation_id, error)
+            return
+        if finishing or running.finishing:
+            self.inbox.finish.remote(simulation_id, sorted(finishing))
+        running.finishing = finishing
 
     def merge_on_demand(self, simulation_id: int, running: Running) -> None:
         """Merges the maps the users asked for, only those pages, of the tasks' latest saves; apart from the live
@@ -1178,6 +1215,8 @@ class Engine:
             self.fail(simulation_id)
         else:
             del self.running[simulation_id]
+            if running.finishing:
+                self.inbox.finish.remote(simulation_id, [])
             delete_task_results.remote(simulation_id)
             logging.info("Simulation %d finished", simulation_id)
 
@@ -1213,6 +1252,8 @@ class Engine:
         running = self.running.pop(simulation_id, None)
         if running is None:
             return
+        if running.finishing:
+            self.inbox.finish.remote(simulation_id, [])
         # not forced: that kills the worker process, maybe just as it takes a task of another simulation;
         # a running simulator is killed by its task (execute_simulation_subprocess)
         for ref in running.refs():

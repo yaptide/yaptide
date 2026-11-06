@@ -896,6 +896,62 @@ class OnDemandResource(Resource):
         return yaptide_response(message="Page requested", code=202, content=partial_state(simulation))
 
 
+# a simulation whose tasks may still be finished early: they have not all ended
+FINISHABLE_STATES = (EntityState.PENDING.value, EntityState.RUNNING.value)
+
+
+def finish_requested_numbers(simulation_id: int) -> list[int]:
+    """The numbers of the simulation's tasks the user asked to finish early"""
+    rows = db.session.query(TaskModel.task_id).filter_by(simulation_id=simulation_id, finish_requested=True)
+    return sorted(number for number, in rows)
+
+
+class FinishTasksResource(Resource):
+    """Finishes tasks of a running simulation early, e.g. one on a slow node holding up the results of all: each
+    stops at its last whole save, which goes into the final results as it is (its primaries counted, fewer than
+    requested); a task without a save yet ends with nothing. The simulation then ends as usual once all its tasks
+    ended. Direct simulations: the engine tells the tasks (yaptide/engine/engine.py); HPC ones: the tasks' watchers
+    read the finish object in storage (yaptide/batch/watcher.py), so it needs no connection to the cluster
+    """
+
+    @staticmethod
+    @requires_auth()
+    def post(user: UserModel):
+        """Body: job_id, and task_numbers (the tasks' numbers, from 1) or all: true for every task not ended"""
+        payload = request.get_json(force=True, silent=True)
+        if not isinstance(payload, dict):
+            return yaptide_response(message="job_id and task_numbers or all are required", code=400)
+        numbers = payload.get("task_numbers")
+        every = payload.get("all") is True
+        if not every and (
+            not isinstance(numbers, list) or not numbers or not all(type(n) is int and n > 0 for n in numbers)
+        ):
+            return yaptide_response(message="task_numbers must be a list of task numbers, or all true", code=400)
+        simulation, error = owned_simulation(user, payload.get("job_id"))
+        if error:
+            return error
+        if simulation.job_state not in FINISHABLE_STATES:
+            return yaptide_response(message=f"Simulation is {simulation.job_state}", code=409)
+        query = db.session.query(TaskModel).filter(
+            TaskModel.simulation_id == simulation.id, TaskModel.task_state.notin_(FINAL_STATES)
+        )
+        if not every:
+            query = query.filter(TaskModel.task_id.in_(numbers))
+        query.update({TaskModel.finish_requested: True}, synchronize_session=False)
+        db.session.commit()
+        requested = finish_requested_numbers(simulation.id)
+        if simulation.platform == PlatformType.BATCH.value and requested:
+            try:
+                result_storage.put_finish(simulation.id, requested)
+            except Exception as err:  # skipcq: PYL-W0703
+                logging.warning("Telling the tasks of simulation %d to finish failed: %s", simulation.id, err)
+                return yaptide_response(
+                    message="Noted, but the cluster's tasks could not be told: try again", code=502
+                )
+        logging.info("Simulation %d: tasks %s to finish early", simulation.id, requested)
+        return yaptide_response(message="Tasks to finish", code=202, content={"task_numbers": requested})
+
+
 class InputsResource(Resource):
     """Class responsible for returning simulation input"""
 

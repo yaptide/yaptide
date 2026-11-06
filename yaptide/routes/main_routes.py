@@ -7,6 +7,7 @@ from yaptide.routes.common_sim_routes import (
     InputsResource,
     JobsResource,
     LogfilesResource,
+    FinishTasksResource,
     OnDemandResource,
     WatchResource,
     ResultsResource,
@@ -45,6 +46,7 @@ def initialize_routes(api: Api):
 
     api.add_resource(TasksResource, "/tasks")
     api.add_resource(TasksBulkResource, "/tasks/bulk")
+    api.add_resource(FinishTasksResource, "/tasks/finish")
     api.add_resource(TaskLinksResource, "/tasks/links")
 
     api.add_resource(ResultsResource, "/results")

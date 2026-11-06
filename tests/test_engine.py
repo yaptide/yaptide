@@ -1142,3 +1142,23 @@ def test_an_hpc_simulation_waiting_too_long_for_its_cluster_fails(client, engine
     assert "did not answer for 24 h" in db.session.query(LogfilesModel).filter_by(simulation_id=old).one().data["error"]
     engine.cluster.cancel.remote.assert_called_once_with(old)
     engine.cluster.submit.remote.assert_called_once_with(new)
+
+
+def test_tasks_finished_early_end_with_their_last_save(client, engine, cluster):
+    """The user finishes the tasks while they run: each stops at its save half way, which goes into the final
+    results, and the simulation completes with the primaries of those saves
+    """
+    simulation_id = submit(client, "FAKE_SAVES")
+    engine.handle(EntityState.PENDING.value, simulation_id)
+    run_events_until(engine, lambda: task_states(simulation_id) == [EntityState.RUNNING.value] * 2)
+    job_id = db.session.get(SimulationModel, simulation_id).job_id
+    # both saves written (each task holds after its save until released)
+    run_until(engine, lambda: len(list(cluster.glob(f"{WORK_DIR_PREFIX}{simulation_id}_*/*.bdo"))) >= 8)
+
+    assert client.post("/tasks/finish", json={"job_id": job_id, "all": True}).status_code == 202
+    run_until(engine, lambda: state(simulation_id) == EntityState.COMPLETED.value)
+
+    assert task_states(simulation_id) == [EntityState.COMPLETED.value] * 2
+    primaries = [task.simulated_primaries for task in db.session.query(TaskModel).filter_by(simulation_id=simulation_id)]
+    assert primaries == [50, 50]
+    assert db.session.query(PageModel).count() > 0

@@ -93,12 +93,15 @@ def update_rng_seed_in_fluka_file(input_file: Path, task_id: int) -> None:
     update_fluka_function(str(input_file.resolve()), random_seed)
 
 
-def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) -> tuple[bool, str, str]:
+def execute_simulation_subprocess(
+    dir_path: Path, command_as_list: list[str], check: Optional[Callable[[subprocess.Popen], None]] = None
+) -> tuple[bool, str, str]:
     """Runs the simulator and returns whether it succeeded, with its output
 
     A cancel of the task interrupts the wait (Ray raises KeyboardInterrupt in it), and the simulator is then killed
     with every process it started. Ray's force cancel would kill the whole worker process instead, which can also
-    take down a task of another simulation just handed to that worker.
+    take down a task of another simulation just handed to that worker. check is called with the process every
+    second while it runs (e.g. to finish the task early).
     """
     try:
         # its own process group, so the processes it starts (e.g. rfluka's) die with it
@@ -119,6 +122,8 @@ def execute_simulation_subprocess(dir_path: Path, command_as_list: list[str]) ->
                 command_stdout, command_stderr = process.communicate(timeout=1)
                 break
             except subprocess.TimeoutExpired:
+                if check:
+                    check(process)
                 continue
     finally:
         if process.poll() is None:

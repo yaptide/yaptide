@@ -317,10 +317,27 @@ def delete_wanted(sim_id: int) -> None:
     _internal().delete_object(Bucket=os.environ["RESULTS_S3_BUCKET"], Key=wanted_key(sim_id))
 
 
+def finish_key(sim_id: int) -> str:
+    """The object naming the tasks of an HPC simulation the user asked to finish early (JSON {"tasks": [numbers]});
+    their watchers read it, like the cancel
+    """
+    return f"hpc/{sim_id}/finish"
+
+
+def put_finish(sim_id: int, task_numbers: list[int]) -> None:
+    """Tells the tasks of an HPC simulation which of them to finish early: all asked for so far"""
+    _internal().put_object(
+        Bucket=os.environ["RESULTS_S3_BUCKET"],
+        Key=finish_key(sim_id),
+        Body=json.dumps({"tasks": sorted(set(task_numbers))}).encode(),
+        ContentType="application/json",
+    )
+
+
 def job_links(sim_id: int) -> dict:
     """Signed links the jobs of an HPC simulation use: a POST policy for progress objects under the simulation's
-    progress prefix only (each at most MAX_PROGRESS_BYTES), a HEAD of its cancel object and a GET of its wanted
-    object. The tasks' saves stay on the cluster, which merges them into partial results itself
+    progress prefix only (each at most MAX_PROGRESS_BYTES), a HEAD of its cancel object and GETs of its wanted
+    and finish objects. The tasks' saves stay on the cluster, which merges them into partial results itself
     (yaptide/batch/watcher.py, yaptide/batch/merge_groups.py)
     """
     bucket = os.environ["RESULTS_S3_BUCKET"]
@@ -338,12 +355,16 @@ def job_links(sim_id: int) -> dict:
     wanted = client.generate_presigned_url(
         "get_object", Params={"Bucket": bucket, "Key": wanted_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
     )
+    finish = client.generate_presigned_url(
+        "get_object", Params={"Bucket": bucket, "Key": finish_key(sim_id)}, ExpiresIn=JOB_LINK_SECONDS
+    )
     # the jobs ask for new links a day before these expire (Garage answers an expired link with 400, like a bad one)
     expires = int(time.time()) + JOB_LINK_SECONDS
     return {
         "progress": {"url": post["url"], "fields": post["fields"], "prefix": prefix},
         "cancel": cancel,
         "wanted": wanted,
+        "finish": finish,
         "expires": expires,
     }
 

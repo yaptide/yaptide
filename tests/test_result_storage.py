@@ -271,7 +271,8 @@ def test_job_links_hand_out_no_save_links(monkeypatch):
     links = result_storage.job_links(5)
     result_storage._client.cache_clear()  # skipcq: PYL-W0212
 
-    assert set(links) == {"progress", "cancel", "wanted", "expires"}
+    assert set(links) == {"progress", "cancel", "wanted", "finish", "expires"}
+    assert links["finish"].startswith("https://yaptide.test/results/hpc/5/finish?")
     assert links["cancel"].startswith("https://yaptide.test/results/hpc/5/cancel?")
     assert links["wanted"].startswith("https://yaptide.test/results/hpc/5/wanted?")
 

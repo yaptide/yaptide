@@ -210,6 +210,10 @@ class Reporter:
         # the wanted object as last read: its ETag, and live_until and the pages asked for (result_format.parse_wanted)
         self.wanted_etag: Optional[str] = None
         self.wanted_state: tuple = (0.0, frozenset())
+        # the finish object as last read: its ETag, and the tasks the user asked to finish early
+        self.last_finish_check = float("-inf")
+        self.finish_etag: Optional[str] = None
+        self.finish_tasks: frozenset = frozenset()
 
     def update(self, changes: dict) -> None:
         """Takes a change of the task's state; a new state is reported at once, progress at most every interval"""
@@ -282,6 +286,28 @@ class Reporter:
             # no one looked at the simulation yet, or its results are final
             self.wanted_state, self.wanted_etag = (0.0, frozenset()), None
         return self.wanted_state
+
+    def finish_requested(self) -> bool:
+        """Whether the user asked to finish this task early (the finish object names it); read again at most every
+        interval, a conditional GET. False when storage cannot be reached or for links without the object
+        """
+        if "finish" not in self.links or time.monotonic() - self.last_finish_check < self.interval_seconds:
+            return self.task_id in self.finish_tasks
+        self.last_finish_check = time.monotonic()
+        self.renew_links_if_expiring()
+        status, body, etag = self.fetch(self.links["finish"], self.finish_etag)
+        if status in (400, 403) and self.renew_links():
+            status, body, etag = self.fetch(self.links["finish"], self.finish_etag)
+        if status == 200:
+            try:
+                tasks = json.loads(body).get("tasks", [])
+                self.finish_tasks = frozenset(int(task) for task in tasks)
+                self.finish_etag = etag
+            except (ValueError, TypeError, AttributeError):
+                logging.warning("A finish object that cannot be read: %r", body[:200])
+        elif status == 404:
+            self.finish_tasks, self.finish_etag = frozenset(), None
+        return self.task_id in self.finish_tasks
 
     @staticmethod
     def fetch(url: str, etag: Optional[str] = None) -> Tuple[int, bytes, Optional[str]]:
@@ -583,21 +609,140 @@ def stop(pid: int, kill: Callable[[int, int], None] = os.kill) -> None:
 
 def stop_task(work_dir: Path) -> None:
     """Stops the simulator of this task on this node without SLURM: srun passes its signals on through the SLURM
-    controller, which may not answer for minutes. Only the process group the simulator leads (SLURM starts each task
-    in one), and only while that process runs in this task's directory: a PID recorded on another node, reused, or
-    of another user (its /proc entry cannot be read) is left alone.
+    controller, which may not answer for minutes. Only the process group the simulator leads (simulator_group)
+    """
+    group = simulator_group(work_dir)
+    if group is not None:
+        stop(group, os.killpg)
+
+
+# a task finished early waits at most this long for the simulator to end a save it is writing: then stopped anyway
+FINISH_WAIT_SECONDS = 600
+# result files left cut short by a task finished early go here, out of the merges' way
+UNFINISHED_DIR = "unfinished"
+
+
+def simulator_group(work_dir: Path) -> Optional[int]:
+    """The process group the simulator of this task leads on this node (SLURM starts each task in one), only while it
+    runs in this task's directory: a PID recorded on another node, reused, or of another user is not this one's
     """
     try:
         pid = int((work_dir / SIMULATOR_PID_FILE).read_text())
         cwd = Path(os.readlink(f"/proc/{pid}/cwd"))
         if os.getpgid(pid) != pid or pid == os.getpgrp():
-            return
+            return None
     except (OSError, ValueError):
-        return
+        return None
     work_dir = work_dir.resolve()
     # FLUKA runs in a directory of its own inside the task's
-    if cwd == work_dir or work_dir in cwd.parents:
-        stop(pid, os.killpg)
+    return pid if cwd == work_dir or work_dir in cwd.parents else None
+
+
+def results_whole(work_dir: Path, log_path: Optional[Path]) -> bool:
+    """Whether the simulator's result files are one whole save: there are some, none ends within a page, and none
+    changed since the log last did (SHIELD-HIT12A writes its log after a save, and nothing into it while saving)
+    """
+    files = sorted(work_dir.glob("*.bdo"))
+    if not files:
+        return False
+    try:
+        if log_path is not None:
+            logged = log_path.stat().st_mtime_ns
+            # written after the log: a save under way (a file system keeping whole seconds may show both equal)
+            if any(path.stat().st_mtime_ns > logged for path in files):
+                return False
+        for path in files:
+            bdo_pages.pages_of(path)
+    except (OSError, bdo_pages.BdoError):
+        return False
+    return True
+
+
+def stop_at_whole_save(
+    group: int,
+    work_dir: Path,
+    log_path: Optional[Path],
+    kill: Callable[[int, int], None] = os.killpg,
+    wait_seconds: float = FINISH_WAIT_SECONDS,
+    poll_seconds: float = 1,
+) -> bool:
+    """Stops the simulator's process group between two saves, so its result files stay its last whole save: frozen
+    (SIGSTOP), checked, killed when whole, let go on for a while otherwise (it is writing a save). Whether the files
+    are whole; when they are not by wait_seconds, the simulator is stopped all the same
+    """
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        try:
+            kill(group, signal.SIGSTOP)
+        except ProcessLookupError:
+            return results_whole(work_dir, log_path)
+        whole = results_whole(work_dir, log_path)
+        if not any(work_dir.glob("*.bdo")):
+            # no save begun yet: nothing to wait for
+            deadline = float("-inf")
+        if not whole and time.monotonic() > deadline:
+            # the log may have been quiet since the last save: files that are whole do
+            whole = results_whole(work_dir, None)
+        if whole or time.monotonic() > deadline:
+            try:
+                kill(group, signal.SIGKILL)
+                kill(group, signal.SIGCONT)
+            except ProcessLookupError:
+                pass
+            return whole
+        kill(group, signal.SIGCONT)
+        time.sleep(poll_seconds)
+
+
+def set_aside_unfinished(work_dir: Path, patterns=("*.bdo",)) -> None:
+    """Moves result files that are not a whole save out of the merges' way"""
+    target = work_dir / UNFINISHED_DIR
+    for pattern in patterns:
+        for path in work_dir.glob(pattern):
+            target.mkdir(exist_ok=True)
+            path.rename(target / path.name)
+
+
+def finish_shieldhit(work_dir: Path, log_path: Path, pid: int, saved_primaries: int) -> dict:
+    """Finishes a SHIELD-HIT12A task early: stopped between saves, its last whole save stays as its results (the
+    collect merges them) with the primaries of that save; without one, nothing of it is merged and it ends canceled
+    """
+    group = simulator_group(work_dir)
+    whole = stop_at_whole_save(group, work_dir, log_path) if group is not None else False
+    stop(pid)
+    if group is None:
+        whole = results_whole(work_dir, log_path)
+    if not whole:
+        set_aside_unfinished(work_dir)
+        logging.info("Finished early without a whole save: nothing of this task goes into the results")
+        return {"task_state": "CANCELED", "end_time": now()}
+    logging.info("Finished early at the save of %d primaries", saved_primaries)
+    return {"task_state": "COMPLETED", "simulated_primaries": saved_primaries, "end_time": now()}
+
+
+# FLUKA ends its cycle when a file of this name appears in its run directory, writing the results of the primaries
+# done so far (one cycle per task here)
+FLUKA_STOP_FILE = "fluka.stop"
+
+
+def finish_fluka(work_dir: Path, pid: int, wait_seconds: float = FINISH_WAIT_SECONDS, poll_seconds: float = 1) -> dict:
+    """Finishes a FLUKA task early: its stop file ends the cycle with the results so far; stopped all the same if it
+    has not ended by wait_seconds, then without results
+    """
+    for run_dir in work_dir.glob("fluka_*"):
+        if run_dir.is_dir():
+            (run_dir / FLUKA_STOP_FILE).touch()
+    deadline = time.monotonic() + wait_seconds
+    while running(pid) and time.monotonic() < deadline:
+        time.sleep(poll_seconds)
+    ended = not running(pid)
+    if not ended:
+        stop_task(work_dir)
+        stop(pid)
+    if ended and any(work_dir.glob("*_fort.*")):
+        return {"task_state": "COMPLETED", "end_time": now()}
+    set_aside_unfinished(work_dir, ("*_fort.*",))
+    return {"task_state": "CANCELED", "end_time": now()}
 
 
 def find_log(find: Callable[[], Optional[Path]], pid: int, poll_seconds: float) -> Optional[Path]:
@@ -620,11 +765,14 @@ def watch(  # skipcq: PY-R1000
     saved: Optional[Callable[[], None]] = None,
     work_dir: Optional[Path] = None,
     idle: Optional[Callable[[], None]] = None,
+    finish: Optional[Callable[[int], dict]] = None,
 ) -> None:
     """Follows the simulator's log until it ends or the simulation is cancelled, reporting the task's state;
     saved is called when SHIELD-HIT12A has saved all its result files. A cancel stops the simulator in the task's
-    directory itself, then srun.
+    directory itself, then srun. A request to finish the task early calls finish with the primaries of the last
+    save, which stops the simulator and gives the task's final state.
     """
+    saved_primaries = 0
     path = find_log(find, pid, poll_seconds)
     if path is None:
         reporter.update({"task_state": "FAILED", "end_time": now()})
@@ -633,8 +781,10 @@ def watch(  # skipcq: PY-R1000
         while True:
             line = log.readline()
             if line:
-                if saved and re.search(SAVED_MATCH, line):
-                    saved()
+                if re.search(SAVED_MATCH, line):
+                    saved_primaries = reporter.state.get("simulated_primaries", saved_primaries)
+                    if saved:
+                        saved()
                 update = parse(line)
                 if update:
                     reporter.update(update)
@@ -646,6 +796,9 @@ def watch(  # skipcq: PY-R1000
                     stop_task(work_dir)
                 stop(pid)
                 reporter.update({"task_state": "CANCELED", "end_time": now()})
+                return
+            if finish and reporter.finish_requested():
+                reporter.update(finish(saved_primaries))
                 return
             if not running(pid):
                 # the simulator ended: what it wrote last decides, a run that never completed failed
@@ -682,7 +835,15 @@ def main(args) -> None:
         {"sim_id": args.sim_id, "update_key": args.update_key, "backend_url": args.backend_url},
     )
     if args.simulator == "fluka":
-        watch(fluka_log(Path(args.work_dir)), FlukaParser(), args.pid, reporter, work_dir=Path(args.work_dir))
+        work_dir = Path(args.work_dir)
+        watch(
+            fluka_log(work_dir),
+            FlukaParser(),
+            args.pid,
+            reporter,
+            work_dir=work_dir,
+            finish=lambda _: finish_fluka(work_dir, args.pid),
+        )
     else:
         log_path = Path(args.filepath)
         saver = Saver(log_path.parent, reporter, n_tasks=args.ntasks)
@@ -695,6 +856,7 @@ def main(args) -> None:
                 saved=saver.saved,
                 work_dir=log_path.parent,
                 idle=saver.idle,
+                finish=lambda primaries: finish_shieldhit(log_path.parent, log_path, args.pid, primaries),
             )
         finally:
             saver.stop_merge()

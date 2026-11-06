@@ -5,6 +5,7 @@ import struct
 import tarfile
 import tempfile
 import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime
 from functools import lru_cache
@@ -14,7 +15,7 @@ from typing import Callable, Optional
 import numpy as np
 
 from yaptide.application import create_app
-from yaptide.batch import bdo_pages, result_format
+from yaptide.batch import bdo_pages, result_format, watcher
 from yaptide.engine.pymc import (
     command_to_run_fluka,
     command_to_run_shieldhit,
@@ -51,6 +52,50 @@ class SimulationTaskResult:
     output_files: list[Path]
 
 
+# how often a running task asks whether the user wants it finished early
+FINISH_CHECK_SECONDS = 5
+
+
+class Finisher:
+    """Finishes a task early when the user asks (finish_requested, asked at most every FINISH_CHECK_SECONDS): a
+    SHIELD-HIT12A run is stopped between two saves and its last whole save stays as its results; FLUKA gets its
+    stop file and ends its cycle with the results so far. finished: None while not asked, then whether results stay
+    """
+
+    def __init__(self, sim_type: str, work_dir: Path, log_path: Optional[Path], requested: Callable[[], bool]):
+        self.sim_type = sim_type
+        self.work_dir = work_dir
+        self.log_path = log_path
+        self.requested = requested
+        self.last_check = float("-inf")
+        self.finished: Optional[bool] = None
+        # the primaries of the simulator's last save
+        self.saved_primaries = 0
+
+    def __call__(self, process) -> None:
+        """Called every second while the simulator runs"""
+        if self.finished is not None or time.monotonic() - self.last_check < FINISH_CHECK_SECONDS:
+            return
+        self.last_check = time.monotonic()
+        try:
+            if not self.requested():
+                return
+        except Exception as error:  # skipcq: PYL-W0703 - the task goes on
+            logging.warning("Asking whether to finish %s early failed: %s", self.work_dir, error)
+            return
+        logging.info("Finishing %s early", self.work_dir)
+        if self.sim_type == "fluka":
+            for run_dir in self.work_dir.glob("fluka_*"):
+                if run_dir.is_dir():
+                    (run_dir / watcher.FLUKA_STOP_FILE).touch()
+            # FLUKA ends by itself: its results are there if it wrote them
+            self.finished = True
+            return
+        self.finished = watcher.stop_at_whole_save(process.pid, self.work_dir, self.log_path)
+        if not self.finished:
+            watcher.set_aside_unfinished(self.work_dir)
+
+
 def run_simulation(
     files_dict: dict,
     task_id: int,
@@ -59,23 +104,28 @@ def run_simulation(
     simulation_id: Optional[int],
     report: Callable[[dict], None],
     saved: Callable[[str, int], None],
+    finish_requested: Callable[[], bool] = lambda: False,
 ) -> dict:
     """Runs one simulation task in work_dir and returns what the engine needs from it
 
     The result files go to storage under the returned "result_key", for the merge; work_dir is removed.
     Progress goes to report while the simulator runs; the final state of the task is in the returned "final_update".
     Each save the simulator makes before the end goes to storage under the same key, passed to saved with its
-    primaries.
+    primaries. When finish_requested says so, the task finishes early (Finisher): its last whole save is its result.
     """
     logging.info("Running simulation, simulation_id: %s, task_id: %d, directory: %s", simulation_id, task_id, work_dir)
     work_dir.mkdir(parents=True, exist_ok=True)
     key = result_storage.work_key(simulation_id, task_id)
     try:
         write_simulation_input_files(files_dict=files_dict, output_dir=work_dir)
+        log_path = work_dir / f"shieldhit_{task_id:04d}.log" if sim_type == "shieldhit" else None
+        finisher = Finisher(sim_type, work_dir, log_path, finish_requested)
         if sim_type == "shieldhit":
-            simulation_result = run_single_simulation_for_shieldhit(work_dir, task_id, simulation_id, report, saved)
+            simulation_result = run_single_simulation_for_shieldhit(
+                work_dir, task_id, simulation_id, report, saved, finisher
+            )
         elif sim_type == "fluka":
-            simulation_result = run_single_simulation_for_fluka(work_dir, task_id, simulation_id, report)
+            simulation_result = run_single_simulation_for_fluka(work_dir, task_id, simulation_id, report, finisher)
         else:
             raise ValueError(f"Unknown simulator type: {sim_type}")
         if simulation_result.output_files:
@@ -93,6 +143,11 @@ def run_simulation(
     finally:
         shutil.rmtree(work_dir, ignore_errors=True)
 
+    if not simulation_result.output_files and finisher.finished is not None:
+        logging.info("Task %d finished early without a whole save: nothing of it goes into the results", task_id)
+        return {
+            "final_update": {"task_state": EntityState.CANCELED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        }
     if not simulation_result.output_files:
         logging.info("Simulation failed for task %d", task_id)
         return {
@@ -102,6 +157,12 @@ def run_simulation(
             "final_update": {"task_state": EntityState.FAILED.value, "end_time": datetime.utcnow().isoformat(sep=" ")},
         }
 
+    if finisher.finished:
+        # finished early: the primaries of its last save (FLUKA's results carry their own)
+        update = {"task_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
+        if sim_type == "shieldhit":
+            update["simulated_primaries"] = finisher.saved_primaries
+        return {"result_key": key, "final_update": update}
     # the monitor may have missed the last lines of the log, so the final state comes with the result
     return {
         "result_key": key,
@@ -120,6 +181,7 @@ def run_single_simulation_for_shieldhit(
     simulation_id: Optional[int],
     report: Callable[[dict], None],
     saved: Callable[[str, int], None],
+    finisher: Optional[Finisher] = None,
 ) -> SimulationTaskResult:
     """Function running single simulation for shieldhit"""
     command_as_list = command_to_run_shieldhit(dir_path=work_dir, task_id=task_id)
@@ -133,13 +195,11 @@ def run_single_simulation_for_shieldhit(
         simulation_id=simulation_id,
         task_id=task_id,
         report=report,
-        on_save=lambda primaries: store_save(
-            work_dir, result_storage.work_key(simulation_id, task_id), primaries, saved
-        ),
+        on_save=lambda primaries: on_save(work_dir, simulation_id, task_id, primaries, saved, finisher),
     )
     try:
         process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
-            dir_path=work_dir, command_as_list=command_as_list
+            dir_path=work_dir, command_as_list=command_as_list, check=finisher
         )
     finally:
         event.set()
@@ -160,8 +220,26 @@ def run_single_simulation_for_shieldhit(
     )
 
 
+def on_save(
+    work_dir: Path,
+    simulation_id: Optional[int],
+    task_id: int,
+    primaries: int,
+    saved: Callable[[str, int], None],
+    finisher: Optional[Finisher],
+) -> None:
+    """The simulator saved its results along the way: noted for a finish, stored for the partial results"""
+    if finisher is not None:
+        finisher.saved_primaries = primaries
+    store_save(work_dir, result_storage.work_key(simulation_id, task_id), primaries, saved)
+
+
 def run_single_simulation_for_fluka(
-    work_dir: Path, task_id: int, simulation_id: Optional[int], report: Callable[[dict], None]
+    work_dir: Path,
+    task_id: int,
+    simulation_id: Optional[int],
+    report: Callable[[dict], None],
+    finisher: Optional[Finisher] = None,
 ) -> SimulationTaskResult:
     """Function running single simulation for fluka"""
     command_as_list = command_to_run_fluka(dir_path=work_dir, task_id=task_id)
@@ -173,7 +251,7 @@ def run_single_simulation_for_fluka(
     )
     try:
         process_exit_success, command_stdout, command_stderr = execute_simulation_subprocess(
-            dir_path=work_dir, command_as_list=command_as_list
+            dir_path=work_dir, command_as_list=command_as_list, check=finisher
         )
     finally:
         event.set()
