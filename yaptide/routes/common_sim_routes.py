@@ -6,7 +6,7 @@ from typing import List, Optional
 
 from flask import request, current_app as app
 from flask_restful import Resource
-from sqlalchemy import text
+from sqlalchemy import func, text
 from sqlalchemy.dialects import postgresql, sqlite
 from marshmallow import Schema, fields
 
@@ -39,6 +39,7 @@ from yaptide.persistence.models import (
     PartialPageModel,
     PartialViewerModel,
     SimulationModel,
+    TaskModel,
     UserModel,
 )
 from yaptide.routes.utils.decorators import requires_auth
@@ -356,6 +357,24 @@ def stored_pages(estimators: list[dict]) -> list[str]:
     return [page["stored"]["key"] for estimator in estimators for page in estimator["pages"] if "stored" in page]
 
 
+def end_unfinished_tasks(sim_id: int) -> int:
+    """Tasks not finished when the final results come (one the cluster stopped at its time limit, whose watcher was
+    killed with it and never reported its end) failed: the results lack their remaining primaries. How many
+    """
+    now = datetime.utcnow()
+    ended = (
+        db.session.query(TaskModel)
+        .filter(TaskModel.simulation_id == sim_id, TaskModel.task_state.notin_(FINAL_STATES))
+        .update(
+            {TaskModel.task_state: EntityState.FAILED.value, TaskModel.end_time: func.coalesce(TaskModel.end_time, now)},
+            synchronize_session=False,
+        )
+    )
+    if ended:
+        logging.warning("Simulation %d has final results without %d unfinished tasks: marked failed", sim_id, ended)
+    return ended
+
+
 def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
     """Stores the merged results of a simulation and marks it completed, unless it was finished meanwhile; whether
     they were stored (pages already in storage that were not are removed)
@@ -390,6 +409,7 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
     # estimators and pages together, so a failure in between does not leave estimators without pages
     make_commit_to_db()
 
+    end_unfinished_tasks(simulation.id)
     update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     update_simulation_state(simulation=simulation, update_dict=update_dict)
     if had_partial:

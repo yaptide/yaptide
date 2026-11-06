@@ -468,6 +468,11 @@ class Saver:
                 return
         except FileNotFoundError:
             pass
+        try:
+            if not merge_groups.live_merge_due(self.root_dir, group, self.n_tasks):
+                return
+        except OSError as err:
+            logging.info("Could not tell whether a live merge is due, starting one: %s", err)
         if not merge_groups.take_lock(lock, PARTIAL_LOCK_SECONDS):
             return
         stamp.touch()

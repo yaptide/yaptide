@@ -21,11 +21,13 @@ from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
+    BatchTaskModel,
     ClusterModel,
     EstimatorModel,
     KeycloakUserModel,
     PageModel,
     SimulationModel,
+    TaskModel,
 )
 from yaptide.batch import results_merger
 from yaptide.routes.common_sim_routes import store_partial_results
@@ -551,3 +553,24 @@ def test_no_partial_results_once_the_final_pages_are_uploaded(client, storage):
     simulation = db.session.get(SimulationModel, simulation_id())
     assert simulation.job_state == EntityState.MERGING_RUNNING.value
     assert not store_partial_results(simulation, RESULTS, 100)
+
+
+def test_tasks_unfinished_at_the_final_results_failed(client, storage):
+    """A task the cluster stopped at its time limit never reports its end (its watcher is killed with it): once the
+    final results come, it failed, so the user sees that the results lack its primaries
+    """
+    store_all(storage)
+    tasks = [
+        BatchTaskModel(simulation_id=simulation_id(), task_id=1, task_state=EntityState.COMPLETED.value),
+        BatchTaskModel(simulation_id=simulation_id(), task_id=2, task_state=EntityState.RUNNING.value),
+    ]
+    db.session.add_all(tasks)
+    db.session.commit()
+
+    assert client.post("/results/done", json=body(estimators=listed())).status_code == 202
+
+    db.session.remove()
+    states = dict(db.session.query(TaskModel.task_id, TaskModel.task_state).all())
+    assert states == {1: EntityState.COMPLETED.value, 2: EntityState.FAILED.value}
+    assert db.session.query(TaskModel.end_time).filter(TaskModel.task_id == 2).scalar() is not None
+    assert db.session.query(SimulationModel.job_state).scalar() == EntityState.COMPLETED.value

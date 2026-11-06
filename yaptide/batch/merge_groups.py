@@ -352,6 +352,29 @@ def partial_units(root: Path, size: int, n_tasks: int) -> List[List[str]]:
     return latest_saves(root, n_tasks)
 
 
+def units_signature(units: List[List[str]]) -> str:
+    """What a merge read: the directories of its units (each named by its primaries, so a new save is another)"""
+    return json.dumps(sorted(str(Path(unit[0]).parent) for unit in units if unit))
+
+
+def live_merge_due(root: Path, group: int, n_tasks: int) -> bool:
+    """Whether a live merge of the group would merge anything new: a save of its tasks newer than the group's latest
+    merge, or units of the last tier other than the last uploaded. Checked by the watchers before they start the
+    partial script, so that a merge with nothing new does not start a Python process on the task's core
+    """
+    size = read_plan(root)
+    if size is None:
+        return True
+    if size < n_tasks:
+        saves = [latest_save(task_dir(root, task)) for task in group_tasks(group, size, n_tasks)]
+        saves = [save for save in saves if save is not None]
+        if saves and not (root / GROUPS_DIR / str(group) / str(sum(int(save.name) for save in saves))).exists():
+            return True
+    units = [unit for unit in partial_units(root, size, n_tasks) if unit]
+    # no saves found where the plan says (another layout): the script decides
+    return not units or read_text(root / f"{UPLOADED_FILE}.{result_format.LIVE}") != units_signature(units)
+
+
 def merge_and_upload(
     root: Path,
     units: List[List[str]],
@@ -379,8 +402,7 @@ def merge_and_upload(
         while True:
             if not units:
                 return 0
-            signature = json.dumps(sorted(str(Path(unit[0]).parent) for unit in units))
-            if live and read_text(uploaded) == signature:
+            if live and read_text(uploaded) == units_signature(units):
                 logging.info("No new saves since the last partial results")
                 return 0
             shutil.rmtree(str(output), ignore_errors=True)
@@ -407,7 +429,7 @@ def merge_and_upload(
         command += [f"--sim_id={args.sim_id}", f"--update_key={args.update_key}", f"--backend_url={args.backend_url}"]
         code = subprocess.run(command, check=False).returncode
         if live and code == 0:
-            uploaded.write_text(signature)
+            uploaded.write_text(units_signature(units))
         return code
     finally:
         shutil.rmtree(str(output), ignore_errors=True)

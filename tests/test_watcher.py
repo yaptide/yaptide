@@ -649,3 +649,26 @@ def test_the_live_interval_goes_by_the_live_pages_only(storage, monkeypatch):
     monkeypatch.setattr(watcher.result_format, "live_interval", lambda size: seen.append(size) or 15.0)
     task.saved()
     assert seen == [live] and live < len(DOSE) + len(maps)
+
+
+def test_a_live_merge_with_nothing_new_is_not_started(storage, monkeypatch):
+    """The watcher checks for a save newer than the last partial results before it starts the partial script: a
+    merge with nothing new would only cost a Python start on the task's core
+    """
+    tmp_path, backend_url = storage
+    monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
+    monkeypatch.setattr(watcher.result_format, "LIVE_MIN_SECONDS", 0)
+    # the task's directory where the submit script makes it: here, the test's own
+    monkeypatch.setattr(watcher.merge_groups, "task_dir", lambda root, task: tmp_path)
+    task = saver(tmp_path, backend_url, 100)
+    task.saved()
+    assert merges(tmp_path) == 1
+    root = task.root_dir
+    units = watcher.merge_groups.latest_saves(root, task.n_tasks)
+    (root / f"{watcher.merge_groups.UPLOADED_FILE}.live").write_text(watcher.merge_groups.units_signature(units))
+    task.start_merge(task.group)
+    assert merges(tmp_path) == 1
+
+    task.reporter.state["simulated_primaries"] = 200
+    task.saved()
+    assert merges(tmp_path) == 2
