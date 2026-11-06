@@ -555,10 +555,15 @@ def test_no_partial_results_once_the_final_pages_are_uploaded(client, storage):
     assert not store_partial_results(simulation, RESULTS, 100)
 
 
-def test_tasks_unfinished_at_the_final_results_failed(client, storage):
-    """A task the cluster stopped at its time limit never reports its end (its watcher is killed with it): once the
-    final results come, it failed, so the user sees that the results lack its primaries
+def test_tasks_unfinished_long_after_the_final_results_failed(client, storage):
+    """A task's last report may come seconds after the final results: it is kept running until the engine read the
+    last reports. One that never reported its end by then (the cluster stopped it at its time limit, its watcher with
+    it) failed, so the user sees that the results lack its primaries
     """
+    from datetime import datetime, timedelta
+
+    from yaptide.engine.engine import ENDED_READ_SECONDS, Engine
+
     store_all(storage)
     tasks = [
         BatchTaskModel(simulation_id=simulation_id(), task_id=1, task_state=EntityState.COMPLETED.value),
@@ -570,7 +575,16 @@ def test_tasks_unfinished_at_the_final_results_failed(client, storage):
     assert client.post("/results/done", json=body(estimators=listed())).status_code == 202
 
     db.session.remove()
+    assert db.session.query(SimulationModel.job_state).scalar() == EntityState.COMPLETED.value
+    Engine.end_unfinished_hpc_tasks()
+    states = dict(db.session.query(TaskModel.task_id, TaskModel.task_state).all())
+    assert states == {1: EntityState.COMPLETED.value, 2: EntityState.RUNNING.value}
+
+    ended = datetime.utcnow() - timedelta(seconds=ENDED_READ_SECONDS + 60)
+    db.session.query(SimulationModel).update({"end_time": ended})
+    db.session.commit()
+    Engine.end_unfinished_hpc_tasks()
+    db.session.remove()
     states = dict(db.session.query(TaskModel.task_id, TaskModel.task_state).all())
     assert states == {1: EntityState.COMPLETED.value, 2: EntityState.FAILED.value}
     assert db.session.query(TaskModel.end_time).filter(TaskModel.task_id == 2).scalar() is not None
-    assert db.session.query(SimulationModel.job_state).scalar() == EntityState.COMPLETED.value

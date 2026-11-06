@@ -358,8 +358,10 @@ def stored_pages(estimators: list[dict]) -> list[str]:
 
 
 def end_unfinished_tasks(sim_id: int) -> int:
-    """Tasks not finished when the final results come (one the cluster stopped at its time limit, whose watcher was
-    killed with it and never reported its end) failed: the results lack their remaining primaries. How many
+    """Tasks not finished when the final results of a simulation are in failed: the results lack their remaining
+    primaries. Direct simulations: at once, their tasks hand their final state over with their results. HPC ones: the
+    engine, once it read the tasks' last reports (a report may come seconds after the results): a task still not
+    ended then was stopped by the cluster, e.g. at its time limit, its watcher killed with it. How many
     """
     now = datetime.utcnow()
     ended = (
@@ -409,7 +411,8 @@ def store_results(simulation: SimulationModel, estimators: list[dict]) -> bool:
     # estimators and pages together, so a failure in between does not leave estimators without pages
     make_commit_to_db()
 
-    end_unfinished_tasks(simulation.id)
+    if simulation.platform != PlatformType.BATCH.value:
+        end_unfinished_tasks(simulation.id)
     update_dict = {"job_state": EntityState.COMPLETED.value, "end_time": datetime.utcnow().isoformat(sep=" ")}
     update_simulation_state(simulation=simulation, update_dict=update_dict)
     if had_partial:

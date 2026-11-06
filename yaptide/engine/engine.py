@@ -43,6 +43,7 @@ from yaptide.persistence import result_storage
 from yaptide.persistence.database import db, listen_to
 from yaptide.persistence.db_methods import (
     DATABASE_FAILURES,
+    FINAL_TASK_STATES,
     add_object_to_db,
     bulk_update_task_states,
     update_reported_tasks,
@@ -58,7 +59,12 @@ from yaptide.persistence.models import (
     TaskModel,
     UserActivityModel,
 )
-from yaptide.routes.common_sim_routes import clean_partial_results, finish_requested_numbers, wanted_state
+from yaptide.routes.common_sim_routes import (
+    clean_partial_results,
+    end_unfinished_tasks,
+    finish_requested_numbers,
+    wanted_state,
+)
 from yaptide.routes.utils.utils import FINAL_STATES, update_state_from_tasks
 from yaptide.utils.enums import EntityState, PlatformType, SimulationType
 from yaptide.utils.sim_utils import estimated_result_bytes, set_shieldhit_save_step
@@ -785,12 +791,36 @@ class Engine:
         for simulation_id in sorted(to_cancel):
             self.cancel(simulation_id)
 
+    @staticmethod
+    def end_unfinished_hpc_tasks() -> None:
+        """Tasks of HPC simulations completed over ENDED_READ_SECONDS ago that never reported their end (the cluster
+        stopped them, e.g. at the time limit, with their watchers) failed: their last reports were read by then
+        """
+        now = datetime.now(timezone.utc)
+        ended = (
+            db.session.query(BatchSimulationModel.id)
+            .join(TaskModel, TaskModel.simulation_id == BatchSimulationModel.id)
+            .filter(
+                BatchSimulationModel.job_state == EntityState.COMPLETED.value,
+                BatchSimulationModel.end_time < now - timedelta(seconds=ENDED_READ_SECONDS),
+                BatchSimulationModel.end_time >= now - timedelta(seconds=ENDED_READ_SECONDS) - timedelta(days=1),
+                TaskModel.task_state.notin_(FINAL_TASK_STATES),
+            )
+            .distinct()
+            .all()
+        )
+        for (simulation_id,) in ended:
+            end_unfinished_tasks(simulation_id)
+        if ended:
+            db.session.commit()
+
     def read_hpc_progress(self) -> None:
         """Starts a round saving what the tasks of running HPC simulations put into storage since the last look,
         spread over the readers; each reader's end comes as an event, the last one ends the round (hpc_progress_read)
         """
         if not result_storage.configured():
             return
+        self.end_unfinished_hpc_tasks()
         # one that ended recently may still have the last reports of its tasks to read: the last task completes it
         # seconds after its report, and the engine may be restarting or the storage out of reach meanwhile
         recently = datetime.now(timezone.utc) - timedelta(seconds=ENDED_READ_SECONDS)
