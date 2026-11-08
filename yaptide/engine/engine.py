@@ -211,7 +211,7 @@ CANCEL_RETRY_SECONDS = 10 * 60
 # the engine gives up and restarts with its container after failing for this long
 GIVE_UP_SECONDS = 60
 # partial results are merged again once the saves of the tasks cover this much more of the requested primaries
-PARTIAL_GROWTH = 0.05
+PARTIAL_GROWTH = 0.001
 # partial merges at once over all simulations, next to the simulators (an HPC simulation's are merged on its cluster)
 MAX_PARTIAL_MERGES = 2
 # what the users look at (someone has a running simulation's results open, a map asked for) is looked up this often

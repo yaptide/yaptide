@@ -402,9 +402,9 @@ def test_saves_are_kept_aside_and_merged_on_the_cluster(storage):
     assert set(FakeStorage.objects) == {"simulations/7/progress/task_0003.json"}
 
 
-def test_saves_are_kept_at_most_every_minute_and_tenth_the_latest_two(storage, monkeypatch):
-    """One save a minute at most, each covering more primaries; the two latest are kept (a merge may still read the
-    older one)
+def test_saves_are_kept_at_most_every_live_interval_the_latest_two(storage, monkeypatch):
+    """One save a live interval at most, each covering more primaries; the two latest are kept (a merge may still
+    read the older one)
     """
     tmp_path, backend_url = storage
     task = saver(tmp_path, backend_url, 100)
@@ -414,7 +414,7 @@ def test_saves_are_kept_at_most_every_minute_and_tenth_the_latest_two(storage, m
     assert list(saves(tmp_path)) == ["100"]  # within the minute
 
     monkeypatch.setattr(watcher, "SAVE_SECONDS", 0)
-    task.reporter.state["simulated_primaries"] = 120
+    task.reporter.state["simulated_primaries"] = 100 + int(watcher.SAVE_GROWTH * 1000) - 1
     task.saved()
     assert list(saves(tmp_path)) == ["100"]  # too few new primaries
     for primaries in (300, 500):

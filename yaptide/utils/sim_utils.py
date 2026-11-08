@@ -295,12 +295,17 @@ def adjust_primaries_for_fluka_files(
     return files_dict, parsed_number_of_all_primaries
 
 
-# SHIELD-HIT12A writes every page of every output at each save, so a task with large results saves less often: its
-# saves together write about SAVE_BUDGET_BYTES, between MIN_SAVES and MAX_SAVES saves (a tenth of the primaries each
-# for results up to 200 MB)
+# SHIELD-HIT12A saves every so many primaries, not every so many seconds, and the live partial results are merged
+# every 15 s: so small results save often (up to MAX_SAVES times a task, a fresh save in almost every live window
+# whatever the task's length), large ones less, as each save writes every page of every output: a task's saves
+# together write about SAVE_BUDGET_BYTES, at least MIN_SAVES of them. The watchers and the direct tasks keep a save
+# at most every 15 s (yaptide/batch/watcher.py, yaptide/engine/simulation.py), so saving more often costs only the
+# simulator's writes
 SAVE_BUDGET_BYTES = 2e9
 MIN_SAVES = 2
-MAX_SAVES = 9
+MAX_SAVES = 1000
+# primaries between two saves at least: a short task saves less than MAX_SAVES times
+MIN_SAVE_STEP = 1000
 # a SHIELD-HIT12A geometry's axis (X, Y, Z, R, Phi and so on: the bins are its third number) and an output's lines
 DETECT_BLOCK = re.compile(r"^\s*(Geometry|Output|Filter)\b", re.MULTILINE | re.IGNORECASE)
 DETECT_AXIS = re.compile(r"^\s*(X|Y|Z|R|Phi|Theta)\s+\S+\s+\S+\s+(\d+)\b", re.MULTILINE | re.IGNORECASE)
@@ -342,12 +347,12 @@ def saves_per_task(result_bytes: Optional[int]) -> int:
 
 
 def set_shieldhit_save_step(files_dict: dict, primaries_per_task: int) -> None:
-    """Makes SHIELD-HIT12A save its results along the way, for partial results: about every tenth of a task's
-    primaries, less often for large results (saves_per_task); a step of saving set in the input is kept
+    """Makes SHIELD-HIT12A save its results along the way, for partial results: saves_per_task times, every
+    MIN_SAVE_STEP primaries at most often; a step of saving set in the input is kept
     """
     if "beam.dat" in files_dict:
         saves = saves_per_task(estimated_result_bytes(files_dict.get("detect.dat", "")))
-        step = max(1, primaries_per_task // (saves + 1))
+        step = max(MIN_SAVE_STEP, primaries_per_task // (saves + 1))
         files_dict["beam.dat"] = NSTAT_WITHOUT_SAVES.sub(lambda match: f"{match[1]}    {step}", files_dict["beam.dat"])
 
 

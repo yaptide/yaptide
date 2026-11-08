@@ -155,3 +155,19 @@ def test_a_running_simulation_shows_the_progress_of_each_task(client):
     db.session.query(SimulationModel).update({"job_state": EntityState.COMPLETED.value})
     db.session.commit()
     assert "task_progress" not in client.get("/jobs", query_string={"job_id": "hpcjob"}).get_json()
+
+
+def test_a_direct_task_stores_its_saves_at_most_every_live_interval(tmp_path, monkeypatch):
+    """Small results save far more often than the live merges read them: a save is stored at most every
+    STORE_SAVE_SECONDS, while the primaries of the last save are always noted (for a finish)
+    """
+    stored = []
+    monkeypatch.setattr(engine_simulation, "store_save", lambda work_dir, key, primaries, saved: stored.append(primaries))
+    finisher = engine_simulation.Finisher("shieldhit", tmp_path, None, lambda: False)
+    for primaries in (100, 200, 300):
+        engine_simulation.on_save(tmp_path, 7, 1, primaries, lambda *_: None, finisher)
+    assert stored == [100] and finisher.saved_primaries == 300
+
+    finisher.last_stored -= engine_simulation.STORE_SAVE_SECONDS
+    engine_simulation.on_save(tmp_path, 7, 1, 400, lambda *_: None, finisher)
+    assert stored == [100, 400]

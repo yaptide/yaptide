@@ -40,6 +40,7 @@ from yaptide.persistence.models import (
 )
 from yaptide.routes.utils.tokens import encode_auth_token, encode_simulation_auth_token
 from yaptide.routes.utils.utils import update_state_from_tasks
+from yaptide.utils import sim_utils
 from yaptide.utils.enums import EntityState
 
 SUBMIT_OUTPUT = "Job id: 101\nAggregator id: 102\nCollect id: 103\nReporter id: 104\n"
@@ -569,7 +570,7 @@ def test_submit_puts_the_links_and_scripts_next_to_the_jobs(client, cluster_conn
 
 
 def test_shieldhit_tasks_on_the_cluster_save_along_the_way(client, cluster_connection, monkeypatch):
-    """The cluster's copy of the input saves every tenth of a task, and the partial script merging the saves is
+    """The cluster's copy of the input saves along the way, and the partial script merging the saves is
     put next to it; the stored input stays the user's
     """
     uploaded = {}
@@ -577,7 +578,8 @@ def test_shieldhit_tasks_on_the_cluster_save_along_the_way(client, cluster_conne
     simulation = submit(client, ntasks=2)
     batch_methods.submit_simulation(simulation.id)
 
-    assert uploaded["beam.dat"].startswith("NSTAT 50    5\n")
+    # 50 primaries a task: shorter than the shortest step of saving, which it gets
+    assert uploaded["beam.dat"].startswith(f"NSTAT 50    {sim_utils.MIN_SAVE_STEP}\n")
     put = {call.args[1].rsplit("/", 1)[-1]: call.args[0] for call in cluster_connection.put.call_args_list}
     # the saves stay on the cluster, whose partial script merges them
     assert "saves" not in json.loads(put["storage_links.json"].getvalue())

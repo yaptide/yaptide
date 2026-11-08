@@ -121,10 +121,12 @@ def test_live_size_counts_only_points_and_lines():
     [((1, 1, 2000), sim_utils.MAX_SAVES), ((400, 400, 300), 2), ((2000, 600, 100), sim_utils.MIN_SAVES)],
 )
 def test_large_results_are_saved_less_often(bins, saves):
-    """SHIELD-HIT12A writes every page at each save: a 2 GB budget of saves for each task"""
+    """SHIELD-HIT12A writes every page at each save: a 2 GB budget of saves for each task, small results saving up to
+    MAX_SAVES times
+    """
     files = {"beam.dat": "NSTAT 100000 0\n", "detect.dat": MESH.format(x=bins[0], y=bins[1], z=bins[2])}
-    sim_utils.set_shieldhit_save_step(files, 100000)
-    assert files["beam.dat"].startswith(f"NSTAT 100000    {100000 // (saves + 1)}\n")
+    sim_utils.set_shieldhit_save_step(files, 10_000_000)
+    assert files["beam.dat"].startswith(f"NSTAT 100000    {10_000_000 // (saves + 1)}\n")
 
 
 def test_a_lock_is_kept_alive_by_its_merge(tmp_path: Path, monkeypatch):

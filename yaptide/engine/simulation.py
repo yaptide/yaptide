@@ -54,6 +54,8 @@ class SimulationTaskResult:
 
 # how often a running task asks whether the user wants it finished early
 FINISH_CHECK_SECONDS = 5
+# a task's saves go to storage for the partial results at most this often: the live merges' interval at least
+STORE_SAVE_SECONDS = result_format.LIVE_MIN_SECONDS
 
 
 class Finisher:
@@ -69,8 +71,9 @@ class Finisher:
         self.requested = requested
         self.last_check = float("-inf")
         self.finished: Optional[bool] = None
-        # the primaries of the simulator's last save
+        # the primaries of the simulator's last save, and when a save was last stored for the partial results
         self.saved_primaries = 0
+        self.last_stored = float("-inf")
 
     def __call__(self, process) -> None:
         """Called every second while the simulator runs"""
@@ -232,9 +235,14 @@ def on_save(
     saved: Callable[[str, int], None],
     finisher: Optional[Finisher],
 ) -> None:
-    """The simulator saved its results along the way: noted for a finish, stored for the partial results"""
+    """The simulator saved its results along the way: noted for a finish, stored for the partial results at most every
+    STORE_SAVE_SECONDS (small results save more often than the live merges read them)
+    """
     if finisher is not None:
         finisher.saved_primaries = primaries
+        if time.monotonic() - finisher.last_stored < STORE_SAVE_SECONDS:
+            return
+        finisher.last_stored = time.monotonic()
     store_save(work_dir, result_storage.work_key(simulation_id, task_id), primaries, saved)
 
 

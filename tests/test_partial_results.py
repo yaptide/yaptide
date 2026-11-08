@@ -118,13 +118,15 @@ def test_partial_results_of_a_simulation_no_longer_running_are_dropped(client, j
 @pytest.mark.parametrize(
     "beam, expected",
     [
-        ("NSTAT       10000    0       ! NSTAT, Step of saving\n", "NSTAT       10000    100       ! NSTAT, Step"),
-        ("NSTAT 100\nTMAX0 10.0\n", "NSTAT 100    100\nTMAX0"),
+        ("NSTAT       10000    0       ! NSTAT, Step of saving\n", "NSTAT       10000    1000       ! NSTAT, Step"),
+        ("NSTAT 100\nTMAX0 10.0\n", "NSTAT 100    1000\nTMAX0"),
         ("NSTAT 100 5000 ! own step\n", "NSTAT 100 5000 ! own step"),
     ],
 )
-def test_shieldhit_saves_every_tenth_of_a_task_unless_the_input_says_otherwise(beam, expected):
-    """The step of saving is the second number of NSTAT; 0 or none means a save only at the end"""
+def test_shieldhit_saves_often_unless_the_input_says_otherwise(beam, expected):
+    """The step of saving is the second number of NSTAT; 0 or none means a save only at the end. A short task saves
+    every MIN_SAVE_STEP primaries at most often
+    """
     files = {"beam.dat": beam}
     set_shieldhit_save_step(files, 1000)
     assert files["beam.dat"].startswith(expected)
@@ -247,7 +249,7 @@ def test_files_from_windows_get_a_step_of_saving():
     """Line ends of beam.dat written on Windows"""
     files = {"beam.dat": "NSTAT 1000 0\r\nTMAX0 10.0\r\n"}
     set_shieldhit_save_step(files, 1000)
-    assert files["beam.dat"].startswith("NSTAT 1000    100\r\n")
+    assert files["beam.dat"].startswith("NSTAT 1000    1000\r\n")
 
 
 def test_merge_of_missing_task_outputs_fails(tmp_path, monkeypatch):

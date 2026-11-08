@@ -61,10 +61,10 @@ RENEW_INTERVAL_SECONDS = 600
 # the final state is retried for about two minutes, longer than a restart of the storage
 FINAL_ATTEMPTS = 6
 FINAL_RETRY_SECONDS = 20
-# a save is copied aside at most this often, and once it covers this much more of the task's primaries (half the
-# step of saving the backend sets, which a save may miss by a few primaries): at most twenty per task
+# a save is copied aside at most this often (the live merges' interval at least), and once it covers this much more
+# of the task's primaries: small results save far more often than that (yaptide/utils/sim_utils.py, MAX_SAVES)
 SAVE_SECONDS = result_format.LIVE_MIN_SECONDS
-SAVE_GROWTH = 0.05
+SAVE_GROWTH = 0.001
 # the pages a save is copied with: the ones of partial results (volumes and particle lists wait for the end)
 SAVED_MODES = {result_format.LIVE, result_format.ON_DEMAND}
 # saves kept of each task: the latest, and the one before for a partial merge still reading it
