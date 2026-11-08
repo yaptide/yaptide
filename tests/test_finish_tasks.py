@@ -17,6 +17,8 @@ from yaptide.persistence.database import db
 from yaptide.persistence.models import (
     BatchSimulationModel,
     BatchTaskModel,
+    CelerySimulationModel,
+    CeleryTaskModel,
     ClusterModel,
     KeycloakUserModel,
     SimulationModel,
@@ -90,7 +92,29 @@ def test_tasks_asked_to_finish_are_noted_and_their_watchers_told(client):
     assert tasks[2].get("finish_requested") and not tasks[1].get("finish_requested")
 
 
-@pytest.mark.parametrize("body", [{}, {"task_numbers": []}, {"task_numbers": [0]}, {"task_numbers": "2"}])
+def test_the_first_task_of_a_direct_simulation_is_task_0(client):
+    """Direct simulations number their tasks from 0, and the first can be finished too; the engine tells it"""
+    user_id = db.session.get(BatchSimulationModel, client.simulation_id).user_id
+    simulation = CelerySimulationModel(
+        job_id="directjob",
+        user_id=user_id,
+        title="direct",
+        input_type=InputType.FILES.value,
+        sim_type=SimulationType.SHIELDHIT.value,
+        job_state=EntityState.RUNNING.value,
+    )
+    db.session.add(simulation)
+    db.session.commit()
+    db.session.add(CeleryTaskModel(simulation_id=simulation.id, task_id=0, task_state=EntityState.RUNNING.value))
+    db.session.commit()
+
+    response = client.post("/tasks/finish", json={"job_id": "directjob", "task_numbers": [0]})
+    assert response.status_code == 202 and response.get_json()["task_numbers"] == [0]
+    assert finish_requested_numbers(simulation.id) == [0]
+    assert simulation.id not in client.objects
+
+
+@pytest.mark.parametrize("body", [{}, {"task_numbers": []}, {"task_numbers": [-1]}, {"task_numbers": "2"}])
 def test_a_request_without_tasks_is_refused(client, body):
     assert finish(client, **body).status_code == 400
 

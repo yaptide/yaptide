@@ -357,7 +357,7 @@ class TaskModel(db.Model):
             "simulated_primaries": self.simulated_primaries,
             "last_update_time": self.last_update_time,
             "task_id": self.id,
-            # the task's number in the simulation (from 1), which a request to finish it early names
+            # the task's number in the simulation (from 0 if direct, from 1 on HPC), which a request to finish it names
             "task_number": self.task_id,
         }
         if self.finish_requested:

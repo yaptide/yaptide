@@ -920,14 +920,16 @@ class FinishTasksResource(Resource):
     @staticmethod
     @requires_auth()
     def post(user: UserModel):
-        """Body: job_id, and task_numbers (the tasks' numbers, from 1) or all: true for every task not ended"""
+        """Body: job_id, and task_numbers (the tasks' numbers: from 0 for direct simulations, from 1 for HPC ones)
+        or all: true for every task not ended
+        """
         payload = request.get_json(force=True, silent=True)
         if not isinstance(payload, dict):
             return yaptide_response(message="job_id and task_numbers or all are required", code=400)
         numbers = payload.get("task_numbers")
         every = payload.get("all") is True
         if not every and (
-            not isinstance(numbers, list) or not numbers or not all(type(n) is int and n > 0 for n in numbers)
+            not isinstance(numbers, list) or not numbers or not all(type(n) is int and n >= 0 for n in numbers)
         ):
             return yaptide_response(message="task_numbers must be a list of task numbers, or all true", code=400)
         simulation, error = owned_simulation(user, payload.get("job_id"))
