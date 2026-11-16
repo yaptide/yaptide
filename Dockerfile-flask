@@ -26,5 +26,5 @@ RUN python -c "import os; content = open('yaptide/admin/db_manage.py', 'rb').rea
 # Health check using Python and requests, we are not using curl or wget as they are not installed by default
 HEALTHCHECK CMD python -c "import requests; exit(0) if requests.get('http://localhost:6000/').ok else exit(1)"
 
-# Run Flask app
-ENTRYPOINT ["flask", "run", "--host=0.0.0.0", "--port=6000"]
+# Migrate the database (or create it on first start), then run Flask app
+ENTRYPOINT ["sh", "-c", "flask prepare-db && exec flask run --host=0.0.0.0 --port=6000"]
