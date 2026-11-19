@@ -11,7 +11,8 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+# keep the app's loggers: migrations also run inside the backend's own process
+fileConfig(config.config_file_name, disable_existing_loggers=False)
 logger = logging.getLogger('alembic.env')
 
 
@@ -97,6 +98,11 @@ def run_migrations_online():
     connectable = get_engine()
 
     with connectable.connect() as connection:
+        if connection.dialect.name == "sqlite":
+            # batch migrations recreate tables on SQLite, cascading foreign keys would empty their children
+            connection.exec_driver_sql("PRAGMA foreign_keys=OFF")
+            # ends the transaction the statement began, alembic commits only the ones it begins itself
+            connection.commit()
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),

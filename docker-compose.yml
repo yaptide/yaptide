@@ -31,6 +31,8 @@ services:
     image: yaptide_flask
     container_name: yaptide_flask
     restart: unless-stopped
+    # longer than gunicorn's 30 s graceful timeout, so a redeploy lets requests up to 30 s long finish
+    stop_grace_period: 40s
     environment:
       - CELERY_BROKER_URL=redis://yaptide_redis:6379/0
       - CELERY_RESULT_BACKEND=redis://yaptide_redis:6379/0
@@ -38,6 +40,12 @@ services:
       - KEYCLOAK_BASE_URL=${KEYCLOAK_BASE_URL:-}
       - KEYCLOAK_REALM=${KEYCLOAK_REALM:-}
       - BACKEND_EXTERNAL_URL=${BACKEND_EXTERNAL_URL:-}
+      # set both in production, otherwise every restart invalidates the update keys of running HPC jobs
+      - YAPTIDE_TOKEN_SECRET=${YAPTIDE_TOKEN_SECRET:-}
+      - YAPTIDE_REFRESH_TOKEN_SECRET=${YAPTIDE_REFRESH_TOKEN_SECRET:-}
+      # empty means sized to the machine, see gunicorn.conf.py
+      - GUNICORN_WORKERS=${GUNICORN_WORKERS:-}
+      - GUNICORN_TIMEOUT=${GUNICORN_TIMEOUT:-}
       # Local (username/password) users are disabled unless explicitly enabled, so that
       # Keycloak-authenticated deployments (yap-dev, yaptide) do not expose /auth/register and /auth/login.
       - ENABLE_LOCAL_USERS=${ENABLE_LOCAL_USERS:-false}
