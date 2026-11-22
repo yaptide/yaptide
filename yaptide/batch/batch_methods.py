@@ -18,7 +18,7 @@ from yaptide.batch.fluka_string_templates import ARRAY_FLUKA_BASH, COLLECT_FLUKA
 from yaptide.batch.utils.utils import convert_dict_to_sbatch_options, extract_sbatch_header
 from yaptide.persistence.models import BatchSimulationModel, ClusterModel, KeycloakUserModel, UserModel
 from yaptide.utils.enums import EntityState, SimulationType
-from yaptide.utils.sim_utils import write_simulation_input_files
+from yaptide.utils.sim_utils import FLUKA_INPUT_FILE, write_simulation_input_files
 
 from yaptide.admin.db_manage import TableTypes, connect_to_db
 from yaptide.utils.helper_worker import celery_app
@@ -243,7 +243,12 @@ def prepare_script_files(
         convertmc_version=pymchelper.__version__,
     )
     array_script = array_template.format(
-        array_header=array_header, root_dir=job_dir, sim_id=sim_id, update_key=update_key, backend_url=backend_url
+        array_header=array_header,
+        root_dir=job_dir,
+        sim_id=sim_id,
+        update_key=update_key,
+        backend_url=backend_url,
+        fluka_input_file=FLUKA_INPUT_FILE,
     )
     collect_script = collect_template.format(
         collect_header=collect_header,

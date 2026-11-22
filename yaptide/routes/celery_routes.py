@@ -37,6 +37,7 @@ from yaptide.routes.utils.utils import (
 )
 from yaptide.routes.utils.tokens import encode_simulation_auth_token
 from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.sim_utils import missing_particle_source_input_file
 from yaptide.utils.helper_tasks import terminate_unfinished_tasks
 
 
@@ -61,6 +62,10 @@ class JobsDirect(Resource):
 
         if input_type is None:
             return error_validation_response()
+
+        missing_file = missing_particle_source_input_file(payload_dict)
+        if missing_file:
+            return yaptide_response(message=f"Missing {missing_file} in input files", code=400)
 
         # ensure the ntasks value is in allowed range
         payload_dict["ntasks"] = get_clamped_ntasks_value(payload_dict=payload_dict, ntasks=payload_dict["ntasks"])

@@ -71,11 +71,11 @@ INPUT_DIR=$ROOT_DIR/input
 # go to working directory
 cd $WORK_DIR
 
-# copy .inp file from input folder to working directory
-cp $INPUT_DIR/*.inp .
+# copy input files from input folder to working directory
+cp $INPUT_DIR/* .
 
-# assign .inp file to a variable
-INPUT_FILE=$(ls *.inp)
+# assign main FLUKA input file to a variable
+INPUT_FILE={fluka_input_file}
 
 module load pymchelper
 python3 -c "from pymchelper.executor.runner import Runner;Runner._Runner__update_fluka_input_file('\\''${{INPUT_FILE}}'\\'',${{RNG_SEED}}.0)" # noqa: E501
@@ -97,7 +97,7 @@ sig_handler()
 trap 'sig_handler' SIGUSR1
 
 # execute simulation
-srun rfluka -N0 -M1 $WORK_DIR/*.inp &
+srun rfluka -N0 -M1 $WORK_DIR/$INPUT_FILE &
 
 wait
 """
