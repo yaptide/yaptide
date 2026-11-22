@@ -6,6 +6,7 @@ from flask import Flask
 from flask_restful import Api
 from flask_migrate import Migrate
 from sqlalchemy.engine import make_url
+from yaptide.persistence import result_storage
 from yaptide.persistence.database import db
 from yaptide.persistence.models import prepare_database
 from yaptide.routes.main_routes import initialize_routes
@@ -54,6 +55,11 @@ def create_app():
         }
 
         CORS(app, **cors_config)
+
+    # results are kept only in the bucket: without it no simulation could store its results
+    missing = result_storage.missing_settings()
+    if missing:
+        raise RuntimeError(f"The results bucket is not configured, set {', '.join(missing)} (see README.md)")
 
     database_uri = make_url(app.config["SQLALCHEMY_DATABASE_URI"]).render_as_string(hide_password=True)
     app.logger.info(f"Initializing Flask to use SQLAlchemy ORM @ {database_uri}")

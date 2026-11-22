@@ -8,13 +8,11 @@ from marshmallow import Schema, fields
 from uuid import uuid4
 
 from yaptide.celery.simulation_worker import celery_app
-from yaptide.celery.utils.manage_tasks import get_job_results, run_job
+from yaptide.celery.utils.manage_tasks import run_job
 from yaptide.persistence.db_methods import (
     add_object_to_db,
     fetch_celery_simulation_by_job_id,
     fetch_celery_tasks_by_sim_id,
-    fetch_estimators_by_sim_id,
-    fetch_pages_by_estimator_id,
     make_commit_to_db,
     update_simulation_state,
     update_task_state,
@@ -22,9 +20,7 @@ from yaptide.persistence.db_methods import (
 from yaptide.persistence.models import (
     CelerySimulationModel,
     CeleryTaskModel,
-    EstimatorModel,
     InputModel,
-    PageModel,
     UserModel,
 )
 from yaptide.routes.utils.decorators import requires_auth
@@ -213,68 +209,3 @@ class JobsDirect(Resource):
 
         terminate_unfinished_tasks.delay(simulation_id=simulation.id)
         return yaptide_response(message="Cancelled sucessfully", code=200)
-
-
-class ResultsDirect(Resource):
-    """Class responsible for returning simulation results"""
-
-    class APIParametersSchema(Schema):
-        """Class specifies API parameters"""
-
-        job_id = fields.String()
-
-    @staticmethod
-    @requires_auth()
-    def get(user: UserModel):
-        """Method returning job status and results"""
-        schema = ResultsDirect.APIParametersSchema()
-        errors: dict[str, list[str]] = schema.validate(request.args)
-        if errors:
-            return yaptide_response(message="Wrong parameters", code=400, content=errors)
-        param_dict: dict = schema.load(request.args)
-
-        job_id = param_dict["job_id"]
-        is_owned, error_message, res_code = check_if_job_is_owned_and_exist(job_id=job_id, user=user)
-        if not is_owned:
-            return yaptide_response(message=error_message, code=res_code)
-
-        simulation = fetch_celery_simulation_by_job_id(job_id=job_id)
-
-        estimators: list[EstimatorModel] = fetch_estimators_by_sim_id(sim_id=simulation.id)
-        if len(estimators) > 0:
-            logging.debug("Returning results from database")
-            result_estimators = []
-            for estimator in estimators:
-                pages: list[PageModel] = fetch_pages_by_estimator_id(est_id=estimator.id)
-                estimator_dict = {
-                    "metadata": estimator.data,
-                    "name": estimator.name,
-                    "pages": [page.data for page in pages],
-                }
-                result_estimators.append(estimator_dict)
-            return yaptide_response(
-                message=f"Results for job: {job_id}", code=200, content={"estimators": result_estimators}
-            )
-
-        result: dict = get_job_results(job_id=job_id)
-        if "estimators" not in result:
-            logging.debug("Results for job %s are unavailable", job_id)
-            return yaptide_response(message="Results are unavailable", code=404, content=result)
-
-        for estimator_dict in result["estimators"]:
-            estimator = EstimatorModel(name=estimator_dict["name"], simulation_id=simulation.id)
-            estimator.data = estimator_dict["metadata"]
-            add_object_to_db(estimator)
-            for page_dict in estimator_dict["pages"]:
-                page = PageModel(
-                    estimator_id=estimator.id,
-                    page_number=int(page_dict["metadata"]["page_number"]),
-                    page_dimension=int(page_dict["dimensions"]),
-                    page_name=str(page_dict["metadata"]["name"]),
-                )
-                page.data = page_dict
-                add_object_to_db(page, False)
-            make_commit_to_db()
-
-        logging.debug("Returning results from Celery")
-        return yaptide_response(message=f"Results for job: {job_id}, results from Celery", code=200, content=result)
