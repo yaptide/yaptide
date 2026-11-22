@@ -33,6 +33,7 @@ from yaptide.routes.utils.utils import (
     get_clamped_ntasks_value,
 )
 from yaptide.utils.enums import EntityState, PlatformType
+from yaptide.utils.sim_utils import missing_particle_source_input_file
 
 
 class JobsBatch(Resource):
@@ -59,6 +60,10 @@ class JobsBatch(Resource):
 
         if input_type is None:
             return error_validation_response()
+
+        missing_file = missing_particle_source_input_file(payload_dict)
+        if missing_file:
+            return yaptide_response(message=f"Missing {missing_file} in input files", code=400)
 
         # ensure the ntasks value is in allowed range
         payload_dict["ntasks"] = get_clamped_ntasks_value(payload_dict=payload_dict, ntasks=payload_dict["ntasks"])

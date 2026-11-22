@@ -13,6 +13,12 @@ from yaptide.utils.enums import InputType, SimulationType
 
 NSTAT_MATCH = r"NSTAT\s*\d*\s*\d*"
 
+PARTICLE_SOURCE_INPUT_FILES = {
+    SimulationType.SHIELDHIT: "beam.dat",
+    SimulationType.FLUKA: "fl_sim.inp",
+}
+FLUKA_INPUT_FILE = PARTICLE_SOURCE_INPUT_FILES[SimulationType.FLUKA]
+
 
 def estimators_to_list(estimators_dict: dict, dir_path: Path) -> list[dict]:
     """Convert simulation output to JSON dictionary representation (to be consumed by UI)"""
@@ -64,17 +70,40 @@ def get_simulator_type_and_particle_source_input_file(
         logging.warning("Received payload doesn't have the input_files dictionary.")
         return None, None
 
-    # determining input file type - that information should most certainly be passed in the payload,
-    # but now it's not, so we have to do this ugly thing
-    if "beam.dat" in input_files:
-        return SimulationType.SHIELDHIT, "beam.dat"
-    inp_file = next((file for file in input_files if file.endswith(".inp")), None)
-    if inp_file:
-        return SimulationType.FLUKA, inp_file
+    try:
+        simulation_type = SimulationType(payload_dict.get("sim_type"))
+    except ValueError:
+        logging.warning("Unknown simulator type in the received payload: %s", payload_dict.get("sim_type"))
+        return None, None
 
-    # if we couldn't determine the file type, return a tuple of Nones
-    logging.warning("Couldn't determine the file type from the received payload.")
-    return None, None
+    file_name = PARTICLE_SOURCE_INPUT_FILES.get(simulation_type)
+    if file_name is None:
+        logging.warning("Primaries can't be read from input files of %s.", simulation_type.value)
+        return None, None
+    if file_name not in input_files:
+        logging.warning("Received payload for %s doesn't have the %s file.", simulation_type.value, file_name)
+        return None, None
+
+    return simulation_type, file_name
+
+
+def missing_particle_source_input_file(payload_dict: dict) -> Optional[str]:
+    """
+    Returns the name of the file with primary particles that the simulator requires
+    when the payload uses input files and this file is missing, otherwise None.
+    """
+    if get_json_type(payload_dict) != InputType.FILES:
+        return None
+
+    try:
+        simulation_type = SimulationType(payload_dict.get("sim_type"))
+    except ValueError:
+        return None
+
+    file_name = PARTICLE_SOURCE_INPUT_FILES.get(simulation_type)
+    if file_name is None or file_name in (payload_dict.get("input_files") or {}):
+        return None
+    return file_name
 
 
 def get_total_number_of_primaries(payload_dict: dict) -> Optional[int]:
@@ -246,16 +275,13 @@ def adjust_primaries_for_shieldhit_files(
 
 
 def adjust_primaries_for_fluka_files(
-    payload_files_dict: dict, ntasks: int = None, fluka_input_file: str = None
+    payload_files_dict: dict, ntasks: int = None, fluka_input_file: str = FLUKA_INPUT_FILE
 ) -> tuple[dict, int]:
-    """Adjusts number of primaries in *.inp file for FLUKA"""
+    """Adjusts number of primaries in fl_sim.inp file for FLUKA"""
     files_dict = copy.deepcopy(payload_files_dict["input_files"])
 
-    # if the primaries file name is not passed, get it from payload
-    if not fluka_input_file:
-        fluka_input_file = next((file for file in files_dict if file.endswith(".inp")), None)
-        if not fluka_input_file:
-            return {}, 0
+    if fluka_input_file not in files_dict:
+        return {}, 0
 
     # read number of primaries from fluka file
     all_input_lines: list[str] = files_dict[fluka_input_file].split("\n")

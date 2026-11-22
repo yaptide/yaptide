@@ -17,6 +17,7 @@ from yaptide.batch.watcher import COMPLETE_MATCH, REQUESTED_MATCH, RUN_MATCH, lo
 from yaptide.celery.utils.progress.fluka_monitor import TaskDetails, read_fluka_out_file
 from yaptide.celery.utils.requests import send_task_update
 from yaptide.utils.enums import EntityState
+from yaptide.utils.sim_utils import FLUKA_INPUT_FILE
 
 
 def get_tmp_dir() -> Path:
@@ -79,9 +80,9 @@ def get_shieldhit_estimators(dir_path: Path) -> dict:
 
 def command_to_run_fluka(dir_path: Path, task_id: int) -> list[str]:
     """Function to create command to run FLUKA."""
-    input_file = next(dir_path.glob("*.inp"), None)
-    if input_file is None:
-        logging.debug("failed to generate fluka command. No *.inp file found in %s", dir_path)
+    input_file = dir_path / FLUKA_INPUT_FILE
+    if not input_file.is_file():
+        logging.debug("failed to generate fluka command. No %s file found in %s", FLUKA_INPUT_FILE, dir_path)
         # if there is no input file, raise an error
         # this should never happen
         raise FileNotFoundError("Input file not found")
