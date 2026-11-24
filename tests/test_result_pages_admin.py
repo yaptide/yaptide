@@ -198,6 +198,22 @@ def test_clear_and_move_back_give_the_same_pages(database):
         assert json.loads(gzip.decompress(body)) == old_page(name, page_number, sim_id)
 
 
+def test_copy_after_move_back_finds_the_copies_already_made(database):
+    """Pages moved back to the database and copied again go to the prefixes they had, so nothing is uploaded twice
+    and the bucket keeps one copy of each page
+    """
+    run("copy-pages-to-storage")
+    run("clear-pages-in-postgres")
+    before = stored_prefixes(1) | stored_prefixes(2)
+    run("move-pages-to-postgres")
+
+    assert "12 of 12 pages already in storage, 0 to upload" in run("copy-pages-to-storage", "--dry-run").output
+    assert ", 0 uploaded in this run" in run("copy-pages-to-storage").output
+    run("clear-pages-in-postgres")
+    assert stored_prefixes(1) | stored_prefixes(2) == before
+    assert {page_prefix(page_id) for page_id in range(1, 13)} == before
+
+
 def test_every_page_gets_a_prefix_of_its_own(database):
     """Two estimators with the same file name and pages with the same data still get their own copies, so clearing
     or replacing one never touches another

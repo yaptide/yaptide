@@ -414,16 +414,21 @@ def count_pages_in_postgres(con, metadata: db.MetaData) -> tuple[int, int]:
 
 def zarr_copy(result_storage, page) -> tuple[str, dict[str, bytes]]:
     """Where a page kept in the database goes in storage, and its objects there: the page converted to Zarr as the
-    backend stores new pages. The revision is taken from the page's id and data, so the same page always gets the same
-    prefix and objects (a repeated copy finds them), while another page, or the page changed since, gets another one
+    backend stores new pages. The revision is taken from the page's id and its Zarr objects, so the same page always
+    gets the same prefix and objects (a repeated copy finds them, also after move-pages-to-postgres brought the page
+    back as float32 JSON), while another page, or the page changed since, gets another one
     """
-    digest = hashlib.md5(f"{page.id}:".encode() + page.compressed_data, usedforsecurity=False)  # skipcq: PTC-W1003
-    revision = digest.hexdigest()[:16]
-    prefix = result_storage.page_prefix(page.simulation_id, page.file_name, page.page_number, revision)
     page_dict = json.loads(gzip.decompress(page.compressed_data))
     data = dict(page_dict["data"])
     values = data.pop("values")
-    return prefix, result_format().page_files(dict(page_dict, data=data), values)
+    files = result_format().page_files(dict(page_dict, data=data), values)
+    # names a copy, not a security measure
+    digest = hashlib.md5(f"{page.id}:".encode(), usedforsecurity=False)  # skipcq: PTC-W1003
+    for name in sorted(files):
+        digest.update(f"{name}:{len(files[name])}:".encode() + files[name])
+    revision = digest.hexdigest()[:16]
+    prefix = result_storage.page_prefix(page.simulation_id, page.file_name, page.page_number, revision)
+    return prefix, files
 
 
 def copy_matches(result_storage, prefix: str, files: dict[str, bytes]) -> bool:
