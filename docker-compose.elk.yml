@@ -1,0 +1,43 @@
+services:
+  yaptide_flask:
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://127.0.0.1:12201"
+
+  yaptide_simulation_worker:
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://127.0.0.1:12201"
+
+  yaptide_helper_worker:
+    logging:
+      driver: gelf
+      options:
+        gelf-address: "udp://127.0.0.1:12201"
+
+  elasticsearch:
+    container_name: yaptide_elasticsearch
+    restart: unless-stopped
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+    ports: [ "127.0.0.1:9200:9200" ]
+
+  logstash:
+    container_name: yaptide_logstash
+    restart: unless-stopped
+    image: docker.elastic.co/logstash/logstash:8.12.0
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+    ports:
+      - "127.0.0.1:12201:12201/udp"
+
+  kibana:
+    container_name: yaptide_kibana
+    restart: unless-stopped
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    ports: [ "127.0.0.1:5601:5601" ]
+    environment: [ "ELASTICSEARCH_HOSTS=http://elasticsearch:9200" ]
