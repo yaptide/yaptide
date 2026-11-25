@@ -1,0 +1,333 @@
+# Multi-stage Dockerfile for Slurm runtime
+# Stage 1: Build gosu from source with latest Go (avoids CVEs in pre-built binaries)
+# Stage 2: Build RPMs using the builder image
+# Stage 3: Install RPMs in a clean runtime image
+
+ARG SLURM_VERSION=25.11.4
+ARG GOSU_VERSION=1.19
+ARG LMOD_VERSION=9.1.2
+ARG SPACK_VERSION=v1.1.1
+ARG PYMCHELPER_VERSION=2.7.0
+ARG NUMPY_VERSION=2.2.3
+ARG BUILDER_BASE=rockylinux/rockylinux:9
+ARG RUNTIME_BASE=rockylinux/rockylinux:9
+
+# ============================================================================
+# Stage 1: Build gosu from source
+# ============================================================================
+FROM golang:1.26-bookworm AS gosu-builder
+
+ARG GOSU_VERSION
+ARG TARGETOS
+ARG TARGETARCH
+
+RUN set -ex \
+    && git clone --branch "${GOSU_VERSION}" --depth 1 \
+       https://github.com/tianon/gosu.git /go/src/github.com/tianon/gosu
+
+WORKDIR /go/src/github.com/tianon/gosu
+
+RUN set -ex \
+    && go mod download \
+    && CGO_ENABLED=0 GOOS="${TARGETOS}" GOARCH="${TARGETARCH}" \
+       go build -v -trimpath -ldflags '-d -w' \
+       -o /go/bin/gosu . \
+    && chmod +x /go/bin/gosu
+
+# ============================================================================
+# Stage 2: Build RPMs
+# ============================================================================
+FROM ${BUILDER_BASE} AS builder
+
+ARG SLURM_VERSION=25.11.4
+ARG TARGETARCH
+
+# Enable CRB and EPEL repositories for development packages
+# Install RPM build tools and dependencies
+# skipcq: DOK-W1005
+RUN set -ex \
+    && dnf makecache \
+    && dnf -y install dnf-plugins-core epel-release \
+    && dnf config-manager --set-enabled crb \
+    && dnf makecache \
+    && dnf -y install --nobest --exclude='*.i686' \
+       autoconf \
+       automake \
+       bzip2 \
+       freeipmi-devel \
+       dbus-devel \
+       gcc \
+       gcc-c++ \
+       git \
+       gtk2-devel \
+       hdf5-devel \
+       http-parser-devel \
+       hwloc-devel \
+       json-c-devel \
+       libcurl-devel \
+       libyaml-devel \
+       lua-devel \
+       lz4-devel \
+       make \
+       man2html \
+       mariadb-devel \
+       munge \
+       munge-devel \
+       ncurses-devel \
+       numactl-devel \
+       openssl-devel \
+       pam-devel \
+       perl \
+       python3.12 \
+       python3.12-devel \
+       readline-devel \
+       rpm-build \
+       rpmdevtools \
+       rrdtool-devel \
+       wget \
+       libjwt \
+       libjwt-devel \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+RUN rpmdev-setuptree
+
+COPY rpmbuild/slurm.rpmmacros /root/.rpmmacros
+
+RUN set -ex \
+    && wget -q -O "/root/rpmbuild/SOURCES/slurm-${SLURM_VERSION}.tar.bz2" \
+       "https://download.schedmd.com/slurm/slurm-${SLURM_VERSION}.tar.bz2"
+
+WORKDIR /root/rpmbuild/SOURCES
+
+RUN set -ex \
+    && RPM_ARCH=$(case "${TARGETARCH}" in \
+         amd64) echo "x86_64" ;; \
+         arm64) echo "aarch64" ;; \
+         *) echo "Unsupported architecture: ${TARGETARCH}" && exit 1 ;; \
+       esac) \
+    && echo "Building Slurm RPMs for architecture: ${RPM_ARCH}" \
+    && rpmbuild -ta "slurm-${SLURM_VERSION}.tar.bz2" \
+    && ls -lh "/root/rpmbuild/RPMS/${RPM_ARCH}/"
+
+# ============================================================================
+# Stage 3: Build Lmod from source
+# ============================================================================
+FROM rockylinux/rockylinux:9 AS lmod-builder
+
+ARG LMOD_VERSION
+
+# skipcq: DOK-W1005
+RUN set -ex \
+    && dnf -y install dnf-plugins-core epel-release \
+    && dnf config-manager --set-enabled crb \
+    && dnf -y install \
+       bc \
+       gcc \
+       lua \
+       lua-devel \
+       lua-posix \
+       lua-filesystem \
+       tcl \
+       tcl-devel \
+       procps-ng \
+       python3 \
+       wget \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf
+
+RUN set -ex \
+    && wget -q -O "/tmp/Lmod-${LMOD_VERSION}.tar.gz" \
+       "https://github.com/TACC/Lmod/archive/refs/tags/${LMOD_VERSION}.tar.gz" \
+    && tar -xzf "/tmp/Lmod-${LMOD_VERSION}.tar.gz" -C /tmp
+
+WORKDIR /tmp/Lmod-${LMOD_VERSION}
+
+RUN set -ex \
+    && ./configure --prefix=/usr/local \
+    && make install
+
+# ============================================================================
+# Stage 4: Clone Spack from source
+# ============================================================================
+FROM rockylinux/rockylinux:9 AS spack-builder
+
+ARG SPACK_VERSION
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# skipcq: DOK-W1005
+RUN dnf -y install git gcc && dnf clean all
+
+RUN git clone --depth=1 --branch "${SPACK_VERSION}" \
+        https://github.com/spack/spack.git /usr/local/spack
+
+RUN set -exo pipefail \
+    && GCC_VER=$(gcc --version | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1) \
+    && ARCH=$(uname -m) \
+    && mkdir -p /usr/local/spack/etc/spack \
+    && printf 'modules:\n  default:\n    enable:\n      - lmod\n    roots:\n      lmod: /opt/spack/modules\n    lmod:\n      core_compilers:\n        - gcc@%s\n' \
+         "${GCC_VER}" > /usr/local/spack/etc/spack/modules.yaml \
+    && printf 'config:\n  install_tree:\n    root: /opt/spack\n' \
+         > /usr/local/spack/etc/spack/config.yaml \
+    && printf 'packages:\n  all:\n    require:\n      - "target=%s"\n' \
+         "${ARCH}" > /usr/local/spack/etc/spack/packages.yaml
+
+# ============================================================================
+# Stage 5: Runtime image
+# ============================================================================
+FROM ${RUNTIME_BASE}
+
+LABEL org.opencontainers.image.source="https://github.com/giovtorres/slurm-docker-cluster" \
+      org.opencontainers.image.title="slurm-docker-cluster" \
+      org.opencontainers.image.description="Slurm Docker cluster on Rocky Linux 9" \
+      maintainer="Giovanni Torres"
+
+ARG SLURM_VERSION=25.11.4
+ARG PYMCHELPER_VERSION=2.7.0
+ARG NUMPY_VERSION=2.2.3
+ARG TARGETARCH
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# skipcq: DOK-W1005
+RUN set -ex \
+    && dnf -y update \
+    && dnf -y install dnf-plugins-core epel-release \
+    && dnf config-manager --set-enabled crb \
+    && dnf makecache \
+    && dnf -y install \
+       apptainer \
+       bash-completion \
+       bzip2 \
+       bzip2-devel \
+       file \
+       gcc \
+       gcc-c++ \
+       gcc-gfortran \
+       gettext \
+       git \
+       hdf5 \
+       http-parser \
+       hwloc \
+       json-c \
+       jq \
+       libaec \
+       libyaml \
+       lua \
+       lua-posix \
+       lua-filesystem \
+       lz4 \
+       make \
+       mariadb \
+       munge \
+       numactl \
+       openssh-server \
+       patch \
+       perl \
+       procps-ng \
+       psmisc \
+       python3.12 \
+       python3.12-pip \
+       readline \
+       tcl \
+       vim-enhanced \
+       wget \
+       xz \
+       libjwt \
+    && dnf clean all \
+    && rm -rf /var/cache/dnf \
+    && alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
+    && alternatives --set python3 /usr/bin/python3.12 \
+    && ssh-keygen -A \
+    && sed -i 's/^#\?PermitRootLogin.*/PermitRootLogin prohibit-password/' /etc/ssh/sshd_config \
+    && sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+
+RUN python3 -m pip install --no-cache-dir \
+    "numpy==${NUMPY_VERSION}" \
+    "pymchelper==${PYMCHELPER_VERSION}"
+
+COPY --from=gosu-builder /go/bin/gosu /usr/local/bin/gosu
+RUN gosu --version && gosu nobody true
+
+COPY --from=lmod-builder /usr/local/lmod /usr/local/lmod
+COPY --from=spack-builder /usr/local/spack /usr/local/spack
+
+RUN ARCH=$(uname -m) \
+    && printf '%s\n' \
+      'source /usr/local/lmod/lmod/init/bash' \
+      'export SPACK_ROOT=/usr/local/spack' \
+      "export MODULEPATH=\"/opt/spack/modules/linux-rocky9-${ARCH}/Core:/opt/modulefiles\"" \
+      'source /usr/local/spack/share/spack/setup-env.sh' \
+      > /etc/profile.d/lmod.sh \
+    && chmod 644 /etc/profile.d/lmod.sh \
+    && mkdir -p /opt/modulefiles /opt/spack /opt/spack/modules
+
+COPY --from=builder /root/rpmbuild/RPMS/*/*.rpm /tmp/rpms/
+
+# skipcq: DOK-W1005
+RUN set -ex \
+    && dnf -y install /tmp/rpms/slurm-[0-9]*.rpm \
+       /tmp/rpms/slurm-perlapi-*.rpm \
+       /tmp/rpms/slurm-slurmctld-*.rpm \
+       /tmp/rpms/slurm-slurmd-*.rpm \
+       /tmp/rpms/slurm-slurmdbd-*.rpm \
+       /tmp/rpms/slurm-slurmrestd-*.rpm \
+       /tmp/rpms/slurm-contribs-*.rpm \
+       /tmp/rpms/slurm-devel-*.rpm \
+    && mkdir -p /var/cache/slurm-rpms \
+    && cp /tmp/rpms/slurm-[0-9]*.rpm /tmp/rpms/slurm-contribs-*.rpm /tmp/rpms/slurm-devel-*.rpm /var/cache/slurm-rpms/ \
+    && rm -rf /tmp/rpms \
+    && dnf clean all
+
+RUN set -x \
+    && groupadd -r --gid=990 slurm \
+    && useradd -r -g slurm --uid=990 slurm \
+    && groupadd -r --gid=991 slurmrest \
+    && useradd -r -g slurmrest --uid=991 slurmrest \
+    && chmod 0755 /etc \
+    && /sbin/create-munge-key \
+    && mkdir -m 0755 -p \
+        /var/run/slurm \
+        /var/spool/slurm \
+        /var/lib/slurm \
+        /var/log/slurm \
+        /etc/slurm \
+    && chown slurm:slurm \
+        /var/run/slurm \
+        /var/spool/slurm \
+        /var/lib/slurm \
+        /var/log/slurm \
+        /etc/slurm
+
+COPY config/ /tmp/slurm-config/
+RUN set -ex \
+    && MAJOR_MINOR=$(echo "${SLURM_VERSION}" | cut -d. -f1,2) \
+    && echo "Detected Slurm version: ${MAJOR_MINOR}" \
+    && if [ -f "/tmp/slurm-config/${MAJOR_MINOR}/slurm.conf" ]; then \
+         echo "Using version-specific config for ${MAJOR_MINOR}"; \
+         cp "/tmp/slurm-config/${MAJOR_MINOR}/slurm.conf" /etc/slurm/slurm.conf; \
+       else \
+         echo "No version-specific config found for ${MAJOR_MINOR}, using latest (25.11)"; \
+         cp /tmp/slurm-config/25.11/slurm.conf /etc/slurm/slurm.conf; \
+       fi \
+    && cp /tmp/slurm-config/common/slurmdbd.conf /etc/slurm/slurmdbd.conf \
+    && cp /tmp/slurm-config/common/job_submit.lua /etc/slurm/job_submit.lua \
+    && if [ -f "/tmp/slurm-config/${MAJOR_MINOR}/cgroup.conf" ]; then \
+         echo "Using version-specific cgroup.conf for ${MAJOR_MINOR}"; \
+         cp "/tmp/slurm-config/${MAJOR_MINOR}/cgroup.conf" /etc/slurm/cgroup.conf; \
+       else \
+         echo "Using common cgroup.conf"; \
+         cp /tmp/slurm-config/common/cgroup.conf /etc/slurm/cgroup.conf; \
+       fi \
+    && chown slurm:slurm /etc/slurm/slurm.conf /etc/slurm/cgroup.conf /etc/slurm/slurmdbd.conf /etc/slurm/job_submit.lua \
+    && chmod 644 /etc/slurm/slurm.conf /etc/slurm/cgroup.conf \
+    && chmod 600 /etc/slurm/slurmdbd.conf \
+    && rm -rf /tmp/slurm-config
+
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+
+CMD ["slurmdbd"]
