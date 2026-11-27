@@ -41,14 +41,14 @@ def results_bucket() -> Generator[str, None, None]:
     from yaptide.persistence import result_storage
 
     try:
-        result_storage._internal().head_bucket(Bucket=result_storage.bucket())
+        result_storage._internal().head_bucket(Bucket=result_storage.bucket())  # skipcq: PYL-W0212
     except ClientError:
-        result_storage._internal().create_bucket(Bucket=result_storage.bucket())
+        result_storage._internal().create_bucket(Bucket=result_storage.bucket())  # skipcq: PYL-W0212
     yield result_storage.bucket()
     empty_results_bucket()
     if server:
         server.stop()
-        result_storage._client.cache_clear()
+        result_storage._client.cache_clear()  # skipcq: PYL-W0212
 
 
 def empty_results_bucket() -> None:
@@ -58,8 +58,9 @@ def empty_results_bucket() -> None:
     result_storage._delete_listed(result_storage._internal(), result_storage.PAGE_PREFIX)  # skipcq: PYL-W0212
 
 
+# results_bucket is requested only so the bucket exists first
 @pytest.fixture(autouse=True)
-def results_bucket_emptied(results_bucket: str) -> Generator[None, None, None]:
+def results_bucket_emptied(results_bucket: str) -> Generator[None, None, None]:  # skipcq: PYL-W0613
     """Every test starts with no result pages in the bucket (simulation ids repeat in every new database); emptied
     before the test, as a test may leave the storage patched until its own teardown
     """
