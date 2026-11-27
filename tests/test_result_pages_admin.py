@@ -7,7 +7,9 @@ SQLite by default, an empty Postgres with TEST_DATABASE_URI; the bucket of tests
 import gzip
 import hashlib
 import json
+import logging
 import os
+from collections.abc import Generator
 
 import pytest
 from click.testing import CliRunner
@@ -73,6 +75,21 @@ def database(tmp_path, monkeypatch) -> str:
             result_storage.delete_simulation(sim_id)
         db.session.remove()
         db.drop_all()
+
+
+@pytest.fixture(autouse=True)
+def quiet_live_log(request) -> Generator[None, None, None]:
+    """No record reaches pytest's live log handler (log_cli in pytest.ini) during a test: printing one resumes
+    pytest's own capture of stdout, which takes a db_manage command's later output away from CliRunner
+    """
+    handler = getattr(request.config.pluginmanager.get_plugin("logging-plugin"), "log_cli_handler", None)
+    if handler is None:
+        yield
+        return
+    level = handler.level
+    handler.setLevel(logging.CRITICAL + 1)
+    yield
+    handler.setLevel(level)
 
 
 def run(*args: str, ok: bool = True):
