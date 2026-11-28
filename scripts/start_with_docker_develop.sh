@@ -6,7 +6,8 @@ docker_version=$(docker -v | awk '{print $3}' | cut -d, -f1)
 # print the docker version
 echo "Docker version: $docker_version"
 
-# the keys of the results bucket (README.md), generated once into .env: Garage keeps them from its first start
+# the keys of the results bucket, generated once into .env: Garage keeps them from its first start
+# (https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage)
 if ! grep -qs '^RESULTS_S3_ACCESS_KEY=' .env; then
   hex() { od -An -tx1 -N"$1" /dev/urandom | tr -d ' \n'; }
   if [ -s .env ] && [ -n "$(tail -c1 .env)" ]; then echo >> .env; fi

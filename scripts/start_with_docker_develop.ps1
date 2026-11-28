@@ -4,7 +4,8 @@ $dockerVersion = docker -v | Select-String -Pattern "\d+\.\d+\.\d+" | ForEach-Ob
 # print the docker version
 Write-Host "Docker version: $dockerVersion"
 
-# the keys of the results bucket (README.md), generated once into .env: Garage keeps them from its first start
+# the keys of the results bucket, generated once into .env: Garage keeps them from its first start
+# (https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage)
 if (-not (Test-Path .env) -or -not (Select-String -Path .env -Pattern '^RESULTS_S3_ACCESS_KEY=' -Quiet)) {
   function New-Hex([int]$bytes) {
     $buffer = New-Object byte[] $bytes

@@ -277,7 +277,7 @@ def test_objects_are_removed_in_batches_as_they_are_listed(monkeypatch):
 
     result_storage.delete_simulation(7)
 
-    assert clients == [{"read_timeout": 120, "attempts": 5}]
+    assert clients == [{"read_timeout_seconds": 120, "attempts": 5}]
     paginate = client.get_paginator.return_value.paginate
     assert paginate.call_args.kwargs["Prefix"] == "simulations/7/"
     assert paginate.call_args.kwargs["PaginationConfig"] == {"PageSize": result_storage.DELETE_BATCH}

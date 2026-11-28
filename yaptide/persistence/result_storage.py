@@ -23,7 +23,8 @@ from yaptide.batch import result_format
 
 # a page as a Zarr v3 array, its objects under a prefix (PageObjectModel.key ends with "/")
 ZARR_FORMAT = result_format.FORMAT
-# the UI fetches a page right after asking for it; a link that leaks stops working this long after
+# how long a signed link to a page object, handed out by GET /results, stays valid: the UI fetches the page right
+# away, and a link that leaks stops working after this
 URL_SECONDS = 15 * 60
 # the settings without which no results can be stored
 REQUIRED_SETTINGS = ("RESULTS_S3_BUCKET", "RESULTS_S3_ENDPOINT", "RESULTS_S3_ACCESS_KEY", "RESULTS_S3_SECRET_KEY")
@@ -40,7 +41,7 @@ def bucket() -> str:
 
 
 @lru_cache(maxsize=3)
-def _client(endpoint: str, read_timeout: int = 10, attempts: int = 2):
+def _client(endpoint: str, read_timeout_seconds: int = 10, attempts: int = 2):
     """S3 client for the given endpoint: the internal one for reads and writes, the public one for browser links;
     the defaults fail fast, for a web request waiting on the storage
     """
@@ -57,7 +58,7 @@ def _client(endpoint: str, read_timeout: int = 10, attempts: int = 2):
             request_checksum_calculation="when_required",
             response_checksum_validation="when_required",
             connect_timeout=2,
-            read_timeout=read_timeout,
+            read_timeout=read_timeout_seconds,
             # attempts in total ("max_attempts" would count retries only, one more)
             retries={"total_max_attempts": attempts},
         ),
@@ -73,7 +74,7 @@ def _patient():
     """Like _internal, for removals of many objects: a busy storage gets time and more attempts (removing again what
     is gone already is harmless)
     """
-    return _client(os.environ["RESULTS_S3_ENDPOINT"], read_timeout=120, attempts=5)
+    return _client(os.environ["RESULTS_S3_ENDPOINT"], read_timeout_seconds=120, attempts=5)
 
 
 def public_client():

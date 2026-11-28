@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Backup of the database and the result pages to a second S3 server, see "Backups" in README.md.
+# Backup of the database and the result pages to a second S3 server, see
+# https://yaptide.github.io/for_developers/backend/result-storage/#backups
 #   scripts/backup.sh                  dump the database, mirror the results bucket, drop old backups (run nightly)
 #   scripts/backup.sh restore DATE     put the dump of DATE (YYYY-MM-DD) and the stored pages back
 # Reads .env of the deployment: BACKUP_S3_ENDPOINT, BACKUP_S3_BUCKET, BACKUP_S3_ACCESS_KEY, BACKUP_S3_SECRET_KEY

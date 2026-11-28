@@ -38,8 +38,8 @@ FORMAT = "zarr-v3"
 METADATA_FILE = "zarr.json"
 SHARD_FILE = "c/0"
 FILES = (METADATA_FILE, SHARD_FILE)
-# values in one chunk: 256 KiB, a read of the browser fetches a few of them for a slice of a large mesh
-CHUNK_ITEMS = 1 << 16
+# values per chunk (65536 float32 = 256 KiB)
+CHUNK_ITEMS = 65536
 # what the values are stored as: a Monte Carlo result has far fewer significant digits than float32's 7
 DATA_TYPE = "float32"
 ITEM_SIZE = 4
