@@ -27,6 +27,7 @@ requests = "2.33.0"
 sqlalchemy = "2.0.51"
 werkzeug = "3.1.8"
 boto3 = "1.42.10"
+zstandard = "0.25.0"
 cryptography = "50.0.0"
 psycopg = {version = "3.2.13", extras = ["binary"]}
 yaptide-converter = { git = "https://github.com/yaptide/converter.git", rev = "69f615d0fb391984793017b7eaa0336c38fa1f4b"}
@@ -40,6 +41,7 @@ pre-commit = "4.3.0"
 pytest-dotenv = "0.5.2"
 black = "26.5.1"
 pytest-rerunfailures = "^16.0"
+moto = {version = "5.1.18", extras = ["s3"]}
 
 
 [build-system]

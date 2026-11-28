@@ -10,6 +10,63 @@ import os
 from yaptide.application import create_app
 from yaptide.persistence.database import db
 
+# the results bucket of the tests, emptied by them; created on the S3 server below if missing
+TEST_BUCKET = "yaptide-results-test"
+
+
+@pytest.fixture(scope="session", autouse=True)
+def results_bucket() -> Generator[str, None, None]:
+    """An S3 bucket for result pages, required by the backend: the server RESULTS_S3_ENDPOINT points at (e.g. a
+    Garage container in CI, with its keys set), otherwise an in-process S3 mock (moto) started for the session
+    """
+    server = None
+    if not os.environ.get("RESULTS_S3_ENDPOINT"):
+        from moto.server import ThreadedMotoServer
+
+        server = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)
+        server.start()
+        host, port = server.get_host_and_port()
+        os.environ["RESULTS_S3_ENDPOINT"] = f"http://{host}:{port}"
+        os.environ.setdefault("RESULTS_S3_ACCESS_KEY", "test")
+        os.environ.setdefault("RESULTS_S3_SECRET_KEY", "test")
+        # the mock creates buckets without a location only in the default region
+        os.environ.setdefault("RESULTS_S3_REGION", "us-east-1")
+    # always a bucket of its own: the tests empty it, so never a bucket of a deployment the environment points at
+    os.environ["RESULTS_S3_BUCKET"] = TEST_BUCKET
+    # the address the browser's signed links point to
+    os.environ["BACKEND_EXTERNAL_URL"] = "https://yaptide.test"
+    os.environ.pop("RESULTS_S3_PUBLIC_ENDPOINT", None)
+
+    from botocore.exceptions import ClientError
+    from yaptide.persistence import result_storage
+
+    try:
+        result_storage._internal().head_bucket(Bucket=result_storage.bucket())  # skipcq: PYL-W0212
+    except ClientError:
+        result_storage._internal().create_bucket(Bucket=result_storage.bucket())  # skipcq: PYL-W0212
+    yield result_storage.bucket()
+    empty_results_bucket()
+    if server:
+        server.stop()
+        result_storage._client.cache_clear()  # skipcq: PYL-W0212
+
+
+def empty_results_bucket() -> None:
+    """Removes every result page from the test bucket"""
+    from yaptide.persistence import result_storage
+
+    result_storage._delete_listed(result_storage._internal(), result_storage.PAGE_PREFIX)  # skipcq: PYL-W0212
+
+
+# results_bucket is requested only so the bucket exists first
+@pytest.fixture(autouse=True)
+def results_bucket_emptied(results_bucket: str) -> Generator[None, None, None]:  # skipcq: PYL-W0613
+    """Every test starts with no result pages in the bucket (simulation ids repeat in every new database); emptied
+    before the test, as a test may leave the storage patched until its own teardown
+    """
+    empty_results_bucket()
+    yield
+
 
 @pytest.fixture(scope="session")
 def shieldhit_binary_filename() -> str:

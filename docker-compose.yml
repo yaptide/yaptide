@@ -1,6 +1,26 @@
 # this docker compose should be compatible also with older (<=v24) version of docker engine
 
 services:
+  # result pages (yaptide/persistence/result_storage.py); needs RESULTS_S3_ACCESS_KEY ("GK" + 24 hex),
+  # RESULTS_S3_SECRET_KEY and GARAGE_RPC_SECRET (64 hex each) in .env, see
+  # https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage; the key pair is fixed after the
+  # first start - a new secret for the same key id stops Garage from starting
+  garage:
+    image: dxflrs/garage:v2.4.1
+    container_name: yaptide_garage
+    restart: unless-stopped
+    command: ["/garage", "server", "--single-node", "--default-bucket"]
+    environment:
+      - GARAGE_RPC_SECRET=${GARAGE_RPC_SECRET:?set GARAGE_RPC_SECRET in .env, see https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage}
+      - GARAGE_DEFAULT_ACCESS_KEY=${RESULTS_S3_ACCESS_KEY:?set RESULTS_S3_ACCESS_KEY in .env, see https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage}
+      - GARAGE_DEFAULT_SECRET_KEY=${RESULTS_S3_SECRET_KEY:?set RESULTS_S3_SECRET_KEY in .env, see https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage}
+      - GARAGE_DEFAULT_BUCKET=yaptide-results
+    volumes:
+      - ./garage.toml:/etc/garage.toml:ro
+      - garage_meta:/var/lib/garage/meta
+      - garage_data:/var/lib/garage/data
+    # no ports are published: the browser reaches the bucket only through nginx, with signed links
+
   redis:
     image: redis:8-alpine
     container_name: yaptide_redis
@@ -50,11 +70,18 @@ services:
       # Keycloak-authenticated deployments (yap-dev, yaptide) do not expose /auth/register and /auth/login.
       - ENABLE_LOCAL_USERS=${ENABLE_LOCAL_USERS:-false}
       - FLASK_SQLALCHEMY_DATABASE_URI=postgresql+psycopg://${POSTGRES_USER:-yaptide_user}:${POSTGRES_PASSWORD:-yaptide_password}@postgresql:5432/${POSTGRES_DB:-yaptide_db}
+      # result pages go to the garage service; the browser's signed links point to BACKEND_EXTERNAL_URL
+      - RESULTS_S3_BUCKET=yaptide-results
+      - RESULTS_S3_ENDPOINT=http://garage:3900
+      - RESULTS_S3_ACCESS_KEY=${RESULTS_S3_ACCESS_KEY:?set RESULTS_S3_ACCESS_KEY in .env, see https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage}
+      - RESULTS_S3_SECRET_KEY=${RESULTS_S3_SECRET_KEY:?set RESULTS_S3_SECRET_KEY in .env, see https://yaptide.github.io/for_developers/backend/docker-deployment/#result-storage}
     depends_on:
       redis:
         condition: service_healthy
       postgresql:
         condition: service_healthy
+      garage:
+        condition: service_started
 
   yaptide_simulation_worker:
     build:
@@ -132,3 +159,5 @@ services:
 volumes:
   data:
   simulators:
+  garage_meta:
+  garage_data:

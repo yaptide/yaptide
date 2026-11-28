@@ -7,6 +7,9 @@ We do not use ORM model classes here, because we do not want to import the yapti
 """
 
 from enum import Enum, auto
+import gzip
+import hashlib
+import json
 import os
 
 import click
@@ -27,6 +30,7 @@ class TableTypes(Enum):
     Input = auto()
     Estimator = auto()
     Page = auto()
+    PageObject = auto()
 
 
 def connect_to_db(verbose: int = 0) -> tuple[db.Connection, db.MetaData, db.Engine]:
@@ -297,6 +301,11 @@ def remove_simulation(simulation_id, verbose):
     con.execute(query)
     con.commit()
     click.echo(f"Successfully deleted simulation: {simulation_id}")
+    if os.environ.get("RESULTS_S3_BUCKET"):
+        results_storage().delete_simulation(simulation_id)
+        click.echo(f"Removed the stored result pages of simulation {simulation_id}")
+    else:
+        click.echo("RESULTS_S3_BUCKET not set: its result pages stay in the results bucket", err=True)
 
 
 @run.command
@@ -330,6 +339,292 @@ def list_clusters():
     click.echo(f"{len(clusters)} clusters in DB:")
     for cluster in clusters:
         click.echo(f"id {cluster.id}; cluster name {cluster.cluster_name};")
+
+
+def results_storage():
+    """The result_storage module, when a results bucket is configured; imported only here, see the module docstring"""
+    if not os.environ.get("RESULTS_S3_BUCKET"):
+        click.echo("RESULTS_S3_BUCKET not set - aborting", err=True)
+        raise click.Abort()
+    from yaptide.persistence import result_storage
+
+    return result_storage
+
+
+def result_format():
+    """The result_format module (Zarr pages), imported only here, see the module docstring"""
+    from yaptide.batch import result_format as module
+
+    return module
+
+
+# the backend stores no results of a simulation in these states, so the pages of only these simulations are copied
+# and cleared: a running one may replace its pages at any time
+FINAL_STATES = ("COMPLETED", "FAILED", "CANCELED")
+
+
+def pages_in_postgres_query(metadata: db.MetaData, *columns) -> db.Select:
+    """The columns of the pages kept only in the database, of finished simulations"""
+    pages = metadata.tables[TableTypes.Page.name]
+    estimators = metadata.tables[TableTypes.Estimator.name]
+    simulations = metadata.tables[TableTypes.Simulation.name]
+    objects = metadata.tables[TableTypes.PageObject.name]
+    return (
+        db.select(*columns)
+        .select_from(pages)
+        .join(estimators, pages.c.estimator_id == estimators.c.id)
+        .join(simulations, estimators.c.simulation_id == simulations.c.id)
+        .outerjoin(objects, objects.c.page_id == pages.c.id)
+        .where(
+            pages.c.compressed_data.is_not(None),
+            objects.c.page_id.is_(None),
+            simulations.c.job_state.in_(FINAL_STATES),
+        )
+    )
+
+
+def pages_in_postgres(con, metadata: db.MetaData, after_id: int, batch_size: int) -> list:
+    """The next pages kept only in the database, by id: id, the parts of the page's key and its gzipped data"""
+    pages = metadata.tables[TableTypes.Page.name]
+    estimators = metadata.tables[TableTypes.Estimator.name]
+    stmt = (
+        pages_in_postgres_query(
+            metadata,
+            pages.c.id,
+            pages.c.page_number,
+            pages.c.compressed_data,
+            estimators.c.simulation_id,
+            estimators.c.file_name,
+        )
+        .where(pages.c.id > after_id)
+        .order_by(pages.c.id)
+        .limit(batch_size)
+    )
+    return con.execute(stmt).all()
+
+
+def count_pages_in_postgres(con, metadata: db.MetaData) -> tuple[int, int]:
+    """How many pages of finished simulations are kept only in the database, and their size in bytes"""
+    pages = metadata.tables[TableTypes.Page.name]
+    stmt = pages_in_postgres_query(
+        metadata, db.func.count(), db.func.coalesce(db.func.sum(db.func.length(pages.c.compressed_data)), 0)
+    )
+    return tuple(con.execute(stmt).one())
+
+
+def zarr_copy(result_storage, page) -> tuple[str, dict[str, bytes]]:
+    """Where a page kept in the database goes in storage, and its objects there: the page converted to Zarr as the
+    backend stores new pages. The revision is taken from the page's id and its Zarr objects, so the same page always
+    gets the same prefix and objects (a repeated copy finds them, also after move-pages-to-postgres brought the page
+    back as float32 JSON), while another page, or the page changed since, gets another one
+    """
+    page_dict = json.loads(gzip.decompress(page.compressed_data))
+    data = dict(page_dict["data"])
+    values = data.pop("values")
+    files = result_format().page_files(dict(page_dict, data=data), values)
+    # names a copy, not a security measure
+    digest = hashlib.md5(f"{page.id}:".encode(), usedforsecurity=False)  # skipcq: PTC-W1003
+    for name in sorted(files):
+        digest.update(f"{name}:{len(files[name])}:".encode() + files[name])
+    revision = digest.hexdigest()[:16]
+    prefix = result_storage.page_prefix(page.simulation_id, page.file_name, page.page_number, revision)
+    return prefix, files
+
+
+def copy_matches(result_storage, prefix: str, files: dict[str, bytes]) -> bool:
+    """Whether every object of a page's copy is in storage, each with its size and MD5"""
+    return all(
+        result_storage.stored_matches(prefix + name, len(body), result_storage.body_md5(body))
+        for name, body in files.items()
+    )
+
+
+def lock_simulations(con, simulation_ids) -> None:
+    """Waits for results of these simulations being stored by the backend, as it does (lock_results in
+    yaptide/routes/common_sim_routes.py), so it reads the pages again after this transaction
+    """
+    if con.dialect.name == "postgresql":
+        for simulation_id in sorted(set(simulation_ids)):
+            con.execute(db.text("SELECT pg_advisory_xact_lock(:simulation_id)"), {"simulation_id": simulation_id})
+
+
+def megabytes(size: int) -> str:
+    """Size for the progress output"""
+    return f"{size / 1e6:.1f} MB"
+
+
+@run.command
+@click.option("--batch-size", default=100, show_default=True, help="Pages read from the database at once")
+@click.option("--dry-run", is_flag=True, help="Only check which pages are already in storage, upload nothing")
+@click.option("-v", "--verbose", count=True)
+def copy_pages_to_storage(batch_size, dry_run, verbose):
+    """Copies result pages from the database to storage, converted to Zarr; the database keeps them.
+
+    Each copy is checked in the results bucket (size and MD5). Only reads the database: the pages are still read
+    from it until clear-pages-in-postgres. Can be stopped and repeated at any time; a page already in storage
+    unchanged is not uploaded again.
+    """
+    result_storage = results_storage()
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    # closed at the end, also when stopped: an open transaction would hold its locks until the process exits
+    with con:
+        total, total_size = count_pages_in_postgres(con, metadata)
+        click.echo(f"{total} pages ({megabytes(total_size)}) of finished simulations kept only in the database")
+        done, uploaded, after_id = 0, 0, 0
+        while batch := pages_in_postgres(con, metadata, after_id, batch_size):
+            # read-only: end the transaction, so it holds nothing while the batch uploads
+            con.rollback()
+            after_id = batch[-1].id
+            batch_size_bytes = 0
+            for page in batch:
+                prefix, files = zarr_copy(result_storage, page)
+                if not copy_matches(result_storage, prefix, files):
+                    if dry_run:
+                        continue
+                    batch_size_bytes += result_storage.put_page_files(prefix, files)
+                    if not copy_matches(result_storage, prefix, files):
+                        raise click.ClickException(f"Page {page.id}: the copy in storage does not match ({prefix})")
+                    uploaded += 1
+                done += 1
+            click.echo(
+                f"up to page {after_id}: {done}/{total} in storage, {uploaded} uploaded in this run "
+                f"(+{megabytes(batch_size_bytes)})"
+            )
+        if dry_run:
+            click.echo(f"Dry run: {done} of {total} pages already in storage, {total - done} to upload")
+
+
+@run.command
+@click.option("--batch-size", default=100, show_default=True, help="Pages cleared in one transaction")
+@click.option("--dry-run", is_flag=True, help="Only check that the pages are in storage, change nothing")
+@click.option("-v", "--verbose", count=True)
+def clear_pages_in_postgres(batch_size, dry_run, verbose):
+    """Removes from the database the pages verified in storage (pg_dump first).
+
+    Makes the copies made by copy-pages-to-storage the only ones: the pages are read from storage from now on.
+
+    A batch is changed only when every page of it is in storage with the same size and MD5, then in one
+    transaction; otherwise the command stops and that batch stays in the database. Undone by move-pages-to-postgres.
+    """
+    result_storage = results_storage()
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    # closed at the end, also when stopped: an open transaction would hold its locks until the process exits
+    with con:
+        pages = metadata.tables[TableTypes.Page.name]
+        objects = metadata.tables[TableTypes.PageObject.name]
+        total, total_size = count_pages_in_postgres(con, metadata)
+        click.echo(f"{total} pages ({megabytes(total_size)}) of finished simulations kept only in the database")
+        cleared, changed, after_id = 0, [], 0
+        while batch := pages_in_postgres(con, metadata, after_id, batch_size):
+            con.rollback()
+            after_id = batch[-1].id
+            copies = {page.id: zarr_copy(result_storage, page) for page in batch}
+            missing = [page.id for page in batch if not copy_matches(result_storage, *copies[page.id])]
+            if missing:
+                raise click.ClickException(
+                    f"{len(missing)} pages of this batch are not in storage as in the database, run "
+                    f"copy-pages-to-storage first; nothing changed from page {batch[0].id} on: {missing}"
+                )
+            if dry_run:
+                cleared += len(batch)
+                continue
+            with con.begin():
+                lock_simulations(con, (page.simulation_id for page in batch))
+                for page in batch:
+                    # only if the backend did not store the page again since it was read
+                    stmt = (
+                        db.update(pages)
+                        .where(pages.c.id == page.id, pages.c.compressed_data == page.compressed_data)
+                        .values(compressed_data=None)
+                    )
+                    if con.execute(stmt).rowcount != 1:
+                        changed.append(page.id)
+                        continue
+                    prefix, files = copies[page.id]
+                    con.execute(
+                        db.insert(objects).values(
+                            page_id=page.id,
+                            key=prefix,
+                            size=sum(len(body) for body in files.values()),
+                            format=result_storage.ZARR_FORMAT,
+                        )
+                    )
+                    cleared += 1
+            click.echo(f"up to page {after_id}: {cleared}/{total} cleared")
+        if dry_run:
+            click.echo(f"Dry run: all {cleared} pages are in storage and can be cleared")
+        if changed:
+            click.echo(f"{len(changed)} pages changed meanwhile and stay in the database: {changed}", err=True)
+
+
+@run.command
+@click.option("--batch-size", default=100, show_default=True, help="Pages written to the database in one transaction")
+@click.option("--dry-run", is_flag=True, help="Only count the pages, change nothing")
+@click.option("-v", "--verbose", count=True)
+def move_pages_to_postgres(batch_size, dry_run, verbose):
+    """Moves every result page kept in storage back into the database, as JSON (with float32 values).
+
+    The database reads the pages from itself again.
+
+    Run before downgrading below the PageObject migration (9e2b41c7d5a3), or to undo clear-pages-in-postgres.
+    Each batch is one transaction; the objects stay in the bucket.
+    """
+    result_storage = results_storage()
+    con, metadata, _ = connect_to_db(verbose=verbose)
+    # closed at the end, also when stopped: an open transaction would hold its locks until the process exits
+    with con:
+        pages = metadata.tables[TableTypes.Page.name]
+        estimators = metadata.tables[TableTypes.Estimator.name]
+        objects = metadata.tables[TableTypes.PageObject.name]
+        total, total_size = con.execute(
+            db.select(db.func.count(), db.func.coalesce(db.func.sum(objects.c.size), 0))
+        ).one()
+        con.rollback()
+        click.echo(f"{total} pages ({megabytes(total_size)}) kept in object storage")
+        if dry_run:
+            return
+        moved, changed, after_id = 0, [], 0
+        stmt = (
+            db.select(objects.c.page_id, objects.c.key, objects.c.size, objects.c.format, estimators.c.simulation_id)
+            .join(pages, pages.c.id == objects.c.page_id)
+            .join(estimators, pages.c.estimator_id == estimators.c.id)
+            .order_by(objects.c.page_id)
+            .limit(batch_size)
+        )
+        while batch := con.execute(stmt.where(objects.c.page_id > after_id)).all():
+            con.rollback()
+            after_id = batch[-1].page_id
+            bodies = {}
+            for page in batch:
+                if page.format != result_storage.ZARR_FORMAT:
+                    raise click.ClickException(
+                        f"Page {page.page_id} is stored as {page.format}, which is not known here"
+                    )
+                files = result_storage.get_page_files(page.key)
+                # the size it was stored with
+                size = sum(len(body) for body in files.values())
+                if size != page.size:
+                    raise click.ClickException(f"Page {page.page_id}: {page.key} has {size} bytes, not {page.size}")
+                page_dict = result_format().json_page(*result_format().read_page(files))
+                bodies[page.page_id] = gzip.compress(json.dumps(page_dict).encode())
+            with con.begin():
+                lock_simulations(con, (page.simulation_id for page in batch))
+                for page in batch:
+                    # only if the backend did not store the page again since it was read: a new store points the
+                    # page at another prefix
+                    removed = db.delete(objects).where(
+                        objects.c.page_id == page.page_id, objects.c.key == page.key, objects.c.size == page.size
+                    )
+                    if con.execute(removed).rowcount != 1:
+                        changed.append(page.page_id)
+                        continue
+                    con.execute(
+                        db.update(pages).where(pages.c.id == page.page_id).values(compressed_data=bodies[page.page_id])
+                    )
+                    moved += 1
+            click.echo(f"up to page {after_id}: {moved}/{total} back in the database")
+        if changed:
+            click.echo(f"{len(changed)} pages changed meanwhile and stay in storage, run again: {changed}", err=True)
 
 
 if __name__ == "__main__":

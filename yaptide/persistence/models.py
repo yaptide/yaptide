@@ -371,6 +371,9 @@ class PageModel(db.Model):
     page_number: Column[int] = db.Column(db.Integer, nullable=False, doc="Page number")
     compressed_data: Column[bytes] = db.Column(db.LargeBinary, doc="Page json object - data, axes and metadata")
     page_dimension: Column[int] = db.Column(db.Integer, nullable=False, doc="Dimension of data")
+    # where the page is in object storage; compressed_data is then empty. Pages stored before the bucket keep
+    # compressed_data until db_manage copy-pages-to-storage and clear-pages-in-postgres move them
+    stored_object = relationship("PageObjectModel", uselist=False, cascade="all, delete-orphan", lazy="joined")
 
     @property
     def data(self):
@@ -380,6 +383,16 @@ class PageModel(db.Model):
     def data(self, value):
         if value is not None:
             self.compressed_data = compress(value)
+
+
+class PageObjectModel(db.Model):
+    """Where a result page is kept in object storage (yaptide/persistence/result_storage.py)"""
+
+    __tablename__ = "PageObject"
+    page_id: Column[int] = db.Column(db.Integer, db.ForeignKey("Page.id", ondelete="CASCADE"), primary_key=True)
+    key: Column[str] = db.Column(db.String, nullable=False, doc="Object key (a prefix for Zarr) in the results bucket")
+    size: Column[int] = db.Column(db.Integer, nullable=False, doc="Stored size in bytes")
+    format: Column[str] = db.Column(db.String, nullable=False, doc="How the page is encoded in the object")
 
 
 class LogfilesModel(db.Model):

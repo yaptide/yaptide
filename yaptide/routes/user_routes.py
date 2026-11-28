@@ -7,6 +7,7 @@ from flask_restful import Resource
 from marshmallow import Schema, fields, ValidationError
 from sqlalchemy import asc, desc
 
+from yaptide.persistence import result_storage
 from yaptide.persistence.models import SimulationModel, UserModel
 from yaptide.routes.utils.decorators import requires_auth
 from yaptide.routes.utils.response_templates import error_validation_response, yaptide_response
@@ -132,7 +133,14 @@ class UserSimulations(Resource):
                 code=403,
             )
 
+        sim_id = simulation.id
         delete_object_from_db(simulation)
+        # its result pages in object storage, after the database no longer points at them: a failure leaves objects
+        # nobody reads, never a simulation with its results gone
+        try:
+            result_storage.delete_simulation(sim_id)
+        except Exception:  # skipcq: PYL-W0703
+            logging.exception("Removing the stored results of deleted simulation %d failed", sim_id)
         return yaptide_response(message=f"Simulation with job_id={job_id} successfully deleted from database", code=200)
 
 
